@@ -16,7 +16,7 @@ render_scene_data_extension_name :: proc "contextless" () -> String_Name {
 }
 
 new_render_scene_data_extension :: proc "contextless" () -> Render_Scene_Data_Extension {
-    return __bindgen_gde.classdb_construct_object(render_scene_data_extension_name_ref())
+    return cast(Render_Scene_Data_Extension)__bindgen_gde.classdb_construct_object(render_scene_data_extension_name_ref())
 }
 
 // methods
@@ -79,7 +79,9 @@ render_scene_data_extension__get_view_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

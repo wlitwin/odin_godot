@@ -16,7 +16,7 @@ visible_on_screen_notifier2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_visible_on_screen_notifier2d :: proc "contextless" () -> Visible_On_Screen_Notifier2d {
-    return __bindgen_gde.classdb_construct_object(visible_on_screen_notifier2d_name_ref())
+    return cast(Visible_On_Screen_Notifier2d)__bindgen_gde.classdb_construct_object(visible_on_screen_notifier2d_name_ref())
 }
 
 // methods

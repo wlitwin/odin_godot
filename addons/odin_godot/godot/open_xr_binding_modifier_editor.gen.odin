@@ -16,7 +16,7 @@ open_xr_binding_modifier_editor_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_binding_modifier_editor :: proc "contextless" () -> Open_Xr_Binding_Modifier_Editor {
-    return __bindgen_gde.classdb_construct_object(open_xr_binding_modifier_editor_name_ref())
+    return cast(Open_Xr_Binding_Modifier_Editor)__bindgen_gde.classdb_construct_object(open_xr_binding_modifier_editor_name_ref())
 }
 
 // methods

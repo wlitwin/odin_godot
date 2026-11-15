@@ -81,6 +81,7 @@ ensure_class_set :: proc() {
     if g_class_set_built {
         return
     }
+
     g_class_set = make(map[string]bool)
     g_snake_to_pascal = make(map[string]string)
     root := godot_collection_root()
@@ -88,18 +89,23 @@ ensure_class_set :: proc() {
     dir := strings.concatenate({root, "/godot"})
     defer delete(dir)
     fis, err := os.read_directory_by_path(dir, -1, context.temp_allocator)
+
     if err == nil {
         for fi in fis {
             if !strings.has_suffix(fi.name, ".gen.odin") {
                 continue
             }
+
             base := fi.name[:len(fi.name) - len(".gen.odin")]
+
             if base == "" {
                 continue
             }
+
             g_class_set[strings.clone(base)] = true
         }
     }
+
     g_class_set_built = true // even on a read error: a one-shot empty set degrades to graceful-miss
 }
 
@@ -111,22 +117,27 @@ pascal_for :: proc(snake: string) -> (string, bool) {
     if p, found := g_snake_to_pascal[snake]; found {
         return p, p != ""
     }
+
     root := godot_collection_root()
     defer delete(root)
     path := strings.concatenate({root, "/godot/", snake, ".gen.odin"})
     defer delete(path)
 
     pascal := ""
+
     if data, rerr := os.read_entire_file(path, context.temp_allocator); rerr == nil {
         text := string(data)
         marker := "__class_name = new_string_name_cstring(\""
+
         if idx := strings.index(text, marker); idx >= 0 {
             rest := text[idx + len(marker):]
+
             if end := strings.index_byte(rest, '"'); end >= 0 {
                 pascal = strings.clone(rest[:end]) // heap-owned (persistent cache)
             }
         }
     }
+
     g_snake_to_pascal[strings.clone(snake)] = pascal // cache even "" (negative)
     return pascal, pascal != ""
 }
@@ -146,15 +157,19 @@ classify_member :: proc(pascal: string, member: string) -> i64 {
     if bool(godot.class_db_class_has_method(cdb, class_sn, member_sn, false)) {
         return LOOKUP_RESULT_CLASS_METHOD
     }
+
     if bool(godot.class_db_class_has_signal(cdb, class_sn, member_sn)) {
         return LOOKUP_RESULT_CLASS_SIGNAL
     }
+
     if bool(godot.class_db_class_has_integer_constant(cdb, class_sn, member_sn)) {
         return LOOKUP_RESULT_CLASS_CONSTANT
     }
+
     if class_has_property(cdb, class_sn, member) {
         return LOOKUP_RESULT_CLASS_PROPERTY
     }
+
     return LOOKUP_RESULT_CLASS
 }
 
@@ -167,16 +182,19 @@ class_has_property :: proc(cdb: godot.Class_Db, class_sn: godot.String_Name, mem
     n := godot.array_size(parr)
     name_key := godot.new_string_cstring("name")
     name_kv := godot.variant_from_string(&name_key)
+
     for i in 0 ..< n {
         v := godot.array_get(parr, godot.Int(i))
         d := godot.variant_to_dictionary(&v)
         nv := godot.dictionary_get(&d, name_kv, godot.Variant{})
         ns := godot.variant_to_string(&nv)
         name := string_to_odin(ns, context.temp_allocator)
+
         if name == member {
             return true
         }
     }
+
     return false
 }
 
@@ -219,9 +237,11 @@ lv_lookup_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]
     class_snake, member, is_class, ok := lookup.resolve_symbol(symbol, g_class_set)
 
     pascal := ""
+
     if ok {
         pascal, ok = pascal_for(class_snake)
     }
+
     sync.unlock(&g_lookup_mutex)
 
     if ok {
@@ -234,6 +254,7 @@ lv_lookup_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]
             ld_set_int(&d, "result", OK)
             ld_set_int(&d, "type", lr)
             ld_set_str(&d, "class_name", pascal)
+
             // For a pure class fallback there is no member to anchor on.
             if lr != LOOKUP_RESULT_CLASS {
                 ld_set_str(&d, "class_member", member)
@@ -266,16 +287,20 @@ try_definition :: proc(d: ^godot.Dictionary, args: [^]gdext.TypePtr) -> bool {
     code := string_to_odin((cast(^godot.String)args[0])^)
     defer delete(code)
 
-    global := godot.project_settings_globalize_path(
-        godot.singleton_project_settings(),
-        (cast(^godot.String)args[2])^,
-    )
+    global := godot.project_settings_globalize_path(godot.singleton_project_settings(), (cast(^godot.String)args[2])^)
     abs_path := string_to_odin(global)
     defer delete(abs_path)
-    if abs_path == "" {return false}
+
+    if abs_path == "" {
+        return false
+    }
 
     ols_bin, found := resolve_bin("odin_godot/ols_bin", "OLS", "ols")
-    if !found {return false}
+
+    if !found {
+        return false
+    }
+
     defer delete(ols_bin)
     root := godot_collection_root()
     defer delete(root)
@@ -283,10 +308,15 @@ try_definition :: proc(d: ^godot.Dictionary, args: [^]gdext.TypePtr) -> bool {
     defer delete(share)
 
     def, sok := complete.session_definition(&complete.g_session, code, abs_path, root, share, ols_bin)
+
     if !sok || !def.ok || def.path == "" {
-        if def.ok {delete(def.path)}
+        if def.ok {
+            delete(def.path)
+        }
+
         return false
     }
+
     defer delete(def.path)
 
     // Localize the absolute target back to res:// — the editor opens project resources.
@@ -294,7 +324,10 @@ try_definition :: proc(d: ^godot.Dictionary, args: [^]gdext.TypePtr) -> bool {
     res := godot.project_settings_localize_path(godot.singleton_project_settings(), abs_g)
     res_path := string_to_odin(res)
     defer delete(res_path)
-    if !strings.has_prefix(res_path, "res://") {return false} // external (stdlib / binding) — not openable
+
+    if !strings.has_prefix(res_path, "res://") {
+        return false
+    } // external (stdlib / binding) — not openable
 
     ld_set_int(d, "result", OK)
     ld_set_int(d, "type", LOOKUP_RESULT_SCRIPT_LOCATION)
@@ -307,10 +340,12 @@ try_definition :: proc(d: ^godot.Dictionary, args: [^]gdext.TypePtr) -> bool {
     res_g := godot.new_string_odin(res_path)
     empty := godot.new_string_cstring("")
     obj := godot.resource_loader_load(godot.singleton_resource_loader(), res_g, empty, .Cache_Mode_Reuse)
+
     if obj != nil {
         o := godot.Object(obj)
         sv := godot.variant_from_object(&o)
         ld_set_variant(d, "script", sv)
     }
+
     return true
 }

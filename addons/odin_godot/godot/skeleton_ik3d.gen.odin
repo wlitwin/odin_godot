@@ -16,7 +16,7 @@ skeleton_ik3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_skeleton_ik3d :: proc "contextless" () -> Skeleton_Ik3d {
-    return __bindgen_gde.classdb_construct_object(skeleton_ik3d_name_ref())
+    return cast(Skeleton_Ik3d)__bindgen_gde.classdb_construct_object(skeleton_ik3d_name_ref())
 }
 
 // methods
@@ -352,7 +352,9 @@ skeleton_ik3d_get_max_iterations :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

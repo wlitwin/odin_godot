@@ -47,6 +47,8 @@ Display_Server_Feature :: enum int {
     Feature_Native_Color_Picker = 32,
     Feature_Self_Fitting_Windows = 33,
     Feature_Accessibility_Screen_Reader = 34,
+    Feature_Hdr_Output = 35,
+    Feature_Pip_Mode = 36,
 }
 Display_Server_Accessibility_Role :: enum int {
     Role_Unknown = 0,
@@ -95,6 +97,8 @@ Display_Server_Accessibility_Role :: enum int {
     Role_Title_Bar = 43,
     Role_Dialog = 44,
     Role_Tooltip = 45,
+    Role_Region = 46,
+    Role_Text_Run = 47,
 }
 Display_Server_Accessibility_Popup_Type :: enum int {
     Popup_Menu = 0,
@@ -217,6 +221,13 @@ Display_Server_Window_Mode :: enum int {
     Window_Mode_Fullscreen = 3,
     Window_Mode_Exclusive_Fullscreen = 4,
 }
+Display_Server_Progress_State :: enum int {
+    Progress_State_Noprogress = 0,
+    Progress_State_Indeterminate = 1,
+    Progress_State_Normal = 2,
+    Progress_State_Error = 3,
+    Progress_State_Paused = 4,
+}
 Display_Server_Window_Flags :: enum int {
     Window_Flag_Resize_Disabled = 0,
     Window_Flag_Borderless = 1,
@@ -243,6 +254,7 @@ Display_Server_Window_Event :: enum int {
     Window_Event_Dpi_Change = 6,
     Window_Event_Titlebar_Change = 7,
     Window_Event_Force_Close = 8,
+    Window_Event_Output_Max_Linear_Value_Changed = 9,
 }
 Display_Server_Window_Resize_Edge :: enum int {
     Window_Edge_Top_Left = 0,
@@ -268,6 +280,8 @@ Display_Server_Handle_Type :: enum int {
     Opengl_Context = 3,
     Egl_Display = 4,
     Egl_Config = 5,
+    Glx_Visualid = 6,
+    Glx_Fbconfig = 7,
 }
 Display_Server_Tts_Utterance_Event :: enum int {
     Tts_Utterance_Started = 0,
@@ -287,7 +301,7 @@ display_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_display_server :: proc "contextless" () -> Display_Server {
-    return __bindgen_gde.classdb_construct_object(display_server_name_ref())
+    return cast(Display_Server)__bindgen_gde.classdb_construct_object(display_server_name_ref())
 }
 
 // methods
@@ -319,7 +333,7 @@ display_server_has_feature :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 334065950)
     }
     self := self
-    feature_ := feature_
+    feature_ := Int(feature_)
     args := []__bindgen_gde.TypePtr {
         &feature_,
     }
@@ -408,7 +422,9 @@ display_server_global_menu_add_submenu_item :: proc "contextless" (
         &submenu_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -433,7 +449,7 @@ display_server_global_menu_add_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
@@ -444,7 +460,9 @@ display_server_global_menu_add_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -469,7 +487,7 @@ display_server_global_menu_add_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
@@ -480,7 +498,9 @@ display_server_global_menu_add_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -507,7 +527,7 @@ display_server_global_menu_add_icon_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
@@ -519,7 +539,9 @@ display_server_global_menu_add_icon_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -546,7 +568,7 @@ display_server_global_menu_add_icon_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
@@ -558,7 +580,9 @@ display_server_global_menu_add_icon_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -583,7 +607,7 @@ display_server_global_menu_add_radio_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
@@ -594,7 +618,9 @@ display_server_global_menu_add_radio_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -621,7 +647,7 @@ display_server_global_menu_add_icon_radio_check_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
@@ -633,7 +659,9 @@ display_server_global_menu_add_icon_radio_check_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -662,7 +690,7 @@ display_server_global_menu_add_multistate_item :: proc "contextless" (
     callback_ := callback_
     key_callback_ := key_callback_
     tag_ := tag_
-    accelerator_ := accelerator_
+    accelerator_ := Int(accelerator_)
     index_ := index_
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
@@ -675,7 +703,9 @@ display_server_global_menu_add_multistate_item :: proc "contextless" (
         &accelerator_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -696,7 +726,9 @@ display_server_global_menu_add_separator :: proc "contextless" (
         &menu_root_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -717,7 +749,9 @@ display_server_global_menu_get_item_index_from_text :: proc "contextless" (
         &menu_root_,
         &text_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -738,7 +772,9 @@ display_server_global_menu_get_item_index_from_tag :: proc "contextless" (
         &menu_root_,
         &tag_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -927,7 +963,9 @@ display_server_global_menu_get_item_accelerator :: proc "contextless" (
         &menu_root_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -1011,7 +1049,9 @@ display_server_global_menu_get_item_state :: proc "contextless" (
         &menu_root_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1032,7 +1072,9 @@ display_server_global_menu_get_item_max_states :: proc "contextless" (
         &menu_root_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1074,7 +1116,9 @@ display_server_global_menu_get_item_indentation_level :: proc "contextless" (
         &menu_root_,
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1299,7 +1343,7 @@ display_server_global_menu_set_item_accelerator :: proc "contextless" (
     self := self
     menu_root_ := menu_root_
     idx_ := idx_
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
         &idx_,
@@ -1483,7 +1527,9 @@ display_server_global_menu_get_item_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &menu_root_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1690,7 +1736,7 @@ display_server_tts_set_utterance_callback :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 109679083)
     }
     self := self
-    event_ := event_
+    event_ := Int(event_)
     callable_ := callable_
     args := []__bindgen_gde.TypePtr {
         &event_,
@@ -1786,7 +1832,7 @@ display_server_mouse_set_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 348288463)
     }
     self := self
-    mouse_mode_ := mouse_mode_
+    mouse_mode_ := Int(mouse_mode_)
     args := []__bindgen_gde.TypePtr {
         &mouse_mode_,
     }
@@ -1804,7 +1850,9 @@ display_server_mouse_get_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Display_Server_Mouse_Mode(__return_storage)
     return
 }
 
@@ -1851,7 +1899,9 @@ display_server_mouse_get_button_state :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Mouse_Button_Mask(__return_storage)
     return
 }
 
@@ -2005,7 +2055,9 @@ display_server_get_screen_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2020,7 +2072,9 @@ display_server_get_primary_screen :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2035,7 +2089,9 @@ display_server_get_keyboard_focus_screen :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2053,7 +2109,9 @@ display_server_get_screen_from_rect :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &rect_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2125,7 +2183,9 @@ display_server_screen_get_dpi :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &screen_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2260,7 +2320,7 @@ display_server_screen_set_orientation :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2211511631)
     }
     self := self
-    orientation_ := orientation_
+    orientation_ := Int(orientation_)
     screen_ := screen_
     args := []__bindgen_gde.TypePtr {
         &orientation_,
@@ -2283,7 +2343,9 @@ display_server_screen_get_orientation :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &screen_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Display_Server_Screen_Orientation(__return_storage)
     return
 }
 
@@ -2348,7 +2410,9 @@ display_server_get_window_at_screen_position :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &position_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2363,7 +2427,7 @@ display_server_window_get_native_handle :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1096425680)
     }
     self := self
-    handle_type_ := handle_type_
+    handle_type_ := Int(handle_type_)
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
         &handle_type_,
@@ -2384,7 +2448,9 @@ display_server_window_get_active_popup :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2501,7 +2567,9 @@ display_server_window_get_current_screen :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &window_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2845,7 +2913,9 @@ display_server_window_get_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &window_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Display_Server_Window_Mode(__return_storage)
     return
 }
 
@@ -2860,7 +2930,7 @@ display_server_window_set_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1319965401)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
         &mode_,
@@ -2881,7 +2951,7 @@ display_server_window_set_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 254894155)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
@@ -2903,7 +2973,7 @@ display_server_window_get_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 802816991)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -2911,6 +2981,26 @@ display_server_window_get_flag :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+display_server_window_set_icon :: proc "contextless" (
+    self: Display_Server,
+    icon_: Image,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_icon", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2457502155)
+    }
+    self := self
+    icon_ := icon_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &icon_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 display_server_window_set_window_buttons_offset :: proc "contextless" (
@@ -2963,6 +3053,46 @@ display_server_window_request_attention :: proc "contextless" (
     self := self
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_set_taskbar_progress_value :: proc "contextless" (
+    self: Display_Server,
+    value_: f64,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_taskbar_progress_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3506631519)
+    }
+    self := self
+    value_ := value_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &value_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_set_taskbar_progress_state :: proc "contextless" (
+    self: Display_Server,
+    state_: Display_Server_Progress_State,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_taskbar_progress_state", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4119882768)
+    }
+    self := self
+    state_ := Int(state_)
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &state_,
         &window_id_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
@@ -3112,7 +3242,7 @@ display_server_window_set_vsync_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2179333492)
     }
     self := self
-    vsync_mode_ := vsync_mode_
+    vsync_mode_ := Int(vsync_mode_)
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
         &vsync_mode_,
@@ -3129,6 +3259,212 @@ display_server_window_get_vsync_mode :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("window_get_vsync_mode", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 578873795)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Display_Server_V_Sync_Mode(__return_storage)
+    return
+}
+
+display_server_window_is_hdr_output_supported :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_is_hdr_output_supported", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1051549951)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_request_hdr_output :: proc "contextless" (
+    self: Display_Server,
+    enable_: Bool,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_request_hdr_output", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1661950165)
+    }
+    self := self
+    enable_ := enable_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &enable_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_is_hdr_output_requested :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_is_hdr_output_requested", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1051549951)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_is_hdr_output_enabled :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_is_hdr_output_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1051549951)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_set_hdr_output_reference_luminance :: proc "contextless" (
+    self: Display_Server,
+    reference_luminance_: f64,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_hdr_output_reference_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3506631519)
+    }
+    self := self
+    reference_luminance_ := reference_luminance_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &reference_luminance_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_get_hdr_output_reference_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_reference_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_get_hdr_output_current_reference_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_current_reference_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_set_hdr_output_max_luminance :: proc "contextless" (
+    self: Display_Server,
+    max_luminance_: f64,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_set_hdr_output_max_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3506631519)
+    }
+    self := self
+    max_luminance_ := max_luminance_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &max_luminance_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_window_get_hdr_output_max_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_max_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_get_hdr_output_current_max_luminance :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_hdr_output_current_max_luminance", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_window_get_output_max_linear_value :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("window_get_output_max_linear_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 218038398)
     }
     self := self
     window_id_ := window_id_
@@ -3215,7 +3551,7 @@ display_server_window_start_resize :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4009722312)
     }
     self := self
-    edge_ := edge_
+    edge_ := Int(edge_)
     window_id_ := window_id_
     args := []__bindgen_gde.TypePtr {
         &edge_,
@@ -3252,7 +3588,9 @@ display_server_accessibility_should_increase_contrast :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -3267,7 +3605,9 @@ display_server_accessibility_should_reduce_animation :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -3282,7 +3622,9 @@ display_server_accessibility_should_reduce_transparency :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -3297,7 +3639,9 @@ display_server_accessibility_screen_reader_active :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -3313,7 +3657,7 @@ display_server_accessibility_create_element :: proc "contextless" (
     }
     self := self
     window_id_ := window_id_
-    role_ := role_
+    role_ := Int(role_)
     args := []__bindgen_gde.TypePtr {
         &window_id_,
         &role_,
@@ -3335,7 +3679,7 @@ display_server_accessibility_create_sub_element :: proc "contextless" (
     }
     self := self
     parent_rid_ := parent_rid_
-    role_ := role_
+    role_ := Int(role_)
     insert_pos_ := insert_pos_
     args := []__bindgen_gde.TypePtr {
         &parent_rid_,
@@ -3539,7 +3883,7 @@ display_server_accessibility_update_set_role :: proc "contextless" (
     }
     self := self
     id_ := id_
-    role_ := role_
+    role_ := Int(role_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &role_,
@@ -3650,7 +3994,7 @@ display_server_accessibility_update_set_tooltip :: proc "contextless" (
 display_server_accessibility_update_set_bounds :: proc "contextless" (
     self: Display_Server,
     id_: Rid,
-    p_rect_: Rect2,
+    rect_: Rect2,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -3659,10 +4003,10 @@ display_server_accessibility_update_set_bounds :: proc "contextless" (
     }
     self := self
     id_ := id_
-    p_rect_ := p_rect_
+    rect_ := rect_
     args := []__bindgen_gde.TypePtr {
         &id_,
-        &p_rect_,
+        &rect_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -3959,7 +4303,7 @@ display_server_accessibility_update_set_live :: proc "contextless" (
     }
     self := self
     id_ := id_
-    live_ := live_
+    live_ := Int(live_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &live_,
@@ -3980,7 +4324,7 @@ display_server_accessibility_update_add_action :: proc "contextless" (
     }
     self := self
     id_ := id_
-    action_ := action_
+    action_ := Int(action_)
     callable_ := callable_
     args := []__bindgen_gde.TypePtr {
         &id_,
@@ -4251,7 +4595,7 @@ display_server_accessibility_update_set_popup_type :: proc "contextless" (
     }
     self := self
     id_ := id_
-    popup_ := popup_
+    popup_ := Int(popup_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &popup_,
@@ -4486,7 +4830,7 @@ display_server_accessibility_update_set_text_align :: proc "contextless" (
     }
     self := self
     id_ := id_
-    align_ := align_
+    align_ := Int(align_)
     args := []__bindgen_gde.TypePtr {
         &id_,
         &align_,
@@ -4536,7 +4880,7 @@ display_server_accessibility_update_set_flag :: proc "contextless" (
     }
     self := self
     id_ := id_
-    flag_ := flag_
+    flag_ := Int(flag_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &id_,
@@ -4833,7 +5177,7 @@ display_server_virtual_keyboard_show :: proc "contextless" (
     self := self
     existing_text_ := existing_text_
     position_ := position_
-    type_ := type_
+    type_ := Int(type_)
     max_length_ := max_length_
     cursor_start_ := cursor_start_
     cursor_end_ := cursor_end_
@@ -4873,7 +5217,9 @@ display_server_virtual_keyboard_get_height :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -4919,7 +5265,7 @@ display_server_cursor_set_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2026291549)
     }
     self := self
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
@@ -4937,7 +5283,9 @@ display_server_cursor_get_shape :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Display_Server_Cursor_Shape(__return_storage)
     return
 }
 
@@ -4954,7 +5302,7 @@ display_server_cursor_set_custom_image :: proc "contextless" (
     }
     self := self
     cursor_ := cursor_
-    shape_ := shape_
+    shape_ := Int(shape_)
     hotspot_ := hotspot_
     args := []__bindgen_gde.TypePtr {
         &cursor_,
@@ -5019,7 +5367,9 @@ display_server_dialog_show :: proc "contextless" (
         &buttons_,
         &callback_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -5046,7 +5396,9 @@ display_server_dialog_input_text :: proc "contextless" (
         &existing_text_,
         &callback_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -5071,7 +5423,7 @@ display_server_file_dialog_show :: proc "contextless" (
     current_directory_ := current_directory_
     filename_ := filename_
     show_hidden_ := show_hidden_
-    mode_ := mode_
+    mode_ := Int(mode_)
     filters_ := filters_
     callback_ := callback_
     parent_window_id_ := parent_window_id_
@@ -5085,7 +5437,9 @@ display_server_file_dialog_show :: proc "contextless" (
         &callback_,
         &parent_window_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -5113,7 +5467,7 @@ display_server_file_dialog_with_options_show :: proc "contextless" (
     root_ := root_
     filename_ := filename_
     show_hidden_ := show_hidden_
-    mode_ := mode_
+    mode_ := Int(mode_)
     filters_ := filters_
     options_ := options_
     callback_ := callback_
@@ -5130,7 +5484,9 @@ display_server_file_dialog_with_options_show :: proc "contextless" (
         &callback_,
         &parent_window_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -5159,7 +5515,9 @@ display_server_keyboard_get_layout_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -5174,7 +5532,9 @@ display_server_keyboard_get_current_layout :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -5241,11 +5601,13 @@ display_server_keyboard_get_keycode_from_physical :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3447613187)
     }
     self := self
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &keycode_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -5259,11 +5621,13 @@ display_server_keyboard_get_label_from_physical :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3447613187)
     }
     self := self
-    keycode_ := keycode_
+    keycode_ := Int(keycode_)
     args := []__bindgen_gde.TypePtr {
         &keycode_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -5381,7 +5745,9 @@ display_server_create_status_indicator :: proc "contextless" (
         &tooltip_,
         &callback_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -5511,7 +5877,9 @@ display_server_tablet_get_driver_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -5627,6 +5995,84 @@ display_server_has_additional_outputs :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+display_server_is_in_pip_mode :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_in_pip_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1885608816)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+display_server_pip_mode_enter :: proc "contextless" (
+    self: Display_Server,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("pip_mode_enter", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1995695955)
+    }
+    self := self
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_pip_mode_set_aspect_ratio :: proc "contextless" (
+    self: Display_Server,
+    numerator_: Int,
+    denominator_: Int,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("pip_mode_set_aspect_ratio", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3471927553)
+    }
+    self := self
+    numerator_ := numerator_
+    denominator_ := denominator_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &numerator_,
+        &denominator_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+display_server_pip_mode_set_auto_enter_on_background :: proc "contextless" (
+    self: Display_Server,
+    auto_enter_on_background_: Bool,
+    window_id_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("pip_mode_set_auto_enter_on_background", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1661950165)
+    }
+    self := self
+    auto_enter_on_background_ := auto_enter_on_background_
+    window_id_ := window_id_
+    args := []__bindgen_gde.TypePtr {
+        &auto_enter_on_background_,
+        &window_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 

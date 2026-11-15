@@ -14,6 +14,7 @@ Audio_Stream_Interactive_Transition_From_Time :: enum int {
 Audio_Stream_Interactive_Transition_To_Time :: enum int {
     Transition_To_Time_Same_Position = 0,
     Transition_To_Time_Start = 1,
+    Transition_To_Time_Previous_Position = 2,
 }
 Audio_Stream_Interactive_Fade_Mode :: enum int {
     Fade_Disabled = 0,
@@ -89,7 +90,9 @@ audio_stream_interactive_get_clip_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -121,7 +124,9 @@ audio_stream_interactive_get_initial_clip :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -213,7 +218,7 @@ audio_stream_interactive_set_clip_auto_advance :: proc "contextless" (
     }
     self := self
     clip_index_ := clip_index_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &clip_index_,
         &mode_,
@@ -235,7 +240,9 @@ audio_stream_interactive_get_clip_auto_advance :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &clip_index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Audio_Stream_Interactive_Auto_Advance_Mode(__return_storage)
     return
 }
 
@@ -273,7 +280,9 @@ audio_stream_interactive_get_clip_auto_advance_next_clip :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &clip_index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -297,9 +306,9 @@ audio_stream_interactive_add_transition :: proc "contextless" (
     self := self
     from_clip_ := from_clip_
     to_clip_ := to_clip_
-    from_time_ := from_time_
-    to_time_ := to_time_
-    fade_mode_ := fade_mode_
+    from_time_ := Int(from_time_)
+    to_time_ := Int(to_time_)
+    fade_mode_ := Int(fade_mode_)
     fade_beats_ := fade_beats_
     use_filler_clip_ := use_filler_clip_
     filler_clip_ := filler_clip_
@@ -391,7 +400,9 @@ audio_stream_interactive_get_transition_from_time :: proc "contextless" (
         &from_clip_,
         &to_clip_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Audio_Stream_Interactive_Transition_From_Time(__return_storage)
     return
 }
 
@@ -412,7 +423,9 @@ audio_stream_interactive_get_transition_to_time :: proc "contextless" (
         &from_clip_,
         &to_clip_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Audio_Stream_Interactive_Transition_To_Time(__return_storage)
     return
 }
 
@@ -433,7 +446,9 @@ audio_stream_interactive_get_transition_fade_mode :: proc "contextless" (
         &from_clip_,
         &to_clip_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Audio_Stream_Interactive_Fade_Mode(__return_storage)
     return
 }
 
@@ -496,7 +511,9 @@ audio_stream_interactive_get_transition_filler_clip :: proc "contextless" (
         &from_clip_,
         &to_clip_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

@@ -16,7 +16,7 @@ geometry3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_geometry3d :: proc "contextless" () -> Geometry3d {
-    return __bindgen_gde.classdb_construct_object(geometry3d_name_ref())
+    return cast(Geometry3d)__bindgen_gde.classdb_construct_object(geometry3d_name_ref())
 }
 
 // methods
@@ -90,7 +90,7 @@ geometry3d_build_cylinder_planes :: proc "contextless" (
     radius_ := radius_
     height_ := height_
     sides_ := sides_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &radius_,
         &height_,
@@ -119,7 +119,7 @@ geometry3d_build_capsule_planes :: proc "contextless" (
     height_ := height_
     sides_ := sides_
     lats_ := lats_
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &radius_,
         &height_,

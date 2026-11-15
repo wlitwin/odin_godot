@@ -10,6 +10,7 @@ Shader_Mode :: enum int {
     Mode_Particles = 2,
     Mode_Sky = 3,
     Mode_Fog = 4,
+    Mode_Texture_Blit = 5,
 }
 
 
@@ -56,7 +57,9 @@ shader_get_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Shader_Mode(__return_storage)
     return
 }
 

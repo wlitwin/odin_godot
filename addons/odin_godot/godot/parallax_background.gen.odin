@@ -16,7 +16,7 @@ parallax_background_name :: proc "contextless" () -> String_Name {
 }
 
 new_parallax_background :: proc "contextless" () -> Parallax_Background {
-    return __bindgen_gde.classdb_construct_object(parallax_background_name_ref())
+    return cast(Parallax_Background)__bindgen_gde.classdb_construct_object(parallax_background_name_ref())
 }
 
 // methods

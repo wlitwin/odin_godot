@@ -21,7 +21,7 @@ editor_undo_redo_manager_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_undo_redo_manager :: proc "contextless" () -> Editor_Undo_Redo_Manager {
-    return __bindgen_gde.classdb_construct_object(editor_undo_redo_manager_name_ref())
+    return cast(Editor_Undo_Redo_Manager)__bindgen_gde.classdb_construct_object(editor_undo_redo_manager_name_ref())
 }
 
 // methods
@@ -58,7 +58,7 @@ editor_undo_redo_manager_create_action :: proc "contextless" (
     }
     self := self
     name_ := name_
-    merge_mode_ := merge_mode_
+    merge_mode_ := Int(merge_mode_)
     custom_context_ := custom_context_
     backward_undo_ops_ := backward_undo_ops_
     mark_unsaved_ := mark_unsaved_
@@ -282,7 +282,9 @@ editor_undo_redo_manager_get_object_history_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &object_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

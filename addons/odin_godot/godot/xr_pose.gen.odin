@@ -228,7 +228,7 @@ xr_pose_set_tracking_confidence :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4171656666)
     }
     self := self
-    tracking_confidence_ := tracking_confidence_
+    tracking_confidence_ := Int(tracking_confidence_)
     args := []__bindgen_gde.TypePtr {
         &tracking_confidence_,
     }
@@ -246,7 +246,9 @@ xr_pose_get_tracking_confidence :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Pose_Tracking_Confidence(__return_storage)
     return
 }
 

@@ -21,7 +21,7 @@ editor_toaster_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_toaster :: proc "contextless" () -> Editor_Toaster {
-    return __bindgen_gde.classdb_construct_object(editor_toaster_name_ref())
+    return cast(Editor_Toaster)__bindgen_gde.classdb_construct_object(editor_toaster_name_ref())
 }
 
 // methods
@@ -56,7 +56,7 @@ editor_toaster_push_toast :: proc "contextless" (
     }
     self := self
     message_ := message_
-    severity_ := severity_
+    severity_ := Int(severity_)
     tooltip_ := tooltip_
     args := []__bindgen_gde.TypePtr {
         &message_,

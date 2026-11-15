@@ -253,7 +253,7 @@ base_material3d_set_transparency :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3435651667)
     }
     self := self
-    transparency_ := transparency_
+    transparency_ := Int(transparency_)
     args := []__bindgen_gde.TypePtr {
         &transparency_,
     }
@@ -271,7 +271,9 @@ base_material3d_get_transparency :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Transparency(__return_storage)
     return
 }
 
@@ -285,7 +287,7 @@ base_material3d_set_alpha_antialiasing :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3212649852)
     }
     self := self
-    alpha_aa_ := alpha_aa_
+    alpha_aa_ := Int(alpha_aa_)
     args := []__bindgen_gde.TypePtr {
         &alpha_aa_,
     }
@@ -303,7 +305,9 @@ base_material3d_get_alpha_antialiasing :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Alpha_Anti_Aliasing(__return_storage)
     return
 }
 
@@ -349,7 +353,7 @@ base_material3d_set_shading_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3368750322)
     }
     self := self
-    shading_mode_ := shading_mode_
+    shading_mode_ := Int(shading_mode_)
     args := []__bindgen_gde.TypePtr {
         &shading_mode_,
     }
@@ -367,7 +371,9 @@ base_material3d_get_shading_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Shading_Mode(__return_storage)
     return
 }
 
@@ -1021,7 +1027,7 @@ base_material3d_set_detail_uv :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 456801921)
     }
     self := self
-    detail_uv_ := detail_uv_
+    detail_uv_ := Int(detail_uv_)
     args := []__bindgen_gde.TypePtr {
         &detail_uv_,
     }
@@ -1039,7 +1045,9 @@ base_material3d_get_detail_uv :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Detail_Uv(__return_storage)
     return
 }
 
@@ -1053,7 +1061,7 @@ base_material3d_set_blend_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2830186259)
     }
     self := self
-    blend_mode_ := blend_mode_
+    blend_mode_ := Int(blend_mode_)
     args := []__bindgen_gde.TypePtr {
         &blend_mode_,
     }
@@ -1071,7 +1079,9 @@ base_material3d_get_blend_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Blend_Mode(__return_storage)
     return
 }
 
@@ -1085,7 +1095,7 @@ base_material3d_set_depth_draw_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1456584748)
     }
     self := self
-    depth_draw_mode_ := depth_draw_mode_
+    depth_draw_mode_ := Int(depth_draw_mode_)
     args := []__bindgen_gde.TypePtr {
         &depth_draw_mode_,
     }
@@ -1103,7 +1113,9 @@ base_material3d_get_depth_draw_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Depth_Draw_Mode(__return_storage)
     return
 }
 
@@ -1117,7 +1129,7 @@ base_material3d_set_depth_test :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3918692338)
     }
     self := self
-    depth_test_ := depth_test_
+    depth_test_ := Int(depth_test_)
     args := []__bindgen_gde.TypePtr {
         &depth_test_,
     }
@@ -1135,7 +1147,9 @@ base_material3d_get_depth_test :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Depth_Test(__return_storage)
     return
 }
 
@@ -1149,7 +1163,7 @@ base_material3d_set_cull_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2338909218)
     }
     self := self
-    cull_mode_ := cull_mode_
+    cull_mode_ := Int(cull_mode_)
     args := []__bindgen_gde.TypePtr {
         &cull_mode_,
     }
@@ -1167,7 +1181,9 @@ base_material3d_get_cull_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Cull_Mode(__return_storage)
     return
 }
 
@@ -1181,7 +1197,7 @@ base_material3d_set_diffuse_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1045299638)
     }
     self := self
-    diffuse_mode_ := diffuse_mode_
+    diffuse_mode_ := Int(diffuse_mode_)
     args := []__bindgen_gde.TypePtr {
         &diffuse_mode_,
     }
@@ -1199,7 +1215,9 @@ base_material3d_get_diffuse_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Diffuse_Mode(__return_storage)
     return
 }
 
@@ -1213,7 +1231,7 @@ base_material3d_set_specular_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 584737147)
     }
     self := self
-    specular_mode_ := specular_mode_
+    specular_mode_ := Int(specular_mode_)
     args := []__bindgen_gde.TypePtr {
         &specular_mode_,
     }
@@ -1231,7 +1249,9 @@ base_material3d_get_specular_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Specular_Mode(__return_storage)
     return
 }
 
@@ -1246,7 +1266,7 @@ base_material3d_set_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3070159527)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     enable_ := enable_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -1265,7 +1285,7 @@ base_material3d_get_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410065)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
     }
@@ -1283,7 +1303,7 @@ base_material3d_set_texture_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 22904437)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1301,7 +1321,9 @@ base_material3d_get_texture_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Texture_Filter(__return_storage)
     return
 }
 
@@ -1316,7 +1338,7 @@ base_material3d_set_feature :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2819288693)
     }
     self := self
-    feature_ := feature_
+    feature_ := Int(feature_)
     enable_ := enable_
     args := []__bindgen_gde.TypePtr {
         &feature_,
@@ -1335,7 +1357,7 @@ base_material3d_get_feature :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1965241794)
     }
     self := self
-    feature_ := feature_
+    feature_ := Int(feature_)
     args := []__bindgen_gde.TypePtr {
         &feature_,
     }
@@ -1354,7 +1376,7 @@ base_material3d_set_texture :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 464208135)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     texture_ := texture_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -1373,7 +1395,7 @@ base_material3d_get_texture :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 329605813)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -1391,7 +1413,7 @@ base_material3d_set_detail_blend_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2830186259)
     }
     self := self
-    detail_blend_mode_ := detail_blend_mode_
+    detail_blend_mode_ := Int(detail_blend_mode_)
     args := []__bindgen_gde.TypePtr {
         &detail_blend_mode_,
     }
@@ -1409,7 +1431,9 @@ base_material3d_get_detail_blend_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Blend_Mode(__return_storage)
     return
 }
 
@@ -1615,7 +1639,7 @@ base_material3d_set_billboard_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4202036497)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1633,7 +1657,9 @@ base_material3d_get_billboard_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Billboard_Mode(__return_storage)
     return
 }
 
@@ -1665,7 +1691,9 @@ base_material3d_get_particles_anim_h_frames :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1697,7 +1725,9 @@ base_material3d_get_particles_anim_v_frames :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1793,7 +1823,9 @@ base_material3d_get_heightmap_deep_parallax_min_layers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1825,7 +1857,9 @@ base_material3d_get_heightmap_deep_parallax_max_layers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1935,7 +1969,7 @@ base_material3d_set_emission_operator :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3825128922)
     }
     self := self
-    operator_ := operator_
+    operator_ := Int(operator_)
     args := []__bindgen_gde.TypePtr {
         &operator_,
     }
@@ -1953,7 +1987,9 @@ base_material3d_get_emission_operator :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Emission_Operator(__return_storage)
     return
 }
 
@@ -2095,7 +2131,7 @@ base_material3d_set_metallic_texture_channel :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 744167988)
     }
     self := self
-    channel_ := channel_
+    channel_ := Int(channel_)
     args := []__bindgen_gde.TypePtr {
         &channel_,
     }
@@ -2113,7 +2149,9 @@ base_material3d_get_metallic_texture_channel :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Texture_Channel(__return_storage)
     return
 }
 
@@ -2127,7 +2165,7 @@ base_material3d_set_roughness_texture_channel :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 744167988)
     }
     self := self
-    channel_ := channel_
+    channel_ := Int(channel_)
     args := []__bindgen_gde.TypePtr {
         &channel_,
     }
@@ -2145,7 +2183,9 @@ base_material3d_get_roughness_texture_channel :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Texture_Channel(__return_storage)
     return
 }
 
@@ -2159,7 +2199,7 @@ base_material3d_set_ao_texture_channel :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 744167988)
     }
     self := self
-    channel_ := channel_
+    channel_ := Int(channel_)
     args := []__bindgen_gde.TypePtr {
         &channel_,
     }
@@ -2177,7 +2217,9 @@ base_material3d_get_ao_texture_channel :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Texture_Channel(__return_storage)
     return
 }
 
@@ -2191,7 +2233,7 @@ base_material3d_set_refraction_texture_channel :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 744167988)
     }
     self := self
-    channel_ := channel_
+    channel_ := Int(channel_)
     args := []__bindgen_gde.TypePtr {
         &channel_,
     }
@@ -2209,7 +2251,9 @@ base_material3d_get_refraction_texture_channel :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Texture_Channel(__return_storage)
     return
 }
 
@@ -2351,7 +2395,7 @@ base_material3d_set_distance_fade :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1379478617)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -2369,7 +2413,9 @@ base_material3d_get_distance_fade :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Distance_Fade_Mode(__return_storage)
     return
 }
 
@@ -2511,7 +2557,7 @@ base_material3d_set_stencil_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2272367200)
     }
     self := self
-    stencil_mode_ := stencil_mode_
+    stencil_mode_ := Int(stencil_mode_)
     args := []__bindgen_gde.TypePtr {
         &stencil_mode_,
     }
@@ -2529,7 +2575,9 @@ base_material3d_get_stencil_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Stencil_Mode(__return_storage)
     return
 }
 
@@ -2561,7 +2609,9 @@ base_material3d_get_stencil_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2575,7 +2625,7 @@ base_material3d_set_stencil_compare :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3741726481)
     }
     self := self
-    stencil_compare_ := stencil_compare_
+    stencil_compare_ := Int(stencil_compare_)
     args := []__bindgen_gde.TypePtr {
         &stencil_compare_,
     }
@@ -2593,7 +2643,9 @@ base_material3d_get_stencil_compare :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Base_Material3d_Stencil_Compare(__return_storage)
     return
 }
 
@@ -2625,7 +2677,9 @@ base_material3d_get_stencil_reference :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

@@ -58,7 +58,7 @@ audio_stream_playback_polyphonic_play_stream :: proc "contextless" (
     from_offset_ := from_offset_
     volume_db_ := volume_db_
     pitch_scale_ := pitch_scale_
-    playback_type_ := playback_type_
+    playback_type_ := Int(playback_type_)
     bus_ := bus_
     args := []__bindgen_gde.TypePtr {
         &stream_,

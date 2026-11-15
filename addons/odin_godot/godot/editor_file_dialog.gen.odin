@@ -16,7 +16,7 @@ editor_file_dialog_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_file_dialog :: proc "contextless" () -> Editor_File_Dialog {
-    return __bindgen_gde.classdb_construct_object(editor_file_dialog_name_ref())
+    return cast(Editor_File_Dialog)__bindgen_gde.classdb_construct_object(editor_file_dialog_name_ref())
 }
 
 // methods

@@ -106,7 +106,9 @@ upnp_device_add_port_mapping :: proc "contextless" (
         &proto_,
         &duration_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -127,7 +129,9 @@ upnp_device_delete_port_mapping :: proc "contextless" (
         &port_,
         &proto_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -301,7 +305,7 @@ upnp_device_set_igd_status :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 519504122)
     }
     self := self
-    status_ := status_
+    status_ := Int(status_)
     args := []__bindgen_gde.TypePtr {
         &status_,
     }
@@ -319,7 +323,9 @@ upnp_device_get_igd_status :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Upnp_Device_Igd_Status(__return_storage)
     return
 }
 

@@ -16,7 +16,7 @@ remote_transform3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_remote_transform3d :: proc "contextless" () -> Remote_Transform3d {
-    return __bindgen_gde.classdb_construct_object(remote_transform3d_name_ref())
+    return cast(Remote_Transform3d)__bindgen_gde.classdb_construct_object(remote_transform3d_name_ref())
 }
 
 // methods

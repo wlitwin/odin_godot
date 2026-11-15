@@ -16,7 +16,7 @@ spring_bone_collision_capsule3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_spring_bone_collision_capsule3d :: proc "contextless" () -> Spring_Bone_Collision_Capsule3d {
-    return __bindgen_gde.classdb_construct_object(spring_bone_collision_capsule3d_name_ref())
+    return cast(Spring_Bone_Collision_Capsule3d)__bindgen_gde.classdb_construct_object(spring_bone_collision_capsule3d_name_ref())
 }
 
 // methods

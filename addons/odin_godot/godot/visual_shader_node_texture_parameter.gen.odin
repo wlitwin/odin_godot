@@ -84,7 +84,7 @@ visual_shader_node_texture_parameter_set_texture_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2227296876)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -102,7 +102,9 @@ visual_shader_node_texture_parameter_get_texture_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Texture_Parameter_Texture_Type(__return_storage)
     return
 }
 
@@ -116,7 +118,7 @@ visual_shader_node_texture_parameter_set_color_default :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4217624432)
     }
     self := self
-    color_ := color_
+    color_ := Int(color_)
     args := []__bindgen_gde.TypePtr {
         &color_,
     }
@@ -134,7 +136,9 @@ visual_shader_node_texture_parameter_get_color_default :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Texture_Parameter_Color_Default(__return_storage)
     return
 }
 
@@ -148,7 +152,7 @@ visual_shader_node_texture_parameter_set_texture_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2147684752)
     }
     self := self
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &filter_,
     }
@@ -166,7 +170,9 @@ visual_shader_node_texture_parameter_get_texture_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Texture_Parameter_Texture_Filter(__return_storage)
     return
 }
 
@@ -180,7 +186,7 @@ visual_shader_node_texture_parameter_set_texture_repeat :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2036143070)
     }
     self := self
-    repeat_ := repeat_
+    repeat_ := Int(repeat_)
     args := []__bindgen_gde.TypePtr {
         &repeat_,
     }
@@ -198,7 +204,9 @@ visual_shader_node_texture_parameter_get_texture_repeat :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Texture_Parameter_Texture_Repeat(__return_storage)
     return
 }
 
@@ -212,7 +220,7 @@ visual_shader_node_texture_parameter_set_texture_source :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1212687372)
     }
     self := self
-    source_ := source_
+    source_ := Int(source_)
     args := []__bindgen_gde.TypePtr {
         &source_,
     }
@@ -230,7 +238,9 @@ visual_shader_node_texture_parameter_get_texture_source :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Texture_Parameter_Texture_Source(__return_storage)
     return
 }
 

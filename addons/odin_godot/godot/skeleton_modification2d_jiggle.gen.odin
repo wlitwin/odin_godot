@@ -98,7 +98,9 @@ skeleton_modification2d_jiggle_get_jiggle_data_chain_length :: proc "contextless
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -322,8 +324,24 @@ skeleton_modification2d_jiggle_get_collision_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
+}
+
+skeleton_modification2d_jiggle_reset :: proc "contextless" (
+    self: Skeleton_Modification2d_Jiggle,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("reset", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 skeleton_modification2d_jiggle_set_jiggle_joint_bone2d_node :: proc "contextless" (
@@ -398,7 +416,9 @@ skeleton_modification2d_jiggle_get_jiggle_joint_bone_index :: proc "contextless"
     args := []__bindgen_gde.TypePtr {
         &joint_idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

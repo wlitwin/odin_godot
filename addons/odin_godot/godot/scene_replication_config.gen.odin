@@ -127,7 +127,9 @@ scene_replication_config_property_get_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -183,7 +185,9 @@ scene_replication_config_property_get_replication_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Scene_Replication_Config_Replication_Mode(__return_storage)
     return
 }
 
@@ -199,7 +203,7 @@ scene_replication_config_property_set_replication_mode :: proc "contextless" (
     }
     self := self
     path_ := path_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &mode_,

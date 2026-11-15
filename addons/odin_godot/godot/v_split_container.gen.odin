@@ -16,7 +16,7 @@ v_split_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_v_split_container :: proc "contextless" () -> V_Split_Container {
-    return __bindgen_gde.classdb_construct_object(v_split_container_name_ref())
+    return cast(V_Split_Container)__bindgen_gde.classdb_construct_object(v_split_container_name_ref())
 }
 
 // methods

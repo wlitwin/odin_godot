@@ -16,7 +16,7 @@ reference_rect_name :: proc "contextless" () -> String_Name {
 }
 
 new_reference_rect :: proc "contextless" () -> Reference_Rect {
-    return __bindgen_gde.classdb_construct_object(reference_rect_name_ref())
+    return cast(Reference_Rect)__bindgen_gde.classdb_construct_object(reference_rect_name_ref())
 }
 
 // methods

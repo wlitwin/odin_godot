@@ -5,8 +5,11 @@ extends SceneTree
 # which script it follows. It instantiates your REAL main scene and presses
 # the same @(gd_method)s your buttons fire — no test doubles, no mock net.
 #
-# Pair this with a queries.odin in your game: small @(gd_method)s returning
-# ints/bools the phases below can poll (see the examples' queries.odin).
+# The mechanical reads come FREE: scriptgen generates @(gd_method) probes on
+# your game class per `entity=` kind — game.probe_<kind>_count(),
+# game.probe_my_<kind>(), game.probe_<kind>_<field>(id) (0 = mine) for every
+# replicated scalar field. Hand-write a queries.odin only for derived views
+# (a predicted-hp overlay, a nearest-scan); see the examples' queries.odin.
 # Print an UPPERCASE tag for every fact worth asserting; run.sh greps them.
 # ----------------------------------------------------------------------------
 

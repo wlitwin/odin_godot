@@ -43,27 +43,46 @@ FAILED :: i64(1)
 @(private)
 resolve_odin_share :: proc(allocator := context.allocator) -> string {
     if v, ok := os.lookup_env("ODIN_SHARE", allocator); ok && v != "" {
-        if os.exists(v) {return v}
+        if os.exists(v) {
+            return v
+        }
+
         delete(v, allocator)
     }
+
     ps := godot.singleton_project_settings()
     key := godot.new_string_cstring("odin_godot/odin_share")
+
     if bool(godot.project_settings_has_setting(ps, key)) {
         def := godot.Variant{}
         v := godot.project_settings_get_setting(ps, key, def)
         s := godot.variant_to_string(&v)
         cand := string_to_odin(s, allocator)
-        if cand != "" && os.exists(cand) {return cand}
+
+        if cand != "" && os.exists(cand) {
+            return cand
+        }
+
         delete(cand, allocator)
     }
+
     odin_bin, found := resolve_bin("odin_godot/odin_bin", "ODIN", "odin", allocator)
-    if !found {return ""}
+
+    if !found {
+        return ""
+    }
+
     defer delete(odin_bin, allocator)
     // Follow up to a few symlink levels to the real binary (nix profiles symlink it).
     real := strings.clone(odin_bin, allocator)
+
     for _ in 0 ..< 8 {
         target, err := os.read_link(real, allocator)
-        if err != nil {break}
+
+        if err != nil {
+            break
+        }
+
         // resolve relative symlink against its dir
         if len(target) > 0 && target[0] != '/' {
             if slash := strings.last_index_byte(real, '/'); slash >= 0 {
@@ -72,18 +91,32 @@ resolve_odin_share :: proc(allocator := context.allocator) -> string {
                 target = joined
             }
         }
+
         delete(real, allocator)
         real = target
     }
+
     defer delete(real, allocator)
     // dir(dir(real)) + "/share"
     s1 := strings.last_index_byte(real, '/')
-    if s1 <= 0 {return ""}
+
+    if s1 <= 0 {
+        return ""
+    }
+
     parent := real[:s1]
     s2 := strings.last_index_byte(parent, '/')
-    if s2 <= 0 {return ""}
+
+    if s2 <= 0 {
+        return ""
+    }
+
     share := strings.concatenate({parent[:s2], "/share"}, allocator)
-    if os.exists(share) {return share}
+
+    if os.exists(share) {
+        return share
+    }
+
     delete(share, allocator)
     return ""
 }
@@ -182,7 +215,10 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
     defer delete(abs_path)
 
     ols_bin, found := resolve_bin("odin_godot/ols_bin", "OLS", "ols")
-    defer if found {delete(ols_bin)}
+
+    defer if found {
+        delete(ols_bin)
+    }
 
     if !found {
         // ols is unreachable from the editor process — completion can't run. Warn ONCE with
@@ -211,6 +247,7 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
         //   Failed       -> ols session unusable: the self-contained fresh-spawn path (and
         //                   re-kick the warm-up, bounded by its retry backoff).
         warm := complete.session_warm_state(&complete.g_session)
+
         if warm == .Cold || warm == .Warming {
             complete.session_warm_async(&complete.g_session, ols_bin, root, share)
             cd_set_int(&result, "result", result_code)
@@ -220,18 +257,28 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             (cast(^godot.Dictionary)ret)^ = result
             return
         }
+
         // The call hint (signatureHelp) is only requested when the caret is syntactically
         // inside a call's argument list — `in_call_context` — so the common
         // typing-an-identifier completion never pays the extra warm round-trip.
         cs: [dynamic]complete.Completion
+
         if warm == .Ready {
             ok: bool
             cs, ok = complete.session_complete(&complete.g_session, code, abs_path, root, share, ols_bin)
+
             if ok {
                 if complete.in_call_context(code) {
                     // One extra warm request (~tens of ms). A failure just means no tooltip —
                     // never worth a fresh ols spawn of its own.
-                    if h, hok := complete.session_signature_help(&complete.g_session, code, abs_path, root, share, ols_bin); hok {
+                    if h, hok := complete.session_signature_help(
+                        &complete.g_session,
+                        code,
+                        abs_path,
+                        root,
+                        share,
+                        ols_bin,
+                    ); hok {
                         delete(call_hint)
                         call_hint = h
                     } else {
@@ -239,7 +286,12 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
                     }
                 }
             } else {
-                for c in cs {delete(c.label); delete(c.insert_text); delete(c.detail)}
+                for c in cs {
+                    delete(c.label)
+                    delete(c.insert_text)
+                    delete(c.detail)
+                }
+
                 delete(cs)
                 delete(call_hint)
                 cs, call_hint = complete.run_completion(code, abs_path, root, share, ols_bin)
@@ -249,14 +301,17 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             delete(call_hint)
             cs, call_hint = complete.run_completion(code, abs_path, root, share, ols_bin)
         }
+
         defer {
             for c in cs {
                 delete(c.label)
                 delete(c.insert_text)
                 delete(c.detail)
             }
+
             delete(cs)
         }
+
         // Thin an over-long list (a bare `gd.` is the whole ~24k-proc godot API) to
         // what the user is typing, and cap it — building each option's Dictionary is
         // ~20 FFI calls and the editor renders every row, so an unbounded list stalls
@@ -264,10 +319,18 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
         prefix := complete.prefix_at_caret(code)
         filter := len(cs) > complete.MAX_OPTIONS
         emitted := 0
+
         for c in cs {
-            if emitted >= complete.MAX_OPTIONS {break}
-            if filter && !complete.matches_prefix(c.label, prefix) {continue}
+            if emitted >= complete.MAX_OPTIONS {
+                break
+            }
+
+            if filter && !complete.matches_prefix(c.label, prefix) {
+                continue
+            }
+
             od := godot.new_dictionary_default()
+
             // Emit EVERY key Godot's ScriptLanguageExtension::complete_code ERR_CONTINUEs on
             // (else the option is dropped + the editor log is spammed — the font_color bug).
             // Iterate the canonical field set (core/complete/option_shape.odin) so the emitted
@@ -276,6 +339,7 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             // placeholder values here are cosmetically irrelevant — only the KEYS must exist.
             for f in complete.Completion_Option_Field {
                 key := complete.completion_option_field_key(f)
+
                 switch f {
                 case .Kind:
                     cd_set_int(&od, key, i64(c.kind))
@@ -301,10 +365,12 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
                     cd_set_int(&od, key, LOCATION_OTHER)
                 }
             }
+
             ov := godot.variant_from_dictionary(&od)
             godot.array_push_back(&options, ov)
             emitted += 1
         }
+
         result_code = OK // ols ran (0 options is a valid "nothing here", still OK)
     }
 

@@ -16,7 +16,7 @@ h_split_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_h_split_container :: proc "contextless" () -> H_Split_Container {
-    return __bindgen_gde.classdb_construct_object(h_split_container_name_ref())
+    return cast(H_Split_Container)__bindgen_gde.classdb_construct_object(h_split_container_name_ref())
 }
 
 // methods

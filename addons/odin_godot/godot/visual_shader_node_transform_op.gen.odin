@@ -60,7 +60,7 @@ visual_shader_node_transform_op_set_operator :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2287310733)
     }
     self := self
-    op_ := op_
+    op_ := Int(op_)
     args := []__bindgen_gde.TypePtr {
         &op_,
     }
@@ -78,7 +78,9 @@ visual_shader_node_transform_op_get_operator :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Transform_Op_Operator(__return_storage)
     return
 }
 

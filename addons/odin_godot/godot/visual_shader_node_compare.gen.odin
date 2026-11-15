@@ -73,7 +73,7 @@ visual_shader_node_compare_set_comparison_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 516558320)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -91,7 +91,9 @@ visual_shader_node_compare_get_comparison_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Compare_Comparison_Type(__return_storage)
     return
 }
 
@@ -105,7 +107,7 @@ visual_shader_node_compare_set_function :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2370951349)
     }
     self := self
-    func_ := func_
+    func_ := Int(func_)
     args := []__bindgen_gde.TypePtr {
         &func_,
     }
@@ -123,7 +125,9 @@ visual_shader_node_compare_get_function :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Compare_Function(__return_storage)
     return
 }
 
@@ -137,7 +141,7 @@ visual_shader_node_compare_set_condition :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 918742392)
     }
     self := self
-    condition_ := condition_
+    condition_ := Int(condition_)
     args := []__bindgen_gde.TypePtr {
         &condition_,
     }
@@ -155,7 +159,9 @@ visual_shader_node_compare_get_condition :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Visual_Shader_Node_Compare_Condition(__return_storage)
     return
 }
 

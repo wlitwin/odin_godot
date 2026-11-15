@@ -16,7 +16,7 @@ margin_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_margin_container :: proc "contextless" () -> Margin_Container {
-    return __bindgen_gde.classdb_construct_object(margin_container_name_ref())
+    return cast(Margin_Container)__bindgen_gde.classdb_construct_object(margin_container_name_ref())
 }
 
 // methods

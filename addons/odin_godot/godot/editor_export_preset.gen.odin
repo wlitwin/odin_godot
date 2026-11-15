@@ -115,7 +115,9 @@ editor_export_preset_get_customized_files_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -149,12 +151,14 @@ editor_export_preset_get_file_export_mode :: proc "contextless" (
     }
     self := self
     path_ := path_
-    default_ := default_
+    default_ := Int(default_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &default_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Export_Preset_File_Export_Mode(__return_storage)
     return
 }
 
@@ -247,7 +251,9 @@ editor_export_preset_get_export_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Export_Preset_Export_Filter(__return_storage)
     return
 }
 
@@ -412,7 +418,9 @@ editor_export_preset_get_script_export_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Export_Preset_Script_Export_Mode(__return_storage)
     return
 }
 

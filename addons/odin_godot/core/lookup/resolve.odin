@@ -17,30 +17,46 @@ import "core:strings"
 //   - otherwise         -> member = symbol[len(P)+1:]
 //   - no class matches  -> ok = false (caller returns the graceful-miss shape)
 // Returned `class_snake`/`member` are sub-slices of `symbol_in` (no allocation).
-resolve_symbol :: proc(symbol_in: string, class_set: map[string]bool) -> (class_snake: string, member: string, is_class: bool, ok: bool) {
+resolve_symbol :: proc(
+    symbol_in: string,
+    class_set: map[string]bool,
+) -> (
+    class_snake: string,
+    member: string,
+    is_class: bool,
+    ok: bool,
+) {
     symbol := symbol_in
+
     if strings.has_prefix(symbol, "gd.") {
         symbol = symbol[3:]
     }
+
     if symbol == "" {
         return "", "", false, false
     }
+
     best := ""
+
     for name in class_set {
         if len(name) <= len(best) {
             continue // can't beat the current longest match
         }
+
         if symbol == name {
             best = name
         } else if len(symbol) > len(name) && strings.has_prefix(symbol, name) && symbol[len(name)] == '_' {
             best = name
         }
     }
+
     if best == "" {
         return "", "", false, false
     }
+
     if symbol == best {
         return best, "", true, true
     }
+
     return best, symbol[len(best) + 1:], false, true
 }

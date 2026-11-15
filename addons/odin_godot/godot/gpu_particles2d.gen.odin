@@ -28,7 +28,7 @@ gpu_particles2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_gpu_particles2d :: proc "contextless" () -> Gpu_Particles2d {
-    return __bindgen_gde.classdb_construct_object(gpu_particles2d_name_ref())
+    return cast(Gpu_Particles2d)__bindgen_gde.classdb_construct_object(gpu_particles2d_name_ref())
 }
 
 // methods
@@ -325,16 +325,19 @@ gpu_particles2d_set_interp_to_end :: proc "contextless" (
 gpu_particles2d_request_particles_process :: proc "contextless" (
     self: Gpu_Particles2d,
     process_time_: f64,
+    process_time_residual_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("request_particles_process", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2019720106)
     }
     self := self
     process_time_ := process_time_
+    process_time_residual_ := process_time_residual_
     args := []__bindgen_gde.TypePtr {
         &process_time_,
+        &process_time_residual_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -365,7 +368,9 @@ gpu_particles2d_get_amount :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -485,7 +490,9 @@ gpu_particles2d_get_fixed_fps :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -589,7 +596,7 @@ gpu_particles2d_set_draw_order :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1939677959)
     }
     self := self
-    order_ := order_
+    order_ := Int(order_)
     args := []__bindgen_gde.TypePtr {
         &order_,
     }
@@ -607,7 +614,9 @@ gpu_particles2d_get_draw_order :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gpu_Particles2d_Draw_Order(__return_storage)
     return
 }
 
@@ -828,7 +837,9 @@ gpu_particles2d_get_trail_sections :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -860,7 +871,9 @@ gpu_particles2d_get_trail_section_subdivisions :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -973,7 +986,9 @@ gpu_particles2d_get_seed :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

@@ -1902,7 +1902,7 @@ object_get_script_instance: ExtensionInterfaceObjectGetScriptInstance
  * @param p_object A pointer to the Object.
  * @param p_script_instance A pointer to the script instance data to attach to this object.
  */
- object_set_script_instance: ExtensionInterfaceObjectSetScriptInstance
+object_set_script_instance: ExtensionInterfaceObjectSetScriptInstance
 
 /**
  * @name callable_custom_create
@@ -2286,7 +2286,7 @@ editor_help_load_xml_from_utf8_chars_and_len: ExtensionsInterfaceEditorHelpLoadX
  */
 editor_register_get_classes_used_callback: ExtensionInterfaceEditorRegisterGetClassesUsedCallback
 
- /**
+/**
  * @name register_main_loop_callbacks
  * @since 4.5
  *
@@ -2297,17 +2297,26 @@ editor_register_get_classes_used_callback: ExtensionInterfaceEditorRegisterGetCl
  */
 register_main_loop_callbacks: ExtensionInterfaceRegisterMainLoopCallbacks
 
-init :: proc "contextless" (library_ptr: ExtensionClassLibraryPtr, get_proc_address: ExtensionInterfaceGetProcAddress) {
+init :: proc "contextless" (
+    library_ptr: ExtensionClassLibraryPtr,
+    get_proc_address: ExtensionInterfaceGetProcAddress,
+) {
     library = library_ptr
     mem_alloc = cast(ExtensionInterfaceMemAlloc)get_proc_address("mem_alloc")
     mem_realloc = cast(ExtensionInterfaceMemRealloc)get_proc_address("mem_realloc")
     mem_free = cast(ExtensionInterfaceMemFree)get_proc_address("mem_free")
     print_error = cast(ExtensionInterfacePrintError)get_proc_address("print_error")
-    print_error_with_message = cast(ExtensionInterfacePrintErrorWithMessage)get_proc_address("print_error_with_message")
+    print_error_with_message = cast(ExtensionInterfacePrintErrorWithMessage)get_proc_address(
+        "print_error_with_message",
+    )
     print_warning = cast(ExtensionInterfacePrintWarning)get_proc_address("print_warning")
-    print_warning_with_message = cast(ExtensionInterfacePrintWarningWithMessage)get_proc_address("print_warning_with_message")
+    print_warning_with_message = cast(ExtensionInterfacePrintWarningWithMessage)get_proc_address(
+        "print_warning_with_message",
+    )
     print_script_error = cast(ExtensionInterfacePrintScriptError)get_proc_address("print_script_error")
-    print_script_error_with_message = cast(ExtensionInterfacePrintScriptErrorWithMessage)get_proc_address("print_script_error_with_message")
+    print_script_error_with_message = cast(ExtensionInterfacePrintScriptErrorWithMessage)get_proc_address(
+        "print_script_error_with_message",
+    )
     get_native_struct_size = cast(ExtensionInterfaceGetNativeStructSize)get_proc_address("get_native_struct_size")
     variant_new_copy = cast(ExtensionInterfaceVariantNewCopy)get_proc_address("variant_new_copy")
     variant_new_nil = cast(ExtensionInterfaceVariantNewNil)get_proc_address("variant_new_nil")
@@ -2336,138 +2345,328 @@ init :: proc "contextless" (library_ptr: ExtensionClassLibraryPtr, get_proc_addr
     variant_has_method = cast(ExtensionInterfaceVariantHasMethod)get_proc_address("variant_has_method")
     variant_has_member = cast(ExtensionInterfaceVariantHasMember)get_proc_address("variant_has_member")
     variant_has_key = cast(ExtensionInterfaceVariantHasKey)get_proc_address("variant_has_key")
-    variant_get_object_instance_id = cast(ExtensionInterfaceVariantGetObjectInstanceId)get_proc_address("variant_get_object_instance_id")
+    variant_get_object_instance_id = cast(ExtensionInterfaceVariantGetObjectInstanceId)get_proc_address(
+        "variant_get_object_instance_id",
+    )
     variant_get_type_name = cast(ExtensionInterfaceVariantGetTypeName)get_proc_address("variant_get_type_name")
     variant_can_convert = cast(ExtensionInterfaceVariantCanConvert)get_proc_address("variant_can_convert")
-    variant_can_convert_strict = cast(ExtensionInterfaceVariantCanConvertStrict)get_proc_address("variant_can_convert_strict")
-    get_variant_from_type_constructor = cast(ExtensionInterfaceGetVariantFromTypeConstructor)get_proc_address("get_variant_from_type_constructor")
-    get_variant_to_type_constructor = cast(ExtensionInterfaceGetVariantToTypeConstructor)get_proc_address("get_variant_to_type_constructor")
-    variant_get_ptr_internal_getter = cast(ExtensionInterfaceGetVariantGetInternalPtrFunc)get_proc_address("variant_get_ptr_internal_getter")
-    variant_get_ptr_operator_evaluator = cast(ExtensionInterfaceVariantGetPtrOperatorEvaluator)get_proc_address("variant_get_ptr_operator_evaluator")
-    variant_get_ptr_builtin_method = cast(ExtensionInterfaceVariantGetPtrBuiltinMethod)get_proc_address("variant_get_ptr_builtin_method")
-    variant_get_ptr_constructor = cast(ExtensionInterfaceVariantGetPtrConstructor)get_proc_address("variant_get_ptr_constructor")
-    variant_get_ptr_destructor = cast(ExtensionInterfaceVariantGetPtrDestructor)get_proc_address("variant_get_ptr_destructor")
+    variant_can_convert_strict = cast(ExtensionInterfaceVariantCanConvertStrict)get_proc_address(
+        "variant_can_convert_strict",
+    )
+    get_variant_from_type_constructor = cast(ExtensionInterfaceGetVariantFromTypeConstructor)get_proc_address(
+        "get_variant_from_type_constructor",
+    )
+    get_variant_to_type_constructor = cast(ExtensionInterfaceGetVariantToTypeConstructor)get_proc_address(
+        "get_variant_to_type_constructor",
+    )
+    variant_get_ptr_internal_getter = cast(ExtensionInterfaceGetVariantGetInternalPtrFunc)get_proc_address(
+        "variant_get_ptr_internal_getter",
+    )
+    variant_get_ptr_operator_evaluator = cast(ExtensionInterfaceVariantGetPtrOperatorEvaluator)get_proc_address(
+        "variant_get_ptr_operator_evaluator",
+    )
+    variant_get_ptr_builtin_method = cast(ExtensionInterfaceVariantGetPtrBuiltinMethod)get_proc_address(
+        "variant_get_ptr_builtin_method",
+    )
+    variant_get_ptr_constructor = cast(ExtensionInterfaceVariantGetPtrConstructor)get_proc_address(
+        "variant_get_ptr_constructor",
+    )
+    variant_get_ptr_destructor = cast(ExtensionInterfaceVariantGetPtrDestructor)get_proc_address(
+        "variant_get_ptr_destructor",
+    )
     variant_construct = cast(ExtensionInterfaceVariantConstruct)get_proc_address("variant_construct")
     variant_get_ptr_setter = cast(ExtensionInterfaceVariantGetPtrSetter)get_proc_address("variant_get_ptr_setter")
     variant_get_ptr_getter = cast(ExtensionInterfaceVariantGetPtrGetter)get_proc_address("variant_get_ptr_getter")
-    variant_get_ptr_indexed_setter = cast(ExtensionInterfaceVariantGetPtrIndexedSetter)get_proc_address("variant_get_ptr_indexed_setter")
-    variant_get_ptr_indexed_getter = cast(ExtensionInterfaceVariantGetPtrIndexedGetter)get_proc_address("variant_get_ptr_indexed_getter")
-    variant_get_ptr_keyed_setter = cast(ExtensionInterfaceVariantGetPtrKeyedSetter)get_proc_address("variant_get_ptr_keyed_setter")
-    variant_get_ptr_keyed_getter = cast(ExtensionInterfaceVariantGetPtrKeyedGetter)get_proc_address("variant_get_ptr_keyed_getter")
-    variant_get_ptr_keyed_checker = cast(ExtensionInterfaceVariantGetPtrKeyedChecker)get_proc_address("variant_get_ptr_keyed_checker")
-    variant_get_constant_value = cast(ExtensionInterfaceVariantGetConstantValue)get_proc_address("variant_get_constant_value")
-    variant_get_ptr_utility_function = cast(ExtensionInterfaceVariantGetPtrUtilityFunction)get_proc_address("variant_get_ptr_utility_function")
-    string_new_with_latin1_chars = cast(ExtensionInterfaceStringNewWithLatin1Chars)get_proc_address("string_new_with_latin1_chars")
-    string_new_with_utf8_chars = cast(ExtensionInterfaceStringNewWithUtf8Chars)get_proc_address("string_new_with_utf8_chars")
-    string_new_with_utf16_chars = cast(ExtensionInterfaceStringNewWithUtf16Chars)get_proc_address("string_new_with_utf16_chars")
-    string_new_with_utf32_chars = cast(ExtensionInterfaceStringNewWithUtf32Chars)get_proc_address("string_new_with_utf32_chars")
-    string_new_with_wide_chars = cast(ExtensionInterfaceStringNewWithWideChars)get_proc_address("string_new_with_wide_chars")
-    string_new_with_latin1_chars_and_len = cast(ExtensionInterfaceStringNewWithLatin1CharsAndLen)get_proc_address("string_new_with_latin1_chars_and_len")
-    string_new_with_utf8_chars_and_len = cast(ExtensionInterfaceStringNewWithUtf8CharsAndLen)get_proc_address("string_new_with_utf8_chars_and_len")
-    string_new_with_utf8_chars_and_len2 = cast(ExtensionInterfaceStringNewWithUtf8CharsAndLen2)get_proc_address("string_new_with_utf8_chars_and_len2")
-    string_new_with_utf16_chars_and_len = cast(ExtensionInterfaceStringNewWithUtf16CharsAndLen)get_proc_address("string_new_with_utf16_chars_and_len")
-    string_new_with_utf16_chars_and_len2 = cast(ExtensionInterfaceStringNewWithUtf16CharsAndLen2)get_proc_address("string_new_with_utf16_chars_and_len2")
-    string_new_with_utf32_chars_and_len = cast(ExtensionInterfaceStringNewWithUtf32CharsAndLen)get_proc_address("string_new_with_utf32_chars_and_len")
-    string_new_with_wide_chars_and_len = cast(ExtensionInterfaceStringNewWithWideCharsAndLen)get_proc_address("string_new_with_wide_chars_and_len")
+    variant_get_ptr_indexed_setter = cast(ExtensionInterfaceVariantGetPtrIndexedSetter)get_proc_address(
+        "variant_get_ptr_indexed_setter",
+    )
+    variant_get_ptr_indexed_getter = cast(ExtensionInterfaceVariantGetPtrIndexedGetter)get_proc_address(
+        "variant_get_ptr_indexed_getter",
+    )
+    variant_get_ptr_keyed_setter = cast(ExtensionInterfaceVariantGetPtrKeyedSetter)get_proc_address(
+        "variant_get_ptr_keyed_setter",
+    )
+    variant_get_ptr_keyed_getter = cast(ExtensionInterfaceVariantGetPtrKeyedGetter)get_proc_address(
+        "variant_get_ptr_keyed_getter",
+    )
+    variant_get_ptr_keyed_checker = cast(ExtensionInterfaceVariantGetPtrKeyedChecker)get_proc_address(
+        "variant_get_ptr_keyed_checker",
+    )
+    variant_get_constant_value = cast(ExtensionInterfaceVariantGetConstantValue)get_proc_address(
+        "variant_get_constant_value",
+    )
+    variant_get_ptr_utility_function = cast(ExtensionInterfaceVariantGetPtrUtilityFunction)get_proc_address(
+        "variant_get_ptr_utility_function",
+    )
+    string_new_with_latin1_chars = cast(ExtensionInterfaceStringNewWithLatin1Chars)get_proc_address(
+        "string_new_with_latin1_chars",
+    )
+    string_new_with_utf8_chars = cast(ExtensionInterfaceStringNewWithUtf8Chars)get_proc_address(
+        "string_new_with_utf8_chars",
+    )
+    string_new_with_utf16_chars = cast(ExtensionInterfaceStringNewWithUtf16Chars)get_proc_address(
+        "string_new_with_utf16_chars",
+    )
+    string_new_with_utf32_chars = cast(ExtensionInterfaceStringNewWithUtf32Chars)get_proc_address(
+        "string_new_with_utf32_chars",
+    )
+    string_new_with_wide_chars = cast(ExtensionInterfaceStringNewWithWideChars)get_proc_address(
+        "string_new_with_wide_chars",
+    )
+    string_new_with_latin1_chars_and_len = cast(ExtensionInterfaceStringNewWithLatin1CharsAndLen)get_proc_address(
+        "string_new_with_latin1_chars_and_len",
+    )
+    string_new_with_utf8_chars_and_len = cast(ExtensionInterfaceStringNewWithUtf8CharsAndLen)get_proc_address(
+        "string_new_with_utf8_chars_and_len",
+    )
+    string_new_with_utf8_chars_and_len2 = cast(ExtensionInterfaceStringNewWithUtf8CharsAndLen2)get_proc_address(
+        "string_new_with_utf8_chars_and_len2",
+    )
+    string_new_with_utf16_chars_and_len = cast(ExtensionInterfaceStringNewWithUtf16CharsAndLen)get_proc_address(
+        "string_new_with_utf16_chars_and_len",
+    )
+    string_new_with_utf16_chars_and_len2 = cast(ExtensionInterfaceStringNewWithUtf16CharsAndLen2)get_proc_address(
+        "string_new_with_utf16_chars_and_len2",
+    )
+    string_new_with_utf32_chars_and_len = cast(ExtensionInterfaceStringNewWithUtf32CharsAndLen)get_proc_address(
+        "string_new_with_utf32_chars_and_len",
+    )
+    string_new_with_wide_chars_and_len = cast(ExtensionInterfaceStringNewWithWideCharsAndLen)get_proc_address(
+        "string_new_with_wide_chars_and_len",
+    )
     string_to_latin1_chars = cast(ExtensionInterfaceStringToLatin1Chars)get_proc_address("string_to_latin1_chars")
     string_to_utf8_chars = cast(ExtensionInterfaceStringToUtf8Chars)get_proc_address("string_to_utf8_chars")
     string_to_utf16_chars = cast(ExtensionInterfaceStringToUtf16Chars)get_proc_address("string_to_utf16_chars")
     string_to_utf32_chars = cast(ExtensionInterfaceStringToUtf32Chars)get_proc_address("string_to_utf32_chars")
     string_to_wide_chars = cast(ExtensionInterfaceStringToWideChars)get_proc_address("string_to_wide_chars")
     string_operator_index = cast(ExtensionInterfaceStringOperatorIndex)get_proc_address("string_operator_index")
-    string_operator_index_const = cast(ExtensionInterfaceStringOperatorIndexConst)get_proc_address("string_operator_index_const")
-    string_operator_plus_eq_string = cast(ExtensionInterfaceStringOperatorPlusEqString)get_proc_address("string_operator_plus_eq_string")
-    string_operator_plus_eq_char = cast(ExtensionInterfaceStringOperatorPlusEqChar)get_proc_address("string_operator_plus_eq_char")
-    string_operator_plus_eq_cstr = cast(ExtensionInterfaceStringOperatorPlusEqCstr)get_proc_address("string_operator_plus_eq_cstr")
-    string_operator_plus_eq_wcstr = cast(ExtensionInterfaceStringOperatorPlusEqWcstr)get_proc_address("string_operator_plus_eq_wcstr")
-    string_operator_plus_eq_c32str = cast(ExtensionInterfaceStringOperatorPlusEqC32str)get_proc_address("string_operator_plus_eq_c32str")
+    string_operator_index_const = cast(ExtensionInterfaceStringOperatorIndexConst)get_proc_address(
+        "string_operator_index_const",
+    )
+    string_operator_plus_eq_string = cast(ExtensionInterfaceStringOperatorPlusEqString)get_proc_address(
+        "string_operator_plus_eq_string",
+    )
+    string_operator_plus_eq_char = cast(ExtensionInterfaceStringOperatorPlusEqChar)get_proc_address(
+        "string_operator_plus_eq_char",
+    )
+    string_operator_plus_eq_cstr = cast(ExtensionInterfaceStringOperatorPlusEqCstr)get_proc_address(
+        "string_operator_plus_eq_cstr",
+    )
+    string_operator_plus_eq_wcstr = cast(ExtensionInterfaceStringOperatorPlusEqWcstr)get_proc_address(
+        "string_operator_plus_eq_wcstr",
+    )
+    string_operator_plus_eq_c32str = cast(ExtensionInterfaceStringOperatorPlusEqC32str)get_proc_address(
+        "string_operator_plus_eq_c32str",
+    )
     string_resize = cast(ExtensionInterfaceStringResize)get_proc_address("string_resize")
-    string_name_new_with_latin1_chars = cast(ExtensionInterfaceStringNameNewWithLatin1Chars)get_proc_address("string_name_new_with_latin1_chars")
-    string_name_new_with_utf8_chars = cast(ExtensionInterfaceStringNameNewWithUtf8Chars)get_proc_address("string_name_new_with_utf8_chars")
-    string_name_new_with_utf8_chars_and_len = cast(ExtensionInterfaceStringNameNewWithUtf8CharsAndLen)get_proc_address("string_name_new_with_utf8_chars_and_len")
+    string_name_new_with_latin1_chars = cast(ExtensionInterfaceStringNameNewWithLatin1Chars)get_proc_address(
+        "string_name_new_with_latin1_chars",
+    )
+    string_name_new_with_utf8_chars = cast(ExtensionInterfaceStringNameNewWithUtf8Chars)get_proc_address(
+        "string_name_new_with_utf8_chars",
+    )
+    string_name_new_with_utf8_chars_and_len = cast(ExtensionInterfaceStringNameNewWithUtf8CharsAndLen)get_proc_address(
+        "string_name_new_with_utf8_chars_and_len",
+    )
     xml_parser_open_buffer = cast(ExtensionInterfaceXmlParserOpenBuffer)get_proc_address("xml_parser_open_buffer")
-    file_access_store_buffer = cast(ExtensionInterfaceFileAccessStoreBuffer)get_proc_address("file_access_store_buffer")
+    file_access_store_buffer = cast(ExtensionInterfaceFileAccessStoreBuffer)get_proc_address(
+        "file_access_store_buffer",
+    )
     file_access_get_buffer = cast(ExtensionInterfaceFileAccessGetBuffer)get_proc_address("file_access_get_buffer")
     image_ptrw = cast(ExtensionInterfaceImagePtrw)get_proc_address("image_ptrw")
     image_ptr = cast(ExtensionInterfaceImagePtr)get_proc_address("image_ptr")
-    worker_thread_pool_add_native_group_task = cast(ExtensionInterfaceWorkerThreadPoolAddNativeGroupTask)get_proc_address("worker_thread_pool_add_native_group_task")
-    worker_thread_pool_add_native_task = cast(ExtensionInterfaceWorkerThreadPoolAddNativeTask)get_proc_address("worker_thread_pool_add_native_task")
-    packed_byte_array_operator_index = cast(ExtensionInterfacePackedByteArrayOperatorIndex)get_proc_address("packed_byte_array_operator_index")
-    packed_byte_array_operator_index_const = cast(ExtensionInterfacePackedByteArrayOperatorIndexConst)get_proc_address("packed_byte_array_operator_index_const")
-    packed_float32_array_operator_index = cast(ExtensionInterfacePackedFloat32ArrayOperatorIndex)get_proc_address("packed_float32_array_operator_index")
-    packed_float32_array_operator_index_const = cast(ExtensionInterfacePackedFloat32ArrayOperatorIndexConst)get_proc_address("packed_float32_array_operator_index_const")
-    packed_float64_array_operator_index = cast(ExtensionInterfacePackedFloat64ArrayOperatorIndex)get_proc_address("packed_float64_array_operator_index")
-    packed_float64_array_operator_index_const = cast(ExtensionInterfacePackedFloat64ArrayOperatorIndexConst)get_proc_address("packed_float64_array_operator_index_const")
-    packed_int32_array_operator_index = cast(ExtensionInterfacePackedInt32ArrayOperatorIndex)get_proc_address("packed_int32_array_operator_index")
-    packed_int32_array_operator_index_const = cast(ExtensionInterfacePackedInt32ArrayOperatorIndexConst)get_proc_address("packed_int32_array_operator_index_const")
-    packed_int64_array_operator_index = cast(ExtensionInterfacePackedInt64ArrayOperatorIndex)get_proc_address("packed_int64_array_operator_index")
-    packed_int64_array_operator_index_const = cast(ExtensionInterfacePackedInt64ArrayOperatorIndexConst)get_proc_address("packed_int64_array_operator_index_const")
-    packed_string_array_operator_index = cast(ExtensionInterfacePackedStringArrayOperatorIndex)get_proc_address("packed_string_array_operator_index")
-    packed_string_array_operator_index_const = cast(ExtensionInterfacePackedStringArrayOperatorIndexConst)get_proc_address("packed_string_array_operator_index_const")
-    packed_vector2_array_operator_index = cast(ExtensionInterfacePackedVector2ArrayOperatorIndex)get_proc_address("packed_vector2_array_operator_index")
-    packed_vector2_array_operator_index_const = cast(ExtensionInterfacePackedVector2ArrayOperatorIndexConst)get_proc_address("packed_vector2_array_operator_index_const")
-    packed_vector3_array_operator_index = cast(ExtensionInterfacePackedVector3ArrayOperatorIndex)get_proc_address("packed_vector3_array_operator_index")
-    packed_vector3_array_operator_index_const = cast(ExtensionInterfacePackedVector3ArrayOperatorIndexConst)get_proc_address("packed_vector3_array_operator_index_const")
-    packed_vector4_array_operator_index = cast(ExtensionInterfacePackedVector4ArrayOperatorIndex)get_proc_address("packed_vector4_array_operator_index")
-    packed_vector4_array_operator_index_const = cast(ExtensionInterfacePackedVector4ArrayOperatorIndexConst)get_proc_address("packed_vector4_array_operator_index_const")
-    packed_color_array_operator_index = cast(ExtensionInterfacePackedColorArrayOperatorIndex)get_proc_address("packed_color_array_operator_index")
-    packed_color_array_operator_index_const = cast(ExtensionInterfacePackedColorArrayOperatorIndexConst)get_proc_address("packed_color_array_operator_index_const")
+    worker_thread_pool_add_native_group_task = cast(ExtensionInterfaceWorkerThreadPoolAddNativeGroupTask)get_proc_address(
+        "worker_thread_pool_add_native_group_task",
+    )
+    worker_thread_pool_add_native_task = cast(ExtensionInterfaceWorkerThreadPoolAddNativeTask)get_proc_address(
+        "worker_thread_pool_add_native_task",
+    )
+    packed_byte_array_operator_index = cast(ExtensionInterfacePackedByteArrayOperatorIndex)get_proc_address(
+        "packed_byte_array_operator_index",
+    )
+    packed_byte_array_operator_index_const = cast(ExtensionInterfacePackedByteArrayOperatorIndexConst)get_proc_address(
+        "packed_byte_array_operator_index_const",
+    )
+    packed_float32_array_operator_index = cast(ExtensionInterfacePackedFloat32ArrayOperatorIndex)get_proc_address(
+        "packed_float32_array_operator_index",
+    )
+    packed_float32_array_operator_index_const = cast(ExtensionInterfacePackedFloat32ArrayOperatorIndexConst)get_proc_address(
+        "packed_float32_array_operator_index_const",
+    )
+    packed_float64_array_operator_index = cast(ExtensionInterfacePackedFloat64ArrayOperatorIndex)get_proc_address(
+        "packed_float64_array_operator_index",
+    )
+    packed_float64_array_operator_index_const = cast(ExtensionInterfacePackedFloat64ArrayOperatorIndexConst)get_proc_address(
+        "packed_float64_array_operator_index_const",
+    )
+    packed_int32_array_operator_index = cast(ExtensionInterfacePackedInt32ArrayOperatorIndex)get_proc_address(
+        "packed_int32_array_operator_index",
+    )
+    packed_int32_array_operator_index_const = cast(ExtensionInterfacePackedInt32ArrayOperatorIndexConst)get_proc_address(
+        "packed_int32_array_operator_index_const",
+    )
+    packed_int64_array_operator_index = cast(ExtensionInterfacePackedInt64ArrayOperatorIndex)get_proc_address(
+        "packed_int64_array_operator_index",
+    )
+    packed_int64_array_operator_index_const = cast(ExtensionInterfacePackedInt64ArrayOperatorIndexConst)get_proc_address(
+        "packed_int64_array_operator_index_const",
+    )
+    packed_string_array_operator_index = cast(ExtensionInterfacePackedStringArrayOperatorIndex)get_proc_address(
+        "packed_string_array_operator_index",
+    )
+    packed_string_array_operator_index_const = cast(ExtensionInterfacePackedStringArrayOperatorIndexConst)get_proc_address(
+        "packed_string_array_operator_index_const",
+    )
+    packed_vector2_array_operator_index = cast(ExtensionInterfacePackedVector2ArrayOperatorIndex)get_proc_address(
+        "packed_vector2_array_operator_index",
+    )
+    packed_vector2_array_operator_index_const = cast(ExtensionInterfacePackedVector2ArrayOperatorIndexConst)get_proc_address(
+        "packed_vector2_array_operator_index_const",
+    )
+    packed_vector3_array_operator_index = cast(ExtensionInterfacePackedVector3ArrayOperatorIndex)get_proc_address(
+        "packed_vector3_array_operator_index",
+    )
+    packed_vector3_array_operator_index_const = cast(ExtensionInterfacePackedVector3ArrayOperatorIndexConst)get_proc_address(
+        "packed_vector3_array_operator_index_const",
+    )
+    packed_vector4_array_operator_index = cast(ExtensionInterfacePackedVector4ArrayOperatorIndex)get_proc_address(
+        "packed_vector4_array_operator_index",
+    )
+    packed_vector4_array_operator_index_const = cast(ExtensionInterfacePackedVector4ArrayOperatorIndexConst)get_proc_address(
+        "packed_vector4_array_operator_index_const",
+    )
+    packed_color_array_operator_index = cast(ExtensionInterfacePackedColorArrayOperatorIndex)get_proc_address(
+        "packed_color_array_operator_index",
+    )
+    packed_color_array_operator_index_const = cast(ExtensionInterfacePackedColorArrayOperatorIndexConst)get_proc_address(
+        "packed_color_array_operator_index_const",
+    )
     array_operator_index = cast(ExtensionInterfaceArrayOperatorIndex)get_proc_address("array_operator_index")
-    array_operator_index_const = cast(ExtensionInterfaceArrayOperatorIndexConst)get_proc_address("array_operator_index_const")
+    array_operator_index_const = cast(ExtensionInterfaceArrayOperatorIndexConst)get_proc_address(
+        "array_operator_index_const",
+    )
     array_ref = cast(ExtensionInterfaceArrayRef)get_proc_address("array_ref")
     array_set_typed = cast(ExtensionInterfaceArraySetTyped)get_proc_address("array_set_typed")
-    dictionary_operator_index = cast(ExtensionInterfaceDictionaryOperatorIndex)get_proc_address("dictionary_operator_index")
-    dictionary_operator_index_const = cast(ExtensionInterfaceDictionaryOperatorIndexConst)get_proc_address("dictionary_operator_index_const")
+    dictionary_operator_index = cast(ExtensionInterfaceDictionaryOperatorIndex)get_proc_address(
+        "dictionary_operator_index",
+    )
+    dictionary_operator_index_const = cast(ExtensionInterfaceDictionaryOperatorIndexConst)get_proc_address(
+        "dictionary_operator_index_const",
+    )
     dictionary_set_typed = cast(ExtensionInterfaceDictionarySetTyped)get_proc_address("dictionary_set_typed")
     object_method_bind_call = cast(ExtensionInterfaceObjectMethodBindCall)get_proc_address("object_method_bind_call")
-    object_method_bind_ptrcall = cast(ExtensionInterfaceObjectMethodBindPtrcall)get_proc_address("object_method_bind_ptrcall")
+    object_method_bind_ptrcall = cast(ExtensionInterfaceObjectMethodBindPtrcall)get_proc_address(
+        "object_method_bind_ptrcall",
+    )
     object_destroy = cast(ExtensionInterfaceObjectDestroy)get_proc_address("object_destroy")
     global_get_singleton = cast(ExtensionInterfaceGlobalGetSingleton)get_proc_address("global_get_singleton")
-    object_get_instance_binding = cast(ExtensionInterfaceObjectGetInstanceBinding)get_proc_address("object_get_instance_binding")
-    object_set_instance_binding = cast(ExtensionInterfaceObjectSetInstanceBinding)get_proc_address("object_set_instance_binding")
-    object_free_instance_binding = cast(ExtensionInterfaceObjectFreeInstanceBinding)get_proc_address("object_free_instance_binding")
+    object_get_instance_binding = cast(ExtensionInterfaceObjectGetInstanceBinding)get_proc_address(
+        "object_get_instance_binding",
+    )
+    object_set_instance_binding = cast(ExtensionInterfaceObjectSetInstanceBinding)get_proc_address(
+        "object_set_instance_binding",
+    )
+    object_free_instance_binding = cast(ExtensionInterfaceObjectFreeInstanceBinding)get_proc_address(
+        "object_free_instance_binding",
+    )
     object_set_instance = cast(ExtensionInterfaceObjectSetInstance)get_proc_address("object_set_instance")
     object_get_class_name = cast(ExtensionInterfaceObjectGetClassName)get_proc_address("object_get_class_name")
     object_cast_to = cast(ExtensionInterfaceObjectCastTo)get_proc_address("object_cast_to")
-    object_get_instance_from_id = cast(ExtensionInterfaceObjectGetInstanceFromId)get_proc_address("object_get_instance_from_id")
+    object_get_instance_from_id = cast(ExtensionInterfaceObjectGetInstanceFromId)get_proc_address(
+        "object_get_instance_from_id",
+    )
     object_get_instance_id = cast(ExtensionInterfaceObjectGetInstanceId)get_proc_address("object_get_instance_id")
-    object_has_script_method = cast(ExtensionInterfaceObjectHasScriptMethod)get_proc_address("object_has_script_method")
-    object_call_script_method = cast(ExtensionInterfaceObjectCallScriptMethod)get_proc_address("object_call_script_method")
+    object_has_script_method = cast(ExtensionInterfaceObjectHasScriptMethod)get_proc_address(
+        "object_has_script_method",
+    )
+    object_call_script_method = cast(ExtensionInterfaceObjectCallScriptMethod)get_proc_address(
+        "object_call_script_method",
+    )
     ref_get_object = cast(ExtensionInterfaceRefGetObject)get_proc_address("ref_get_object")
     ref_set_object = cast(ExtensionInterfaceRefSetObject)get_proc_address("ref_set_object")
     script_instance_create = cast(ExtensionInterfaceScriptInstanceCreate)get_proc_address("script_instance_create")
     script_instance_create2 = cast(ExtensionInterfaceScriptInstanceCreate2)get_proc_address("script_instance_create2")
     script_instance_create3 = cast(ExtensionInterfaceScriptInstanceCreate3)get_proc_address("script_instance_create3")
-    placeholder_script_instance_create = cast(ExtensionInterfacePlaceHolderScriptInstanceCreate)get_proc_address("placeholder_script_instance_create")
-    placeholder_script_instance_update = cast(ExtensionInterfacePlaceHolderScriptInstanceUpdate)get_proc_address("placeholder_script_instance_update")
-    object_get_script_instance = cast(ExtensionInterfaceObjectGetScriptInstance)get_proc_address("object_get_script_instance")
-    object_set_script_instance = cast(ExtensionInterfaceObjectSetScriptInstance)get_proc_address("object_set_script_instance")
+    placeholder_script_instance_create = cast(ExtensionInterfacePlaceHolderScriptInstanceCreate)get_proc_address(
+        "placeholder_script_instance_create",
+    )
+    placeholder_script_instance_update = cast(ExtensionInterfacePlaceHolderScriptInstanceUpdate)get_proc_address(
+        "placeholder_script_instance_update",
+    )
+    object_get_script_instance = cast(ExtensionInterfaceObjectGetScriptInstance)get_proc_address(
+        "object_get_script_instance",
+    )
+    object_set_script_instance = cast(ExtensionInterfaceObjectSetScriptInstance)get_proc_address(
+        "object_set_script_instance",
+    )
     callable_custom_create = cast(ExtensionInterfaceCallableCustomCreate)get_proc_address("callable_custom_create")
     callable_custom_create2 = cast(ExtensionInterfaceCallableCustomCreate2)get_proc_address("callable_custom_create2")
-    callable_custom_get_userdata = cast(ExtensionInterfaceCallableCustomGetUserData)get_proc_address("callable_custom_get_userdata")
-    classdb_construct_object = cast(ExtensionInterfaceClassdbConstructObject)get_proc_address("classdb_construct_object")
-    classdb_construct_object2 = cast(ExtensionInterfaceClassdbConstructObject2)get_proc_address("classdb_construct_object2")
+    callable_custom_get_userdata = cast(ExtensionInterfaceCallableCustomGetUserData)get_proc_address(
+        "callable_custom_get_userdata",
+    )
+    classdb_construct_object = cast(ExtensionInterfaceClassdbConstructObject)get_proc_address(
+        "classdb_construct_object",
+    )
+    classdb_construct_object2 = cast(ExtensionInterfaceClassdbConstructObject2)get_proc_address(
+        "classdb_construct_object2",
+    )
     classdb_get_method_bind = cast(ExtensionInterfaceClassdbGetMethodBind)get_proc_address("classdb_get_method_bind")
     classdb_get_class_tag = cast(ExtensionInterfaceClassdbGetClassTag)get_proc_address("classdb_get_class_tag")
-    classdb_register_extension_class = cast(ExtensionInterfaceClassdbRegisterExtensionClass)get_proc_address("classdb_register_extension_class")
-    classdb_register_extension_class2 = cast(ExtensionInterfaceClassdbRegisterExtensionClass2)get_proc_address("classdb_register_extension_class2")
-    classdb_register_extension_class3 = cast(ExtensionInterfaceClassdbRegisterExtensionClass3)get_proc_address("classdb_register_extension_class3")
-    classdb_register_extension_class4 = cast(ExtensionInterfaceClassdbRegisterExtensionClass4)get_proc_address("classdb_register_extension_class4")
-    classdb_register_extension_class5 = cast(ExtensionInterfaceClassdbRegisterExtensionClass5)get_proc_address("classdb_register_extension_class5")
-    classdb_register_extension_class_method = cast(ExtensionInterfaceClassdbRegisterExtensionClassMethod)get_proc_address("classdb_register_extension_class_method")
-    classdb_register_extension_class_virtual_method = cast(ExtensionInterfaceClassdbRegisterExtensionClassVirtualMethod)get_proc_address("classdb_register_extension_class_virtual_method")
-    classdb_register_extension_class_integer_constant = cast(ExtensionInterfaceClassdbRegisterExtensionClassIntegerConstant)get_proc_address("classdb_register_extension_class_integer_constant")
-    classdb_register_extension_class_property = cast(ExtensionInterfaceClassdbRegisterExtensionClassProperty)get_proc_address("classdb_register_extension_class_property")
-    classdb_register_extension_class_property_indexed = cast(ExtensionInterfaceClassdbRegisterExtensionClassPropertyIndexed)get_proc_address("classdb_register_extension_class_property_indexed")
-    classdb_register_extension_class_property_group = cast(ExtensionInterfaceClassdbRegisterExtensionClassPropertyGroup)get_proc_address("classdb_register_extension_class_property_group")
-    classdb_register_extension_class_property_subgroup = cast(ExtensionInterfaceClassdbRegisterExtensionClassPropertySubgroup)get_proc_address("classdb_register_extension_class_property_subgroup")
-    classdb_register_extension_class_signal = cast(ExtensionInterfaceClassdbRegisterExtensionClassSignal)get_proc_address("classdb_register_extension_class_signal")
-    classdb_unregister_extension_class = cast(ExtensionInterfaceClassdbUnregisterExtensionClass)get_proc_address("classdb_unregister_extension_class")
+    classdb_register_extension_class = cast(ExtensionInterfaceClassdbRegisterExtensionClass)get_proc_address(
+        "classdb_register_extension_class",
+    )
+    classdb_register_extension_class2 = cast(ExtensionInterfaceClassdbRegisterExtensionClass2)get_proc_address(
+        "classdb_register_extension_class2",
+    )
+    classdb_register_extension_class3 = cast(ExtensionInterfaceClassdbRegisterExtensionClass3)get_proc_address(
+        "classdb_register_extension_class3",
+    )
+    classdb_register_extension_class4 = cast(ExtensionInterfaceClassdbRegisterExtensionClass4)get_proc_address(
+        "classdb_register_extension_class4",
+    )
+    classdb_register_extension_class5 = cast(ExtensionInterfaceClassdbRegisterExtensionClass5)get_proc_address(
+        "classdb_register_extension_class5",
+    )
+    classdb_register_extension_class_method = cast(ExtensionInterfaceClassdbRegisterExtensionClassMethod)get_proc_address(
+        "classdb_register_extension_class_method",
+    )
+    classdb_register_extension_class_virtual_method = cast(ExtensionInterfaceClassdbRegisterExtensionClassVirtualMethod)get_proc_address(
+        "classdb_register_extension_class_virtual_method",
+    )
+    classdb_register_extension_class_integer_constant = cast(ExtensionInterfaceClassdbRegisterExtensionClassIntegerConstant)get_proc_address(
+        "classdb_register_extension_class_integer_constant",
+    )
+    classdb_register_extension_class_property = cast(ExtensionInterfaceClassdbRegisterExtensionClassProperty)get_proc_address(
+        "classdb_register_extension_class_property",
+    )
+    classdb_register_extension_class_property_indexed = cast(ExtensionInterfaceClassdbRegisterExtensionClassPropertyIndexed)get_proc_address(
+        "classdb_register_extension_class_property_indexed",
+    )
+    classdb_register_extension_class_property_group = cast(ExtensionInterfaceClassdbRegisterExtensionClassPropertyGroup)get_proc_address(
+        "classdb_register_extension_class_property_group",
+    )
+    classdb_register_extension_class_property_subgroup = cast(ExtensionInterfaceClassdbRegisterExtensionClassPropertySubgroup)get_proc_address(
+        "classdb_register_extension_class_property_subgroup",
+    )
+    classdb_register_extension_class_signal = cast(ExtensionInterfaceClassdbRegisterExtensionClassSignal)get_proc_address(
+        "classdb_register_extension_class_signal",
+    )
+    classdb_unregister_extension_class = cast(ExtensionInterfaceClassdbUnregisterExtensionClass)get_proc_address(
+        "classdb_unregister_extension_class",
+    )
     get_library_path = cast(ExtensionInterfaceGetLibraryPath)get_proc_address("get_library_path")
     editor_add_plugin = cast(ExtensionInterfaceEditorAddPlugin)get_proc_address("editor_add_plugin")
     editor_remove_plugin = cast(ExtensionInterfaceEditorRemovePlugin)get_proc_address("editor_remove_plugin")
-    editor_help_load_xml_from_utf8_chars = cast(ExtensionsInterfaceEditorHelpLoadXmlFromUtf8Chars)get_proc_address("editor_help_load_xml_from_utf8_chars")
-    editor_help_load_xml_from_utf8_chars_and_len = cast(ExtensionsInterfaceEditorHelpLoadXmlFromUtf8CharsAndLen)get_proc_address("editor_help_load_xml_from_utf8_chars_and_len")
-    editor_register_get_classes_used_callback = cast(ExtensionInterfaceEditorRegisterGetClassesUsedCallback)get_proc_address("editor_register_get_classes_used_callback")
-    register_main_loop_callbacks = cast(ExtensionInterfaceRegisterMainLoopCallbacks)get_proc_address("register_main_loop_callbacks")
+    editor_help_load_xml_from_utf8_chars = cast(ExtensionsInterfaceEditorHelpLoadXmlFromUtf8Chars)get_proc_address(
+        "editor_help_load_xml_from_utf8_chars",
+    )
+    editor_help_load_xml_from_utf8_chars_and_len = cast(ExtensionsInterfaceEditorHelpLoadXmlFromUtf8CharsAndLen)get_proc_address(
+        "editor_help_load_xml_from_utf8_chars_and_len",
+    )
+    editor_register_get_classes_used_callback = cast(ExtensionInterfaceEditorRegisterGetClassesUsedCallback)get_proc_address(
+        "editor_register_get_classes_used_callback",
+    )
+    register_main_loop_callbacks = cast(ExtensionInterfaceRegisterMainLoopCallbacks)get_proc_address(
+        "register_main_loop_callbacks",
+    )
 }

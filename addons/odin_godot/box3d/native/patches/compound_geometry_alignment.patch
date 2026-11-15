@@ -1,0 +1,21 @@
+--- a/src/compound.c
++++ b/src/compound.c
+@@ -491,6 +491,9 @@
+ 	// Packed shared hull blobs
+ 	for ( int i = 0; i < sharedHullCount; ++i )
+ 	{
++		// Packed blobs contain 64-bit fields even when instance strides are only 4-byte aligned.
++		int alignment = (int)_Alignof( b3HullData );
++		byteCount = ( byteCount + alignment - 1 ) & ~( alignment - 1 );
+ 		sharedHulls[i].hullOffset = byteCount;
+ 		byteCount += sharedHulls[i].hull->byteCount;
+ 	}
+@@ -507,6 +510,8 @@
+ 	// Packed shared mesh blobs
+ 	for ( int i = 0; i < sharedMeshCount; ++i )
+ 	{
++		int alignment = (int)_Alignof( b3MeshData );
++		byteCount = ( byteCount + alignment - 1 ) & ~( alignment - 1 );
+ 		sharedMeshes[i].meshOffset = byteCount;
+ 		byteCount += sharedMeshes[i].meshData->byteCount;
+ 	}

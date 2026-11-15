@@ -60,71 +60,86 @@ g_watch_last_mtime: i64
 // frame from lv_frame (core/highlighter.odin); cheap when idle: a counter, then one
 // stat(2) every WATCH_INTERVAL_TICKS frames.
 crash_watch_pump :: proc() {
-	g_watch_ticks += 1
-	if g_watch_ticks < WATCH_INTERVAL_TICKS {
-		return
-	}
-	g_watch_ticks = 0
-	// EDITOR process only. The game child (editor_hint false) writes the file; it must
-	// never surface it. The editor never installs the handler (crash_reporter_install
-	// gates it out), so this can never fire on the editor's own session.
-	if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
-		return
-	}
-	if !g_watch_path_ready {
-		g_watch_path_ready = true
-		gres := godot.new_string_cstring("res://bin/.odin_crash.log")
-		global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
-		p := string_to_odin(global, core_allocator())
-		if p == "" {
-			return
-		}
-		g_watch_path = p
-		g_watch_prev_path = strings.concatenate(
-			{p[:len(p) - len(".log")], ".prev.log"},
-			core_allocator(),
-		)
-	}
-	if g_watch_path == "" {
-		return
-	}
+    g_watch_ticks += 1
 
-	fi, serr := os.stat(g_watch_path, context.temp_allocator)
-	if serr != nil {
-		return // no report — the overwhelmingly common case
-	}
-	mtime := time.time_to_unix_nano(fi.modification_time)
-	if mtime <= g_watch_last_mtime {
-		return // already surfaced (rename must have failed) — never spam
-	}
-	g_watch_last_mtime = mtime
+    if g_watch_ticks < WATCH_INTERVAL_TICKS {
+        return
+    }
 
-	// Read the report (capped) and push the FULL text as ONE framed red error into the
-	// editor Output — the symbolized report finally lands where the user is looking.
-	content := ""
-	if fd, oerr := os.open(g_watch_path); oerr == nil {
-		buf := make([]byte, WATCH_READ_CAP, context.temp_allocator)
-		total := 0
-		for total < len(buf) {
-			n, rerr := os.read(fd, buf[total:])
-			if rerr != nil || n <= 0 {
-				break
-			}
-			total += n
-		}
-		os.close(fd)
-		content = strings.trim_space(string(buf[:total]))
-	}
-	if content != "" {
-		msg := godot.new_string_odin(
-			fmt.tprintf(
-				"odin_godot: the game process CRASHED — report (%s):\n%s",
-				g_watch_prev_path, // where the artifact lives AFTER the rename below
-				content,
-			),
-		)
-		godot.gd_push_error(godot.variant_from_string(&msg))
-	}
-	// One-shot + artifact preserved: the next crash recreates .odin_crash.log fresh.
-	os.rename(g_watch_path, g_watch_prev_path)
+    g_watch_ticks = 0
+
+    // EDITOR process only. The game child (editor_hint false) writes the file; it must
+    // never surface it. The editor never installs the handler (crash_reporter_install
+    // gates it out), so this can never fire on the editor's own session.
+    if !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
+        return
+    }
+
+    if !g_watch_path_ready {
+        g_watch_path_ready = true
+        gres := godot.new_string_cstring("res://bin/.odin_crash.log")
+        global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
+        p := string_to_odin(global, core_allocator())
+
+        if p == "" {
+            return
+        }
+
+        g_watch_path = p
+        g_watch_prev_path = strings.concatenate({p[:len(p) - len(".log")], ".prev.log"}, core_allocator())
+    }
+
+    if g_watch_path == "" {
+        return
+    }
+
+    fi, serr := os.stat(g_watch_path, context.temp_allocator)
+
+    if serr != nil {
+        return // no report — the overwhelmingly common case
+    }
+
+    mtime := time.time_to_unix_nano(fi.modification_time)
+
+    if mtime <= g_watch_last_mtime {
+        return // already surfaced (rename must have failed) — never spam
+    }
+
+    g_watch_last_mtime = mtime
+
+    // Read the report (capped) and push the FULL text as ONE framed red error into the
+    // editor Output — the symbolized report finally lands where the user is looking.
+    content := ""
+
+    if fd, oerr := os.open(g_watch_path); oerr == nil {
+        buf := make([]byte, WATCH_READ_CAP, context.temp_allocator)
+        total := 0
+
+        for total < len(buf) {
+            n, rerr := os.read(fd, buf[total:])
+
+            if rerr != nil || n <= 0 {
+                break
+            }
+
+            total += n
+        }
+
+        os.close(fd)
+        content = strings.trim_space(string(buf[:total]))
+    }
+
+    if content != "" {
+        msg := godot.new_string_odin(
+            fmt.tprintf(
+                "odin_godot: the game process CRASHED — report (%s):\n%s",
+                g_watch_prev_path, // where the artifact lives AFTER the rename below
+                content,
+            ),
+        )
+        godot.gd_push_error(godot.variant_from_string(&msg))
+    }
+
+    // One-shot + artifact preserved: the next crash recreates .odin_crash.log fresh.
+    os.rename(g_watch_path, g_watch_prev_path)
 }

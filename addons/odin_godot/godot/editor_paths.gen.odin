@@ -16,7 +16,7 @@ editor_paths_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_paths :: proc "contextless" () -> Editor_Paths {
-    return __bindgen_gde.classdb_construct_object(editor_paths_name_ref())
+    return cast(Editor_Paths)__bindgen_gde.classdb_construct_object(editor_paths_name_ref())
 }
 
 // methods

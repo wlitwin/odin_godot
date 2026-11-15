@@ -16,7 +16,7 @@ lightmap_probe_name :: proc "contextless" () -> String_Name {
 }
 
 new_lightmap_probe :: proc "contextless" () -> Lightmap_Probe {
-    return __bindgen_gde.classdb_construct_object(lightmap_probe_name_ref())
+    return cast(Lightmap_Probe)__bindgen_gde.classdb_construct_object(lightmap_probe_name_ref())
 }
 
 // methods

@@ -22,7 +22,7 @@ open_xr_android_thread_settings_extension_name :: proc "contextless" () -> Strin
 }
 
 new_open_xr_android_thread_settings_extension :: proc "contextless" () -> Open_Xr_Android_Thread_Settings_Extension {
-    return __bindgen_gde.classdb_construct_object(open_xr_android_thread_settings_extension_name_ref())
+    return cast(Open_Xr_Android_Thread_Settings_Extension)__bindgen_gde.classdb_construct_object(open_xr_android_thread_settings_extension_name_ref())
 }
 
 // methods
@@ -55,7 +55,7 @@ open_xr_android_thread_settings_extension_set_application_thread_type :: proc "c
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1558751158)
     }
     self := self
-    thread_type_ := thread_type_
+    thread_type_ := Int(thread_type_)
     thread_id_ := thread_id_
     args := []__bindgen_gde.TypePtr {
         &thread_type_,

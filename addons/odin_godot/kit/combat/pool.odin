@@ -39,30 +39,43 @@ Pool_Targets :: proc(user: rawptr) -> []Target
 // One host tick of a whole pool: sweep (if targeted), step, despawn — callbacks decide meaning.
 // `T` is the element: either a wrapper with a `p: Projectile` field, or Projectile itself.
 pool_tick :: proc(
-	pool: ^[dynamic]$T,
-	user: rawptr,
-	targets: Pool_Targets,
-	on_hit: proc(user: rawptr, item: ^T, tg: Target),
-	on_expire: proc(user: rawptr, item: ^T),
-) where T == Projectile || intrinsics.type_has_field(T, "p") {
-	i := 0
-	for i < len(pool) {
-		it := &pool[i]
-		pr: ^Projectile
-		when T == Projectile {pr = it} else {pr = &it.p}
-		// Sweep the tick's segment BEFORE stepping — a fast projectile still connects.
-		if targets != nil && on_hit != nil {
-			if tg, hit := projectile_hit(pr.pos, pr.vel, targets(user)); hit {
-				on_hit(user, it, tg)
-				unordered_remove(pool, i)
-				continue
-			}
-		}
-		if !projectile_step(pr) {
-			if on_expire != nil {on_expire(user, it)}
-			unordered_remove(pool, i)
-			continue
-		}
-		i += 1
-	}
+    pool: ^[dynamic]$T,
+    user: rawptr,
+    targets: Pool_Targets,
+    on_hit: proc(user: rawptr, item: ^T, tg: Target),
+    on_expire: proc(user: rawptr, item: ^T),
+) where T == Projectile ||
+    intrinsics.type_has_field(T, "p") {
+    i := 0
+
+    for i < len(pool) {
+        it := &pool[i]
+        pr: ^Projectile
+
+        when T == Projectile {
+            pr = it
+        } else {
+            pr = &it.p
+        }
+
+        // Sweep the tick's segment BEFORE stepping — a fast projectile still connects.
+        if targets != nil && on_hit != nil {
+            if tg, hit := projectile_hit(pr.pos, pr.vel, targets(user)); hit {
+                on_hit(user, it, tg)
+                unordered_remove(pool, i)
+                continue
+            }
+        }
+
+        if !projectile_step(pr) {
+            if on_expire != nil {
+                on_expire(user, it)
+            }
+
+            unordered_remove(pool, i)
+            continue
+        }
+
+        i += 1
+    }
 }

@@ -8,8 +8,8 @@ package kit_netgd
 // MultiplayerPeer the game installed — the existing ergonomic wrappers
 // (gd.host/gd.join for ENet, gd.webrtc_host/webrtc_join for browser room codes)
 // already handle peer creation, so the toolkit works over every transport those
-// support, and Steam later slots in the same way. Riding SceneMultiplayer (rather
-// than owning the peer and polling it) keeps @(gd_rpc) and the engine's
+// support, and Steam later slots in the same way. Using SceneMultiplayer's
+// packet path keeps @(gd_rpc) and the engine's
 // spawner/synchronizer interop working alongside the toolkit.
 //
 // CHANNEL PLAN (see the design doc's wire model):
@@ -25,6 +25,7 @@ package kit_netgd
 // stateless sugar.
 
 import gd "godot:godot"
+import ksess "godot:kit/session"
 import "godot:gdext"
 import "core:mem"
 
@@ -38,38 +39,58 @@ UNRELIABLE_ORDERED :: gd.Multiplayer_Peer_Transfer_Mode.Transfer_Mode_Unreliable
 // Send raw bytes to `peer` (0 = broadcast to all peers, >0 = that peer only,
 // <0 = everyone except -peer — engine semantics). The bytes are copied into the
 // engine packet; the caller's buffer is untouched and reusable immediately.
+// A disconnected transport or absent positive target returns Err_Unavailable
+// before invoking Godot's send path; this is not a successful delivery receipt.
 send_to :: proc "contextless" (
-	node: gd.Node,
-	peer: int,
-	bytes: []u8,
-	mode: gd.Multiplayer_Peer_Transfer_Mode,
-	channel: int,
+    node: gd.Node,
+    peer: int,
+    bytes: []u8,
+    mode: gd.Multiplayer_Peer_Transfer_Mode,
+    channel: int,
 ) -> gd.Error {
-	mp := gd.node_get_multiplayer(node)
-	if cast(rawptr)mp == nil {return .Failed}
-	// The default MultiplayerAPI implementation IS SceneMultiplayer; a project
-	// that swapped in a custom MultiplayerAPIExtension is outside the toolkit's
-	// support (documented), so this cast is the supported path.
-	sm := cast(gd.Scene_Multiplayer)mp
+    mp := gd.node_get_multiplayer(node)
+    defer gd.release_ref(mp)
 
-	pba := gd.new_packed_byte_array()
-	defer gd.free_packed_byte_array(pba)
-	if len(bytes) > 0 {
-		gd.packed_byte_array_resize(&pba, gd.Int(len(bytes)))
-		dst := gdext.packed_byte_array_operator_index(cast(gdext.TypePtr)&pba, 0)
-		mem.copy(dst, raw_data(bytes), len(bytes))
-	}
-	return gd.scene_multiplayer_send_bytes(sm, pba, gd.Int(peer), mode, gd.Int(channel))
+    if cast(rawptr)mp == nil {
+        return .Failed
+    }
+
+    transport := gd.multiplayer_api_get_multiplayer_peer(mp)
+    defer gd.release_ref(transport)
+
+    if transport == nil || gd.multiplayer_peer_get_connection_status(transport) != .Connection_Connected {
+        return .Err_Unavailable
+    }
+
+    if peer > 0 && !active_remote_peer(mp, ksess.Peer_Id(peer)) {
+        return .Err_Unavailable
+    }
+
+    // The default MultiplayerAPI implementation IS SceneMultiplayer; a project
+    // that swapped in a custom MultiplayerAPIExtension is outside the toolkit's
+    // support (documented), so this cast is the supported path.
+    sm := cast(gd.Scene_Multiplayer)mp
+
+    pba := gd.new_packed_byte_array()
+    defer gd.free_packed_byte_array(pba)
+
+    if len(bytes) > 0 {
+        gd.packed_byte_array_resize(&pba, gd.Int(len(bytes)))
+        dst := gdext.packed_byte_array_operator_index(cast(gdext.TypePtr)&pba, 0)
+        mem.copy(dst, raw_data(bytes), len(bytes))
+    }
+
+    return gd.scene_multiplayer_send_bytes(sm, pba, gd.Int(peer), mode, gd.Int(channel))
 }
 
 // Reliable-channel convenience (commands/transitions/chat/snapshots).
 send_reliable :: proc "contextless" (node: gd.Node, peer: int, bytes: []u8) -> gd.Error {
-	return send_to(node, peer, bytes, RELIABLE, CHANNEL_RELIABLE)
+    return send_to(node, peer, bytes, RELIABLE, CHANNEL_RELIABLE)
 }
 
 // Stream-channel convenience (owner-authoritative per-tick snapshots).
 send_stream :: proc "contextless" (node: gd.Node, peer: int, bytes: []u8) -> gd.Error {
-	return send_to(node, peer, bytes, UNRELIABLE_ORDERED, CHANNEL_STREAM)
+    return send_to(node, peer, bytes, UNRELIABLE_ORDERED, CHANNEL_STREAM)
 }
 
 // Wire `node`'s SceneMultiplayer `peer_packet(id, packet)` signal to `method` —
@@ -83,17 +104,21 @@ send_stream :: proc "contextless" (node: gd.Node, peer: int, bytes: []u8) -> gd.
 //
 // Call it once, after the node is inside the tree (get_multiplayer needs that).
 listen_packets :: proc "contextless" (node: gd.Node, method: cstring) -> gd.Error {
-	mp := gd.node_get_multiplayer(node)
-	if cast(rawptr)mp == nil {return .Failed}
-	return gd.connect_to(cast(gd.Object)mp, "peer_packet", cast(gd.Object)node, method)
+    mp := gd.node_get_multiplayer(node)
+    defer gd.release_ref(mp)
+
+    if cast(rawptr)mp == nil {
+        return .Failed
+    }
+
+    return gd.connect_to(cast(gd.Object)mp, "peer_packet", cast(gd.Object)node, method)
 }
 
-// Zero-copy view of a Packed_Byte_Array's contents — valid only while `pba` is
-// alive (i.e. inside the receiving method call). Feed it to knet.reader_make;
-// clone anything you keep.
+// Zero-copy view of a Packed_Byte_Array's contents — the packet-handler alias
+// for gd.packed_byte_array_view, which is where the helper lives now (an
+// engine-type ergonomic, beside the engine type: kit/save was importing the
+// whole of kit/netgd for this one proc to read a file). Kept under the short
+// name because every @(gd_method) packet handler in the tree opens with it.
 pba_view :: proc "contextless" (pba: ^gd.Packed_Byte_Array) -> []u8 {
-	n := int(gd.packed_byte_array_size(pba))
-	if n == 0 {return nil}
-	p := gdext.packed_byte_array_operator_index_const(cast(gdext.TypePtr)pba, 0)
-	return ([^]u8)(p)[:n]
+    return gd.packed_byte_array_view(pba)
 }

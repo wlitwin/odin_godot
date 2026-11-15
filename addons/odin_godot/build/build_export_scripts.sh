@@ -18,8 +18,9 @@
 # Cross-compile note: linux/windows targets pass `-target:<os>_amd64`. Odin can emit
 # the object, but producing a final .so/.dll requires the matching cross LINKER on
 # PATH (lld is in the dev shell; a full sysroot may still be needed). Verified here:
-# macos (native). linux/windows: supported-but-unverified — see docs/exporting.md and
-# docs/design/export-internals.md.
+# macOS arm64 and translated Linux x86_64 Box3D exports have functional Gate C
+# evidence. Windows remains build-only here; see docs/exporting.md and
+# docs/contributing/architecture.md for the separate scopes.
 set -euo pipefail
 
 # Root derived from this script's location (build/ -> root), overridable. Never hardcode a
@@ -38,6 +39,7 @@ SCRIPTS="$PROJ/scripts"
 # that layout in the bundle.
 OUTDIR="$(dirname "$OUT")"
 TARGET_EXT="${OUT##*.}"
+BOX3D_RUNTIME_DIR="$OUTDIR"
 
 # Optimization level for the EXPORTED scripts dlls. Unlike the dev rebuild-on-save loop
 # (which stays at -o:none for fast iteration), a shipped game wants real optimization.
@@ -73,7 +75,7 @@ build_scriptgen
 build_one_export_dir() {
     local dir="$1" out="$2"
     check_module_isolation "$dir"
-    run_scriptgen "$dir"
+    run_scriptgen "$dir" "$PROJ"
     atomic_odin_dll "$dir" "$out" \
         -o:"$OPT" \
         ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \

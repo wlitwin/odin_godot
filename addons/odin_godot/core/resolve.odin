@@ -20,19 +20,24 @@ import "core:strings"
 odin_collection_root :: proc(allocator := context.allocator) -> string {
     ps := godot.singleton_project_settings()
     key := godot.new_string_cstring("odin_godot/root")
+
     if bool(godot.project_settings_has_setting(ps, key)) {
         def := godot.Variant{}
         v := godot.project_settings_get_setting(ps, key, def)
         s := godot.variant_to_string(&v)
         os_s := string_to_odin(s, allocator)
+
         if os_s != "" {
             return os_s
         }
+
         delete(os_s, allocator)
     }
+
     if v, ok := os.lookup_env("ODIN_GODOT_ROOT", allocator); ok && v != "" {
         return v
     }
+
     return derive_collection_root(allocator)
 }
 
@@ -54,6 +59,7 @@ warned_no_root: bool
 derive_collection_root :: proc(allocator := context.allocator) -> string {
     if dir, ok := core_dll_dir(allocator); ok {
         defer delete(dir, allocator)
+
         // The INSTALLED layout is <addon>/bin/<platform>/libodin_godot.<ext>, so the addon root
         // is two dirs up. VALIDATE it by checking for the `godot/` collection it must contain —
         // otherwise (e.g. the in-repo dev layout, where the core sits in <project>/bin/) we'd
@@ -61,11 +67,13 @@ derive_collection_root :: proc(allocator := context.allocator) -> string {
         if up := dir_up_n(dir, 2); up != "" {
             marker := strings.concatenate({up, "/godot"}, allocator)
             defer delete(marker, allocator)
+
             if os.exists(marker) {
                 return strings.clone(up, allocator)
             }
         }
     }
+
     if !warned_no_root {
         warned_no_root = true
         msg := godot.new_string_cstring(
@@ -76,6 +84,7 @@ derive_collection_root :: proc(allocator := context.allocator) -> string {
         )
         godot.gd_push_warning(godot.variant_from_string(&msg))
     }
+
     return strings.clone("", allocator)
 }
 
@@ -83,16 +92,23 @@ derive_collection_root :: proc(allocator := context.allocator) -> string {
 @(private = "file")
 dir_up_n :: proc(path: string, n: int) -> string {
     p := path
+
     for _ in 0 ..< n {
         idx := strings.last_index_byte(p, '/')
+
         when ODIN_OS == .Windows {
             if bidx := strings.last_index_byte(p, '\\'); bidx > idx {
                 idx = bidx
             }
         }
-        if idx < 0 {return ""}
+
+        if idx < 0 {
+            return ""
+        }
+
         p = p[:idx]
     }
+
     return p
 }
 
@@ -110,33 +126,57 @@ when ODIN_OS == .Windows {
 resolve_bin :: proc(setting: cstring, envvar: string, name: string, allocator := context.allocator) -> (string, bool) {
     ps := godot.singleton_project_settings()
     key := godot.new_string_cstring(setting)
+
     if bool(godot.project_settings_has_setting(ps, key)) {
         def := godot.Variant{}
         v := godot.project_settings_get_setting(ps, key, def)
         s := godot.variant_to_string(&v)
         cand := string_to_odin(s, allocator)
-        if cand != "" && os.exists(cand) {return cand, true}
+
+        if cand != "" && os.exists(cand) {
+            return cand, true
+        }
+
         delete(cand, allocator)
     }
+
     if v, ok := os.lookup_env(envvar, allocator); ok && v != "" {
-        if os.exists(v) {return v, true}
+        if os.exists(v) {
+            return v, true
+        }
+
         delete(v, allocator)
     }
+
     if pathv, ok := os.lookup_env("PATH", allocator); ok {
         defer delete(pathv, allocator)
         it := pathv
+
         for dir in strings.split_iterator(&it, PATH_LIST_SEP) {
-            if dir == "" {continue}
+            if dir == "" {
+                continue
+            }
+
             cand := strings.concatenate({dir, "/", name}, allocator)
-            if os.exists(cand) {return cand, true}
+
+            if os.exists(cand) {
+                return cand, true
+            }
+
             delete(cand, allocator)
+
             when ODIN_OS == .Windows {
                 cand_exe := strings.concatenate({dir, "/", name, ".exe"}, allocator)
-                if os.exists(cand_exe) {return cand_exe, true}
+
+                if os.exists(cand_exe) {
+                    return cand_exe, true
+                }
+
                 delete(cand_exe, allocator)
             }
         }
     }
+
     return "", false
 }
 

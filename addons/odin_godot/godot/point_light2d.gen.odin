@@ -16,7 +16,7 @@ point_light2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_point_light2d :: proc "contextless" () -> Point_Light2d {
-    return __bindgen_gde.classdb_construct_object(point_light2d_name_ref())
+    return cast(Point_Light2d)__bindgen_gde.classdb_construct_object(point_light2d_name_ref())
 }
 
 // methods

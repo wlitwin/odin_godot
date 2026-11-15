@@ -21,7 +21,7 @@ collision_object2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_collision_object2d :: proc "contextless" () -> Collision_Object2d {
-    return __bindgen_gde.classdb_construct_object(collision_object2d_name_ref())
+    return cast(Collision_Object2d)__bindgen_gde.classdb_construct_object(collision_object2d_name_ref())
 }
 
 // methods
@@ -171,7 +171,9 @@ collision_object2d_get_collision_layer :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -203,7 +205,9 @@ collision_object2d_get_collision_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -325,7 +329,7 @@ collision_object2d_set_disable_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1919204045)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -343,7 +347,9 @@ collision_object2d_get_disable_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Collision_Object2d_Disable_Mode(__return_storage)
     return
 }
 
@@ -393,7 +399,9 @@ collision_object2d_create_shape_owner :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &owner_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -599,6 +607,44 @@ collision_object2d_get_shape_owner_one_way_collision_margin :: proc "contextless
     return
 }
 
+collision_object2d_get_shape_owner_one_way_collision_direction :: proc "contextless" (
+    self: Collision_Object2d,
+    owner_id_: Int,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_shape_owner_one_way_collision_direction", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2299179447)
+    }
+    self := self
+    owner_id_ := owner_id_
+    args := []__bindgen_gde.TypePtr {
+        &owner_id_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+collision_object2d_shape_owner_set_one_way_collision_direction :: proc "contextless" (
+    self: Collision_Object2d,
+    owner_id_: Int,
+    direction_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("shape_owner_set_one_way_collision_direction", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 163021252)
+    }
+    self := self
+    owner_id_ := owner_id_
+    direction_ := direction_
+    args := []__bindgen_gde.TypePtr {
+        &owner_id_,
+        &direction_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 collision_object2d_shape_owner_add_shape :: proc "contextless" (
     self: Collision_Object2d,
     owner_id_: Int,
@@ -633,7 +679,9 @@ collision_object2d_shape_owner_get_shape_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &owner_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -675,7 +723,9 @@ collision_object2d_shape_owner_get_shape_index :: proc "contextless" (
         &owner_id_,
         &shape_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -730,7 +780,9 @@ collision_object2d_shape_find_owner :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &shape_index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

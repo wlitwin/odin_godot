@@ -16,7 +16,7 @@ collision_polygon3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_collision_polygon3d :: proc "contextless" () -> Collision_Polygon3d {
-    return __bindgen_gde.classdb_construct_object(collision_polygon3d_name_ref())
+    return cast(Collision_Polygon3d)__bindgen_gde.classdb_construct_object(collision_polygon3d_name_ref())
 }
 
 // methods

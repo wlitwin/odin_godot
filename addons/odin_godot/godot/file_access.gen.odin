@@ -74,7 +74,7 @@ file_access_open :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1247358404)
     }
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &flags_,
@@ -95,7 +95,7 @@ file_access_open_encrypted :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 788003459)
     }
     path_ := path_
-    mode_flags_ := mode_flags_
+    mode_flags_ := Int(mode_flags_)
     key_ := key_
     iv_ := iv_
     args := []__bindgen_gde.TypePtr {
@@ -119,7 +119,7 @@ file_access_open_encrypted_with_pass :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 790283377)
     }
     path_ := path_
-    mode_flags_ := mode_flags_
+    mode_flags_ := Int(mode_flags_)
     pass_ := pass_
     args := []__bindgen_gde.TypePtr {
         &path_,
@@ -141,8 +141,8 @@ file_access_open_compressed :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3686439335)
     }
     path_ := path_
-    mode_flags_ := mode_flags_
-    compression_mode_ := compression_mode_
+    mode_flags_ := Int(mode_flags_)
+    compression_mode_ := Int(compression_mode_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &mode_flags_,
@@ -161,7 +161,9 @@ file_access_get_open_error :: proc "contextless" (
     }
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -176,7 +178,7 @@ file_access_create_temp :: proc "contextless" (
         _gde_name := new_string_name_cstring("create_temp", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 171914364)
     }
-    mode_flags_ := mode_flags_
+    mode_flags_ := Int(mode_flags_)
     prefix_ := prefix_
     extension_ := extension_
     keep_ := keep_
@@ -330,7 +332,9 @@ file_access_get_unix_permissions :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &file_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = File_Access_Unix_Permission_Flags(__return_storage)
     return
 }
 
@@ -344,12 +348,14 @@ file_access_set_unix_permissions :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 846038644)
     }
     file_ := file_
-    permissions_ := permissions_
+    permissions_ := Int(permissions_)
     args := []__bindgen_gde.TypePtr {
         &file_,
         &permissions_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -384,7 +390,9 @@ file_access_set_hidden_attribute :: proc "contextless" (
         &file_,
         &hidden_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -403,7 +411,9 @@ file_access_set_read_only_attribute :: proc "contextless" (
         &file_,
         &ro_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -479,7 +489,9 @@ file_access_set_extended_attribute :: proc "contextless" (
         &attribute_name_,
         &data_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -501,7 +513,9 @@ file_access_set_extended_attribute_string :: proc "contextless" (
         &attribute_name_,
         &data_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -520,7 +534,9 @@ file_access_remove_extended_attribute :: proc "contextless" (
         &file_,
         &attribute_name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -555,7 +571,9 @@ file_access_resize :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &length_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -708,7 +726,9 @@ file_access_get_8 :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u8(__return_storage)
     return
 }
 
@@ -723,7 +743,9 @@ file_access_get_16 :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u16(__return_storage)
     return
 }
 
@@ -738,7 +760,9 @@ file_access_get_32 :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -926,7 +950,9 @@ file_access_get_error :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

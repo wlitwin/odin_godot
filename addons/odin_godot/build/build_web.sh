@@ -17,7 +17,7 @@
 #   nix develop --command bash -c 'bash build/build_web.sh'
 #
 # EMSCRIPTEN VERSION: Godot 4.6.2's web templates were built with emscripten 4.0.20.
-# VERIFIED (docs/design/web-internals.md): a module linked with the dev shell's emscripten (5.0.6)
+# VERIFIED (docs/contributing/architecture.md): a module linked with the dev shell's emscripten (5.0.6)
 # ALSO loads and runs in the browser against the 4.0.20-built engine — with
 # `-sSUPPORT_LONGJMP=wasm` the longjmp ABI is self-contained in the wasm and the dylink
 # format is cross-compatible. 4.0.20 remains the exact-match (use `EMCC=/path/to/4.0.20/emcc
@@ -68,6 +68,36 @@ if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
     exit 1
 fi
 
+# Optional real Box3D AOT profile. A desktop DSO is never substituted for a Wasm
+# archive. Core and every compiled script share this one checked backend/domain.
+BOX3D_WEB_FLAGS=()
+BOX3D_WEB_FIELDS=()
+if [ -n "${BOX3D_WEB_ARCHIVE:-}" ]; then
+    BOX3D_WEB_PROFILE_DIR="$(mktemp -d)"
+    odin_gd_cleanup_on_exit "$BOX3D_WEB_PROFILE_DIR"
+    python3 "$ROOT/build/box3d_profile.py" --web-archive "$BOX3D_WEB_ARCHIVE" \
+        --repo "$ROOT" --state "$BOX3D_WEB_PROFILE_DIR/input.json"
+    while IFS= read -r field; do BOX3D_WEB_FIELDS+=("$field"); done < <(
+        python3 - "$BOX3D_WEB_PROFILE_DIR/input.json" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1]))
+for name in ['source_archive','build','backend_target']: print(d[name])
+PY
+    )
+    if [ "${#BOX3D_WEB_FIELDS[@]}" -ne 3 ]; then
+        echo 'build_web.sh: invalid Box3D profile fields' >&2
+        exit 1
+    fi
+    BOX3D_WEB_FLAGS=(-target-features:atomics,bulk-memory -define:BOX3D_HOST_ENABLED=true -define:BOX3D_REQUIRE_DOMAIN=true
+        "-define:BOX3D_LIBRARY=${BOX3D_WEB_FIELDS[0]}"
+        "-define:BOX3D_EXPECTED_BUILD=sha256:${BOX3D_WEB_FIELDS[1]}"
+        "-define:BOX3D_EXPECTED_TARGET=sha256:${BOX3D_WEB_FIELDS[2]}")
+    while IFS= read -r value; do BOX3D_WEB_FLAGS+=("$value"); done < <(
+        python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["odin_capacity_flags"]))' "$BOX3D_WEB_PROFILE_DIR/input.json"
+    )
+    python3 "$ROOT/build/box3d_capacity.py" --manifest "$BOX3D_WEB_PROFILE_DIR/input.json" --install-authoring "$PROJ"
+fi
+
 # Preflight: catch imports of core packages that do NOT exist on the wasm target BEFORE
 # the compiler spews cryptic "Undeclared name: _read_directory_iterator"-style errors
 # from inside Odin's own core library. Each hit is reported file:line with the portable
@@ -77,6 +107,8 @@ fi
 if [[ "${ODIN_WEB_PREFLIGHT:-1}" != "0" ]]; then
     SCAN_DIRS=("$SCRIPTS")
     [ -d "$PROJ/modules" ] && SCAN_DIRS+=("$PROJ/modules")
+    # The shared vocabulary tree links into the same wasm as the modules that import it.
+    [ -d "$PROJ/shared" ] && SCAN_DIRS+=("$PROJ/shared")
     BAD_IMPORTS="$(
         find "${SCAN_DIRS[@]}" -name '*.odin' \
             ! -name '*.gen.odin' \
@@ -111,11 +143,11 @@ fi
 #    be read-only when installed under res://addons/). SGEN_BIN env reuses a prebuilt one.
 build_scriptgen
 
-# 2. Generate *.gen.odin siblings beside the authored sources — for the main scripts dir
+# 2. Generate the odin_godot_scripts.gen.odin artifact beside the authored sources — for the main scripts dir
 #    AND each optional res://modules/<name> script module (multi-module spike). On web all
 #    modules link into this ONE side module: the compose file below @(require)-imports each
 #    module package, and web_startup's @(init) chain runs their registrations too.
-run_scriptgen "$SCRIPTS"
+run_scriptgen "$SCRIPTS" "$PROJ"
 MODULE_IMPORT_LINES=""
 if [ -d "$PROJ/modules" ]; then
     if [ "$SCRIPTS" != "$PROJ/scripts" ]; then
@@ -125,7 +157,7 @@ if [ -d "$PROJ/modules" ]; then
             mdir="${mdir%/}"
             mname="$(basename "$mdir")"
             [ -z "$(ls "$mdir"/*.odin 2>/dev/null)" ] && continue
-            run_scriptgen "$mdir"
+            run_scriptgen "$mdir" "$PROJ"
             MODULE_IMPORT_LINES="$MODULE_IMPORT_LINES@(require) import mod_$mname \"../modules/$mname\"
 "
         done
@@ -169,22 +201,34 @@ ODIN_OBJ="$OBJ_DIR/$(basename "${OUT%.wasm}").wasm.o"
     -no-entry-point \
     -reloc-mode:pic \
     -define:ODIN_GODOT_WEB=true \
+    ${BOX3D_WEB_FLAGS[@]+"${BOX3D_WEB_FLAGS[@]}"} \
     ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
     -out:"$ODIN_OBJ" \
     ${SCRIPT_BUILD_FLAGS:-}
 
 # 5. Object -> Emscripten SIDE_MODULE. -sSUPPORT_LONGJMP=wasm matches the binding's
 #    setjmp/longjmp -> invoke_* ABI. The entry symbol odin_godot_init is exported via
-#    its Odin @(export) attribute. Link to a temp beside $OUT, then publish atomically
-#    (same invariant as atomic_odin_dll: the live wasm is never missing/half-written).
-TMP_WASM="$(dirname "$OUT")/.$(basename "$OUT").tmp"
-odin_gd_cleanup_on_exit "$TMP_WASM"
-"$EMCC" "$ODIN_OBJ" \
-    -sSIDE_MODULE=1 \
-    -sSUPPORT_LONGJMP=wasm \
-    -O2 \
-    -o "$TMP_WASM"
+#    its Odin @(export) attribute. Link in a unique staging directory beside $OUT, then
+#    publish atomically (same invariant/cleanup contract as atomic_odin_dll).
+WASM_BASE="$(basename "${OUT%.wasm}")"
+odin_gd_prune_stale_stages "$(dirname "$OUT")" "$WASM_BASE"
+WASM_STAGE="$(mktemp -d "$(dirname "$OUT")/.$WASM_BASE.build.$$.XXXXXX")"
+TMP_WASM="$WASM_STAGE/$(basename "$OUT")"
+odin_gd_cleanup_on_exit "$WASM_STAGE"
+if [ "${#BOX3D_WEB_FLAGS[@]}" -ne 0 ]; then
+    python3 "$ROOT/build/box3d_web_link.py" --emcc "$EMCC" --object "$ODIN_OBJ" \
+        --archive "${BOX3D_WEB_FIELDS[0]}" \
+        --manifest "$(dirname "${BOX3D_WEB_FIELDS[0]}")/build-manifest.json" --out "$TMP_WASM"
+    mv -f "${TMP_WASM%.wasm}.box3d-link.json" "${OUT%.wasm}.box3d-link.json"
+else
+    "$EMCC" "$ODIN_OBJ" \
+        -sSIDE_MODULE=1 \
+        -sSUPPORT_LONGJMP=wasm \
+        -O2 \
+        -o "$TMP_WASM"
+fi
 mv -f "$TMP_WASM" "$OUT"
+rm -rf "$WASM_STAGE"
 
 echo "build_web.sh: built $OUT"
 file "$OUT" || true

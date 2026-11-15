@@ -41,7 +41,7 @@ new_audio_effect_instance :: proc "contextless" () -> Audio_Effect_Instance {
 audio_effect_instance__process :: proc "contextless" (
     self: Audio_Effect_Instance,
     src_buffer_: rawptr,
-    dst_buffer_: ^Audio_Frame,
+    r_dst_buffer_: ^Audio_Frame,
     frame_count_: Int,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
@@ -51,11 +51,11 @@ audio_effect_instance__process :: proc "contextless" (
     }
     self := self
     src_buffer_ := src_buffer_
-    dst_buffer_ := dst_buffer_
+    r_dst_buffer_ := r_dst_buffer_
     frame_count_ := frame_count_
     args := []__bindgen_gde.TypePtr {
         &src_buffer_,
-        &dst_buffer_,
+        &r_dst_buffer_,
         &frame_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)

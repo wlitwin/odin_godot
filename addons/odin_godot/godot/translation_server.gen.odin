@@ -16,7 +16,7 @@ translation_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_translation_server :: proc "contextless" () -> Translation_Server {
-    return __bindgen_gde.classdb_construct_object(translation_server_name_ref())
+    return cast(Translation_Server)__bindgen_gde.classdb_construct_object(translation_server_name_ref())
 }
 
 // methods
@@ -102,7 +102,9 @@ translation_server_compare_locales :: proc "contextless" (
         &locale_a_,
         &locale_b_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

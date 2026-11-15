@@ -50,7 +50,7 @@ skeleton_modifier3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_skeleton_modifier3d :: proc "contextless" () -> Skeleton_Modifier3d {
-    return __bindgen_gde.classdb_construct_object(skeleton_modifier3d_name_ref())
+    return cast(Skeleton_Modifier3d)__bindgen_gde.classdb_construct_object(skeleton_modifier3d_name_ref())
 }
 
 // methods

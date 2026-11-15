@@ -66,7 +66,7 @@ method_tweener_set_trans :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3740975367)
     }
     self := self
-    trans_ := trans_
+    trans_ := Int(trans_)
     args := []__bindgen_gde.TypePtr {
         &trans_,
     }
@@ -84,7 +84,7 @@ method_tweener_set_ease :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 315540545)
     }
     self := self
-    ease_ := ease_
+    ease_ := Int(ease_)
     args := []__bindgen_gde.TypePtr {
         &ease_,
     }

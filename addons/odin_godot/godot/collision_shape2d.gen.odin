@@ -16,7 +16,7 @@ collision_shape2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_collision_shape2d :: proc "contextless" () -> Collision_Shape2d {
-    return __bindgen_gde.classdb_construct_object(collision_shape2d_name_ref())
+    return cast(Collision_Shape2d)__bindgen_gde.classdb_construct_object(collision_shape2d_name_ref())
 }
 
 // methods
@@ -158,6 +158,38 @@ collision_shape2d_get_one_way_collision_margin :: proc "contextless" (
     if __ptr == nil {
         _gde_name := new_string_name_cstring("get_one_way_collision_margin", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+collision_shape2d_set_one_way_collision_direction :: proc "contextless" (
+    self: Collision_Shape2d,
+    direction_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_one_way_collision_direction", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 743155724)
+    }
+    self := self
+    direction_ := direction_
+    args := []__bindgen_gde.TypePtr {
+        &direction_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+collision_shape2d_get_one_way_collision_direction :: proc "contextless" (
+    self: Collision_Shape2d,
+) -> (ret: Vector2) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_one_way_collision_direction", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3341600327)
     }
     self := self
     args := []__bindgen_gde.TypePtr {

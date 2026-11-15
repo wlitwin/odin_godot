@@ -1,0 +1,80 @@
+--- a/rollback_shim.c
++++ b/rollback_shim.c
+@@ -1,3 +1,5 @@
++/* Manifest-tracked compatibility adaptation for Box3D 33626332.
++ * Original rollback-in-a-box source and patch preimage are verified by the driver. */
+ #include "rollback_shim.h"
+ 
+ #include "box3d/box3d.h"
+@@ -8,7 +10,8 @@
+ #include "core.h"
+ #include "physics_world.h"
+ #include "recording.h"
+-#include "recording_replay.h"
++#include "replay.h"
++#include "simd.h"
+ #include "world_snapshot.h"
+ 
+ #include <float.h>
+@@ -41,9 +44,9 @@
+ static void b3r_RefreshView( B3RollbackCtx* ctx )
+ {
+ 	const b3GeometryRegistry* reg = &ctx->rec->registry;
+-	if ( reg->count > ctx->viewCapacity )
+-	{
+-		int capacity = reg->count > 16 ? 2 * reg->count : 32;
++	if ( reg->entries.count > ctx->viewCapacity )
++	{
++		int capacity = reg->entries.count > 16 ? 2 * reg->entries.count : 32;
+ 		b3RegistrySlot* view = calloc( (size_t)capacity, sizeof( b3RegistrySlot ) );
+ 		if ( ctx->view != NULL )
+ 		{
+@@ -54,14 +57,13 @@
+ 		ctx->viewCapacity = capacity;
+ 	}
+ 
+-	for ( int i = ctx->viewCount; i < reg->count; ++i )
+-	{
+-		ctx->view[i].kind = reg->entries[i].kind;
+-		ctx->view[i].byteCount = reg->entries[i].byteCount;
+-		ctx->view[i].bytes = reg->entries[i].bytes;
+-		ctx->view[i].live = NULL;
+-	}
+-	ctx->viewCount = reg->count;
++	for ( int i = ctx->viewCount; i < reg->entries.count; ++i )
++	{
++		ctx->view[i].kind = reg->entries.data[i].kind;
++		ctx->view[i].byteCount = reg->entries.data[i].byteCount;
++		ctx->view[i].bytes = reg->entries.data[i].bytes;
++	}
++	ctx->viewCount = reg->entries.count;
+ }
+ 
+ B3RollbackCtx* b3r_create( b3WorldId worldId, int slotCount )
+@@ -98,16 +100,7 @@
+ 	free( ctx->slots );
+ 	free( ctx->slotSizes );
+ 
+-	// Mirror b3RecFreeSlots for lazily-created compound objects, but do NOT free
+-	// view[i].bytes — those blobs belong to rec->registry and are freed by
+-	// b3DestroyRecording below.
+-	for ( int i = 0; i < ctx->viewCount; ++i )
+-	{
+-		if ( ctx->view[i].live != NULL && ctx->view[i].kind == b3_geometryCompound )
+-		{
+-			b3Free( ctx->view[i].live, (size_t)ctx->view[i].byteCount );
+-		}
+-	}
++	// Slots borrow packed geometry owned by rec->registry; no lazy live copies.
+ 	free( ctx->view );
+ 
+ 	b3DestroyRecording( ctx->rec );
+@@ -274,7 +267,7 @@
+ 	b3Version version = b3GetVersion();
+ 	h = b3r_FnvFold( h, (uint64_t)version.major << 32 | (uint64_t)version.minor << 16 | (uint64_t)version.revision );
+ 
+-	h = b3r_FnvFold( h, (uint64_t)B3_SIMD_WIDTH );
++	h = b3r_FnvFold( h, (uint64_t)b3GetSIMDWidth() );
+ #if defined( B3_SIMD_SSE2 )
+ 	h = b3r_FnvFold( h, 1 );
+ #elif defined( B3_SIMD_NEON )

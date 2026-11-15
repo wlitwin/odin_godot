@@ -16,7 +16,7 @@ open_xr_extension_wrapper_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_extension_wrapper :: proc "contextless" () -> Open_Xr_Extension_Wrapper {
-    return __bindgen_gde.classdb_construct_object(open_xr_extension_wrapper_name_ref())
+    return cast(Open_Xr_Extension_Wrapper)__bindgen_gde.classdb_construct_object(open_xr_extension_wrapper_name_ref())
 }
 
 // methods
@@ -209,6 +209,24 @@ open_xr_extension_wrapper__set_frame_end_info_and_get_next_pointer :: proc "cont
     return
 }
 
+open_xr_extension_wrapper__set_projection_layer_and_get_next_pointer :: proc "contextless" (
+    self: Open_Xr_Extension_Wrapper,
+    next_pointer_: rawptr,
+) -> (ret: u64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_set_projection_layer_and_get_next_pointer", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3744713108)
+    }
+    self := self
+    next_pointer_ := next_pointer_
+    args := []__bindgen_gde.TypePtr {
+        &next_pointer_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 open_xr_extension_wrapper__set_view_locate_info_and_get_next_pointer :: proc "contextless" (
     self: Open_Xr_Extension_Wrapper,
     next_pointer_: rawptr,
@@ -314,7 +332,9 @@ open_xr_extension_wrapper__get_composition_layer_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -350,7 +370,9 @@ open_xr_extension_wrapper__get_composition_layer_order :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -371,14 +393,17 @@ open_xr_extension_wrapper__get_suggested_tracker_names :: proc "contextless" (
 
 open_xr_extension_wrapper__on_register_metadata :: proc "contextless" (
     self: Open_Xr_Extension_Wrapper,
+    interaction_profile_metadata_: Open_Xr_Interaction_Profile_Metadata,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("_on_register_metadata", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 309044627)
     }
     self := self
+    interaction_profile_metadata_ := interaction_profile_metadata_
     args := []__bindgen_gde.TypePtr {
+        &interaction_profile_metadata_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

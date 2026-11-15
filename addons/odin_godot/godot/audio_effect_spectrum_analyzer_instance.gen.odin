@@ -56,7 +56,7 @@ audio_effect_spectrum_analyzer_instance_get_magnitude_for_frequency_range :: pro
     self := self
     from_hz_ := from_hz_
     to_hz_ := to_hz_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &from_hz_,
         &to_hz_,

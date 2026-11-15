@@ -16,7 +16,7 @@ xr_origin3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_xr_origin3d :: proc "contextless" () -> Xr_Origin3d {
-    return __bindgen_gde.classdb_construct_object(xr_origin3d_name_ref())
+    return cast(Xr_Origin3d)__bindgen_gde.classdb_construct_object(xr_origin3d_name_ref())
 }
 
 // methods

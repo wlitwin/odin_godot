@@ -269,7 +269,9 @@ web_xr_interface_get_input_source_target_ray_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &input_source_id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Web_Xr_Interface_Target_Ray_Mode(__return_storage)
     return
 }
 

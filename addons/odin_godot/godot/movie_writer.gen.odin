@@ -16,7 +16,7 @@ movie_writer_name :: proc "contextless" () -> String_Name {
 }
 
 new_movie_writer :: proc "contextless" () -> Movie_Writer {
-    return __bindgen_gde.classdb_construct_object(movie_writer_name_ref())
+    return cast(Movie_Writer)__bindgen_gde.classdb_construct_object(movie_writer_name_ref())
 }
 
 // methods
@@ -64,7 +64,9 @@ movie_writer__get_audio_mix_rate :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -79,7 +81,9 @@ movie_writer__get_audio_speaker_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Audio_Server_Speaker_Mode(__return_storage)
     return
 }
 
@@ -136,7 +140,9 @@ movie_writer__write_begin :: proc "contextless" (
         &fps_,
         &base_path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -157,7 +163,9 @@ movie_writer__write_frame :: proc "contextless" (
         &frame_image_,
         &audio_frame_block_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

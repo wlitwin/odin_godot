@@ -4,6 +4,11 @@ import __bindgen_gde "godot:gdext"
 
 Sprite_Frames_Constants :: enum {
 }
+Sprite_Frames_Loop_Mode :: enum int {
+    Loop_None = 0,
+    Loop_Linear = 1,
+    Loop_Pingpong = 2,
+}
 
 
 
@@ -221,6 +226,46 @@ sprite_frames_get_animation_loop :: proc "contextless" (
     return
 }
 
+sprite_frames_set_animation_loop_mode :: proc "contextless" (
+    self: Sprite_Frames,
+    anim_: String_Name,
+    loop_mode_: Sprite_Frames_Loop_Mode,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_animation_loop_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 918068248)
+    }
+    self := self
+    anim_ := anim_
+    loop_mode_ := Int(loop_mode_)
+    args := []__bindgen_gde.TypePtr {
+        &anim_,
+        &loop_mode_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+sprite_frames_get_animation_loop_mode :: proc "contextless" (
+    self: Sprite_Frames,
+    anim_: String_Name,
+) -> (ret: Sprite_Frames_Loop_Mode) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_animation_loop_mode", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3606360228)
+    }
+    self := self
+    anim_ := anim_
+    args := []__bindgen_gde.TypePtr {
+        &anim_,
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Sprite_Frames_Loop_Mode(__return_storage)
+    return
+}
+
 sprite_frames_add_frame :: proc "contextless" (
     self: Sprite_Frames,
     anim_: String_Name,
@@ -307,7 +352,9 @@ sprite_frames_get_frame_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &anim_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

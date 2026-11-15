@@ -16,7 +16,7 @@ uniform_set_cache_rd_name :: proc "contextless" () -> String_Name {
 }
 
 new_uniform_set_cache_rd :: proc "contextless" () -> Uniform_Set_Cache_Rd {
-    return __bindgen_gde.classdb_construct_object(uniform_set_cache_rd_name_ref())
+    return cast(Uniform_Set_Cache_Rd)__bindgen_gde.classdb_construct_object(uniform_set_cache_rd_name_ref())
 }
 
 // methods

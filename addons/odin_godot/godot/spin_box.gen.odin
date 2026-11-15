@@ -16,7 +16,7 @@ spin_box_name :: proc "contextless" () -> String_Name {
 }
 
 new_spin_box :: proc "contextless" () -> Spin_Box {
-    return __bindgen_gde.classdb_construct_object(spin_box_name_ref())
+    return cast(Spin_Box)__bindgen_gde.classdb_construct_object(spin_box_name_ref())
 }
 
 // methods
@@ -48,7 +48,7 @@ spin_box_set_horizontal_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2312603777)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -66,7 +66,9 @@ spin_box_get_horizontal_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Horizontal_Alignment(__return_storage)
     return
 }
 

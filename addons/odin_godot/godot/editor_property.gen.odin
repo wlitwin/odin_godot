@@ -16,7 +16,7 @@ editor_property_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_property :: proc "contextless" () -> Editor_Property {
-    return __bindgen_gde.classdb_construct_object(editor_property_name_ref())
+    return cast(Editor_Property)__bindgen_gde.classdb_construct_object(editor_property_name_ref())
 }
 
 // methods

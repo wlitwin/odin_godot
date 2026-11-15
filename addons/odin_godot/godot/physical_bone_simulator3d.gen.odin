@@ -16,7 +16,7 @@ physical_bone_simulator3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_physical_bone_simulator3d :: proc "contextless" () -> Physical_Bone_Simulator3d {
-    return __bindgen_gde.classdb_construct_object(physical_bone_simulator3d_name_ref())
+    return cast(Physical_Bone_Simulator3d)__bindgen_gde.classdb_construct_object(physical_bone_simulator3d_name_ref())
 }
 
 // methods

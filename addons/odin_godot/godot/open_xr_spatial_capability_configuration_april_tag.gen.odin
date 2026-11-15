@@ -69,7 +69,7 @@ open_xr_spatial_capability_configuration_april_tag_set_april_dict :: proc "conte
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3902905799)
     }
     self := self
-    april_dict_ := april_dict_
+    april_dict_ := Int(april_dict_)
     args := []__bindgen_gde.TypePtr {
         &april_dict_,
     }
@@ -87,7 +87,9 @@ open_xr_spatial_capability_configuration_april_tag_get_april_dict :: proc "conte
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Spatial_Capability_Configuration_April_Tag_April_Tag_Dict(__return_storage)
     return
 }
 

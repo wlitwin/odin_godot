@@ -100,7 +100,9 @@ editor_node3d_gizmo_plugin__get_priority :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -125,6 +127,21 @@ editor_node3d_gizmo_plugin__is_selectable_when_hidden :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("_is_selectable_when_hidden", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+editor_node3d_gizmo_plugin__can_commit_handle_on_click :: proc "contextless" (
+    self: Editor_Node3d_Gizmo_Plugin,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_can_commit_handle_on_click", true)
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
     }
     self := self
@@ -324,7 +341,9 @@ editor_node3d_gizmo_plugin__subgizmos_intersect_ray :: proc "contextless" (
         &camera_,
         &screen_pos_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

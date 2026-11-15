@@ -86,7 +86,7 @@ style_box_texture_set_texture_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4290182280)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     size_ := size_
     args := []__bindgen_gde.TypePtr {
         &margin_,
@@ -122,7 +122,7 @@ style_box_texture_get_texture_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }
@@ -141,7 +141,7 @@ style_box_texture_set_expand_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4290182280)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     size_ := size_
     args := []__bindgen_gde.TypePtr {
         &margin_,
@@ -177,7 +177,7 @@ style_box_texture_get_expand_margin :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2869120046)
     }
     self := self
-    margin_ := margin_
+    margin_ := Int(margin_)
     args := []__bindgen_gde.TypePtr {
         &margin_,
     }
@@ -291,7 +291,7 @@ style_box_texture_set_h_axis_stretch_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2965538783)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -309,7 +309,9 @@ style_box_texture_get_h_axis_stretch_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Style_Box_Texture_Axis_Stretch_Mode(__return_storage)
     return
 }
 
@@ -323,7 +325,7 @@ style_box_texture_set_v_axis_stretch_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2965538783)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -341,7 +343,9 @@ style_box_texture_get_v_axis_stretch_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Style_Box_Texture_Axis_Stretch_Mode(__return_storage)
     return
 }
 

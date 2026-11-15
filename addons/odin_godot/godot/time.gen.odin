@@ -39,7 +39,7 @@ time_name :: proc "contextless" () -> String_Name {
 }
 
 new_time :: proc "contextless" () -> Time {
-    return __bindgen_gde.classdb_construct_object(time_name_ref())
+    return cast(Time)__bindgen_gde.classdb_construct_object(time_name_ref())
 }
 
 // methods

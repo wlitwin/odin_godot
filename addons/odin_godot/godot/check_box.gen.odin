@@ -16,7 +16,7 @@ check_box_name :: proc "contextless" () -> String_Name {
 }
 
 new_check_box :: proc "contextless" () -> Check_Box {
-    return __bindgen_gde.classdb_construct_object(check_box_name_ref())
+    return cast(Check_Box)__bindgen_gde.classdb_construct_object(check_box_name_ref())
 }
 
 // methods

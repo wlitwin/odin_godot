@@ -35,15 +35,18 @@ script_context_hook: proc "contextless" () -> runtime.Context
 
 @(require_results)
 script_context :: proc "contextless" () -> runtime.Context {
-	if script_context_hook != nil {
-		return script_context_hook()
-	}
-	c := runtime.default_context()
-	// NATIVE panic/assert surfacing (see panic_native.odin). Excluded on freestanding
-	// wasm32, where the web hook above is always installed before any script runs (and
-	// the freestanding fallthrough context must stay untouched).
-	when ODIN_OS != .Freestanding {
-		c.assertion_failure_proc = native_script_assertion_failure
-	}
-	return c
+    if script_context_hook != nil {
+        return script_context_hook()
+    }
+
+    c := runtime.default_context()
+
+    // NATIVE panic/assert surfacing (see panic_native.odin). Excluded on freestanding
+    // wasm32, where the web hook above is always installed before any script runs (and
+    // the freestanding fallthrough context must stay untouched).
+    when ODIN_OS != .Freestanding {
+        c.assertion_failure_proc = native_script_assertion_failure
+    }
+
+    return c
 }

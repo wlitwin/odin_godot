@@ -99,7 +99,9 @@ gltf_object_model_property_get_accessor_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Accessor_Gltf_Accessor_Type(__return_storage)
     return
 }
 
@@ -225,7 +227,9 @@ gltf_object_model_property_get_object_model_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gltf_Object_Model_Property_Gltf_Object_Model_Type(__return_storage)
     return
 }
 
@@ -239,7 +243,7 @@ gltf_object_model_property_set_object_model_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4108684086)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
     }
@@ -304,7 +308,9 @@ gltf_object_model_property_get_variant_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = __bindgen_gde.Variant_Type(__return_storage)
     return
 }
 
@@ -318,7 +324,7 @@ gltf_object_model_property_set_variant_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2887708385)
     }
     self := self
-    variant_type_ := variant_type_
+    variant_type_ := Int(variant_type_)
     args := []__bindgen_gde.TypePtr {
         &variant_type_,
     }
@@ -336,8 +342,8 @@ gltf_object_model_property_set_types :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4150728237)
     }
     self := self
-    variant_type_ := variant_type_
-    obj_model_type_ := obj_model_type_
+    variant_type_ := Int(variant_type_)
+    obj_model_type_ := Int(obj_model_type_)
     args := []__bindgen_gde.TypePtr {
         &variant_type_,
         &obj_model_type_,

@@ -181,7 +181,7 @@ xr_body_tracker_set_body_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2103235750)
     }
     self := self
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &flags_,
     }
@@ -199,7 +199,9 @@ xr_body_tracker_get_body_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Body_Tracker_Body_Flags(__return_storage)
     return
 }
 
@@ -214,8 +216,8 @@ xr_body_tracker_set_joint_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 592144999)
     }
     self := self
-    joint_ := joint_
-    flags_ := flags_
+    joint_ := Int(joint_)
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
         &flags_,
@@ -233,11 +235,13 @@ xr_body_tracker_get_joint_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1030162609)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Body_Tracker_Joint_Flags(__return_storage)
     return
 }
 
@@ -252,7 +256,7 @@ xr_body_tracker_set_joint_transform :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2635424328)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     transform_ := transform_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -271,7 +275,7 @@ xr_body_tracker_get_joint_transform :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3474811534)
     }
     self := self
-    joint_ := joint_
+    joint_ := Int(joint_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }

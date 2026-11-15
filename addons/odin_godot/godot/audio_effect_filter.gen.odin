@@ -150,7 +150,7 @@ audio_effect_filter_set_db :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 771740901)
     }
     self := self
-    amount_ := amount_
+    amount_ := Int(amount_)
     args := []__bindgen_gde.TypePtr {
         &amount_,
     }
@@ -168,7 +168,9 @@ audio_effect_filter_get_db :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Audio_Effect_Filter_Filter_Db(__return_storage)
     return
 }
 

@@ -48,7 +48,7 @@ rd_texture_view_set_format_override :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 565531219)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -66,7 +66,9 @@ rd_texture_view_get_format_override :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Data_Format(__return_storage)
     return
 }
 
@@ -80,7 +82,7 @@ rd_texture_view_set_swizzle_r :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3833362581)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -98,7 +100,9 @@ rd_texture_view_get_swizzle_r :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Texture_Swizzle(__return_storage)
     return
 }
 
@@ -112,7 +116,7 @@ rd_texture_view_set_swizzle_g :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3833362581)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -130,7 +134,9 @@ rd_texture_view_get_swizzle_g :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Texture_Swizzle(__return_storage)
     return
 }
 
@@ -144,7 +150,7 @@ rd_texture_view_set_swizzle_b :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3833362581)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -162,7 +168,9 @@ rd_texture_view_get_swizzle_b :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Texture_Swizzle(__return_storage)
     return
 }
 
@@ -176,7 +184,7 @@ rd_texture_view_set_swizzle_a :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3833362581)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -194,7 +202,9 @@ rd_texture_view_get_swizzle_a :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Texture_Swizzle(__return_storage)
     return
 }
 

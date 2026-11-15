@@ -77,7 +77,7 @@ text_line_set_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1418190634)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -95,7 +95,9 @@ text_line_get_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Direction(__return_storage)
     return
 }
 
@@ -110,7 +112,9 @@ text_line_get_inferred_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Direction(__return_storage)
     return
 }
 
@@ -124,7 +128,7 @@ text_line_set_orientation :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 42823726)
     }
     self := self
-    orientation_ := orientation_
+    orientation_ := Int(orientation_)
     args := []__bindgen_gde.TypePtr {
         &orientation_,
     }
@@ -142,7 +146,9 @@ text_line_get_orientation :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Orientation(__return_storage)
     return
 }
 
@@ -273,7 +279,7 @@ text_line_add_object :: proc "contextless" (
     self := self
     key_ := key_
     size_ := size_
-    inline_align_ := inline_align_
+    inline_align_ := Int(inline_align_)
     length_ := length_
     baseline_ := baseline_
     args := []__bindgen_gde.TypePtr {
@@ -302,7 +308,7 @@ text_line_resize_object :: proc "contextless" (
     self := self
     key_ := key_
     size_ := size_
-    inline_align_ := inline_align_
+    inline_align_ := Int(inline_align_)
     baseline_ := baseline_
     args := []__bindgen_gde.TypePtr {
         &key_,
@@ -374,7 +380,7 @@ text_line_set_horizontal_alignment :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2312603777)
     }
     self := self
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     args := []__bindgen_gde.TypePtr {
         &alignment_,
     }
@@ -392,7 +398,9 @@ text_line_get_horizontal_alignment :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Horizontal_Alignment(__return_storage)
     return
 }
 
@@ -423,7 +431,7 @@ text_line_set_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2877345813)
     }
     self := self
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &flags_,
     }
@@ -441,7 +449,9 @@ text_line_get_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Justification_Flag(__return_storage)
     return
 }
 
@@ -455,7 +465,7 @@ text_line_set_text_overrun_behavior :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1008890932)
     }
     self := self
-    overrun_behavior_ := overrun_behavior_
+    overrun_behavior_ := Int(overrun_behavior_)
     args := []__bindgen_gde.TypePtr {
         &overrun_behavior_,
     }
@@ -473,7 +483,9 @@ text_line_get_text_overrun_behavior :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Overrun_Behavior(__return_storage)
     return
 }
 
@@ -716,7 +728,9 @@ text_line_hit_test :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &coords_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

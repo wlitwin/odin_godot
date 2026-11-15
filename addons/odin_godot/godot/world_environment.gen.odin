@@ -16,7 +16,7 @@ world_environment_name :: proc "contextless" () -> String_Name {
 }
 
 new_world_environment :: proc "contextless" () -> World_Environment {
-    return __bindgen_gde.classdb_construct_object(world_environment_name_ref())
+    return cast(World_Environment)__bindgen_gde.classdb_construct_object(world_environment_name_ref())
 }
 
 // methods

@@ -53,7 +53,7 @@ image_texture3d_create :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1130379827)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     width_ := width_
     height_ := height_
     depth_ := depth_
@@ -67,7 +67,9 @@ image_texture3d_create :: proc "contextless" (
         &use_mipmaps_,
         &data_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

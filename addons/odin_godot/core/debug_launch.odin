@@ -69,11 +69,16 @@ project_dir :: proc() -> string {
 launcher_path :: proc() -> (path: string, ok: bool) {
     root := odin_collection_root()
     defer delete(root)
+
     if root == "" {
-        editor_msg_error("odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.")
+        editor_msg_error(
+            "odin_godot: couldn't locate the addon — set the `odin_godot/root` project setting, then retry.",
+        )
         return "", false
     }
+
     path = fmt.tprintf("%s/build/debug_game.sh", root)
+
     if !os.exists(path) {
         editor_msg_error(
             fmt.tprintf(
@@ -84,6 +89,7 @@ launcher_path :: proc() -> (path: string, ok: bool) {
         )
         return "", false
     }
+
     return path, true
 }
 
@@ -95,12 +101,15 @@ launcher_path :: proc() -> (path: string, ok: bool) {
 @(private = "file")
 applescript_escape :: proc(s: string) -> string {
     b := strings.builder_make(context.temp_allocator)
+
     for i in 0 ..< len(s) {
         if s[i] == '\\' || s[i] == '"' {
             strings.write_byte(&b, '\\')
         }
+
         strings.write_byte(&b, s[i])
     }
+
     return strings.to_string(b)
 }
 
@@ -112,10 +121,7 @@ open_terminal :: proc(cmd: string) -> bool {
         // layers: cmd -> AppleScript string literal (applescript_escape), then the whole
         // AppleScript program -> shell word (shell_quote — cmd is full of single quotes
         // from its own shell_quote'ing, so the -e argument can NOT be '-quoted inline).
-        program := fmt.tprintf(
-            `tell application "Terminal" to do script "%s"`,
-            applescript_escape(cmd),
-        )
+        program := fmt.tprintf(`tell application "Terminal" to do script "%s"`, applescript_escape(cmd))
         script := fmt.tprintf(
             `osascript -e %s -e 'tell application "Terminal" to activate' >/dev/null 2>&1`,
             shell_quote(program, context.temp_allocator),
@@ -127,25 +133,31 @@ open_terminal :: proc(cmd: string) -> bool {
         // takes a `bash -c <cmd>` payload; nohup+& detaches it from the editor process
         // (xterm -e otherwise blocks the editor main thread until the session ends).
         q := shell_quote(cmd, context.temp_allocator)
-        candidates := [4]string{
+        candidates := [4]string {
             fmt.tprintf("x-terminal-emulator -e bash -c %s", q),
             fmt.tprintf("gnome-terminal -- bash -c %s", q),
             fmt.tprintf("konsole -e bash -c %s", q),
             fmt.tprintf("xterm -e bash -c %s", q),
         }
         names := [4]string{"x-terminal-emulator", "gnome-terminal", "konsole", "xterm"}
+
         for name, i in names {
             probe := strings.clone_to_cstring(
                 fmt.tprintf("command -v %s >/dev/null 2>&1", name),
                 context.temp_allocator,
             )
-            if libc.system(probe) != 0 {continue}
+
+            if libc.system(probe) != 0 {
+                continue
+            }
+
             launch := strings.clone_to_cstring(
                 fmt.tprintf("nohup %s >/dev/null 2>&1 &", candidates[i]),
                 context.temp_allocator,
             )
             return libc.system(launch) == 0
         }
+
         editor_msg_error(
             "odin_godot: no terminal emulator found (tried x-terminal-emulator, gnome-terminal, " +
             "konsole, xterm) — run build/debug_game.sh from your own terminal instead.",
@@ -158,7 +170,11 @@ open_terminal :: proc(cmd: string) -> bool {
 @(private = "file")
 launch_debug_session :: proc(break_spec: string) {
     launcher, ok := launcher_path()
-    if !ok {return}
+
+    if !ok {
+        return
+    }
+
     exe := editor_executable()
     proj := project_dir()
     b := strings.builder_make(context.temp_allocator)
@@ -168,15 +184,20 @@ launch_debug_session :: proc(break_spec: string) {
         shell_quote(launcher, context.temp_allocator),
         shell_quote(exe, context.temp_allocator),
     )
+
     if break_spec != "" {
         fmt.sbprintf(&b, " --break %s", shell_quote(break_spec, context.temp_allocator))
     }
+
     fmt.sbprintf(&b, " %s", shell_quote(proj, context.temp_allocator))
+
     if open_terminal(strings.to_string(b)) {
         msg := "odin_godot: lldb session opened in a terminal window."
+
         if break_spec != "" {
             msg = fmt.tprintf("odin_godot: lldb session opened — breakpoint at %s.", break_spec)
         }
+
         godot.print_str(msg)
     } else {
         editor_msg_error("odin_godot: couldn't open a terminal for the lldb session.")
@@ -188,9 +209,19 @@ launch_debug_session :: proc(break_spec: string) {
 // ---------------------------------------------------------------------------
 
 @(private = "file")
-debug_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+debug_menu_call :: proc "c" (
+    userdata: rawptr,
+    args: [^]gdext.VariantPtr,
+    argc: i64,
+    ret: gdext.VariantPtr,
+    err: ^gdext.CallError,
+) {
     context = gdext.godot_context()
-    if err != nil {err.error = .Ok}
+
+    if err != nil {
+        err.error = .Ok
+    }
+
     launch_debug_session("")
 }
 
@@ -199,37 +230,78 @@ debug_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: 
 @(private = "file")
 cursor_break_spec :: proc() -> string {
     ei := godot.singleton_editor_interface()
-    if ei == nil {return ""}
+
+    if ei == nil {
+        return ""
+    }
+
     se := godot.editor_interface_get_script_editor(ei)
-    if se == nil {return ""}
+
+    if se == nil {
+        return ""
+    }
+
     script := godot.script_editor_get_current_script(se)
+
     if script == nil {
         editor_msg_warn("odin_godot: no script open — open the .odin file and put the caret on the target line.")
         return ""
     }
+
     path := string_to_odin(godot.resource_get_path(cast(godot.Resource)script), context.temp_allocator)
+
     if !strings.has_suffix(path, ".odin") {
-        editor_msg_warn(fmt.tprintf("odin_godot: current script is not Odin (%s) — lldb breakpoints only apply to .odin scripts.", path))
+        editor_msg_warn(
+            fmt.tprintf(
+                "odin_godot: current script is not Odin (%s) — lldb breakpoints only apply to .odin scripts.",
+                path,
+            ),
+        )
         return ""
     }
+
     current := godot.script_editor_get_current_editor(se)
-    if current == nil {return ""}
+
+    if current == nil {
+        return ""
+    }
+
     code_edit := godot.script_editor_base_get_base_editor(current)
-    if code_edit == nil {return ""}
+
+    if code_edit == nil {
+        return ""
+    }
+
     line := godot.text_edit_get_caret_line(cast(godot.Text_Edit)code_edit, 0)
     base := path
+
     if idx := strings.last_index_byte(path, '/'); idx >= 0 {
         base = path[idx + 1:]
     }
+
     return fmt.tprintf("%s:%d", base, line + 1) // caret line is 0-based; DWARF lines are 1-based
 }
 
 @(private = "file")
-debug_cursor_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+debug_cursor_menu_call :: proc "c" (
+    userdata: rawptr,
+    args: [^]gdext.VariantPtr,
+    argc: i64,
+    ret: gdext.VariantPtr,
+    err: ^gdext.CallError,
+) {
     context = gdext.godot_context()
-    if err != nil {err.error = .Ok}
+
+    if err != nil {
+        err.error = .Ok
+    }
+
     spec := cursor_break_spec()
-    if spec == "" {return} // warned inside
+
+    if spec == "" {
+        return
+    } // warned inside
+
     launch_debug_session(spec)
 }
 
@@ -243,7 +315,11 @@ debug_cursor_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr,
 debuggable_godot_path :: proc(exe: string) -> string {
     when ODIN_OS == .Darwin {
         tmp := os.get_env("TMPDIR", context.temp_allocator)
-        if tmp == "" {tmp = "/tmp"}
+
+        if tmp == "" {
+            tmp = "/tmp"
+        }
+
         return fmt.tprintf("%s/odin-godot-lldb/Godot-dbg", strings.trim_suffix(tmp, "/"))
     } else {
         return exe
@@ -256,20 +332,35 @@ write_if_absent :: proc(path: string, content: string) -> bool {
         editor_msg_warn(fmt.tprintf("odin_godot: %s already exists — leaving it untouched.", path))
         return false
     }
+
     if werr := os.write_entire_file(path, transmute([]byte)content); werr != nil {
         editor_msg_error(fmt.tprintf("odin_godot: couldn't write %s.", path))
         return false
     }
+
     return true
 }
 
 @(private = "file")
-vscode_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc: i64, ret: gdext.VariantPtr, err: ^gdext.CallError) {
+vscode_menu_call :: proc "c" (
+    userdata: rawptr,
+    args: [^]gdext.VariantPtr,
+    argc: i64,
+    ret: gdext.VariantPtr,
+    err: ^gdext.CallError,
+) {
     context = gdext.godot_context()
-    if err != nil {err.error = .Ok}
+
+    if err != nil {
+        err.error = .Ok
+    }
 
     launcher, ok := launcher_path()
-    if !ok {return}
+
+    if !ok {
+        return
+    }
+
     exe := editor_executable()
     proj := project_dir()
 
@@ -283,6 +374,7 @@ vscode_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc:
     _ = libc.system(strings.clone_to_cstring(prep, context.temp_allocator))
 
     vsdir := fmt.tprintf("%s/.vscode", proj)
+
     if !os.exists(vsdir) {
         if mkerr := os.make_directory(vsdir); mkerr != nil {
             editor_msg_error(fmt.tprintf("odin_godot: couldn't create %s.", vsdir))
@@ -335,8 +427,15 @@ vscode_menu_call :: proc "c" (userdata: rawptr, args: [^]gdext.VariantPtr, argc:
     )
 
     wrote := 0
-    if write_if_absent(fmt.tprintf("%s/launch.json", vsdir), launch) {wrote += 1}
-    if write_if_absent(fmt.tprintf("%s/tasks.json", vsdir), tasks) {wrote += 1}
+
+    if write_if_absent(fmt.tprintf("%s/launch.json", vsdir), launch) {
+        wrote += 1
+    }
+
+    if write_if_absent(fmt.tprintf("%s/tasks.json", vsdir), tasks) {
+        wrote += 1
+    }
+
     if wrote > 0 {
         godot.print_str(
             fmt.tprintf(

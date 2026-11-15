@@ -16,7 +16,7 @@ multiplayer_spawner_name :: proc "contextless" () -> String_Name {
 }
 
 new_multiplayer_spawner :: proc "contextless" () -> Multiplayer_Spawner {
-    return __bindgen_gde.classdb_construct_object(multiplayer_spawner_name_ref())
+    return cast(Multiplayer_Spawner)__bindgen_gde.classdb_construct_object(multiplayer_spawner_name_ref())
 }
 
 // methods
@@ -66,7 +66,9 @@ multiplayer_spawner_get_spawnable_scene_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -163,7 +165,9 @@ multiplayer_spawner_get_spawn_limit :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

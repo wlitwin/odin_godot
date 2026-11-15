@@ -16,7 +16,7 @@ csg_combiner3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_csg_combiner3d :: proc "contextless" () -> Csg_Combiner3d {
-    return __bindgen_gde.classdb_construct_object(csg_combiner3d_name_ref())
+    return cast(Csg_Combiner3d)__bindgen_gde.classdb_construct_object(csg_combiner3d_name_ref())
 }
 
 // methods

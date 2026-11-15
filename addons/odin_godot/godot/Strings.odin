@@ -1,6 +1,6 @@
 package godot
 
-import gd "godot:gdext" 
+import gd "godot:gdext"
 import "core:mem"
 
 @(private)
@@ -98,6 +98,7 @@ Returns:
 */
 new_string_name_cstring :: proc "contextless" (from: cstring, static: bool) -> (ret: String_Name) {
     ret = String_Name{}
+
     if static {
         // `static = true` promises a permanent (interned-for-the-program) name — method / signal /
         // action / class-name literals. Use Godot's static StringName constructor (the only one
@@ -111,6 +112,7 @@ new_string_name_cstring :: proc "contextless" (from: cstring, static: bool) -> (
         // Transient and/or non-ASCII name — refcounted utf8 StringName.
         gd.string_name_new_with_utf8_chars(&ret, from)
     }
+
     return
 }
 

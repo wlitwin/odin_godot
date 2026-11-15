@@ -29,6 +29,11 @@ Open_Xr_Composition_Layer_Swizzle :: enum int {
     Swizzle_Zero = 4,
     Swizzle_One = 5,
 }
+Open_Xr_Composition_Layer_Eye_Visibility :: enum int {
+    Eye_Visibility_Both = 0,
+    Eye_Visibility_Left = 1,
+    Eye_Visibility_Right = 2,
+}
 
 
 
@@ -41,7 +46,7 @@ open_xr_composition_layer_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_composition_layer :: proc "contextless" () -> Open_Xr_Composition_Layer {
-    return __bindgen_gde.classdb_construct_object(open_xr_composition_layer_name_ref())
+    return cast(Open_Xr_Composition_Layer)__bindgen_gde.classdb_construct_object(open_xr_composition_layer_name_ref())
 }
 
 // methods
@@ -219,7 +224,9 @@ open_xr_composition_layer_get_sort_order :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -327,7 +334,7 @@ open_xr_composition_layer_set_min_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3653437593)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -345,7 +352,9 @@ open_xr_composition_layer_get_min_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Filter(__return_storage)
     return
 }
 
@@ -359,7 +368,7 @@ open_xr_composition_layer_set_mag_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3653437593)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -377,7 +386,9 @@ open_xr_composition_layer_get_mag_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Filter(__return_storage)
     return
 }
 
@@ -391,7 +402,7 @@ open_xr_composition_layer_set_mipmap_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3271133183)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -409,7 +420,9 @@ open_xr_composition_layer_get_mipmap_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Mipmap_Mode(__return_storage)
     return
 }
 
@@ -423,7 +436,7 @@ open_xr_composition_layer_set_horizontal_wrap :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 15634990)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -441,7 +454,9 @@ open_xr_composition_layer_get_horizontal_wrap :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Wrap(__return_storage)
     return
 }
 
@@ -455,7 +470,7 @@ open_xr_composition_layer_set_vertical_wrap :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 15634990)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -473,7 +488,9 @@ open_xr_composition_layer_get_vertical_wrap :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Wrap(__return_storage)
     return
 }
 
@@ -487,7 +504,7 @@ open_xr_composition_layer_set_red_swizzle :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 741598951)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -505,7 +522,9 @@ open_xr_composition_layer_get_red_swizzle :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Swizzle(__return_storage)
     return
 }
 
@@ -519,7 +538,7 @@ open_xr_composition_layer_set_green_swizzle :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 741598951)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -537,7 +556,9 @@ open_xr_composition_layer_get_green_swizzle :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Swizzle(__return_storage)
     return
 }
 
@@ -551,7 +572,7 @@ open_xr_composition_layer_set_blue_swizzle :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 741598951)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -569,7 +590,9 @@ open_xr_composition_layer_get_blue_swizzle :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Swizzle(__return_storage)
     return
 }
 
@@ -583,7 +606,7 @@ open_xr_composition_layer_set_alpha_swizzle :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 741598951)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -601,7 +624,9 @@ open_xr_composition_layer_get_alpha_swizzle :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Swizzle(__return_storage)
     return
 }
 
@@ -666,6 +691,40 @@ open_xr_composition_layer_get_border_color :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+open_xr_composition_layer_set_eye_visibility :: proc "contextless" (
+    self: Open_Xr_Composition_Layer,
+    eye_visibility_: Open_Xr_Composition_Layer_Eye_Visibility,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_eye_visibility", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 156391336)
+    }
+    self := self
+    eye_visibility_ := Int(eye_visibility_)
+    args := []__bindgen_gde.TypePtr {
+        &eye_visibility_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+open_xr_composition_layer_get_eye_visibility :: proc "contextless" (
+    self: Open_Xr_Composition_Layer,
+) -> (ret: Open_Xr_Composition_Layer_Eye_Visibility) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_eye_visibility", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 467669000)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Open_Xr_Composition_Layer_Eye_Visibility(__return_storage)
     return
 }
 

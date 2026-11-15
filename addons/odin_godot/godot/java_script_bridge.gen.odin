@@ -16,7 +16,7 @@ java_script_bridge_name :: proc "contextless" () -> String_Name {
 }
 
 new_java_script_bridge :: proc "contextless" () -> Java_Script_Bridge {
-    return __bindgen_gde.classdb_construct_object(java_script_bridge_name_ref())
+    return cast(Java_Script_Bridge)__bindgen_gde.classdb_construct_object(java_script_bridge_name_ref())
 }
 
 // methods
@@ -207,7 +207,9 @@ java_script_bridge_pwa_update :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

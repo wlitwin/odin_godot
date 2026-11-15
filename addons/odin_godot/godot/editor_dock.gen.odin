@@ -15,7 +15,9 @@ Editor_Dock_Dock_Slot :: enum int {
     Dock_Slot_Right_Ur = 6,
     Dock_Slot_Right_Br = 7,
     Dock_Slot_Bottom = 8,
-    Dock_Slot_Max = 9,
+    Dock_Slot_Bottom_L = 9,
+    Dock_Slot_Bottom_R = 10,
+    Dock_Slot_Max = 11,
 }
 
 Editor_Dock_Dock_Layout :: enum i64 {
@@ -35,7 +37,7 @@ editor_dock_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_dock :: proc "contextless" () -> Editor_Dock {
-    return __bindgen_gde.classdb_construct_object(editor_dock_name_ref())
+    return cast(Editor_Dock)__bindgen_gde.classdb_construct_object(editor_dock_name_ref())
 }
 
 // methods
@@ -486,7 +488,7 @@ editor_dock_set_default_slot :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4142995464)
     }
     self := self
-    slot_ := slot_
+    slot_ := Int(slot_)
     args := []__bindgen_gde.TypePtr {
         &slot_,
     }
@@ -504,7 +506,9 @@ editor_dock_get_default_slot :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Dock_Dock_Slot(__return_storage)
     return
 }
 
@@ -518,7 +522,7 @@ editor_dock_set_available_layouts :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3440531249)
     }
     self := self
-    layouts_ := layouts_
+    layouts_ := Int(layouts_)
     args := []__bindgen_gde.TypePtr {
         &layouts_,
     }
@@ -536,7 +540,9 @@ editor_dock_get_available_layouts :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Editor_Dock_Dock_Layout(__return_storage)
     return
 }
 

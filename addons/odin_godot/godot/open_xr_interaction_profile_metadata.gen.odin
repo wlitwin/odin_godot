@@ -16,7 +16,7 @@ open_xr_interaction_profile_metadata_name :: proc "contextless" () -> String_Nam
 }
 
 new_open_xr_interaction_profile_metadata :: proc "contextless" () -> Open_Xr_Interaction_Profile_Metadata {
-    return __bindgen_gde.classdb_construct_object(open_xr_interaction_profile_metadata_name_ref())
+    return cast(Open_Xr_Interaction_Profile_Metadata)__bindgen_gde.classdb_construct_object(open_xr_interaction_profile_metadata_name_ref())
 }
 
 // methods
@@ -144,7 +144,7 @@ open_xr_interaction_profile_metadata_register_io_path :: proc "contextless" (
     toplevel_path_ := toplevel_path_
     openxr_path_ := openxr_path_
     openxr_extension_names_ := openxr_extension_names_
-    action_type_ := action_type_
+    action_type_ := Int(action_type_)
     args := []__bindgen_gde.TypePtr {
         &interaction_profile_,
         &display_name_,

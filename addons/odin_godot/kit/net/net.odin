@@ -20,28 +20,112 @@ package kit_net
 //     per peer; a predicted transition and its authoritative echo share an intent
 //     id so confirmation MATCHES the already-played effect instead of replaying it.
 //
-// WHAT LIVES WHERE:
+// ONE PACKAGE, TWO LAYERS. What lives here is really two things fused under one
+// name, and the fusion is DELIBERATE:
+//
+//   1. a shared REPLICATION SUBSTRATE — the wire, the field descriptors, the
+//      codecs and blend math, the tick and clock. BOTH lanes consume it: the
+//      coop lane below AND kit/sim (the server-authority resim lane, which is
+//      its own package). The substrate has no name of its own.
+//   2. the COOP LANE proper — the command + owned-streams model described above.
+//      The substrate serves it but does not depend on it.
+//
+// A package split (substrate → its own package) was weighed and DEFERRED: the
+// substrate stays nameless until a THIRD consumer earns the split. Two consumers
+// is a shared header, not a library. This is why Field_Desc carries sim-only
+// tuning fields (slack/glide/cut, whose comments open "kit/sim …") and why a
+// couple of substrate symbols still sit in coop-lane files (below): the seam is
+// named, not drawn. sim.md calls this the substrate LAYER of kit/net; net.md
+// calls kit/net the coop replication core — both are this same package, this
+// same fusion, seen from the two lanes that share it.
+//
+// SUBSTRATE — consumed by BOTH lanes (coop and kit/sim):
 //   wire.odin    — bounds-checked little-endian Writer/Reader (the byte format).
 //   delta.odin   — descriptor-driven dirty tracking: per-entity shadow copies,
 //                  memcmp field masks, delta write/apply, full snapshot/restore.
+//                  Also the field codecs (Wire_Kind) and interp blend math
+//                  (Lerp_Kind, angle_arc/angle_lerp) both lanes encode/blend by.
 //                  Replicated fields are POD-ONLY by design (ints/floats/bools/
 //                  enums/fixed arrays) — strings & dynamic data travel as explicit
 //                  reliable messages, never as replicated fields.
-//   intent.odin  — intent ids, per-peer dedup windows, the pending-prediction
-//                  table with timeout → automatic revert.
-//   tick.odin    — the fixed net tick (decoupled from frame rate) + clock sync.
-//   interp.odin  — timestamped sample ring + delayed interpolated sampling for
-//                  remote entities (masks jitter and single drops).
+//   tick.odin    — the fixed net tick (decoupled from frame rate) + clock sync
+//                  (Clock_Sync feeds both lanes' interpolation timelines).
+//   net.odin     — the shared identity types (Net_Id, Player_Id) and the id-space
+//                  contract (PROVISIONAL_BIT), owned beside the values they carve.
 //
-// The generated side (scriptgen's gd:"replicate" / @(gd_command), later in phase 0)
-// produces Entity_Desc tables and calls into this core; nothing here depends on
+// COOP LANE — this model's own machinery (kit/sim does NOT consume these):
+//   registry.odin — Net_Id → entity bookkeeping + the per-tick delta walk.
+//   stream.odin   — owner-authoritative field streaming with delayed interp sampling.
+//   intent.odin   — intent ids, per-peer dedup windows, the pending-prediction
+//                   table with timeout → automatic revert.
+//   command.odin  — the intent→command→result runtime loop.
+//   edge.odin     — delta-lane change presentation (the <class>_<field>_edge halves).
+//   later.odin    — the render-timeline delay queue (present on the eye's clock).
+//
+// The line isn't perfectly clean: kit/sim borrows quat_nlerp and the INTERP_CAP
+// ring depth out of stream.odin (sharing the one nlerp/interp math rather than
+// twinning it) and registry_bless out of registry.odin — small shared surfaces
+// that are exactly the untidiness a future split would tidy. Named, not fixed.
+//
+// The generated side (scriptgen's gd:"replicate" / @(gd_command)) produces
+// Entity_Desc tables and calls into this core; nothing here depends on
 // codegen, so everything is testable with hand-built descriptors first.
+
+// This package's wire revision — the substrate + coop-lane formats ONLY
+// (field codecs, delta masks, stream batches, the command loop). Folded into
+// the session's fingerprint salt beside every other package's rev, so a wire
+// change here bumps a constant HERE, in the same commit. The coop delta
+// mask's move to subset-ordinal bits (the phase-2 codec unification) will be
+// rev 2.
+WIRE_REV :: u64(3) // 1: fingerprint-era wire · 2: subset-ordinal delta masks · 3: protocol packet/field/container admission ceilings
 
 // Stable identity of a replicated entity across the session. Allocated by the host
 // (authority) — never reused within a session. 0 is the invalid id.
 Net_Id :: distinct u32
 
 NET_ID_INVALID :: Net_Id(0)
+
+// A typed, pointer-free reference to a replicated entity. T is part of the
+// TYPE, so a Net_Ref(Player) cannot be passed where Net_Ref(Chest) is wanted;
+// the value on the wire/storage side stays the entity's stable id. Resolving
+// belongs to the generated entity census because that is where T's
+// Entity_Type is known. A stale/despawned reference resolves to (nil, false) —
+// never keep a raw entity pointer when the lifetime can cross a despawn.
+Net_Ref :: struct($T: typeid) {
+    id: Net_Id,
+}
+
+net_ref_id :: proc(ref: Net_Ref($T)) -> Net_Id {
+    return ref.id
+}
+
+net_ref_valid :: proc(ref: Net_Ref($T)) -> bool {
+    return ref.id != NET_ID_INVALID
+}
+
+// One frame-local row from a generated `<entity>_all` query. `using ref`
+// promotes `.id`, so the common loop reads like ordinary game objects:
+//
+//     for mob in mob_all(&game.boot) {
+//         mob.entity.think(mob.owner)
+//         remember(mob.ref) // the pointer-free part may outlive this pass
+//     }
+//
+// The row's pointer is valid only while that entity remains live; retain ref,
+// not the row or entity pointer, across a despawn boundary.
+Net_Entity :: struct($T: typeid) {
+    using ref: Net_Ref(T),
+    entity:    ^T,
+    owner:     Player_Id,
+}
+
+// The high bit of the id space is RESERVED for kit/sim's client-local
+// provisional spawns. Authority ids increment from 1 and never reach it;
+// registry_insert refuses ids carrying the bit, so a leaked provisional can
+// neither enter replication nor drag next_id past 2^31 via the insert chase.
+// The constant lives HERE, beside the type whose value space it carves, so
+// the contract has one owner; kit/sim aliases it.
+PROVISIONAL_BIT :: u32(0x8000_0000)
 
 // Transport-INDEPENDENT player identity: survives reconnects and (post-v1) host
 // migration. Assigned at first join, reclaimed on reconnect; never derived from a
@@ -50,8 +134,7 @@ Player_Id :: distinct u64
 
 PLAYER_ID_INVALID :: Player_Id(0)
 
-// Who owns (is authoritative for) a replicated entity's streamed state.
-Ownership :: struct {
-	owner: Player_Id, // PLAYER_ID_INVALID + host_owned=true => the world/host
-	host_owned: bool,
-}
+// House rule, kit-wide: a composite map key is a STRUCT, never a packed
+// integer. `u64(player) << 32 | id` silently truncated a u64 Player_Id twice
+// (the session's interest pairs, xfer's assembly inbox) before the rule was
+// written down — struct keys make the mistake unrepresentable.

@@ -84,7 +84,7 @@ animation_node_animation_set_play_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3347718873)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -102,7 +102,9 @@ animation_node_animation_get_play_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Node_Animation_Play_Mode(__return_storage)
     return
 }
 
@@ -276,7 +278,7 @@ animation_node_animation_set_loop_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3155355575)
     }
     self := self
-    loop_mode_ := loop_mode_
+    loop_mode_ := Int(loop_mode_)
     args := []__bindgen_gde.TypePtr {
         &loop_mode_,
     }
@@ -294,7 +296,9 @@ animation_node_animation_get_loop_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Loop_Mode(__return_storage)
     return
 }
 

@@ -58,7 +58,9 @@ stream_peer_extension__get_data :: proc "contextless" (
         &r_bytes_,
         &r_received_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -82,14 +84,16 @@ stream_peer_extension__get_partial_data :: proc "contextless" (
         &r_bytes_,
         &r_received_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
 stream_peer_extension__put_data :: proc "contextless" (
     self: Stream_Peer_Extension,
-    p_data_: ^u8,
-    p_bytes_: Int,
+    data_: ^u8,
+    bytes_: Int,
     r_sent_: ^i32,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
@@ -98,22 +102,24 @@ stream_peer_extension__put_data :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 298948178)
     }
     self := self
-    p_data_ := p_data_
-    p_bytes_ := p_bytes_
+    data_ := data_
+    bytes_ := bytes_
     r_sent_ := r_sent_
     args := []__bindgen_gde.TypePtr {
-        &p_data_,
-        &p_bytes_,
+        &data_,
+        &bytes_,
         &r_sent_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
 stream_peer_extension__put_partial_data :: proc "contextless" (
     self: Stream_Peer_Extension,
-    p_data_: ^u8,
-    p_bytes_: Int,
+    data_: ^u8,
+    bytes_: Int,
     r_sent_: ^i32,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
@@ -122,15 +128,17 @@ stream_peer_extension__put_partial_data :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 298948178)
     }
     self := self
-    p_data_ := p_data_
-    p_bytes_ := p_bytes_
+    data_ := data_
+    bytes_ := bytes_
     r_sent_ := r_sent_
     args := []__bindgen_gde.TypePtr {
-        &p_data_,
-        &p_bytes_,
+        &data_,
+        &bytes_,
         &r_sent_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -145,7 +153,9 @@ stream_peer_extension__get_available_bytes :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

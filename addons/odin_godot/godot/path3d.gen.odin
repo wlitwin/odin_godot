@@ -16,7 +16,7 @@ path3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_path3d :: proc "contextless" () -> Path3d {
-    return __bindgen_gde.classdb_construct_object(path3d_name_ref())
+    return cast(Path3d)__bindgen_gde.classdb_construct_object(path3d_name_ref())
 }
 
 // methods

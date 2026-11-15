@@ -74,7 +74,7 @@ window_name :: proc "contextless" () -> String_Name {
 }
 
 new_window :: proc "contextless" () -> Window {
-    return __bindgen_gde.classdb_construct_object(window_name_ref())
+    return cast(Window)__bindgen_gde.classdb_construct_object(window_name_ref())
 }
 
 // methods
@@ -166,7 +166,7 @@ window_set_initial_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4084468099)
     }
     self := self
-    initial_position_ := initial_position_
+    initial_position_ := Int(initial_position_)
     args := []__bindgen_gde.TypePtr {
         &initial_position_,
     }
@@ -184,7 +184,9 @@ window_get_initial_position :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Window_Window_Initial_Position(__return_storage)
     return
 }
 
@@ -216,7 +218,9 @@ window_get_current_screen :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -416,7 +420,7 @@ window_set_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3095236531)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -434,7 +438,9 @@ window_get_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Window_Mode(__return_storage)
     return
 }
 
@@ -449,7 +455,7 @@ window_set_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3426449779)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     args := []__bindgen_gde.TypePtr {
         &flag_,
@@ -468,9 +474,56 @@ window_get_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3062752289)
     }
     self := self
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &flag_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+window_set_hdr_output_requested :: proc "contextless" (
+    self: Window,
+    requested_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_hdr_output_requested", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    requested_ := requested_
+    args := []__bindgen_gde.TypePtr {
+        &requested_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+window_is_hdr_output_requested :: proc "contextless" (
+    self: Window,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_hdr_output_requested", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+window_get_output_max_linear_value :: proc "contextless" (
+    self: Window,
+) -> (ret: f64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_output_max_linear_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1740695150)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -501,6 +554,40 @@ window_request_attention :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+window_set_taskbar_progress_value :: proc "contextless" (
+    self: Window,
+    value_: f64,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_taskbar_progress_value", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+    }
+    self := self
+    value_ := value_
+    args := []__bindgen_gde.TypePtr {
+        &value_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+window_set_taskbar_progress_state :: proc "contextless" (
+    self: Window,
+    state_: Display_Server_Progress_State,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_taskbar_progress_state", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 824071031)
+    }
+    self := self
+    state_ := Int(state_)
+    args := []__bindgen_gde.TypePtr {
+        &state_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -760,7 +847,7 @@ window_start_resize :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 122288853)
     }
     self := self
-    edge_ := edge_
+    edge_ := Int(edge_)
     args := []__bindgen_gde.TypePtr {
         &edge_,
     }
@@ -905,7 +992,7 @@ window_set_content_scale_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2937716473)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -923,7 +1010,9 @@ window_get_content_scale_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Window_Content_Scale_Mode(__return_storage)
     return
 }
 
@@ -937,7 +1026,7 @@ window_set_content_scale_aspect :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2370399418)
     }
     self := self
-    aspect_ := aspect_
+    aspect_ := Int(aspect_)
     args := []__bindgen_gde.TypePtr {
         &aspect_,
     }
@@ -955,7 +1044,9 @@ window_get_content_scale_aspect :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Window_Content_Scale_Aspect(__return_storage)
     return
 }
 
@@ -969,7 +1060,7 @@ window_set_content_scale_stretch :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 349355940)
     }
     self := self
-    stretch_ := stretch_
+    stretch_ := Int(stretch_)
     args := []__bindgen_gde.TypePtr {
         &stretch_,
     }
@@ -987,7 +1078,9 @@ window_get_content_scale_stretch :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Window_Content_Scale_Stretch(__return_storage)
     return
 }
 
@@ -1559,7 +1652,9 @@ window_get_theme_font_size :: proc "contextless" (
         &name_,
         &theme_type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1601,7 +1696,9 @@ window_get_theme_constant :: proc "contextless" (
         &name_,
         &theme_type_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1880,7 +1977,9 @@ window_get_theme_default_font_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1895,7 +1994,9 @@ window_get_window_id :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1973,7 +2074,7 @@ window_set_layout_direction :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3094704184)
     }
     self := self
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
     }
@@ -1991,7 +2092,9 @@ window_get_layout_direction :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Window_Layout_Direction(__return_storage)
     return
 }
 
@@ -2359,6 +2462,9 @@ window_get_maximize_disabled :: proc "contextless" (self: Window) -> Bool {
 }
 window_set_maximize_disabled :: proc "contextless" (self: Window, value: Bool) {
     window_set_flag(self, Window_Flags(12), value)
+}
+window_get_hdr_output_requested :: proc "contextless" (self: Window) -> Bool {
+    return window_is_hdr_output_requested(self)
 }
 window_get_auto_translate :: proc "contextless" (self: Window) -> Bool {
     return window_is_auto_translating(self)

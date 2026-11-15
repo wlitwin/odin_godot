@@ -80,9 +80,9 @@ render_scene_buffers_rd_create_texture :: proc "contextless" (
     self := self
     context_ := context_
     name_ := name_
-    data_format_ := data_format_
+    data_format_ := Int(data_format_)
     usage_bits_ := usage_bits_
-    texture_samples_ := texture_samples_
+    texture_samples_ := Int(texture_samples_)
     size_ := size_
     layers_ := layers_
     mipmaps_ := mipmaps_
@@ -456,7 +456,9 @@ render_scene_buffers_rd_get_view_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -501,7 +503,9 @@ render_scene_buffers_rd_get_scaling_3d_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Scaling3d_Mode(__return_storage)
     return
 }
 
@@ -531,7 +535,9 @@ render_scene_buffers_rd_get_msaa_3d :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Msaa(__return_storage)
     return
 }
 
@@ -546,7 +552,9 @@ render_scene_buffers_rd_get_texture_samples :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Texture_Samples(__return_storage)
     return
 }
 
@@ -561,7 +569,9 @@ render_scene_buffers_rd_get_screen_space_aa :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Screen_Space_Aa(__return_storage)
     return
 }
 

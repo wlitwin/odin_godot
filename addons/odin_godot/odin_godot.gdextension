@@ -11,7 +11,7 @@
 ; build/build_scripts.sh (it emits res://bin/libodinscripts.<ext>, which the core finds).
 [configuration]
 entry_symbol = "odin_godot_init"
-compatibility_minimum = "4.6"
+compatibility_minimum = "4.7"
 
 [libraries]
 macos.debug      = "res://addons/odin_godot/bin/macos/libodin_godot.dylib"

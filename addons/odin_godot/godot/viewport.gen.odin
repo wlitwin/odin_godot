@@ -20,7 +20,8 @@ Viewport_Scaling3d_Mode :: enum int {
     Scaling_3d_Mode_Fsr2 = 2,
     Scaling_3d_Mode_Metalfx_Spatial = 3,
     Scaling_3d_Mode_Metalfx_Temporal = 4,
-    Scaling_3d_Mode_Max = 5,
+    Scaling_3d_Mode_Nearest = 5,
+    Scaling_3d_Mode_Max = 6,
 }
 Viewport_Msaa :: enum int {
     Msaa_Disabled = 0,
@@ -83,19 +84,23 @@ Viewport_Debug_Draw :: enum int {
     Debug_Draw_Occluders = 24,
     Debug_Draw_Motion_Vectors = 25,
     Debug_Draw_Internal_Buffer = 26,
+    Debug_Draw_Cluster_Area_Lights = 27,
+    Debug_Draw_Area_Light_Atlas = 28,
 }
 Viewport_Default_Canvas_Item_Texture_Filter :: enum int {
     Default_Canvas_Item_Texture_Filter_Nearest = 0,
     Default_Canvas_Item_Texture_Filter_Linear = 1,
     Default_Canvas_Item_Texture_Filter_Linear_With_Mipmaps = 2,
     Default_Canvas_Item_Texture_Filter_Nearest_With_Mipmaps = 3,
-    Default_Canvas_Item_Texture_Filter_Max = 4,
+    Default_Canvas_Item_Texture_Filter_Parent_Node = 4,
+    Default_Canvas_Item_Texture_Filter_Max = 5,
 }
 Viewport_Default_Canvas_Item_Texture_Repeat :: enum int {
     Default_Canvas_Item_Texture_Repeat_Disabled = 0,
     Default_Canvas_Item_Texture_Repeat_Enabled = 1,
     Default_Canvas_Item_Texture_Repeat_Mirror = 2,
-    Default_Canvas_Item_Texture_Repeat_Max = 3,
+    Default_Canvas_Item_Texture_Repeat_Parent_Node = 3,
+    Default_Canvas_Item_Texture_Repeat_Max = 4,
 }
 Viewport_Sdf_Oversize :: enum int {
     Sdf_Oversize_100_Percent = 0,
@@ -134,7 +139,7 @@ viewport_name :: proc "contextless" () -> String_Name {
 }
 
 new_viewport :: proc "contextless" () -> Viewport {
-    return __bindgen_gde.classdb_construct_object(viewport_name_ref())
+    return cast(Viewport)__bindgen_gde.classdb_construct_object(viewport_name_ref())
 }
 
 // methods
@@ -401,7 +406,7 @@ viewport_set_msaa_2d :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3330258708)
     }
     self := self
-    msaa_ := msaa_
+    msaa_ := Int(msaa_)
     args := []__bindgen_gde.TypePtr {
         &msaa_,
     }
@@ -419,7 +424,9 @@ viewport_get_msaa_2d :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Msaa(__return_storage)
     return
 }
 
@@ -433,7 +440,7 @@ viewport_set_msaa_3d :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3330258708)
     }
     self := self
-    msaa_ := msaa_
+    msaa_ := Int(msaa_)
     args := []__bindgen_gde.TypePtr {
         &msaa_,
     }
@@ -451,7 +458,9 @@ viewport_get_msaa_3d :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Msaa(__return_storage)
     return
 }
 
@@ -465,7 +474,7 @@ viewport_set_screen_space_aa :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3544169389)
     }
     self := self
-    screen_space_aa_ := screen_space_aa_
+    screen_space_aa_ := Int(screen_space_aa_)
     args := []__bindgen_gde.TypePtr {
         &screen_space_aa_,
     }
@@ -483,7 +492,9 @@ viewport_get_screen_space_aa :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Screen_Space_Aa(__return_storage)
     return
 }
 
@@ -593,7 +604,7 @@ viewport_set_debug_draw :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1970246205)
     }
     self := self
-    debug_draw_ := debug_draw_
+    debug_draw_ := Int(debug_draw_)
     args := []__bindgen_gde.TypePtr {
         &debug_draw_,
     }
@@ -611,7 +622,9 @@ viewport_get_debug_draw :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Debug_Draw(__return_storage)
     return
 }
 
@@ -705,13 +718,15 @@ viewport_get_render_info :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 481977019)
     }
     self := self
-    type_ := type_
-    info_ := info_
+    type_ := Int(type_)
+    info_ := Int(info_)
     args := []__bindgen_gde.TypePtr {
         &type_,
         &info_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1167,7 +1182,9 @@ viewport_get_positional_shadow_atlas_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1311,7 +1328,7 @@ viewport_set_positional_shadow_atlas_quadrant_subdiv :: proc "contextless" (
     }
     self := self
     quadrant_ := quadrant_
-    subdiv_ := subdiv_
+    subdiv_ := Int(subdiv_)
     args := []__bindgen_gde.TypePtr {
         &quadrant_,
         &subdiv_,
@@ -1333,7 +1350,9 @@ viewport_get_positional_shadow_atlas_quadrant_subdiv :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &quadrant_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Positional_Shadow_Atlas_Quadrant_Subdiv(__return_storage)
     return
 }
 
@@ -1408,7 +1427,7 @@ viewport_set_default_canvas_item_texture_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2815160100)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1426,7 +1445,9 @@ viewport_get_default_canvas_item_texture_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Default_Canvas_Item_Texture_Filter(__return_storage)
     return
 }
 
@@ -1505,7 +1526,9 @@ viewport_get_drag_threshold :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1537,7 +1560,9 @@ viewport_get_canvas_cull_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1589,7 +1614,7 @@ viewport_set_default_canvas_item_texture_repeat :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1658513413)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1607,7 +1632,9 @@ viewport_get_default_canvas_item_texture_repeat :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Default_Canvas_Item_Texture_Repeat(__return_storage)
     return
 }
 
@@ -1621,7 +1648,7 @@ viewport_set_sdf_oversize :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2574159017)
     }
     self := self
-    oversize_ := oversize_
+    oversize_ := Int(oversize_)
     args := []__bindgen_gde.TypePtr {
         &oversize_,
     }
@@ -1639,7 +1666,9 @@ viewport_get_sdf_oversize :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Sdf_Oversize(__return_storage)
     return
 }
 
@@ -1653,7 +1682,7 @@ viewport_set_sdf_scale :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1402773951)
     }
     self := self
-    scale_ := scale_
+    scale_ := Int(scale_)
     args := []__bindgen_gde.TypePtr {
         &scale_,
     }
@@ -1671,7 +1700,9 @@ viewport_get_sdf_scale :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Sdf_Scale(__return_storage)
     return
 }
 
@@ -1965,7 +1996,7 @@ viewport_is_using_xr :: proc "contextless" (
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("is_using_xr", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2240911060)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
     }
     self := self
     args := []__bindgen_gde.TypePtr {
@@ -1984,7 +2015,7 @@ viewport_set_scaling_3d_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1531597597)
     }
     self := self
-    scaling_3d_mode_ := scaling_3d_mode_
+    scaling_3d_mode_ := Int(scaling_3d_mode_)
     args := []__bindgen_gde.TypePtr {
         &scaling_3d_mode_,
     }
@@ -2002,7 +2033,9 @@ viewport_get_scaling_3d_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Scaling3d_Mode(__return_storage)
     return
 }
 
@@ -2112,7 +2145,7 @@ viewport_set_anisotropic_filtering_level :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3445583046)
     }
     self := self
-    anisotropic_filtering_level_ := anisotropic_filtering_level_
+    anisotropic_filtering_level_ := Int(anisotropic_filtering_level_)
     args := []__bindgen_gde.TypePtr {
         &anisotropic_filtering_level_,
     }
@@ -2130,7 +2163,9 @@ viewport_get_anisotropic_filtering_level :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Anisotropic_Filtering(__return_storage)
     return
 }
 
@@ -2144,7 +2179,7 @@ viewport_set_vrs_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2749867817)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -2162,7 +2197,9 @@ viewport_get_vrs_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Vrs_Mode(__return_storage)
     return
 }
 
@@ -2176,7 +2213,7 @@ viewport_set_vrs_update_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3182412319)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -2194,7 +2231,9 @@ viewport_get_vrs_update_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Viewport_Vrs_Update_Mode(__return_storage)
     return
 }
 

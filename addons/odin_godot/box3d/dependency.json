@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "abi_version": 1,
+  "dependencies": {
+    "box3d": {
+      "url": "https://github.com/erincatto/box3d.git",
+      "commit": "336263320469e5e9febfe18697ab562488f7e97a",
+      "tree": "50877041b7e4de95ff0b6c194182aa50d453b736",
+      "git_archive_sha256": "a9143675b297bb6c6f3d031d1bdf5c265d8642139eea26f265958066bd947935"
+    },
+    "rollback-in-a-box": {
+      "url": "https://github.com/pdaddyo/rollback-in-a-box.git",
+      "commit": "9e1fe882a0ea4eb52e160d5754a752580b4db462",
+      "tree": "7cefe9ae72bd39788473bb318d160fca7eee8a91",
+      "git_archive_sha256": "f2f2a2488a1d88d4eb79f448a627b2adc820e36697d07c65a949551aea8e279d",
+      "files": {
+        "core/src/rollback_shim.c": "3553c8e430d3561230be509803dc3c4e3cfcf4e66442e3d7033fe99fd52ef921",
+        "core/include/box3d_rollback/rollback_shim.h": "992c796ac3b6c79580992378ee10ee4a6dcd3b962c1ef557233b546aee0ab24e"
+      }
+    }
+  },
+  "runtime_dependency_closure": [
+    "Box3D C engine",
+    "isolated rollback_shim.c",
+    "local ogb3 C wrappers and owned snapshot/digest modules"
+  ],
+  "excluded": [
+    "upstream C++ session/world",
+    "godot-cpp",
+    "Godot"
+  ],
+  "simulation": {
+    "precision": "float32",
+    "units": "meters",
+    "coordinates": "Y-up/right-handed",
+    "workers": 1,
+    "corpus_hz": 60,
+    "corpus_substeps": 4,
+    "validate": true,
+    "assertions": "enabled in Debug and Release",
+    "fp_flags": [
+      "-fno-fast-math",
+      "-ffp-contract=off"
+    ],
+    "simd": "runtime dispatch explicitly locked to width4 by ogb3_initialize; OGB3_DISABLE_SIMD selects scalar implementation; record resolved compiler macros per build"
+  },
+  "shim_patches": [
+    {
+      "path": "box3d/native/patches/rollback_shim_box3d_33626332.patch",
+      "sha256": "92cc54f8c2dfc27de6d09f92accebbb5f6e8356099c4b75ac6bf03227f63568d",
+      "reason": "Adapt private recording registry/replay header and SIMD-width fingerprint to Box3D33626332; retain explicit original-source preimage and allocator/ownership behavior.",
+      "base_files": {
+        "core/src/rollback_shim.c": "3553c8e430d3561230be509803dc3c4e3cfcf4e66442e3d7033fe99fd52ef921"
+      },
+      "output_files": {
+        "core/src/rollback_shim.c": "b439f788081230278dec88b676a14b831a0a51b8b4600512067d67e106c30218"
+      }
+    }
+  ],
+  "engine_patches": [
+    {
+      "path": "box3d/native/patches/rolling_resistance_limit.patch",
+      "sha256": "33201e35dcfbc144c60896169aa1cee9c4ec479a74eaf58073bef6475022a216",
+      "reason": "Limit rolling resistance without an absolute FLT_EPSILON on the squared angular impulse (scalar and wide contact solvers), as friction already does; light bodies' impulses square below it, so rolling resistance locked their spin instead of limiting it.",
+      "base_files": {
+        "src/contact_solver.c": "200d1d6010fb9995c06cddf8e259493dc50bbd94d45fbb9b08d9aa7e2a889e93",
+        "src/contact_solver_wide.inl": "3b8481229692249d534cfe7a04c4525f1f9c8537c90d2fdeaeb53e276bd9b549"
+      },
+      "output_files": {
+        "src/contact_solver.c": "a58641ed1857ceb7e29e74cded3d5b276b6c917c4748025c31f7c6fa9d21f0dc",
+        "src/contact_solver_wide.inl": "2b9775103057378627d26e0c6686790c38a734edb190929ba453a1200c32a1ec"
+      }
+    },
+    {
+      "path": "box3d/native/patches/snapshot_empty_arrays.patch",
+      "sha256": "074d628cb29d241961c17fc4a9f0153be1f4b74bdd3799265d5c8644d152b51a",
+      "reason": "Skip zero-length snapshot reads and array clears whose storage may be null; preserve empty-world/sensor restore semantics without undefined C library calls.",
+      "base_files": {
+        "src/world_snapshot.c": "b6fb6babdd5c95787791043211b2f6ccfc9093d4653e295a952899a8f3fb90ea"
+      },
+      "output_files": {
+        "src/world_snapshot.c": "13ec30c5f0a1ece40d8c00269fc497595f332c27c3321220bda897ab6daf8a49"
+      }
+    },
+    {
+      "path": "box3d/native/patches/zero_size_memory.patch",
+      "sha256": "1937fc22108d6eccff91ab8e1f1308a7dd0a66be526866b2a018d7e40b093f4b",
+      "reason": "Preserve the allocator null result for zero-byte requests without clearing it, and skip absent hull/mesh instance copies in compound geometries; avoid null C library arguments at the shared allocation/copy boundaries.",
+      "base_files": {
+        "src/core.c": "61a7fd150194f960304388ddbaca425f2a1e2739813bd9497d5256b741895a0c",
+        "src/compound.c": "4e25b9ee118dc0e83f9a58e01300ffcff0ebc2261afd300876b7a682d7759059"
+      },
+      "output_files": {
+        "src/core.c": "2d309c472ca70191e1d08d279a735055cf3c392ee190920c543af3fc4cebdd29",
+        "src/compound.c": "e3c70227f63331b203951ed846bf25ed5a0c1212fb9d57f84e58b1aeddb59360"
+      }
+    }
+  ]
+}

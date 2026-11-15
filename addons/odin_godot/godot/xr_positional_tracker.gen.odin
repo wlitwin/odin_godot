@@ -87,7 +87,9 @@ xr_positional_tracker_get_tracker_hand :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Positional_Tracker_Tracker_Hand(__return_storage)
     return
 }
 
@@ -101,7 +103,7 @@ xr_positional_tracker_set_tracker_hand :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3904108980)
     }
     self := self
-    hand_ := hand_
+    hand_ := Int(hand_)
     args := []__bindgen_gde.TypePtr {
         &hand_,
     }
@@ -179,7 +181,7 @@ xr_positional_tracker_set_pose :: proc "contextless" (
     transform_ := transform_
     linear_velocity_ := linear_velocity_
     angular_velocity_ := angular_velocity_
-    tracking_confidence_ := tracking_confidence_
+    tracking_confidence_ := Int(tracking_confidence_)
     args := []__bindgen_gde.TypePtr {
         &name_,
         &transform_,

@@ -204,7 +204,9 @@ gradient_get_point_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -282,7 +284,7 @@ gradient_set_interpolation_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1971444490)
     }
     self := self
-    interpolation_mode_ := interpolation_mode_
+    interpolation_mode_ := Int(interpolation_mode_)
     args := []__bindgen_gde.TypePtr {
         &interpolation_mode_,
     }
@@ -300,7 +302,9 @@ gradient_get_interpolation_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gradient_Interpolation_Mode(__return_storage)
     return
 }
 
@@ -314,7 +318,7 @@ gradient_set_interpolation_color_space :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3685995981)
     }
     self := self
-    interpolation_color_space_ := interpolation_color_space_
+    interpolation_color_space_ := Int(interpolation_color_space_)
     args := []__bindgen_gde.TypePtr {
         &interpolation_color_space_,
     }
@@ -332,7 +336,9 @@ gradient_get_interpolation_color_space :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gradient_Color_Space(__return_storage)
     return
 }
 

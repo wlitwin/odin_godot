@@ -339,7 +339,9 @@ animation_node_state_machine_get_transition_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -422,7 +424,7 @@ animation_node_state_machine_set_state_machine_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2584759088)
     }
     self := self
-    state_machine_type_ := state_machine_type_
+    state_machine_type_ := Int(state_machine_type_)
     args := []__bindgen_gde.TypePtr {
         &state_machine_type_,
     }
@@ -440,7 +442,9 @@ animation_node_state_machine_get_state_machine_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Animation_Node_State_Machine_State_Machine_Type(__return_storage)
     return
 }
 

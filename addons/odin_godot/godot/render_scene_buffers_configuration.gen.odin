@@ -145,7 +145,9 @@ render_scene_buffers_configuration_get_view_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -177,7 +179,9 @@ render_scene_buffers_configuration_get_scaling_3d_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Scaling3d_Mode(__return_storage)
     return
 }
 
@@ -191,7 +195,7 @@ render_scene_buffers_configuration_set_scaling_3d_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 447477857)
     }
     self := self
-    scaling_3d_mode_ := scaling_3d_mode_
+    scaling_3d_mode_ := Int(scaling_3d_mode_)
     args := []__bindgen_gde.TypePtr {
         &scaling_3d_mode_,
     }
@@ -209,7 +213,9 @@ render_scene_buffers_configuration_get_msaa_3d :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Msaa(__return_storage)
     return
 }
 
@@ -223,7 +229,7 @@ render_scene_buffers_configuration_set_msaa_3d :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3952630748)
     }
     self := self
-    msaa_3d_ := msaa_3d_
+    msaa_3d_ := Int(msaa_3d_)
     args := []__bindgen_gde.TypePtr {
         &msaa_3d_,
     }
@@ -241,7 +247,9 @@ render_scene_buffers_configuration_get_screen_space_aa :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Screen_Space_Aa(__return_storage)
     return
 }
 
@@ -255,7 +263,7 @@ render_scene_buffers_configuration_set_screen_space_aa :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 139543108)
     }
     self := self
-    screen_space_aa_ := screen_space_aa_
+    screen_space_aa_ := Int(screen_space_aa_)
     args := []__bindgen_gde.TypePtr {
         &screen_space_aa_,
     }
@@ -337,7 +345,9 @@ render_scene_buffers_configuration_get_anisotropic_filtering_level :: proc "cont
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Anisotropic_Filtering(__return_storage)
     return
 }
 
@@ -351,7 +361,7 @@ render_scene_buffers_configuration_set_anisotropic_filtering_level :: proc "cont
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2559658741)
     }
     self := self
-    anisotropic_filtering_level_ := anisotropic_filtering_level_
+    anisotropic_filtering_level_ := Int(anisotropic_filtering_level_)
     args := []__bindgen_gde.TypePtr {
         &anisotropic_filtering_level_,
     }

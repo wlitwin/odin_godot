@@ -51,7 +51,7 @@ cpu_particles2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_cpu_particles2d :: proc "contextless" () -> Cpu_Particles2d {
-    return __bindgen_gde.classdb_construct_object(cpu_particles2d_name_ref())
+    return cast(Cpu_Particles2d)__bindgen_gde.classdb_construct_object(cpu_particles2d_name_ref())
 }
 
 // methods
@@ -280,16 +280,19 @@ cpu_particles2d_set_speed_scale :: proc "contextless" (
 cpu_particles2d_request_particles_process :: proc "contextless" (
     self: Cpu_Particles2d,
     process_time_: f64,
+    process_time_residual_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("request_particles_process", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 373806689)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 66938510)
     }
     self := self
     process_time_ := process_time_
+    process_time_residual_ := process_time_residual_
     args := []__bindgen_gde.TypePtr {
         &process_time_,
+        &process_time_residual_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -320,7 +323,9 @@ cpu_particles2d_get_amount :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -440,7 +445,9 @@ cpu_particles2d_get_fixed_fps :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -534,7 +541,9 @@ cpu_particles2d_get_seed :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -548,7 +557,7 @@ cpu_particles2d_set_draw_order :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4183193490)
     }
     self := self
-    order_ := order_
+    order_ := Int(order_)
     args := []__bindgen_gde.TypePtr {
         &order_,
     }
@@ -566,7 +575,9 @@ cpu_particles2d_get_draw_order :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Cpu_Particles2d_Draw_Order(__return_storage)
     return
 }
 
@@ -694,7 +705,7 @@ cpu_particles2d_set_param_min :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3320615296)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -713,7 +724,7 @@ cpu_particles2d_get_param_min :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2038050600)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -732,7 +743,7 @@ cpu_particles2d_set_param_max :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3320615296)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -751,7 +762,7 @@ cpu_particles2d_get_param_max :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2038050600)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -770,7 +781,7 @@ cpu_particles2d_set_param_curve :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2959350143)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     curve_ := curve_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -789,7 +800,7 @@ cpu_particles2d_get_param_curve :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2603158474)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }
@@ -904,7 +915,7 @@ cpu_particles2d_set_particle_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4178137949)
     }
     self := self
-    particle_flag_ := particle_flag_
+    particle_flag_ := Int(particle_flag_)
     enable_ := enable_
     args := []__bindgen_gde.TypePtr {
         &particle_flag_,
@@ -923,7 +934,7 @@ cpu_particles2d_get_particle_flag :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2829976507)
     }
     self := self
-    particle_flag_ := particle_flag_
+    particle_flag_ := Int(particle_flag_)
     args := []__bindgen_gde.TypePtr {
         &particle_flag_,
     }
@@ -941,7 +952,7 @@ cpu_particles2d_set_emission_shape :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 393763892)
     }
     self := self
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
@@ -959,7 +970,9 @@ cpu_particles2d_get_emission_shape :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Cpu_Particles2d_Emission_Shape(__return_storage)
     return
 }
 

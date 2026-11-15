@@ -16,7 +16,7 @@ editor_script_picker_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_script_picker :: proc "contextless" () -> Editor_Script_Picker {
-    return __bindgen_gde.classdb_construct_object(editor_script_picker_name_ref())
+    return cast(Editor_Script_Picker)__bindgen_gde.classdb_construct_object(editor_script_picker_name_ref())
 }
 
 // methods

@@ -1,74 +1,100 @@
 # Build a multiplayer game in a day
 
-The friendslop toolkit exists for one shape of game: **you and your friends,
-one of you hosts, things go wrong together.** This tutorial builds that game —
-a small co-op cave crawler — the same way `examples/cavecrawl` was built,
-brick by brick. Cavecrawl is the finished version of everything below; when a
-step here feels terse, the corresponding file there is the long answer.
+This guided tour explains the co-op replication workflow by following the
+structure of `examples/cavecrawl`. Its snippets are excerpts, not a complete
+project. Start with the [session quickstart](quickstart.md) if you want the
+smallest buildable example first; use the [glossary](glossary.md) for Kit
+terminology.
 
-The promise you are holding the toolkit to: **gameplay code has zero role
-branches.** You write mutation code that looks single-player; the host runs
-it authoritatively, clients predict it, rejections revert it, and remote
-screens interpolate it — without you checking `is_host` in gameplay. Where a
-role branch would creep in, the toolkit hands you a hook instead.
+The tutorial builds an invited-peer game in which one player hosts a small
+co-op cave crawler. Cavecrawl is the complete reference implementation for the
+features introduced below.
 
-## 0. The one struct
+Generated wrappers apply the declared authority, prediction, rejection, and
+presentation policies. The game implements target validation and mutation,
+accepted cross-entity consequences, authority steps, and presentation hooks.
 
-Everything hangs off your main script (cavecrawl calls it `CaveLobby`):
+<a id="0-the-one-struct"></a>
+
+## 0. The main game script
+
+Declare the session, communications, and Boot fields on the main game script.
+Cavecrawl calls this script `CaveLobby`:
 
 ```odin
 CaveLobby :: struct {
 	owner: gd.Node,
 	ses:   ksess.Session,
-	wire:  netgd.Session_Wire,
+	comms: kcomms.Comms,
+	boot:  kboot.Boot,
 	// ...your world: entity maps, UI handles, campaign state
 }
 ```
 
-One session, one wire, no globals. Everything the toolkit needs to survive a
-re-host or a resumed save lives in the session; everything transport-shaped
-lives in the wire.
+Keep one session and one Boot on the script instead of in package globals.
+The session retains network identity, entities, and stats for rehosting and
+saved runs. Boot ([kit/boot](boot.md)) holds the Godot-facing lobby, chat,
+scoreboard, stage/world containers, and transport wire. Its widgets are public
+fields that the game can restyle or ignore. Game-specific campaign state will
+need a separate save blob, described below.
 
-## 1. Wire and lobby (15 minutes)
+## 1. Boot and lobby (15 minutes)
 
 In `ready()`:
 
 ```odin
-ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
-ksess.session_set_command_hook(&self.ses, self, cave_command_hook)
-netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_SESSION)
-netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
-self.ui = kui.lobby_make(self.owner, "MY GAME")
+my_game_net_attach(self, kboot.Options{
+	title    = "MY GAME",
+	status   = "Host a cave, or join one at localhost",
+	msg_kind = MSG_SESSION, // MSG_SESSION :: u8(0) — all kit/session traffic under one game byte
+	env      = "MY", // MY_PORT/_NAME/_TOKEN identity + the MY_LATENCY shim
+	methods  = {"on_host", "on_join", "on_start", "on_chat",
+	            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
+}, kboot.network_profile(.Friends_Coop))
 ```
 
-Godot signals must land on script methods, so your game keeps four one-line
-forwards (`wire_receive`, `session_peer_disconnected`, `session_client_join`,
-`session_peer_disconnected(HOST_PEER)`) — see [netgd](netgd.md). **Do not skip
-the disconnect forwards.** An unwired `peer_disconnected` means an alt-F4'd
-friend haunts your roster forever; an unwired `connection_failed` means a
-failed join hangs on "Joining..." — the first playtest bug of every
-multiplayer game ever shipped.
+The attach call creates the lobby title, status, player list, Host/Join/Start
+buttons, chat, scoreboard, and session transport wire. The `boot: kboot.Boot`
+field also generates four transport forwarders:
+`on_packet`/`on_peer_left`/`on_net_up`/`on_net_down`. They report transport
+changes to the session, which clears disconnected peers from the roster after
+Alt-F4, a crash, or connection loss. A hand-written method with the same name
+overrides a generated forwarder.
 
-Host button → `gd.host` + `session_host_start`. Join button → `gd.join` +
-`session_client_start(ksave.persistent_token("user://my_token"), name)`.
+`.Friends_Coop` records that invited entity owners may author their streamed
+movement. Choose `.Listen_Server_Action` when clients send validated inputs to
+a player-hosted simulation, or `.Dedicated_Competitive` when that authority
+runs on trusted infrastructure. See [Network profiles](profiles.md).
 
-That token IS the player. Same token later — after a crash, a quit, a resumed
-save — reclaims the same identity, stats, and entities. Persist it; never
-regenerate it. See [session](session.md).
+Implement the four UI methods for hosting, joining, starting, and chat. The
+Host handler calls `kboot.boot_host(&self.boot, port, name)`; Join calls
+`kboot.boot_join(&self.boot, addr, port, token, name)`. Each connection handler
+checks whether the action is allowed, calls Boot, and updates status text.
+Use an example game's `net.odin` as a starting point; its connection handlers
+take about 60 lines.
 
-In `process()`, drive everything and drain events:
+The join's `token` is the player identity (`kboot.boot_token(&self.boot)`,
+persisted in `user://my_token`, overridable via `MY_TOKEN` so same-machine
+tests pick distinct seats). Presenting the same token later (after a crash, a
+quit, a resumed save) reclaims the same identity, stats, and entities. Persist
+it; never regenerate it. See [session](session.md).
+
+The attach call is generated from the shell's direct Boot, Session, and Comms
+fields. It also installs generated entity/message/migration wiring. In
+`process()`, one generated call pumps the wire, ticks the session, applies the
+stock reactions, and dispatches your [event
+halves](session.md#event-halves-and-generated-dispatch). A co-op authority step
+remains an explicit game decision because it commonly runs only while playing:
 
 ```odin
-ticks, _ := ksess.session_tick(&self.ses, delta, now)
-netgd.wire_pump(&self.wire, now)
-for {
-	ev, ok := ksess.session_poll(&self.ses)
-	if !ok {break}
-	switch e in ev { /* react: joins, spawns, state, rejections... */ }
-}
+frame := my_game_net_frame(self, delta, now_s())
 ```
 
-Events, not callbacks: nothing calls into your half-initialized script.
+Generated dispatch runs synchronously inside `my_game_net_frame`, applying
+each hook's execution policy. For custom ordering, the component calls
+`boot_attach`/`boot_pump`/`my_game_events` and underlying
+`wire_attach`/`wire_pump`, `session_tick`/`session_poll` remain public.
+See [boot](boot.md), [netgd](netgd.md), and [session](session.md).
 
 ## 2. Your first replicated entity (30 minutes)
 
@@ -85,202 +111,242 @@ Chest :: struct {
 }
 ```
 
-scriptgen generates the serialization, dirty-tracking, and a `Command_Set`;
-`registry_insert` writes `net_id` back so you can't forget it. Your factory
-(one switch, used by EVERY peer — the host included) instantiates the scene
-and returns the struct + generated set. The host spawns with the two-phase
-pair, so creation code exists exactly once:
+Scriptgen generates serialization, dirty tracking, and a `Command_Set`.
+`registry_insert` writes the registered id into `net_id`. Add an `entity=` tag
+to the scene export to declare the scene's entity type and stable wire id:
 
 ```odin
-ep, id := ksess.session_spawn_make(&self.ses, CHEST_TYPE)
-chest := cast(^Chest)ep
-chest.x, chest.y = 300, 180
-ksess.session_spawn_send(&self.ses, id)
+// CaveLobby field: assign the scene in the Inspector and declare its entity type.
+chest_scene: ^gd.Resource `gd:"entity=Chest:2"`,
 ```
 
-Fields you change on the host after this ride the per-tick delta walk to
-everyone. That is the whole replication story: **change a field, done.**
+The generated `cave_lobby_net_attach` installs `cave_lobby_entities`. On every
+peer, including the host, that factory instantiates scenes under `boot.world`,
+records each id and node, and frees the node on despawn. The tag also generates
+typed lookup and iteration procedures, so the game does not need a parallel
+entity map:
 
-## 3. Movement that feels right (30 minutes)
+```odin
+if chest, ok := chest_of(&self.boot, id); ok {
+	inspect(chest)
+}
+for tracked in chest_all(&self.boot) {
+	inspect(tracked.entity)
+}
+```
+
+A custom shell may call the entity installer directly. Typed `_spawned` and
+`_freed` hooks remain for game-specific indexes or bookkeeping, not for
+recreating the registry.
+
+On the host, call the generated `chest_spawn` helper. It returns a typed
+`Chest` pointer and id; initialize its fields, then announce the spawn:
+
+```odin
+chest, id := chest_spawn(&self.boot)
+chest.x, chest.y = 300, 180
+kboot.boot_spawn_send(&self.boot, id)
+```
+
+After replication starts, the per-tick delta walk sends changes to registered
+authority-written fields. Clients receive the current value; late joiners
+receive it in their snapshot.
+
+<a id="3-movement-that-feels-right-30-minutes"></a>
+
+## 3. Owner-streamed movement (30 minutes)
 
 Give players' avatars owner-streamed fields:
 
 ```odin
-x, y: f32 `gd:"replicate,interp,owner"`,
+x, y: f32 `gd:"owner"`, // continuous owner fields interpolate by default
 ```
 
-The OWNER writes them every frame; the toolkit ships last-value snapshots on
-the unreliable channel and remote screens interpolate ~3 ticks in the past —
-smooth through jitter and drops. Two contracts to respect:
+The entity owner writes these fields every frame. Kit sends their latest
+values over the unreliable channel; remote peers interpolate about 3 ticks
+in the past to absorb jitter and packet loss. Follow two rules:
 
-- **Only the owner moves the owner.** Respawns, level changes, knockbacks on
-  someone else's avatar are expressed as replicated state the owner REACTS to
-  (hp came back → walk out of the grave yourself).
-- **Jumps are teleports.** Level change, blink, respawn — call
-  `ksess.session_teleport(&ses, id)` on the frame you write the jumped
-  position, or remote screens will slide your avatar across the whole map.
+- Only the entity owner writes its owner-streamed position. For respawns,
+  level changes, and knockbacks, the authority replicates state that tells the
+  owner how to move its avatar. For example, restored hp can trigger the
+  owner's respawn positioning.
+- Announce discontinuous position changes as teleports. On the frame of a
+  level change, blink, or respawn, call the generated helper, such as
+  `spelunker_teleport(&self.boot, self.me)`. Otherwise remote peers interpolate
+  across the position jump and show the avatar sliding across the map.
 
-## 4. Verbs — the intent pipeline (1 hour)
+<a id="4-verbs--the-intent-pipeline-1-hour"></a>
 
-A verb is a plain proc on the entity it mutates:
+## 4. Commands and authority consequences (1 hour)
+
+A Kit command is a procedure on the entity it validates and mutates. Here a
+player requests items from a chest:
 
 ```odin
-@(gd_command = "predict")
-chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> bool {
-	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false}
-	taken := kitems.take(self.slots[:], int(slot), count)
-	if taken.count == 0 {return false}
-	self.last_take = taken // non-replicated scratch for the hook
-	return true
+@(gd_command = knet.ACTION_ANY_SEAT_PREDICTED)
+chest_take :: proc(self: ^Chest, slot: u8, count: u16, px, py: f32) -> (ok: bool, taken: kitems.Slot) {
+	if !kinter.in_range({px, py, 0}, {self.x, self.y, 0}, REACH) {return false, {}}
+	taken = kitems.take(self.slots[:], int(slot), count)
+	return taken.count > 0, taken
 }
 ```
 
-Single-player-looking code, zero role branches. The generated `chest_take_cmd`
-wrapper runs it authoritatively on the host and predictively on clients;
-`false` means NO — state auto-reverts on every peer, and a rejection carries
-the authoritative truth back. Two players race the last item: both predict
-success, the host runs them in arrival order, the loser reverts. Conflict
-resolution costs you nothing — it IS the pipeline.
+The generated `chest_take_cmd` wrapper runs this command authoritatively on
+the host and predictively on clients. Returning false as the first result
+rejects the request and reverts its writes. An authority rejection also sends
+accepted state back to the predicting client. If two players request the last
+item, both can predict success. The host executes requests in arrival order,
+accepts the first, and rejects the second; that client then reverts its
+prediction.
 
-A command may only mutate its target. The cross-entity half — "loot lands in
-MY bag" — goes in the **command hook**, which fires on the authority for
-client commands AND the host's own (no "inline authority half" beside each
-issue site):
+A command may mutate only its target. To add the accepted loot to the player's
+inventory, implement its paired [consequence](net.md#command-consequences),
+`<verb>_then`. Results after the applied boolean become payload arguments to
+that procedure, alongside the issuer and wire arguments. The consequence runs
+only on the authority, for both client-issued and host-issued commands. Client
+prediction never calls it:
 
 ```odin
-cave_command_hook :: proc(user: rawptr, player: knet.Player_Id, entity: knet.Net_Id, cmd: u16, ok: bool) {
-	if !ok {return}
-	switch cmd { case CHEST_CMD_TAKE: /* credit player's bag from last_take */ }
+@(gd_half)
+chest_take_then :: proc(game: ^CaveLobby, self: ^Chest, by: knet.Player_Id, slot: u8, count: u16, px, py: f32, taken: kitems.Slot) {
+	cave_credit(game, by, self, taken) // authority mutation replicated through deltas
 }
 ```
 
-Gate verbs BEFORE issuing (stamina, cooldown, death) — a refused prediction
-still rides the wire, and spamming ungated verbs floods your log with
-rejections. See [items](items.md) and [interact](interact.md) for the
+Check stamina, cooldown, and life state before issuing a command. A locally
+refused prediction is still sent, so repeated unavailable actions create
+avoidable requests and rejection logs. See [items](items.md) and [interact](interact.md) for the
 deterministic ops that are safe inside command procs.
 
-## 5. Combat that never feels sloppy (1-2 hours)
+<a id="5-combat-that-never-feels-sloppy-1-2-hours"></a>
 
-The pattern (cavecrawl's `rocks.odin`, ~100 lines with kit/fx doing the
-flying):
+## 5. Predicted combat presentation (1-2 hours)
 
-- The **cast** is a predicted command (ability slot: cooldown + cost checked
-  in the proc, [combat](combat.md)).
-- The shooter's screen draws its projectile **at cast time** — a
-  `kfx.Tracers` visual, no entity, no wire. Press fire, see rock.
-- The **host** simulates the authoritative projectile (the only one that
-  hurts) and announces the `kcombat.Fire` on an app tag; other screens draw
-  their visuals from that. Everyone skips their own echo.
-- Visual contact plays the impact NOW: `kcombat.php_note_hit` dips the hp you
-  DISPLAY (an overlay — never the replicated field); truth arrives a beat
-  later as ordinary deltas and squares the number. A host-side miss heals the
-  dip back.
+Cavecrawl's `rocks.odin` implements this projectile pattern in about 100 lines,
+using kit/fx for presentation:
 
-**The moving-cast lesson, learned the hard way:** the Fire must carry the
-shooter's OWN origin (their screen's truth), not the host's lagged copy of
-their position — leashed within reach on the host (`kcombat.leash`). Without
-it, a strafing shooter watches rocks connect while the host sails them wide.
+- The cast is a predicted command that checks its ability slot's cooldown and
+  cost; see [combat](combat.md).
+- At cast time, the shooter starts a local `kfx.Tracers` visual. It needs no
+  replicated projectile entity or network message before appearing.
+- The host simulates the projectile that applies damage and announces a
+  `kcombat.Fire` through an app tag. Other peers start their visuals from the
+  announcement, while the shooter skips the echo of its predicted cast.
+- On local visual contact, `kcombat.php_note_hit` reduces displayed hp through
+  an overlay without changing the replicated field. An authoritative hp delta
+  later consumes the overlay. If the host judges a miss, the overlay expires
+  and displayed hp returns to its authoritative value.
 
-Prove the feel with the latency shim before you trust it:
-`netgd.wire_set_latency(&self.wire, 120)`.
+Include the shooter's local origin in `Fire`. The host's owner-streamed copy
+of the shooter is delayed and would launch along a different path, especially
+while strafing. Bound the supplied origin on the host with `kcombat.leash`.
 
-## 6. Things that bite back (1 hour)
+Test this behavior with injected latency: set
+`Options.latency_env = "MY_LATENCY"` and run under `MY_LATENCY=120` (or call
+`netgd.wire_set_latency(&self.boot.wire, 120)` directly).
 
-There is no NPC framework and that is the point ([ai](ai.md)). A dweller is
-an ordinary entity owned by the host player: the host's brain tick writes its
-streamed position like any owner, its mood is one replicated byte, and every
-client watches the hunt through the same machinery that carries everything
-else. `kai.Director` + `director_tick` pace waves from data; brains live in a
-host-side map keyed by net id, rebuilt on resume from your save blob.
+## 6. Enemies (1 hour)
 
-## 7. Levels: replicate the byte, not the scenery (1 hour)
+Use [ai](ai.md)'s helpers from a game-owned NPC update loop. A dweller is an
+ordinary entity owned by the host player. The host writes its streamed position
+and one replicated behavior byte; clients interpolate its motion and display
+that behavior. `kai.Director` and `director_tick` schedule waves from data.
+Private decision state lives in a host-side map keyed by net id and is rebuilt
+from the game's save blob on resume.
 
-A `Level` entity with a `depth: u8` byte is the entire level-migration wire
-protocol. Each peer loads `level_N.tscn` LOCALLY on the depth edge (static
-geometry never rides the wire); the host reads Marker2D spawn points from its
-own instance and session-spawns the dynamic entities; wave plans live in
-`.tres` resources. Descending = despawn the old floor's entities, bump the
-byte, build the next floor. Drop-in joiners and resumed saves need no special
-casing — the byte is already in the snapshot.
+<a id="7-levels-replicate-the-byte-not-the-scenery-1-hour"></a>
+
+## 7. Loading levels from replicated state (1 hour)
+
+Store the current floor in a `Level` entity's `depth: u8` field. When that
+value changes, each peer loads `level_N.tscn` locally. Static geometry stays in
+the scene files. The host reads Marker2D spawn points from its own scene and
+creates the dynamic session entities; `.tres` resources hold wave plans.
+
+To descend, despawn the old floor's entities, increment depth, and build the
+next floor. New joiners and resumed saves receive the depth in the snapshot,
+so they can load the corresponding local scene through the same path.
 
 ## 8. Runs end: match flow (1 hour)
 
-One more byte on the Level entity: `won: u8`. The last floor's cleared door
-sets it; every peer keys its end screen (scoreboard + status + the host's
-Start reading as "again") off the won edge; restart clears it and rebuilds
-floor 1 **in the same session** — seats, tokens, and the cumulative ledger
-persist, because a restart is just deltas.
+Add `won: u8` to the Level entity. Clearing the last floor sets it, and peers
+respond to the change by showing the scoreboard and status; the host's Start
+button offers another run. Restart clears `won` and rebuilds floor 1 within
+the same session. Seats, tokens, and cumulative stats remain in place while
+deltas carry the new run state.
 
-**The pulse lesson:** deltas carry STATE, not events. A byte flipped 1→0
-within one net tick never ships (the shadow diff sees no change). Edges must
-outlive a tick; anything genuinely event-shaped belongs in an explicit
-message ([comms](comms.md) or an app tag).
+Keep replicated state changes visible across a network tick. A byte that
+changes 1→0 within one tick produces no delta if its final value equals the
+stored comparison value. Use an explicit [comms](comms.md) message or app tag
+for one-shot events that must be delivered.
 
-And moderation, because you are shipping this to the public internet:
-`session_kick(player, ban)`, `session_set_locked`, `Session_Config.max_players`
-— with `netgd.wire_drop` closing the kicked socket AFTER the "you were
-kicked" message flushes. Returning identities pass lock and capacity: their
-seat is theirs.
+If strangers can join, add moderation and admission policy deliberately.
+The tools are `session_kick(player, ban)`, `session_set_locked`, and
+`Session_Config.max_players`, with `netgd.wire_drop` closing the kicked socket
+after the "you were kicked" message flushes. Returning identities pass lock and
+capacity checks when reclaiming their existing seats.
 
 ## 9. Quit and resume (30 minutes)
 
 ```odin
-// save: one call for everything the session knows + your blob for the rest
+// Save session state and the game-specific campaign blob.
 ksave.save_write(&self.ses, &w, GAME_VERSION, my_campaign_blob)
-// resume: the whole Resume button
+// Restore session state and read the campaign blob.
 blob, err := ksave.resume(&self.ses, name, path, GAME_VERSION)
 ```
 
-The session snapshot already carries identity, stats, and every entity —
-saving is the backup-host contract pointed at a file. Your blob carries what
-only you know (wave director, AI clocks). Friends rejoin a resumed run with
-their persisted tokens like any reconnect. See [save](save.md).
+The save snapshot carries session identity, stats, and entities using the
+same data used for backup hosting. The game adds a blob for private state such
+as the wave director and AI clocks. Friends rejoin the resumed run with their
+persisted tokens through the normal reconnect path. See [save](save.md).
 
-## 9b. Things your friends carry (30 minutes)
+## 9b. Carryable entities (30 minutes)
 
-Give an entity owner-streamed position and it can be CARRIED: a grab command
-whose hook calls `session_set_owner(ses, id, player)`, an `Ev_Owner_Changed`
-handler, and per-frame glue on the carrier (`relic.x = me.x + 10`). Drop
-hands it to `PLAYER_ID_INVALID` — it rests where it was left. Mounts,
-possession, and dragging bodies are the same three pieces.
+To carry an entity, give it owner-streamed position. A grab command's `_then`
+calls `session_set_owner(ses, id, by)`. The game handles `Ev_Owner_Changed`
+and lets the carrier update its position each frame, such as
+`relic.x = me.x + 10`. Dropping assigns `PLAYER_ID_INVALID`, leaving the
+entity at its last position. Mounts, possession, and dragging bodies use the
+same ownership transfer and position update pattern.
 
-And the co-op staple on top: **downed/revive** is ONE predicted command on
-the downed player's entity (`hp = REVIVE_HP` behind a range gate), a
-bleed-out clock on the host, and an hp-at-the-edge check so the owner knows
-a revive-in-place from a bleed-out respawn. No new machinery — see
-cavecrawl's `spelunker_revive`.
+For downed players, add a predicted revive command that checks range and sets
+`hp = REVIVE_HP`. The host tracks bleed-out time. When hp changes, the owner
+checks its value to distinguish revival in place from a bleed-out respawn.
+Cavecrawl's `spelunker_revive` demonstrates the pattern.
 
-## 9c. When the host's cat unplugs the router (30 minutes)
+## 9c. Host migration (30 minutes)
 
-The backup snapshots that ship every few seconds (phase 1 machinery) plus
-`session_set_backup_blob` (your campaign bytes ride along) make the death of
-the host survivable: the holder splits the payload with
-`session_backup_parts`, wipes its local world, rebinds as a server, and
-`session_host_resume`s under its own identity. Everyone else rejoins with
-their tokens and reclaims themselves.
+Periodic authority backups let another player resume hosting after the host
+disconnects. Declare four halves and pass their generated table to
+`kboot.boot_migration` in `ready`:
 
-Make it HANDS-FREE with succession: on `Ev_Backup_Target` the host names the
-holder and how to reach them (`netgd.peer_address` +
-`session_set_successor_info`); on host loss every client gets
-`Ev_Succession` — the bearer auto-takes-over, the rest auto-chase (the event
-re-fires on each failed reconnect, so retry is free). Cavecrawl's
-`on_takeover`/`cave_rejoin_to` pair is the whole recipe, and acid act 4
-kills the host with `kill -9` to prove nobody has to press anything.
+- `<game>_backup` writes game-specific campaign bytes into each backup.
+- `<game>_took_over` reads them on the successor and restores private game state.
+- `<game>_wiped` clears non-entity pools after Kit removes tracked entities.
+- `<game>_migrating` updates status for each migration step.
 
-## 9d. Worlds from dice: shared-seed procgen (30 minutes)
+Kit starts the handoff on `Ev_Backup_Target`. After dispatching session events,
+it either takes over or reconnects to the successor, bounds retries, and
+retains the timing state needed to manage the attempt. Act 4 of Cavecrawl's
+acceptance test kills the host with `kill -9` and checks that handoff needs no
+manual input. See [session.md](session.md#backup-hosting-and-resume) for setup.
 
-Replicate the SEED, not the scenery: one `seed: u32` field on your level
-entity, and every peer grows identical decoration locally — zero wire bytes
-for the world it implies. The one rule: **integer math end to end**
-(cavecrawl's `splitmix32` scatter). Floats are the classic procgen
-divergence trap — FMA contraction, libm differences, and fast-math flags all
-vary by platform, and a single divergent low bit becomes two different
-caves. Cavecrawl's acid proves convergence the honest way: both processes
-print a checksum of what they grew, and the test demands they match.
+## 9d. Shared-seed procgen (30 minutes)
 
-## 10. Ship it on Steam (1 hour + a friend)
+Replicate a `seed: u32` field on the level entity and generate decoration
+locally on each peer. Only the seed crosses the wire; generated scenery needs
+zero additional wire bytes. Cavecrawl's `splitmix32` scatter uses integer math
+throughout so peers derive the same result. Floating-point generation can vary
+with FMA contraction, libm implementations, and fast-math flags; even a low-bit
+difference can change the generated cave. Cavecrawl's acceptance test compares
+checksums printed by both processes to verify matching decoration.
 
-Swap the transport, change nothing else ([steamgd](steamgd.md)):
+<a id="10-ship-it-on-steam-1-hour--a-friend"></a>
+
+## 10. Connecting through Steam (1 hour + a friend)
+
+Use [steamgd](steamgd.md) to connect the existing session through Steam lobby
+and peer APIs:
 
 ```odin
 if steamgd.available() && steamgd.init(APP_ID) {
@@ -290,17 +356,25 @@ if steamgd.available() && steamgd.init(APP_ID) {
 // guest: overlay "Join Game" -> join_requested -> join_lobby -> client_peer
 ```
 
-The Session_Wire never changes — SceneMultiplayer's signals fire identically
-over any MultiplayerPeer. Verify live with the Spacewar app id (480), a
-`steam_appid.txt`, and one friend.
+Session_Wire continues receiving SceneMultiplayer signals through the selected
+MultiplayerPeer. Verify the Steam connection live with the Spacewar app id
+(480), a `steam_appid.txt`, and one friend.
 
-## 11. The habit that made all of this work
+## 11. Headless acceptance tests
 
-Every brick above landed with a **headless acid test**: two real processes,
-real ENet, 120ms injected latency, driving the real scene tree and grepping
-log lines (`examples/cavecrawl/run.sh` + `cave_test.gd`). When something felt
-wrong at a friend's house, the first move was reproducing it in the driver —
-the moving-cast miss, the kicked-message race, and the pulse-swallow above
-were all caught by greps, not playtests. Steal the pattern: your game's
-`@(gd_method)` surface is drivable by a test script exactly like keys drive
-it in play.
+Cavecrawl's headless acceptance test starts two processes over ENet with
+120ms injected latency. Its driver operates the scene tree and checks log
+lines from each peer (`examples/cavecrawl/run.sh` + `cave_test.gd`). Reproduce
+observed gameplay failures in a driver so its assertions can check the result
+on both peers. A test script can call the same `@(gd_method)` procedures used
+by gameplay input.
+
+## 12. Moving contested state to the simulation lane
+
+This tutorial uses peer-owned movement, which is appropriate when the host
+trusts each owner to report its fast state. A duel, ranked game, or other
+contested design should derive movement from admitted input on the authority.
+Retag that state with `predict`, move its writes into `@(gd_tick)`, and attach
+the simulation lane. Session identity, entities, commands, chat, and saves can
+remain on their existing lanes. Read [Timelines](timelines.md) to choose a
+model and [kit/sim](sim.md#promoting-a-coop-game) for the migration checklist.

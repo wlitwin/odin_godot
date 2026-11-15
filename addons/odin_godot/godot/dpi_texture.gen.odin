@@ -95,6 +95,70 @@ dpi_texture_get_source :: proc "contextless" (
     return
 }
 
+dpi_texture_set_fix_alpha_border :: proc "contextless" (
+    self: Dpi_Texture,
+    fix_alpha_border_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_fix_alpha_border", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    fix_alpha_border_ := fix_alpha_border_
+    args := []__bindgen_gde.TypePtr {
+        &fix_alpha_border_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+dpi_texture_get_fix_alpha_border :: proc "contextless" (
+    self: Dpi_Texture,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_fix_alpha_border", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+dpi_texture_set_premult_alpha :: proc "contextless" (
+    self: Dpi_Texture,
+    premult_alpha_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_premult_alpha", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    premult_alpha_ := premult_alpha_
+    args := []__bindgen_gde.TypePtr {
+        &premult_alpha_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+dpi_texture_get_premult_alpha :: proc "contextless" (
+    self: Dpi_Texture,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_premult_alpha", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 dpi_texture_set_base_scale :: proc "contextless" (
     self: Dpi_Texture,
     base_scale_: f64,

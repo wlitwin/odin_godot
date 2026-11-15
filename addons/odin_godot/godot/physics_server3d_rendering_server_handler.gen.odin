@@ -16,7 +16,7 @@ physics_server3d_rendering_server_handler_name :: proc "contextless" () -> Strin
 }
 
 new_physics_server3d_rendering_server_handler :: proc "contextless" () -> Physics_Server3d_Rendering_Server_Handler {
-    return __bindgen_gde.classdb_construct_object(physics_server3d_rendering_server_handler_name_ref())
+    return cast(Physics_Server3d_Rendering_Server_Handler)__bindgen_gde.classdb_construct_object(physics_server3d_rendering_server_handler_name_ref())
 }
 
 // methods

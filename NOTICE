@@ -13,3 +13,10 @@ bindgen/UPSTREAM.txt for provenance.
 The Godot engine API description (extension_api.json,
 gdextension_interface.h) is from the Godot Engine project
 (https://godotengine.org), licensed under the MIT license.
+
+The optional Box3D native backend includes Box3D (Erin Catto, MIT), its
+embedded qsort.h (Alexey Tourbin, MIT) and verstable.h (Jackson L. Allan, MIT),
+and the isolated rollback-in-a-box C shim (Paul Barrass, MIT).
+Exact source pins and full license notices are in box3d/dependency.json and
+box3d/native/THIRD_PARTY_NOTICES.txt. Distributions containing this backend
+must include that notice file alongside the native artifacts.

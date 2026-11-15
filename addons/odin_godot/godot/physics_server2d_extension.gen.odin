@@ -16,7 +16,7 @@ physics_server2d_extension_name :: proc "contextless" () -> String_Name {
 }
 
 new_physics_server2d_extension :: proc "contextless" () -> Physics_Server2d_Extension {
-    return __bindgen_gde.classdb_construct_object(physics_server2d_extension_name_ref())
+    return cast(Physics_Server2d_Extension)__bindgen_gde.classdb_construct_object(physics_server2d_extension_name_ref())
 }
 
 // methods
@@ -212,7 +212,9 @@ physics_server2d_extension__shape_get_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Physics_Server2d_Shape_Type(__return_storage)
     return
 }
 
@@ -260,9 +262,9 @@ physics_server2d_extension__shape_collide :: proc "contextless" (
     shape_B_: Rid,
     xform_B_: Transform2d,
     motion_B_: Vector2,
-    results_: rawptr,
+    r_results_: rawptr,
     result_max_: Int,
-    result_count_: ^i32,
+    r_result_count_: ^i32,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -276,9 +278,9 @@ physics_server2d_extension__shape_collide :: proc "contextless" (
     shape_B_ := shape_B_
     xform_B_ := xform_B_
     motion_B_ := motion_B_
-    results_ := results_
+    r_results_ := r_results_
     result_max_ := result_max_
-    result_count_ := result_count_
+    r_result_count_ := r_result_count_
     args := []__bindgen_gde.TypePtr {
         &shape_A_,
         &xform_A_,
@@ -286,9 +288,9 @@ physics_server2d_extension__shape_collide :: proc "contextless" (
         &shape_B_,
         &xform_B_,
         &motion_B_,
-        &results_,
+        &r_results_,
         &result_max_,
-        &result_count_,
+        &r_result_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -360,7 +362,7 @@ physics_server2d_extension__space_set_param :: proc "contextless" (
     }
     self := self
     space_ := space_
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &space_,
@@ -382,7 +384,7 @@ physics_server2d_extension__space_get_param :: proc "contextless" (
     }
     self := self
     space_ := space_
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &space_,
         &param_,
@@ -461,7 +463,9 @@ physics_server2d_extension__space_get_contact_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &space_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -627,7 +631,9 @@ physics_server2d_extension__area_get_shape_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &area_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -799,7 +805,7 @@ physics_server2d_extension__area_set_param :: proc "contextless" (
     }
     self := self
     area_ := area_
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &area_,
@@ -841,7 +847,7 @@ physics_server2d_extension__area_get_param :: proc "contextless" (
     }
     self := self
     area_ := area_
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &area_,
         &param_,
@@ -902,7 +908,9 @@ physics_server2d_extension__area_get_collision_layer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &area_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -940,7 +948,9 @@ physics_server2d_extension__area_get_collision_mask :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &area_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1089,7 +1099,7 @@ physics_server2d_extension__body_set_mode :: proc "contextless" (
     }
     self := self
     body_ := body_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &body_,
         &mode_,
@@ -1111,7 +1121,9 @@ physics_server2d_extension__body_get_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &body_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Physics_Server2d_Body_Mode(__return_storage)
     return
 }
 
@@ -1201,7 +1213,9 @@ physics_server2d_extension__body_get_shape_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &body_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1276,22 +1290,25 @@ physics_server2d_extension__body_set_shape_as_one_way_collision :: proc "context
     shape_idx_: Int,
     enable_: Bool,
     margin_: f64,
+    direction_: Vector2,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("_body_set_shape_as_one_way_collision", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2556489974)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2042146392)
     }
     self := self
     body_ := body_
     shape_idx_ := shape_idx_
     enable_ := enable_
     margin_ := margin_
+    direction_ := direction_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &shape_idx_,
         &enable_,
         &margin_,
+        &direction_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -1421,7 +1438,7 @@ physics_server2d_extension__body_set_continuous_collision_detection_mode :: proc
     }
     self := self
     body_ := body_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &body_,
         &mode_,
@@ -1443,7 +1460,9 @@ physics_server2d_extension__body_get_continuous_collision_detection_mode :: proc
     args := []__bindgen_gde.TypePtr {
         &body_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Physics_Server2dccd_Mode(__return_storage)
     return
 }
 
@@ -1481,7 +1500,9 @@ physics_server2d_extension__body_get_collision_layer :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &body_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1519,7 +1540,9 @@ physics_server2d_extension__body_get_collision_mask :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &body_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1574,7 +1597,7 @@ physics_server2d_extension__body_set_param :: proc "contextless" (
     }
     self := self
     body_ := body_
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &body_,
@@ -1596,7 +1619,7 @@ physics_server2d_extension__body_get_param :: proc "contextless" (
     }
     self := self
     body_ := body_
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &body_,
         &param_,
@@ -1635,7 +1658,7 @@ physics_server2d_extension__body_set_state :: proc "contextless" (
     }
     self := self
     body_ := body_
-    state_ := state_
+    state_ := Int(state_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &body_,
@@ -1657,7 +1680,7 @@ physics_server2d_extension__body_get_state :: proc "contextless" (
     }
     self := self
     body_ := body_
-    state_ := state_
+    state_ := Int(state_)
     args := []__bindgen_gde.TypePtr {
         &body_,
         &state_,
@@ -2043,7 +2066,9 @@ physics_server2d_extension__body_get_max_contacts_reported :: proc "contextless"
     args := []__bindgen_gde.TypePtr {
         &body_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2173,9 +2198,9 @@ physics_server2d_extension__body_collide_shape :: proc "contextless" (
     shape_: Rid,
     shape_xform_: Transform2d,
     motion_: Vector2,
-    results_: rawptr,
+    r_results_: rawptr,
     result_max_: Int,
-    result_count_: ^i32,
+    r_result_count_: ^i32,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -2188,18 +2213,18 @@ physics_server2d_extension__body_collide_shape :: proc "contextless" (
     shape_ := shape_
     shape_xform_ := shape_xform_
     motion_ := motion_
-    results_ := results_
+    r_results_ := r_results_
     result_max_ := result_max_
-    result_count_ := result_count_
+    r_result_count_ := r_result_count_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &body_shape_,
         &shape_,
         &shape_xform_,
         &motion_,
-        &results_,
+        &r_results_,
         &result_max_,
-        &result_count_,
+        &r_result_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -2251,7 +2276,7 @@ physics_server2d_extension__body_test_motion :: proc "contextless" (
     margin_: f64,
     collide_separation_ray_: Bool,
     recovery_as_collision_: Bool,
-    result_: ^Physics_Server2d_Extension_Motion_Result,
+    r_result_: ^Physics_Server2d_Extension_Motion_Result,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -2265,7 +2290,7 @@ physics_server2d_extension__body_test_motion :: proc "contextless" (
     margin_ := margin_
     collide_separation_ray_ := collide_separation_ray_
     recovery_as_collision_ := recovery_as_collision_
-    result_ := result_
+    r_result_ := r_result_
     args := []__bindgen_gde.TypePtr {
         &body_,
         &from_,
@@ -2273,7 +2298,7 @@ physics_server2d_extension__body_test_motion :: proc "contextless" (
         &margin_,
         &collide_separation_ray_,
         &recovery_as_collision_,
-        &result_,
+        &r_result_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -2324,7 +2349,7 @@ physics_server2d_extension__joint_set_param :: proc "contextless" (
     }
     self := self
     joint_ := joint_
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -2346,7 +2371,7 @@ physics_server2d_extension__joint_get_param :: proc "contextless" (
     }
     self := self
     joint_ := joint_
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
         &param_,
@@ -2493,7 +2518,7 @@ physics_server2d_extension__pin_joint_set_flag :: proc "contextless" (
     }
     self := self
     joint_ := joint_
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -2515,7 +2540,7 @@ physics_server2d_extension__pin_joint_get_flag :: proc "contextless" (
     }
     self := self
     joint_ := joint_
-    flag_ := flag_
+    flag_ := Int(flag_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
         &flag_,
@@ -2537,7 +2562,7 @@ physics_server2d_extension__pin_joint_set_param :: proc "contextless" (
     }
     self := self
     joint_ := joint_
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -2559,7 +2584,7 @@ physics_server2d_extension__pin_joint_get_param :: proc "contextless" (
     }
     self := self
     joint_ := joint_
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
         &param_,
@@ -2581,7 +2606,7 @@ physics_server2d_extension__damped_spring_joint_set_param :: proc "contextless" 
     }
     self := self
     joint_ := joint_
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &joint_,
@@ -2603,7 +2628,7 @@ physics_server2d_extension__damped_spring_joint_get_param :: proc "contextless" 
     }
     self := self
     joint_ := joint_
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &joint_,
         &param_,
@@ -2626,7 +2651,9 @@ physics_server2d_extension__joint_get_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &joint_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Physics_Server2d_Joint_Type(__return_storage)
     return
 }
 
@@ -2776,11 +2803,13 @@ physics_server2d_extension__get_process_info :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 576496006)
     }
     self := self
-    process_info_ := process_info_
+    process_info_ := Int(process_info_)
     args := []__bindgen_gde.TypePtr {
         &process_info_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

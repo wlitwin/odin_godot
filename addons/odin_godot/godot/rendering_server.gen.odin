@@ -40,13 +40,20 @@ Rendering_Server_Cube_Map_Layer :: enum int {
     Cubemap_Layer_Front = 4,
     Cubemap_Layer_Back = 5,
 }
+Rendering_Server_Texture_Drawable_Format :: enum int {
+    Texture_Drawable_Format_Rgba8 = 0,
+    Texture_Drawable_Format_Rgba8_Srgb = 1,
+    Texture_Drawable_Format_Rgbah = 2,
+    Texture_Drawable_Format_Rgbaf = 3,
+}
 Rendering_Server_Shader_Mode :: enum int {
     Shader_Spatial = 0,
     Shader_Canvas_Item = 1,
     Shader_Particles = 2,
     Shader_Sky = 3,
     Shader_Fog = 4,
-    Shader_Max = 5,
+    Shader_Texture_Blit = 5,
+    Shader_Max = 6,
 }
 Rendering_Server_Array_Type :: enum int {
     Array_Vertex = 0,
@@ -107,6 +114,7 @@ Rendering_Server_Light_Type :: enum int {
     Light_Directional = 0,
     Light_Omni = 1,
     Light_Spot = 2,
+    Light_Area = 3,
 }
 Rendering_Server_Light_Param :: enum int {
     Light_Param_Energy = 0,
@@ -197,6 +205,18 @@ Rendering_Server_Particles_Transform_Align :: enum int {
     Particles_Transform_Align_Z_Billboard = 1,
     Particles_Transform_Align_Y_To_Velocity = 2,
     Particles_Transform_Align_Z_Billboard_Y_To_Velocity = 3,
+    Particles_Transform_Align_Local_Billboard = 4,
+}
+Rendering_Server_Particles_Transform_Align_Custom_Src :: enum int {
+    Particles_Align_Channel_Filter_Disabled = 0,
+    Particles_Align_Channel_Filter_X = 1,
+    Particles_Align_Channel_Filter_Y = 2,
+    Particles_Align_Channel_Filter_Z = 3,
+    Particles_Align_Channel_Filter_W = 4,
+}
+Rendering_Server_Particles_Transform_Align_Axis :: enum int {
+    Particles_Align_Axis_X = 0,
+    Particles_Align_Axis_Y = 1,
 }
 Rendering_Server_Particles_Draw_Order :: enum int {
     Particles_Draw_Order_Index = 0,
@@ -236,7 +256,8 @@ Rendering_Server_Viewport_Scaling3d_Mode :: enum int {
     Viewport_Scaling_3d_Mode_Fsr2 = 2,
     Viewport_Scaling_3d_Mode_Metalfx_Spatial = 3,
     Viewport_Scaling_3d_Mode_Metalfx_Temporal = 4,
-    Viewport_Scaling_3d_Mode_Max = 5,
+    Viewport_Scaling_3d_Mode_Nearest = 5,
+    Viewport_Scaling_3d_Mode_Max = 6,
 }
 Rendering_Server_Viewport_Update_Mode :: enum int {
     Viewport_Update_Disabled = 0,
@@ -682,7 +703,7 @@ rendering_server_name :: proc "contextless" () -> String_Name {
 }
 
 new_rendering_server :: proc "contextless" () -> Rendering_Server {
-    return __bindgen_gde.classdb_construct_object(rendering_server_name_ref())
+    return cast(Rendering_Server)__bindgen_gde.classdb_construct_object(rendering_server_name_ref())
 }
 
 // methods
@@ -734,7 +755,7 @@ rendering_server_texture_2d_layered_create :: proc "contextless" (
     }
     self := self
     layers_ := layers_
-    layered_type_ := layered_type_
+    layered_type_ := Int(layered_type_)
     args := []__bindgen_gde.TypePtr {
         &layers_,
         &layered_type_,
@@ -758,7 +779,7 @@ rendering_server_texture_3d_create :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4036838706)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     width_ := width_
     height_ := height_
     depth_ := depth_
@@ -811,14 +832,14 @@ rendering_server_texture_create_from_native_handle :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1682977582)
     }
     self := self
-    type_ := type_
-    format_ := format_
+    type_ := Int(type_)
+    format_ := Int(format_)
     native_handle_ := native_handle_
     width_ := width_
     height_ := height_
     depth_ := depth_
     layers_ := layers_
-    layered_type_ := layered_type_
+    layered_type_ := Int(layered_type_)
     args := []__bindgen_gde.TypePtr {
         &type_,
         &format_,
@@ -828,6 +849,36 @@ rendering_server_texture_create_from_native_handle :: proc "contextless" (
         &depth_,
         &layers_,
         &layered_type_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_server_texture_drawable_create :: proc "contextless" (
+    self: Rendering_Server,
+    width_: Int,
+    height_: Int,
+    format_: Rendering_Server_Texture_Drawable_Format,
+    color_: Color,
+    with_mipmaps_: Bool,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1993613667)
+    }
+    self := self
+    width_ := width_
+    height_ := height_
+    format_ := Int(format_)
+    color_ := color_
+    with_mipmaps_ := with_mipmaps_
+    args := []__bindgen_gde.TypePtr {
+        &width_,
+        &height_,
+        &format_,
+        &color_,
+        &with_mipmaps_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -896,6 +947,38 @@ rendering_server_texture_proxy_update :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+rendering_server_texture_drawable_blit_rect :: proc "contextless" (
+    self: Rendering_Server,
+    textures_: Typed_Array(Rid),
+    rect_: Rect2i,
+    material_: Rid,
+    modulate_: Color,
+    source_textures_: Typed_Array(Rid),
+    to_mipmap_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_blit_rect", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4077763890)
+    }
+    self := self
+    textures_ := textures_
+    rect_ := rect_
+    material_ := material_
+    modulate_ := modulate_
+    source_textures_ := source_textures_
+    to_mipmap_ := to_mipmap_
+    args := []__bindgen_gde.TypePtr {
+        &textures_,
+        &rect_,
+        &material_,
+        &modulate_,
+        &source_textures_,
+        &to_mipmap_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 rendering_server_texture_2d_placeholder_create :: proc "contextless" (
     self: Rendering_Server,
 ) -> (ret: Rid) {
@@ -921,7 +1004,7 @@ rendering_server_texture_2d_layered_placeholder_create :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1394585590)
     }
     self := self
-    layered_type_ := layered_type_
+    layered_type_ := Int(layered_type_)
     args := []__bindgen_gde.TypePtr {
         &layered_type_,
     }
@@ -996,6 +1079,38 @@ rendering_server_texture_3d_get :: proc "contextless" (
     texture_ := texture_
     args := []__bindgen_gde.TypePtr {
         &texture_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+rendering_server_texture_drawable_generate_mipmaps :: proc "contextless" (
+    self: Rendering_Server,
+    texture_: Rid,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_generate_mipmaps", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2722037293)
+    }
+    self := self
+    texture_ := texture_
+    args := []__bindgen_gde.TypePtr {
+        &texture_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_texture_drawable_get_default_material :: proc "contextless" (
+    self: Rendering_Server,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("texture_drawable_get_default_material", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2944877500)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -1096,7 +1211,9 @@ rendering_server_texture_get_format :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &texture_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Image_Format(__return_storage)
     return
 }
 
@@ -1132,7 +1249,7 @@ rendering_server_texture_rd_create :: proc "contextless" (
     }
     self := self
     rd_texture_ := rd_texture_
-    layer_type_ := layer_type_
+    layer_type_ := Int(layer_type_)
     args := []__bindgen_gde.TypePtr {
         &rd_texture_,
         &layer_type_,
@@ -1529,7 +1646,7 @@ rendering_server_mesh_surface_get_format_offset :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2981368685)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     vertex_count_ := vertex_count_
     array_index_ := array_index_
     args := []__bindgen_gde.TypePtr {
@@ -1537,7 +1654,9 @@ rendering_server_mesh_surface_get_format_offset :: proc "contextless" (
         &vertex_count_,
         &array_index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1552,13 +1671,15 @@ rendering_server_mesh_surface_get_format_vertex_stride :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3188363337)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     vertex_count_ := vertex_count_
     args := []__bindgen_gde.TypePtr {
         &format_,
         &vertex_count_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1573,13 +1694,15 @@ rendering_server_mesh_surface_get_format_normal_tangent_stride :: proc "contextl
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3188363337)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     vertex_count_ := vertex_count_
     args := []__bindgen_gde.TypePtr {
         &format_,
         &vertex_count_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1594,13 +1717,15 @@ rendering_server_mesh_surface_get_format_attribute_stride :: proc "contextless" 
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3188363337)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     vertex_count_ := vertex_count_
     args := []__bindgen_gde.TypePtr {
         &format_,
         &vertex_count_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1615,13 +1740,15 @@ rendering_server_mesh_surface_get_format_skin_stride :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3188363337)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     vertex_count_ := vertex_count_
     args := []__bindgen_gde.TypePtr {
         &format_,
         &vertex_count_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1636,13 +1763,15 @@ rendering_server_mesh_surface_get_format_index_stride :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3188363337)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     vertex_count_ := vertex_count_
     args := []__bindgen_gde.TypePtr {
         &format_,
         &vertex_count_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1682,11 +1811,11 @@ rendering_server_mesh_add_surface_from_arrays :: proc "contextless" (
     }
     self := self
     mesh_ := mesh_
-    primitive_ := primitive_
+    primitive_ := Int(primitive_)
     arrays_ := arrays_
     blend_shapes_ := blend_shapes_
     lods_ := lods_
-    compress_format_ := compress_format_
+    compress_format_ := Int(compress_format_)
     args := []__bindgen_gde.TypePtr {
         &mesh_,
         &primitive_,
@@ -1712,7 +1841,9 @@ rendering_server_mesh_get_blend_shape_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &mesh_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1728,7 +1859,7 @@ rendering_server_mesh_set_blend_shape_mode :: proc "contextless" (
     }
     self := self
     mesh_ := mesh_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mesh_,
         &mode_,
@@ -1750,7 +1881,9 @@ rendering_server_mesh_get_blend_shape_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &mesh_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Blend_Shape_Mode(__return_storage)
     return
 }
 
@@ -1875,7 +2008,9 @@ rendering_server_mesh_get_surface_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &mesh_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2110,7 +2245,7 @@ rendering_server_multimesh_allocate_data :: proc "contextless" (
     self := self
     multimesh_ := multimesh_
     instances_ := instances_
-    transform_format_ := transform_format_
+    transform_format_ := Int(transform_format_)
     color_format_ := color_format_
     custom_data_format_ := custom_data_format_
     use_indirect_ := use_indirect_
@@ -2139,7 +2274,9 @@ rendering_server_multimesh_get_instance_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &multimesh_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2447,7 +2584,9 @@ rendering_server_multimesh_get_visible_instances :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &multimesh_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2580,7 +2719,7 @@ rendering_server_multimesh_set_physics_interpolation_quality :: proc "contextles
     }
     self := self
     multimesh_ := multimesh_
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &multimesh_,
         &quality_,
@@ -2677,7 +2816,9 @@ rendering_server_skeleton_get_bone_count :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &skeleton_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -2834,6 +2975,21 @@ rendering_server_spot_light_create :: proc "contextless" (
     return
 }
 
+rendering_server_area_light_create :: proc "contextless" (
+    self: Rendering_Server,
+) -> (ret: Rid) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("area_light_create", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 529393457)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 rendering_server_light_set_color :: proc "contextless" (
     self: Rendering_Server,
     light_: Rid,
@@ -2867,7 +3023,7 @@ rendering_server_light_set_param :: proc "contextless" (
     }
     self := self
     light_ := light_
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &light_,
@@ -3038,7 +3194,7 @@ rendering_server_light_set_bake_mode :: proc "contextless" (
     }
     self := self
     light_ := light_
-    bake_mode_ := bake_mode_
+    bake_mode_ := Int(bake_mode_)
     args := []__bindgen_gde.TypePtr {
         &light_,
         &bake_mode_,
@@ -3078,7 +3234,7 @@ rendering_server_light_omni_set_shadow_mode :: proc "contextless" (
     }
     self := self
     light_ := light_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &light_,
         &mode_,
@@ -3098,7 +3254,7 @@ rendering_server_light_directional_set_shadow_mode :: proc "contextless" (
     }
     self := self
     light_ := light_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &light_,
         &mode_,
@@ -3138,10 +3294,50 @@ rendering_server_light_directional_set_sky_mode :: proc "contextless" (
     }
     self := self
     light_ := light_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &light_,
         &mode_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_light_area_set_size :: proc "contextless" (
+    self: Rendering_Server,
+    light_: Rid,
+    size_: Vector2,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("light_area_set_size", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3201125042)
+    }
+    self := self
+    light_ := light_
+    size_ := size_
+    args := []__bindgen_gde.TypePtr {
+        &light_,
+        &size_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_light_area_set_normalize_energy :: proc "contextless" (
+    self: Rendering_Server,
+    light_: Rid,
+    enable_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("light_area_set_normalize_energy", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1265174801)
+    }
+    self := self
+    light_ := light_
+    enable_ := enable_
+    args := []__bindgen_gde.TypePtr {
+        &light_,
+        &enable_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -3156,7 +3352,7 @@ rendering_server_light_projectors_set_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 43944325)
     }
     self := self
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &filter_,
     }
@@ -3190,7 +3386,7 @@ rendering_server_positional_soft_shadow_filter_set_quality :: proc "contextless"
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3613045266)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &quality_,
     }
@@ -3207,7 +3403,7 @@ rendering_server_directional_soft_shadow_filter_set_quality :: proc "contextless
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3613045266)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &quality_,
     }
@@ -3261,7 +3457,7 @@ rendering_server_reflection_probe_set_update_mode :: proc "contextless" (
     }
     self := self
     probe_ := probe_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &probe_,
         &mode_,
@@ -3321,7 +3517,7 @@ rendering_server_reflection_probe_set_ambient_mode :: proc "contextless" (
     }
     self := self
     probe_ := probe_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &probe_,
         &mode_,
@@ -3617,7 +3813,7 @@ rendering_server_decal_set_texture :: proc "contextless" (
     }
     self := self
     decal_ := decal_
-    type_ := type_
+    type_ := Int(type_)
     texture_ := texture_
     args := []__bindgen_gde.TypePtr {
         &decal_,
@@ -3786,7 +3982,7 @@ rendering_server_decals_set_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3519875702)
     }
     self := self
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &filter_,
     }
@@ -4141,7 +4337,7 @@ rendering_server_voxel_gi_set_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1538689978)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &quality_,
     }
@@ -4391,7 +4587,7 @@ rendering_server_particles_set_mode :: proc "contextless" (
     }
     self := self
     particles_ := particles_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &particles_,
         &mode_,
@@ -4540,19 +4736,22 @@ rendering_server_particles_set_pre_process_time :: proc "contextless" (
 rendering_server_particles_request_process_time :: proc "contextless" (
     self: Rendering_Server,
     particles_: Rid,
-    time_: f64,
+    process_time_: f64,
+    process_time_residual_: f64,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("particles_request_process_time", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1794382983)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1515254041)
     }
     self := self
     particles_ := particles_
-    time_ := time_
+    process_time_ := process_time_
+    process_time_residual_ := process_time_residual_
     args := []__bindgen_gde.TypePtr {
         &particles_,
-        &time_,
+        &process_time_,
+        &process_time_residual_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -4809,10 +5008,50 @@ rendering_server_particles_set_transform_align :: proc "contextless" (
     }
     self := self
     particles_ := particles_
-    align_ := align_
+    align_ := Int(align_)
     args := []__bindgen_gde.TypePtr {
         &particles_,
         &align_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_particles_set_transform_align_channel_filter :: proc "contextless" (
+    self: Rendering_Server,
+    particles_: Rid,
+    channel_filter_: Rendering_Server_Particles_Transform_Align_Custom_Src,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("particles_set_transform_align_channel_filter", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1303285813)
+    }
+    self := self
+    particles_ := particles_
+    channel_filter_ := Int(channel_filter_)
+    args := []__bindgen_gde.TypePtr {
+        &particles_,
+        &channel_filter_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+rendering_server_particles_set_transform_align_axis :: proc "contextless" (
+    self: Rendering_Server,
+    particles_: Rid,
+    rotation_axis_: Rendering_Server_Particles_Transform_Align_Axis,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("particles_set_transform_align_axis", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3065310065)
+    }
+    self := self
+    particles_ := particles_
+    rotation_axis_ := Int(rotation_axis_)
+    args := []__bindgen_gde.TypePtr {
+        &particles_,
+        &rotation_axis_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -4976,7 +5215,7 @@ rendering_server_particles_set_draw_order :: proc "contextless" (
     }
     self := self
     particles_ := particles_
-    order_ := order_
+    order_ := Int(order_)
     args := []__bindgen_gde.TypePtr {
         &particles_,
         &order_,
@@ -5092,7 +5331,7 @@ rendering_server_particles_collision_set_collision_type :: proc "contextless" (
     }
     self := self
     particles_collision_ := particles_collision_
-    type_ := type_
+    type_ := Int(type_)
     args := []__bindgen_gde.TypePtr {
         &particles_collision_,
         &type_,
@@ -5269,7 +5508,7 @@ rendering_server_particles_collision_set_height_field_resolution :: proc "contex
     }
     self := self
     particles_collision_ := particles_collision_
-    resolution_ := resolution_
+    resolution_ := Int(resolution_)
     args := []__bindgen_gde.TypePtr {
         &particles_collision_,
         &resolution_,
@@ -5324,7 +5563,7 @@ rendering_server_fog_volume_set_shape :: proc "contextless" (
     }
     self := self
     fog_volume_ := fog_volume_
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &fog_volume_,
         &shape_,
@@ -5724,20 +5963,23 @@ rendering_server_viewport_set_size :: proc "contextless" (
     viewport_: Rid,
     width_: Int,
     height_: Int,
+    view_count_: Int,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("viewport_set_size", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4288446313)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3313592705)
     }
     self := self
     viewport_ := viewport_
     width_ := width_
     height_ := height_
+    view_count_ := view_count_
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &width_,
         &height_,
+        &view_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -5857,7 +6099,7 @@ rendering_server_viewport_set_scaling_3d_mode :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    scaling_3d_mode_ := scaling_3d_mode_
+    scaling_3d_mode_ := Int(scaling_3d_mode_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &scaling_3d_mode_,
@@ -5937,7 +6179,7 @@ rendering_server_viewport_set_anisotropic_filtering_level :: proc "contextless" 
     }
     self := self
     viewport_ := viewport_
-    anisotropic_filtering_level_ := anisotropic_filtering_level_
+    anisotropic_filtering_level_ := Int(anisotropic_filtering_level_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &anisotropic_filtering_level_,
@@ -5957,7 +6199,7 @@ rendering_server_viewport_set_update_mode :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    update_mode_ := update_mode_
+    update_mode_ := Int(update_mode_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &update_mode_,
@@ -5979,7 +6221,9 @@ rendering_server_viewport_get_update_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &viewport_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Viewport_Update_Mode(__return_storage)
     return
 }
 
@@ -5995,7 +6239,7 @@ rendering_server_viewport_set_clear_mode :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    clear_mode_ := clear_mode_
+    clear_mode_ := Int(clear_mode_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &clear_mode_,
@@ -6091,7 +6335,7 @@ rendering_server_viewport_set_environment_mode :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &mode_,
@@ -6231,7 +6475,7 @@ rendering_server_viewport_set_default_canvas_item_texture_filter :: proc "contex
     }
     self := self
     viewport_ := viewport_
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &filter_,
@@ -6251,7 +6495,7 @@ rendering_server_viewport_set_default_canvas_item_texture_repeat :: proc "contex
     }
     self := self
     viewport_ := viewport_
-    repeat_ := repeat_
+    repeat_ := Int(repeat_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &repeat_,
@@ -6361,8 +6605,8 @@ rendering_server_viewport_set_sdf_oversize_and_scale :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    oversize_ := oversize_
-    scale_ := scale_
+    oversize_ := Int(oversize_)
+    scale_ := Int(scale_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &oversize_,
@@ -6429,7 +6673,7 @@ rendering_server_viewport_set_msaa_3d :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    msaa_ := msaa_
+    msaa_ := Int(msaa_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &msaa_,
@@ -6449,7 +6693,7 @@ rendering_server_viewport_set_msaa_2d :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    msaa_ := msaa_
+    msaa_ := Int(msaa_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &msaa_,
@@ -6489,7 +6733,7 @@ rendering_server_viewport_set_screen_space_aa :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &mode_,
@@ -6584,7 +6828,7 @@ rendering_server_viewport_set_occlusion_culling_build_quality :: proc "contextle
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2069725696)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &quality_,
     }
@@ -6604,14 +6848,16 @@ rendering_server_viewport_get_render_info :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    type_ := type_
-    info_ := info_
+    type_ := Int(type_)
+    info_ := Int(info_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &type_,
         &info_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -6627,7 +6873,7 @@ rendering_server_viewport_set_debug_draw :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    draw_ := draw_
+    draw_ := Int(draw_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &draw_,
@@ -6703,7 +6949,7 @@ rendering_server_viewport_set_vrs_mode :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &mode_,
@@ -6723,7 +6969,7 @@ rendering_server_viewport_set_vrs_update_mode :: proc "contextless" (
     }
     self := self
     viewport_ := viewport_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &viewport_,
         &mode_,
@@ -6798,7 +7044,7 @@ rendering_server_sky_set_mode :: proc "contextless" (
     }
     self := self
     sky_ := sky_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &sky_,
         &mode_,
@@ -6901,7 +7147,7 @@ rendering_server_compositor_effect_set_callback :: proc "contextless" (
     }
     self := self
     effect_ := effect_
-    callback_type_ := callback_type_
+    callback_type_ := Int(callback_type_)
     callback_ := callback_
     args := []__bindgen_gde.TypePtr {
         &effect_,
@@ -6924,7 +7170,7 @@ rendering_server_compositor_effect_set_flag :: proc "contextless" (
     }
     self := self
     effect_ := effect_
-    flag_ := flag_
+    flag_ := Int(flag_)
     set_ := set_
     args := []__bindgen_gde.TypePtr {
         &effect_,
@@ -6996,7 +7242,7 @@ rendering_server_environment_set_background :: proc "contextless" (
     }
     self := self
     env_ := env_
-    bg_ := bg_
+    bg_ := Int(bg_)
     args := []__bindgen_gde.TypePtr {
         &env_,
         &bg_,
@@ -7164,10 +7410,10 @@ rendering_server_environment_set_ambient_light :: proc "contextless" (
     self := self
     env_ := env_
     color_ := color_
-    ambient_ := ambient_
+    ambient_ := Int(ambient_)
     energy_ := energy_
     sky_contribution_ := sky_contribution_
-    reflection_source_ := reflection_source_
+    reflection_source_ := Int(reflection_source_)
     args := []__bindgen_gde.TypePtr {
         &env_,
         &color_,
@@ -7208,7 +7454,7 @@ rendering_server_environment_set_glow :: proc "contextless" (
     strength_ := strength_
     mix_ := mix_
     bloom_threshold_ := bloom_threshold_
-    blend_mode_ := blend_mode_
+    blend_mode_ := Int(blend_mode_)
     hdr_bleed_threshold_ := hdr_bleed_threshold_
     hdr_bleed_scale_ := hdr_bleed_scale_
     hdr_luminance_cap_ := hdr_luminance_cap_
@@ -7246,7 +7492,7 @@ rendering_server_environment_set_tonemap :: proc "contextless" (
     }
     self := self
     env_ := env_
-    tone_mapper_ := tone_mapper_
+    tone_mapper_ := Int(tone_mapper_)
     exposure_ := exposure_
     white_ := white_
     args := []__bindgen_gde.TypePtr {
@@ -7419,7 +7665,7 @@ rendering_server_environment_set_fog :: proc "contextless" (
     height_density_ := height_density_
     aerial_perspective_ := aerial_perspective_
     sky_affect_ := sky_affect_
-    fog_mode_ := fog_mode_
+    fog_mode_ := Int(fog_mode_)
     args := []__bindgen_gde.TypePtr {
         &env_,
         &enable_,
@@ -7486,7 +7732,7 @@ rendering_server_environment_set_sdfgi :: proc "contextless" (
     enable_ := enable_
     cascades_ := cascades_
     min_cell_size_ := min_cell_size_
-    y_scale_ := y_scale_
+    y_scale_ := Int(y_scale_)
     use_occlusion_ := use_occlusion_
     bounce_feedback_ := bounce_feedback_
     read_sky_ := read_sky_
@@ -7519,7 +7765,7 @@ rendering_server_environment_set_volumetric_fog :: proc "contextless" (
     emission_energy_: f64,
     anisotropy_: f64,
     length_: f64,
-    p_detail_spread_: f64,
+    detail_spread_: f64,
     gi_inject_: f64,
     temporal_reprojection_: Bool,
     temporal_reprojection_amount_: f64,
@@ -7540,7 +7786,7 @@ rendering_server_environment_set_volumetric_fog :: proc "contextless" (
     emission_energy_ := emission_energy_
     anisotropy_ := anisotropy_
     length_ := length_
-    p_detail_spread_ := p_detail_spread_
+    detail_spread_ := detail_spread_
     gi_inject_ := gi_inject_
     temporal_reprojection_ := temporal_reprojection_
     temporal_reprojection_amount_ := temporal_reprojection_amount_
@@ -7555,7 +7801,7 @@ rendering_server_environment_set_volumetric_fog :: proc "contextless" (
         &emission_energy_,
         &anisotropy_,
         &length_,
-        &p_detail_spread_,
+        &detail_spread_,
         &gi_inject_,
         &temporal_reprojection_,
         &temporal_reprojection_amount_,
@@ -7609,7 +7855,7 @@ rendering_server_environment_set_ssr_roughness_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1190026788)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &quality_,
     }
@@ -7631,7 +7877,7 @@ rendering_server_environment_set_ssao_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 189753569)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     half_size_ := half_size_
     adaptive_target_ := adaptive_target_
     blur_passes_ := blur_passes_
@@ -7663,7 +7909,7 @@ rendering_server_environment_set_ssil_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1713836683)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     half_size_ := half_size_
     adaptive_target_ := adaptive_target_
     blur_passes_ := blur_passes_
@@ -7690,7 +7936,7 @@ rendering_server_environment_set_sdfgi_ray_count :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 340137951)
     }
     self := self
-    ray_count_ := ray_count_
+    ray_count_ := Int(ray_count_)
     args := []__bindgen_gde.TypePtr {
         &ray_count_,
     }
@@ -7707,7 +7953,7 @@ rendering_server_environment_set_sdfgi_frames_to_converge :: proc "contextless" 
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2182444374)
     }
     self := self
-    frames_ := frames_
+    frames_ := Int(frames_)
     args := []__bindgen_gde.TypePtr {
         &frames_,
     }
@@ -7724,7 +7970,7 @@ rendering_server_environment_set_sdfgi_frames_to_update_light :: proc "contextle
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1251144068)
     }
     self := self
-    frames_ := frames_
+    frames_ := Int(frames_)
     args := []__bindgen_gde.TypePtr {
         &frames_,
     }
@@ -7825,7 +8071,7 @@ rendering_server_sub_surface_scattering_set_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 64571803)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &quality_,
     }
@@ -7878,7 +8124,7 @@ rendering_server_camera_attributes_set_dof_blur_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2220136795)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     use_jitter_ := use_jitter_
     args := []__bindgen_gde.TypePtr {
         &quality_,
@@ -7897,7 +8143,7 @@ rendering_server_camera_attributes_set_dof_blur_bokeh_shape :: proc "contextless
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1205058394)
     }
     self := self
-    shape_ := shape_
+    shape_ := Int(shape_)
     args := []__bindgen_gde.TypePtr {
         &shape_,
     }
@@ -8467,7 +8713,7 @@ rendering_server_instance_geometry_set_flag :: proc "contextless" (
     }
     self := self
     instance_ := instance_
-    flag_ := flag_
+    flag_ := Int(flag_)
     enabled_ := enabled_
     args := []__bindgen_gde.TypePtr {
         &instance_,
@@ -8489,7 +8735,7 @@ rendering_server_instance_geometry_set_cast_shadows_setting :: proc "contextless
     }
     self := self
     instance_ := instance_
-    shadow_casting_setting_ := shadow_casting_setting_
+    shadow_casting_setting_ := Int(shadow_casting_setting_)
     args := []__bindgen_gde.TypePtr {
         &instance_,
         &shadow_casting_setting_,
@@ -8557,7 +8803,7 @@ rendering_server_instance_geometry_set_visibility_range :: proc "contextless" (
     max_ := max_
     min_margin_ := min_margin_
     max_margin_ := max_margin_
-    fade_mode_ := fade_mode_
+    fade_mode_ := Int(fade_mode_)
     args := []__bindgen_gde.TypePtr {
         &instance_,
         &min_,
@@ -8914,7 +9160,7 @@ rendering_server_canvas_texture_set_channel :: proc "contextless" (
     }
     self := self
     canvas_texture_ := canvas_texture_
-    channel_ := channel_
+    channel_ := Int(channel_)
     texture_ := texture_
     args := []__bindgen_gde.TypePtr {
         &canvas_texture_,
@@ -8959,7 +9205,7 @@ rendering_server_canvas_texture_set_texture_filter :: proc "contextless" (
     }
     self := self
     canvas_texture_ := canvas_texture_
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &canvas_texture_,
         &filter_,
@@ -8979,7 +9225,7 @@ rendering_server_canvas_texture_set_texture_repeat :: proc "contextless" (
     }
     self := self
     canvas_texture_ := canvas_texture_
-    repeat_ := repeat_
+    repeat_ := Int(repeat_)
     args := []__bindgen_gde.TypePtr {
         &canvas_texture_,
         &repeat_,
@@ -9034,7 +9280,7 @@ rendering_server_canvas_item_set_default_texture_filter :: proc "contextless" (
     }
     self := self
     item_ := item_
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &item_,
         &filter_,
@@ -9054,7 +9300,7 @@ rendering_server_canvas_item_set_default_texture_repeat :: proc "contextless" (
     }
     self := self
     item_ := item_
-    repeat_ := repeat_
+    repeat_ := Int(repeat_)
     args := []__bindgen_gde.TypePtr {
         &item_,
         &repeat_,
@@ -9658,8 +9904,8 @@ rendering_server_canvas_item_add_nine_patch :: proc "contextless" (
     texture_ := texture_
     topleft_ := topleft_
     bottomright_ := bottomright_
-    x_axis_mode_ := x_axis_mode_
-    y_axis_mode_ := y_axis_mode_
+    x_axis_mode_ := Int(x_axis_mode_)
+    y_axis_mode_ := Int(y_axis_mode_)
     draw_center_ := draw_center_
     modulate_ := modulate_
     args := []__bindgen_gde.TypePtr {
@@ -10228,7 +10474,7 @@ rendering_server_canvas_item_set_canvas_group_mode :: proc "contextless" (
     }
     self := self
     item_ := item_
-    mode_ := mode_
+    mode_ := Int(mode_)
     clear_margin_ := clear_margin_
     fit_empty_ := fit_empty_
     fit_margin_ := fit_margin_
@@ -10555,7 +10801,7 @@ rendering_server_canvas_light_set_mode :: proc "contextless" (
     }
     self := self
     light_ := light_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &light_,
         &mode_,
@@ -10595,7 +10841,7 @@ rendering_server_canvas_light_set_shadow_filter :: proc "contextless" (
     }
     self := self
     light_ := light_
-    filter_ := filter_
+    filter_ := Int(filter_)
     args := []__bindgen_gde.TypePtr {
         &light_,
         &filter_,
@@ -10655,7 +10901,7 @@ rendering_server_canvas_light_set_blend_mode :: proc "contextless" (
     }
     self := self
     light_ := light_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &light_,
         &mode_,
@@ -10962,7 +11208,7 @@ rendering_server_canvas_occluder_polygon_set_cull_mode :: proc "contextless" (
     }
     self := self
     occluder_polygon_ := occluder_polygon_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &occluder_polygon_,
         &mode_,
@@ -11000,7 +11246,7 @@ rendering_server_global_shader_parameter_add :: proc "contextless" (
     }
     self := self
     name_ := name_
-    type_ := type_
+    type_ := Int(type_)
     default_value_ := default_value_
     args := []__bindgen_gde.TypePtr {
         &name_,
@@ -11114,7 +11360,9 @@ rendering_server_global_shader_parameter_get_type :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Server_Global_Shader_Parameter_Type(__return_storage)
     return
 }
 
@@ -11177,7 +11425,7 @@ rendering_server_get_rendering_info :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3763192241)
     }
     self := self
-    info_ := info_
+    info_ := Int(info_)
     args := []__bindgen_gde.TypePtr {
         &info_,
     }
@@ -11226,7 +11474,9 @@ rendering_server_get_video_adapter_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Device_Type(__return_storage)
     return
 }
 
@@ -11359,7 +11609,7 @@ rendering_server_set_boot_image_with_stretch :: proc "contextless" (
     self := self
     image_ := image_
     color_ := color_
-    stretch_mode_ := stretch_mode_
+    stretch_mode_ := Int(stretch_mode_)
     use_filter_ := use_filter_
     args := []__bindgen_gde.TypePtr {
         &image_,
@@ -11616,7 +11866,7 @@ rendering_server_has_feature :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 598462696)
     }
     self := self
-    feature_ := feature_
+    feature_ := Int(feature_)
     args := []__bindgen_gde.TypePtr {
         &feature_,
     }

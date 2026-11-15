@@ -28,79 +28,79 @@ package godot
 
 // print logs `s` to the Godot output (stdout + the editor Output panel), like GDScript `print`.
 print :: proc "contextless" (s: cstring) {
-	str := new_string_cstring(s)
-	defer free_string(str)
-	v := variant_from_string(&str)
-	defer variant_destroy(&v)
-	gd_print(v)
+    str := new_string_cstring(s)
+    defer free_string(str)
+    v := variant_from_string(&str)
+    defer variant_destroy(&v)
+    gd_print(v)
 }
 
 // print_str logs an Odin `string` (e.g. the result of `fmt.tprintf`). Convenience over
 // building the cstring yourself.
 print_str :: proc "contextless" (s: string) {
-	str := new_string_odin(s)
-	defer free_string(str)
-	v := variant_from_string(&str)
-	defer variant_destroy(&v)
-	gd_print(v)
+    str := new_string_odin(s)
+    defer free_string(str)
+    v := variant_from_string(&str)
+    defer variant_destroy(&v)
+    gd_print(v)
 }
 
 // print_value logs any Variant directly (the engine stringifies it the same way GDScript
 // `print(var)` does). Use when you already hold a Variant.
 print_value :: proc "contextless" (v: Variant) {
-	gd_print(v)
+    gd_print(v)
 }
 
 // print_int / print_float / print_bool build the matching Variant and log it.
 print_int :: proc "contextless" (v: i64) {
-	i := Int(v)
-	gd_print(variant_from_int(&i))
+    i := Int(v)
+    gd_print(variant_from_int(&i))
 }
 
 print_float :: proc "contextless" (v: f64) {
-	f := Float(v)
-	gd_print(variant_from_float(&f))
+    f := Float(v)
+    gd_print(variant_from_float(&f))
 }
 
 print_bool :: proc "contextless" (v: bool) {
-	b := v
-	gd_print(variant_from_bool(&b))
+    b := v
+    gd_print(variant_from_bool(&b))
 }
 
 // error pushes a Godot error: it shows in the editor's Output/Debugger in red WITH the
 // originating script context, and is routed to any attached debugger. Use for genuine
 // fault conditions (GDScript `push_error`).
 error :: proc "contextless" (s: cstring) {
-	str := new_string_cstring(s)
-	defer free_string(str)
-	v := variant_from_string(&str)
-	defer variant_destroy(&v)
-	gd_push_error(v)
+    str := new_string_cstring(s)
+    defer free_string(str)
+    v := variant_from_string(&str)
+    defer variant_destroy(&v)
+    gd_push_error(v)
 }
 
 // error_str — `error` for an Odin `string` (e.g. `fmt.tprintf` output).
 error_str :: proc "contextless" (s: string) {
-	str := new_string_odin(s)
-	defer free_string(str)
-	v := variant_from_string(&str)
-	defer variant_destroy(&v)
-	gd_push_error(v)
+    str := new_string_odin(s)
+    defer free_string(str)
+    v := variant_from_string(&str)
+    defer variant_destroy(&v)
+    gd_push_error(v)
 }
 
 // warn pushes a Godot warning (yellow, non-fatal — GDScript `push_warning`).
 warn :: proc "contextless" (s: cstring) {
-	str := new_string_cstring(s)
-	defer free_string(str)
-	v := variant_from_string(&str)
-	defer variant_destroy(&v)
-	gd_push_warning(v)
+    str := new_string_cstring(s)
+    defer free_string(str)
+    v := variant_from_string(&str)
+    defer variant_destroy(&v)
+    gd_push_warning(v)
 }
 
 // warn_str — `warn` for an Odin `string`.
 warn_str :: proc "contextless" (s: string) {
-	str := new_string_odin(s)
-	defer free_string(str)
-	v := variant_from_string(&str)
-	defer variant_destroy(&v)
-	gd_push_warning(v)
+    str := new_string_odin(s)
+    defer free_string(str)
+    v := variant_from_string(&str)
+    defer variant_destroy(&v)
+    gd_push_warning(v)
 }

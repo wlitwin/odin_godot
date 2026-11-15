@@ -48,7 +48,7 @@ text_server_extension__has_feature :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3967367083)
     }
     self := self
-    feature_ := feature_
+    feature_ := Int(feature_)
     args := []__bindgen_gde.TypePtr {
         &feature_,
     }
@@ -418,7 +418,7 @@ text_server_extension__font_set_style :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    style_ := style_
+    style_ := Int(style_)
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
         &style_,
@@ -440,7 +440,9 @@ text_server_extension__font_get_style :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Font_Style(__return_storage)
     return
 }
 
@@ -626,7 +628,7 @@ text_server_extension__font_set_antialiasing :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    antialiasing_ := antialiasing_
+    antialiasing_ := Int(antialiasing_)
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
         &antialiasing_,
@@ -648,7 +650,9 @@ text_server_extension__font_get_antialiasing :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Font_Antialiasing(__return_storage)
     return
 }
 
@@ -892,7 +896,7 @@ text_server_extension__font_set_fixed_size_scale_mode :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    fixed_size_scale_mode_ := fixed_size_scale_mode_
+    fixed_size_scale_mode_ := Int(fixed_size_scale_mode_)
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
         &fixed_size_scale_mode_,
@@ -914,7 +918,9 @@ text_server_extension__font_get_fixed_size_scale_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Fixed_Size_Scale_Mode(__return_storage)
     return
 }
 
@@ -1046,6 +1052,142 @@ text_server_extension__font_is_modulate_color_glyphs :: proc "contextless" (
     return
 }
 
+text_server_extension__font_get_palette_count :: proc "contextless" (
+    self: Text_Server_Extension,
+    font_rid_: Rid,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_font_get_palette_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2198884583)
+    }
+    self := self
+    font_rid_ := font_rid_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_extension__font_get_palette_name :: proc "contextless" (
+    self: Text_Server_Extension,
+    font_rid_: Rid,
+    index_: Int,
+) -> (ret: String) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_font_get_palette_name", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1464764419)
+    }
+    self := self
+    font_rid_ := font_rid_
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_extension__font_get_palette_colors :: proc "contextless" (
+    self: Text_Server_Extension,
+    font_rid_: Rid,
+    index_: Int,
+) -> (ret: Packed_Color_Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_font_get_palette_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1595517857)
+    }
+    self := self
+    font_rid_ := font_rid_
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_extension__font_set_palette_custom_colors :: proc "contextless" (
+    self: Text_Server_Extension,
+    font_rid_: Rid,
+    colors_: Packed_Color_Array,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_font_set_palette_custom_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4037098590)
+    }
+    self := self
+    font_rid_ := font_rid_
+    colors_ := colors_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &colors_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+text_server_extension__font_get_palette_custom_colors :: proc "contextless" (
+    self: Text_Server_Extension,
+    font_rid_: Rid,
+) -> (ret: Packed_Color_Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_font_get_palette_custom_colors", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1569415609)
+    }
+    self := self
+    font_rid_ := font_rid_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_extension__font_get_used_palette :: proc "contextless" (
+    self: Text_Server_Extension,
+    font_rid_: Rid,
+) -> (ret: i64) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_font_get_used_palette", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2198884583)
+    }
+    self := self
+    font_rid_ := font_rid_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+text_server_extension__font_set_used_palette :: proc "contextless" (
+    self: Text_Server_Extension,
+    font_rid_: Rid,
+    index_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_font_set_used_palette", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3411492887)
+    }
+    self := self
+    font_rid_ := font_rid_
+    index_ := index_
+    args := []__bindgen_gde.TypePtr {
+        &font_rid_,
+        &index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 text_server_extension__font_set_hinting :: proc "contextless" (
     self: Text_Server_Extension,
     font_rid_: Rid,
@@ -1058,7 +1200,7 @@ text_server_extension__font_set_hinting :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    hinting_ := hinting_
+    hinting_ := Int(hinting_)
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
         &hinting_,
@@ -1080,7 +1222,9 @@ text_server_extension__font_get_hinting :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Hinting(__return_storage)
     return
 }
 
@@ -1096,7 +1240,7 @@ text_server_extension__font_set_subpixel_positioning :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    subpixel_positioning_ := subpixel_positioning_
+    subpixel_positioning_ := Int(subpixel_positioning_)
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
         &subpixel_positioning_,
@@ -1118,7 +1262,9 @@ text_server_extension__font_get_subpixel_positioning :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Subpixel_Positioning(__return_storage)
     return
 }
 
@@ -1211,7 +1357,7 @@ text_server_extension__font_set_spacing :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    spacing_ := spacing_
+    spacing_ := Int(spacing_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
@@ -1233,7 +1379,7 @@ text_server_extension__font_get_spacing :: proc "contextless" (
     }
     self := self
     font_rid_ := font_rid_
-    spacing_ := spacing_
+    spacing_ := Int(spacing_)
     args := []__bindgen_gde.TypePtr {
         &font_rid_,
         &spacing_,
@@ -2988,8 +3134,8 @@ text_server_extension__create_shaped_text :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1431128392)
     }
     self := self
-    direction_ := direction_
-    orientation_ := orientation_
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     args := []__bindgen_gde.TypePtr {
         &direction_,
         &orientation_,
@@ -3045,7 +3191,7 @@ text_server_extension__shaped_text_set_direction :: proc "contextless" (
     }
     self := self
     shaped_ := shaped_
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &direction_,
@@ -3067,7 +3213,9 @@ text_server_extension__shaped_text_get_direction :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &shaped_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Direction(__return_storage)
     return
 }
 
@@ -3085,7 +3233,9 @@ text_server_extension__shaped_text_get_inferred_direction :: proc "contextless" 
     args := []__bindgen_gde.TypePtr {
         &shaped_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Direction(__return_storage)
     return
 }
 
@@ -3197,7 +3347,7 @@ text_server_extension__shaped_text_set_orientation :: proc "contextless" (
     }
     self := self
     shaped_ := shaped_
-    orientation_ := orientation_
+    orientation_ := Int(orientation_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &orientation_,
@@ -3219,7 +3369,9 @@ text_server_extension__shaped_text_get_orientation :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &shaped_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Orientation(__return_storage)
     return
 }
 
@@ -3312,7 +3464,7 @@ text_server_extension__shaped_text_set_spacing :: proc "contextless" (
     }
     self := self
     shaped_ := shaped_
-    spacing_ := spacing_
+    spacing_ := Int(spacing_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &shaped_,
@@ -3334,7 +3486,7 @@ text_server_extension__shaped_text_get_spacing :: proc "contextless" (
     }
     self := self
     shaped_ := shaped_
-    spacing_ := spacing_
+    spacing_ := Int(spacing_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &spacing_,
@@ -3397,7 +3549,7 @@ text_server_extension__shaped_text_add_object :: proc "contextless" (
     shaped_ := shaped_
     key_ := key_
     size_ := size_
-    inline_align_ := inline_align_
+    inline_align_ := Int(inline_align_)
     length_ := length_
     baseline_ := baseline_
     args := []__bindgen_gde.TypePtr {
@@ -3429,7 +3581,7 @@ text_server_extension__shaped_text_resize_object :: proc "contextless" (
     shaped_ := shaped_
     key_ := key_
     size_ := size_
-    inline_align_ := inline_align_
+    inline_align_ := Int(inline_align_)
     baseline_ := baseline_
     args := []__bindgen_gde.TypePtr {
         &shaped_,
@@ -3731,7 +3883,9 @@ text_server_extension__shaped_get_run_font_size :: proc "contextless" (
         &shaped_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -3773,7 +3927,9 @@ text_server_extension__shaped_get_run_direction :: proc "contextless" (
         &shaped_,
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Text_Server_Direction(__return_storage)
     return
 }
 
@@ -3854,7 +4010,7 @@ text_server_extension__shaped_text_fit_to_width :: proc "contextless" (
     self := self
     shaped_ := shaped_
     width_ := width_
-    justification_flags_ := justification_flags_
+    justification_flags_ := Int(justification_flags_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &width_,
@@ -4047,7 +4203,7 @@ text_server_extension__shaped_text_get_line_breaks_adv :: proc "contextless" (
     width_ := width_
     start_ := start_
     once_ := once_
-    break_flags_ := break_flags_
+    break_flags_ := Int(break_flags_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &width_,
@@ -4075,7 +4231,7 @@ text_server_extension__shaped_text_get_line_breaks :: proc "contextless" (
     shaped_ := shaped_
     width_ := width_
     start_ := start_
-    break_flags_ := break_flags_
+    break_flags_ := Int(break_flags_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &width_,
@@ -4099,8 +4255,8 @@ text_server_extension__shaped_text_get_word_breaks :: proc "contextless" (
     }
     self := self
     shaped_ := shaped_
-    grapheme_flags_ := grapheme_flags_
-    skip_grapheme_flags_ := skip_grapheme_flags_
+    grapheme_flags_ := Int(grapheme_flags_)
+    skip_grapheme_flags_ := Int(skip_grapheme_flags_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &grapheme_flags_,
@@ -4196,7 +4352,7 @@ text_server_extension__shaped_text_overrun_trim_to_width :: proc "contextless" (
     self := self
     shaped_ := shaped_
     width_ := width_
-    trim_flags_ := trim_flags_
+    trim_flags_ := Int(trim_flags_)
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &width_,
@@ -4422,7 +4578,7 @@ text_server_extension__shaped_text_get_carets :: proc "contextless" (
     self: Text_Server_Extension,
     shaped_: Rid,
     position_: Int,
-    caret_: ^Caret_Info,
+    r_caret_: ^Caret_Info,
 ) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -4432,11 +4588,11 @@ text_server_extension__shaped_text_get_carets :: proc "contextless" (
     self := self
     shaped_ := shaped_
     position_ := position_
-    caret_ := caret_
+    r_caret_ := r_caret_
     args := []__bindgen_gde.TypePtr {
         &shaped_,
         &position_,
-        &caret_,
+        &r_caret_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
@@ -4997,7 +5153,7 @@ text_server_extension__parse_structured_text :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3310685015)
     }
     self := self
-    parser_type_ := parser_type_
+    parser_type_ := Int(parser_type_)
     args_ := args_
     text_ := text_
     args := []__bindgen_gde.TypePtr {

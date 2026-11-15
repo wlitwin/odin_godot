@@ -16,7 +16,7 @@ option_button_name :: proc "contextless" () -> String_Name {
 }
 
 new_option_button :: proc "contextless" () -> Option_Button {
-    return __bindgen_gde.classdb_construct_object(option_button_name_ref())
+    return cast(Option_Button)__bindgen_gde.classdb_construct_object(option_button_name_ref())
 }
 
 // methods
@@ -213,12 +213,129 @@ option_button_set_item_auto_translate_mode :: proc "contextless" (
     }
     self := self
     idx_ := idx_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &idx_,
         &mode_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+option_button_set_search_bar_enabled :: proc "contextless" (
+    self: Option_Button,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+option_button_set_search_bar_min_item_count :: proc "contextless" (
+    self: Option_Button,
+    count_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_min_item_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    count_ := count_
+    args := []__bindgen_gde.TypePtr {
+        &count_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+option_button_get_search_bar_min_item_count :: proc "contextless" (
+    self: Option_Button,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_search_bar_min_item_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
+    return
+}
+
+option_button_set_search_bar_fuzzy_search_enabled :: proc "contextless" (
+    self: Option_Button,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_fuzzy_search_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+option_button_is_search_bar_fuzzy_search_enabled :: proc "contextless" (
+    self: Option_Button,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_search_bar_fuzzy_search_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+option_button_set_search_bar_fuzzy_search_max_misses :: proc "contextless" (
+    self: Option_Button,
+    max_misses_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_fuzzy_search_max_misses", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    max_misses_ := max_misses_
+    args := []__bindgen_gde.TypePtr {
+        &max_misses_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+option_button_get_search_bar_fuzzy_search_max_misses :: proc "contextless" (
+    self: Option_Button,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_search_bar_fuzzy_search_max_misses", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
+    return
 }
 
 option_button_get_item_text :: proc "contextless" (
@@ -271,7 +388,9 @@ option_button_get_item_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -289,7 +408,9 @@ option_button_get_item_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -343,7 +464,9 @@ option_button_get_item_auto_translate_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &idx_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Node_Auto_Translate_Mode(__return_storage)
     return
 }
 
@@ -378,6 +501,21 @@ option_button_is_item_separator :: proc "contextless" (
     idx_ := idx_
     args := []__bindgen_gde.TypePtr {
         &idx_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+option_button_is_search_bar_enabled :: proc "contextless" (
+    self: Option_Button,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_search_bar_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -442,7 +580,9 @@ option_button_get_selected :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -457,7 +597,9 @@ option_button_get_selected_id :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -550,7 +692,9 @@ option_button_get_item_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -583,7 +727,9 @@ option_button_get_selectable_item :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &from_last_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -672,6 +818,12 @@ option_button_set_disable_shortcuts :: proc "contextless" (
 // properties
 option_button_get_fit_to_longest_item :: proc "contextless" (self: Option_Button) -> Bool {
     return option_button_is_fit_to_longest_item(self)
+}
+option_button_get_search_bar_enabled :: proc "contextless" (self: Option_Button) -> Bool {
+    return option_button_is_search_bar_enabled(self)
+}
+option_button_get_search_bar_fuzzy_search_enabled :: proc "contextless" (self: Option_Button) -> Bool {
+    return option_button_is_search_bar_fuzzy_search_enabled(self)
 }
 
 // Only interns the class StringName (used for object construction and as the

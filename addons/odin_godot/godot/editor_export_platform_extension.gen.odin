@@ -217,7 +217,9 @@ editor_export_platform_extension__get_options_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -336,13 +338,15 @@ editor_export_platform_extension__run :: proc "contextless" (
     self := self
     preset_ := preset_
     device_ := device_
-    debug_flags_ := debug_flags_
+    debug_flags_ := Int(debug_flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &device_,
         &debug_flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -455,14 +459,16 @@ editor_export_platform_extension__export_project :: proc "contextless" (
     preset_ := preset_
     debug_ := debug_
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
         &path_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -482,14 +488,16 @@ editor_export_platform_extension__export_pack :: proc "contextless" (
     preset_ := preset_
     debug_ := debug_
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
         &path_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -509,14 +517,16 @@ editor_export_platform_extension__export_zip :: proc "contextless" (
     preset_ := preset_
     debug_ := debug_
     path_ := path_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
         &path_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -538,7 +548,7 @@ editor_export_platform_extension__export_pack_patch :: proc "contextless" (
     debug_ := debug_
     path_ := path_
     patches_ := patches_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
@@ -546,7 +556,9 @@ editor_export_platform_extension__export_pack_patch :: proc "contextless" (
         &patches_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -568,7 +580,7 @@ editor_export_platform_extension__export_zip_patch :: proc "contextless" (
     debug_ := debug_
     path_ := path_
     patches_ := patches_
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &preset_,
         &debug_,
@@ -576,7 +588,9 @@ editor_export_platform_extension__export_zip_patch :: proc "contextless" (
         &patches_,
         &flags_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

@@ -1,0 +1,71 @@
+--- a/src/world_snapshot.c
++++ b/src/world_snapshot.c
+@@ -125,7 +125,7 @@
+ static void b3SnapR_Bytes( b3SnapReader* r, void* dst, int n )
+ {
+ 	b3SnapRCheck( r, n );
+-	if ( !r->ok )
++	if ( !r->ok || n == 0 )
+ 	{
+ 		return;
+ 	}
+@@ -672,7 +672,10 @@
+ 	}
+ 
+ 	b3Array_Resize( world->shapes, count );
+-	memset( world->shapes.data, 0, (size_t)count * sizeof( b3Shape ) );
++	if ( count > 0 )
++	{
++		memset( world->shapes.data, 0, (size_t)count * sizeof( b3Shape ) );
++	}
+ 
+ 	for ( int i = 0; i < count && r->ok; ++i )
+ 	{
+@@ -900,7 +903,10 @@
+ 	}
+ 
+ 	b3Array_Resize( world->contacts, count );
+-	memset( world->contacts.data, 0, (size_t)count * sizeof( b3Contact ) );
++	if ( count > 0 )
++	{
++		memset( world->contacts.data, 0, (size_t)count * sizeof( b3Contact ) );
++	}
+ 
+ 	for ( int i = 0; i < count && r->ok; ++i )
+ 	{
+@@ -1218,7 +1224,10 @@
+ 	if ( r->ok )
+ 	{
+ 		b3Array_Resize( world->solverSets, setCount );
+-		memset( world->solverSets.data, 0, (size_t)setCount * sizeof( b3SolverSet ) );
++		if ( setCount > 0 )
++		{
++			memset( world->solverSets.data, 0, (size_t)setCount * sizeof( b3SolverSet ) );
++		}
+ 		for ( int i = 0; i < setCount; ++i )
+ 		{
+ 			b3DesSolverSet( r, world->solverSets.data + i );
+@@ -1307,7 +1316,10 @@
+ 		if ( r->ok )
+ 		{
+ 			b3Array_Resize( world->sensors, sensorCount );
+-			memset( world->sensors.data, 0, (size_t)sensorCount * sizeof( b3Sensor ) );
++			if ( sensorCount > 0 )
++			{
++				memset( world->sensors.data, 0, (size_t)sensorCount * sizeof( b3Sensor ) );
++			}
+ 		}
+ 
+ 		for ( int i = 0; i < sensorCount && r->ok; ++i )
+@@ -1336,7 +1348,10 @@
+ 		if ( r->ok )
+ 		{
+ 			b3Array_Resize( world->islands, islandCount );
+-			memset( world->islands.data, 0, (size_t)islandCount * sizeof( b3Island ) );
++			if ( islandCount > 0 )
++			{
++				memset( world->islands.data, 0, (size_t)islandCount * sizeof( b3Island ) );
++			}
+ 		}
+ 
+ 		for ( int i = 0; i < islandCount && r->ok; ++i )

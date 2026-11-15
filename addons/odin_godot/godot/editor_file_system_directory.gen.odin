@@ -16,7 +16,7 @@ editor_file_system_directory_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_file_system_directory :: proc "contextless" () -> Editor_File_System_Directory {
-    return __bindgen_gde.classdb_construct_object(editor_file_system_directory_name_ref())
+    return cast(Editor_File_System_Directory)__bindgen_gde.classdb_construct_object(editor_file_system_directory_name_ref())
 }
 
 // methods
@@ -49,7 +49,9 @@ editor_file_system_directory_get_subdir_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -82,7 +84,9 @@ editor_file_system_directory_get_file_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -253,7 +257,9 @@ editor_file_system_directory_find_file_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -271,7 +277,9 @@ editor_file_system_directory_find_dir_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &name_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

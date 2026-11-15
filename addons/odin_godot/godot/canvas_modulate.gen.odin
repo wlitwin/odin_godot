@@ -16,7 +16,7 @@ canvas_modulate_name :: proc "contextless" () -> String_Name {
 }
 
 new_canvas_modulate :: proc "contextless" () -> Canvas_Modulate {
-    return __bindgen_gde.classdb_construct_object(canvas_modulate_name_ref())
+    return cast(Canvas_Modulate)__bindgen_gde.classdb_construct_object(canvas_modulate_name_ref())
 }
 
 // methods

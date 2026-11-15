@@ -89,7 +89,7 @@ portable_compressed_texture2d_create_from_image :: proc "contextless" (
     }
     self := self
     image_ := image_
-    compression_mode_ := compression_mode_
+    compression_mode_ := Int(compression_mode_)
     normal_map_ := normal_map_
     lossy_quality_ := lossy_quality_
     args := []__bindgen_gde.TypePtr {
@@ -99,21 +99,6 @@ portable_compressed_texture2d_create_from_image :: proc "contextless" (
         &lossy_quality_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
-}
-
-portable_compressed_texture2d_get_format :: proc "contextless" (
-    self: Portable_Compressed_Texture2d,
-) -> (ret: Image_Format) {
-    @(static) __ptr: __bindgen_gde.MethodBindPtr
-    if __ptr == nil {
-        _gde_name := new_string_name_cstring("get_format", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3847873762)
-    }
-    self := self
-    args := []__bindgen_gde.TypePtr {
-    }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
-    return
 }
 
 portable_compressed_texture2d_get_compression_mode :: proc "contextless" (
@@ -127,7 +112,9 @@ portable_compressed_texture2d_get_compression_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Portable_Compressed_Texture2d_Compression_Mode(__return_storage)
     return
 }
 

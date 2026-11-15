@@ -32,19 +32,20 @@ import "core:strings"
 // by the core dll. `Dl_info` / `dladdr` are declared package-wide in scripts_native.odin
 // (darwin/linux), so we reuse them here.
 when ODIN_OS == .Darwin {
-	foreign import libunwind "system:System"
+    foreign import libunwind "system:System"
 } else {
-	foreign import libunwind "system:c"
+    foreign import libunwind "system:c"
 }
 
 // Opaque libunwind cursor; we only ever pass a pointer to it.
 Unwind_Context :: struct {}
+
 // _URC_NO_REASON (0) — returned from the trace callback to keep walking.
 URC_NO_REASON :: 0
 
 foreign libunwind {
-	_Unwind_Backtrace :: proc "c" (fn: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32, arg: rawptr) -> i32 ---
-	_Unwind_GetIP :: proc "c" (ctx: ^Unwind_Context) -> uintptr ---
+    _Unwind_Backtrace :: proc "c" (fn: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32, arg: rawptr) -> i32 ---
+    _Unwind_GetIP :: proc "c" (ctx: ^Unwind_Context) -> uintptr ---
 }
 
 // The substring that identifies a frame as belonging to the compiled scripts dll. Kept
@@ -56,20 +57,22 @@ MAX_FRAMES :: 256
 
 @(private = "file")
 Stack_Collector :: struct {
-	addrs: [MAX_FRAMES]rawptr,
-	n:     int,
+    addrs: [MAX_FRAMES]rawptr,
+    n:     int,
 }
 
 // libunwind trace callback: record this frame's instruction pointer. `proc "c"` (no Odin
 // context), so it threads its state through the `arg` pointer.
 @(private = "file")
 unwind_collect :: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32 {
-	c := cast(^Stack_Collector)arg
-	if c.n < MAX_FRAMES {
-		c.addrs[c.n] = rawptr(_Unwind_GetIP(ctx))
-		c.n += 1
-	}
-	return URC_NO_REASON
+    c := cast(^Stack_Collector)arg
+
+    if c.n < MAX_FRAMES {
+        c.addrs[c.n] = rawptr(_Unwind_GetIP(ctx))
+        c.n += 1
+    }
+
+    return URC_NO_REASON
 }
 
 // debug_capture_odin_stack walks the native stack and returns a Godot `Array` of
@@ -81,90 +84,105 @@ unwind_collect :: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32 {
 // `skip` drops the innermost N frames (this proc + the unwind callback + the virtual
 // trampoline) so the reported chain starts at real script code.
 debug_capture_odin_stack :: proc(skip := 0) -> godot.Array {
-	arr := godot.new_array_default()
+    arr := godot.new_array_default()
 
-	col: Stack_Collector
-	_Unwind_Backtrace(unwind_collect, &col)
-	if col.n <= 0 {
-		return arr
-	}
+    col: Stack_Collector
+    _Unwind_Backtrace(unwind_collect, &col)
 
-	// dladdr resolves each return address to its symbol + owning file. We collect the
-	// scripts-dll frames innermost-first, then push them so the engine sees the natural
-	// call order (outermost script frame at index 0).
-	Frame :: struct {
-		sym:   cstring,
-		fname: cstring,
-	}
-	frames: [MAX_FRAMES]Frame
-	count := 0
-	for i in skip ..< col.n {
-		info: Dl_info
-		if dladdr(col.addrs[i], &info) == 0 {
-			continue
-		}
-		if info.dli_sname == nil || info.dli_fname == nil {
-			continue
-		}
-		fname := string(info.dli_fname)
-		sym := string(info.dli_sname)
-		// Keep ONLY frames that live in the scripts dll. Odin script procs additionally
-		// carry a `pkg::proc` symbol (the `::` check), so engine / libc / core frames —
-		// different dll, no `::` — fall away and the engine sees just the Odin chain.
-		in_scripts_dll := strings.contains(fname, SCRIPTS_DLL_MARKER)
-		looks_like_odin := strings.contains(sym, "::")
-		if !in_scripts_dll || !looks_like_odin {
-			continue
-		}
-		frames[count] = Frame{sym = info.dli_sname, fname = info.dli_fname}
-		count += 1
-		if count >= len(frames) {
-			break
-		}
-	}
+    if col.n <= 0 {
+        return arr
+    }
 
-	// Honest integration probe: when ODIN_DEBUG_STACK_DUMP=1, echo the captured Odin
-	// frames to stderr so a test can observe WHETHER (and when) the engine actually calls
-	// `_debug_get_current_stack_info`. No-op in normal runs.
-	if _, dump := os.lookup_env("ODIN_DEBUG_STACK_DUMP", context.allocator); dump {
-		os.write_string(os.stderr, "ODIN_STACK_BEGIN\n")
-		for i in 0 ..< count {
-			os.write_string(os.stderr, "ODIN_STACK_FRAME ")
-			os.write_string(os.stderr, string(frames[i].sym))
-			os.write_string(os.stderr, "\n")
-		}
-		os.write_string(os.stderr, "ODIN_STACK_END\n")
-	}
+    // dladdr resolves each return address to its symbol + owning file. We collect the
+    // scripts-dll frames innermost-first, then push them so the engine sees the natural
+    // call order (outermost script frame at index 0).
+    Frame :: struct {
+        sym:   cstring,
+        fname: cstring,
+    }
 
-	// Push outermost-first (reverse of the innermost-first capture order).
-	for i := count - 1; i >= 0; i -= 1 {
-		d := debug_make_frame_dict(frames[i].sym, frames[i].fname)
-		dv := godot.variant_from_dictionary(&d)
-		godot.array_push_back(&arr, dv)
-	}
-	return arr
+    frames: [MAX_FRAMES]Frame
+    count := 0
+
+    for i in skip ..< col.n {
+        info: Dl_info
+
+        if dladdr(col.addrs[i], &info) == 0 {
+            continue
+        }
+
+        if info.dli_sname == nil || info.dli_fname == nil {
+            continue
+        }
+
+        fname := string(info.dli_fname)
+        sym := string(info.dli_sname)
+        // Keep ONLY frames that live in the scripts dll. Odin script procs additionally
+        // carry a `pkg::proc` symbol (the `::` check), so engine / libc / core frames —
+        // different dll, no `::` — fall away and the engine sees just the Odin chain.
+        in_scripts_dll := strings.contains(fname, SCRIPTS_DLL_MARKER)
+        looks_like_odin := strings.contains(sym, "::")
+
+        if !in_scripts_dll || !looks_like_odin {
+            continue
+        }
+
+        frames[count] = Frame {
+            sym   = info.dli_sname,
+            fname = info.dli_fname,
+        }
+        count += 1
+
+        if count >= len(frames) {
+            break
+        }
+    }
+
+    // Honest integration probe: when ODIN_DEBUG_STACK_DUMP=1, echo the captured Odin
+    // frames to stderr so a test can observe WHETHER (and when) the engine actually calls
+    // `_debug_get_current_stack_info`. No-op in normal runs.
+    if _, dump := os.lookup_env("ODIN_DEBUG_STACK_DUMP", context.allocator); dump {
+        os.write_string(os.stderr, "ODIN_STACK_BEGIN\n")
+
+        for i in 0 ..< count {
+            os.write_string(os.stderr, "ODIN_STACK_FRAME ")
+            os.write_string(os.stderr, string(frames[i].sym))
+            os.write_string(os.stderr, "\n")
+        }
+
+        os.write_string(os.stderr, "ODIN_STACK_END\n")
+    }
+
+    // Push outermost-first (reverse of the innermost-first capture order).
+    for i := count - 1; i >= 0; i -= 1 {
+        d := debug_make_frame_dict(frames[i].sym, frames[i].fname)
+        dv := godot.variant_from_dictionary(&d)
+        godot.array_push_back(&arr, dv)
+    }
+
+    return arr
 }
 
 // Build one `{ "function", "line", "source" }` Dictionary for a stack frame.
 @(private = "file")
 debug_make_frame_dict :: proc(symbol: cstring, source: cstring) -> godot.Dictionary {
-	d := godot.new_dictionary_default()
+    d := godot.new_dictionary_default()
 
-	set := proc(d: ^godot.Dictionary, key: cstring, val: godot.Variant) {
-		ks := godot.new_string_cstring(key)
-		kv := godot.variant_from_string(&ks)
-		val := val
-		godot.dictionary_set(d, kv, val)
-	}
+    set := proc(d: ^godot.Dictionary, key: cstring, val: godot.Variant) {
+        ks := godot.new_string_cstring(key)
+        kv := godot.variant_from_string(&ks)
+        val := val
+        godot.dictionary_set(d, kv, val)
+    }
 
-	fn_s := godot.new_string_cstring(symbol)
-	set(&d, "function", godot.variant_from_string(&fn_s))
+    fn_s := godot.new_string_cstring(symbol)
+    set(&d, "function", godot.variant_from_string(&fn_s))
 
-	line := godot.Int(0)
-	set(&d, "line", godot.variant_from_int(&line))
+    line := godot.Int(0)
+    set(&d, "line", godot.variant_from_int(&line))
 
-	src_s := godot.new_string_cstring(source)
-	set(&d, "source", godot.variant_from_string(&src_s))
+    src_s := godot.new_string_cstring(source)
+    set(&d, "source", godot.variant_from_string(&src_s))
 
-	return d
+    return d
 }

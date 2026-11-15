@@ -79,6 +79,42 @@ camera_feed__deactivate_feed :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+camera_feed__set_format :: proc "contextless" (
+    self: Camera_Feed,
+    index_: Int,
+    parameters_: Dictionary,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_set_format", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 31872775)
+    }
+    self := self
+    index_ := index_
+    parameters_ := parameters_
+    args := []__bindgen_gde.TypePtr {
+        &index_,
+        &parameters_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+camera_feed__get_formats :: proc "contextless" (
+    self: Camera_Feed,
+) -> (ret: Array) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_get_formats", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3995934104)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
 camera_feed_get_id :: proc "contextless" (
     self: Camera_Feed,
 ) -> (ret: i32) {
@@ -90,7 +126,9 @@ camera_feed_get_id :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -169,7 +207,9 @@ camera_feed_get_position :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Camera_Feed_Feed_Position(__return_storage)
     return
 }
 
@@ -183,7 +223,7 @@ camera_feed_set_position :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 611162623)
     }
     self := self
-    position_ := position_
+    position_ := Int(position_)
     args := []__bindgen_gde.TypePtr {
         &position_,
     }
@@ -306,7 +346,7 @@ camera_feed_get_texture_tex_id :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1135699418)
     }
     self := self
-    feed_image_type_ := feed_image_type_
+    feed_image_type_ := Int(feed_image_type_)
     args := []__bindgen_gde.TypePtr {
         &feed_image_type_,
     }
@@ -325,7 +365,9 @@ camera_feed_get_datatype :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Camera_Feed_Feed_Data_Type(__return_storage)
     return
 }
 

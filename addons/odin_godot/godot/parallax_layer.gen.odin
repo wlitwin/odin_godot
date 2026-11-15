@@ -16,7 +16,7 @@ parallax_layer_name :: proc "contextless" () -> String_Name {
 }
 
 new_parallax_layer :: proc "contextless" () -> Parallax_Layer {
-    return __bindgen_gde.classdb_construct_object(parallax_layer_name_ref())
+    return cast(Parallax_Layer)__bindgen_gde.classdb_construct_object(parallax_layer_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ mesh_instance2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_mesh_instance2d :: proc "contextless" () -> Mesh_Instance2d {
-    return __bindgen_gde.classdb_construct_object(mesh_instance2d_name_ref())
+    return cast(Mesh_Instance2d)__bindgen_gde.classdb_construct_object(mesh_instance2d_name_ref())
 }
 
 // methods

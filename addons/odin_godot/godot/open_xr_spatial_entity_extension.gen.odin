@@ -37,7 +37,7 @@ open_xr_spatial_entity_extension_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_spatial_entity_extension :: proc "contextless" () -> Open_Xr_Spatial_Entity_Extension {
-    return __bindgen_gde.classdb_construct_object(open_xr_spatial_entity_extension_name_ref())
+    return cast(Open_Xr_Spatial_Entity_Extension)__bindgen_gde.classdb_construct_object(open_xr_spatial_entity_extension_name_ref())
 }
 
 // methods
@@ -69,7 +69,7 @@ open_xr_spatial_entity_extension_supports_capability :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1940837202)
     }
     self := self
-    capability_ := capability_
+    capability_ := Int(capability_)
     args := []__bindgen_gde.TypePtr {
         &capability_,
     }
@@ -88,8 +88,8 @@ open_xr_spatial_entity_extension_supports_component_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 26842779)
     }
     self := self
-    capability_ := capability_
-    component_type_ := component_type_
+    capability_ := Int(capability_)
+    component_type_ := Int(component_type_)
     args := []__bindgen_gde.TypePtr {
         &capability_,
         &component_type_,
@@ -170,6 +170,33 @@ open_xr_spatial_entity_extension_get_spatial_context_handle :: proc "contextless
     spatial_context_ := spatial_context_
     args := []__bindgen_gde.TypePtr {
         &spatial_context_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+open_xr_spatial_entity_extension_discover_spatial_entities_with_component_data :: proc "contextless" (
+    self: Open_Xr_Spatial_Entity_Extension,
+    spatial_context_: Rid,
+    component_data_: Typed_Array(Open_Xr_Spatial_Component_Data),
+    next_: Open_Xr_Structure_Base,
+    user_callback_: Callable,
+) -> (ret: Open_Xr_Future_Result) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("discover_spatial_entities_with_component_data", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1830928590)
+    }
+    self := self
+    spatial_context_ := spatial_context_
+    component_data_ := component_data_
+    next_ := next_
+    user_callback_ := user_callback_
+    args := []__bindgen_gde.TypePtr {
+        &spatial_context_,
+        &component_data_,
+        &next_,
+        &user_callback_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

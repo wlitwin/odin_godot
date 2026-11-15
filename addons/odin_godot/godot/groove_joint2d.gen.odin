@@ -16,7 +16,7 @@ groove_joint2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_groove_joint2d :: proc "contextless" () -> Groove_Joint2d {
-    return __bindgen_gde.classdb_construct_object(groove_joint2d_name_ref())
+    return cast(Groove_Joint2d)__bindgen_gde.classdb_construct_object(groove_joint2d_name_ref())
 }
 
 // methods

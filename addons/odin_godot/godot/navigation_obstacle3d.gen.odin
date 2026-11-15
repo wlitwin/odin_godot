@@ -16,7 +16,7 @@ navigation_obstacle3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_navigation_obstacle3d :: proc "contextless" () -> Navigation_Obstacle3d {
-    return __bindgen_gde.classdb_construct_object(navigation_obstacle3d_name_ref())
+    return cast(Navigation_Obstacle3d)__bindgen_gde.classdb_construct_object(navigation_obstacle3d_name_ref())
 }
 
 // methods
@@ -273,7 +273,9 @@ navigation_obstacle3d_get_avoidance_layers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

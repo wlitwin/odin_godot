@@ -23,7 +23,7 @@ script_language_name :: proc "contextless" () -> String_Name {
 }
 
 new_script_language :: proc "contextless" () -> Script_Language {
-    return __bindgen_gde.classdb_construct_object(script_language_name_ref())
+    return cast(Script_Language)__bindgen_gde.classdb_construct_object(script_language_name_ref())
 }
 
 // methods

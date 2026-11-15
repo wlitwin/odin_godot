@@ -1,0 +1,30 @@
+--- a/src/contact_solver.c
++++ b/src/contact_solver.c
+@@ -614,7 +614,11 @@
+ 
+ 				float maxImpulse = rollingResistance * totalNormalImpulse;
+ 				float magSqr = b3Dot( constraint->rollingImpulse, constraint->rollingImpulse );
+-				if ( magSqr > maxImpulse * maxImpulse + FLT_EPSILON )
++				// Compare without an absolute epsilon, like friction: the angular impulses of
++				// light bodies (a 0.2 kg ball's are about 1e-4 per substep) square to far below
++				// FLT_EPSILON, which left the limit unapplied and rolling resistance locked
++				// their spin instead of limiting it.
++				if ( magSqr > maxImpulse * maxImpulse )
+ 				{
+ 					constraint->rollingImpulse = b3MulSV( maxImpulse / sqrtf( magSqr ), constraint->rollingImpulse );
+ 				}
+--- a/src/contact_solver_wide.inl
++++ b/src/contact_solver_wide.inl
+@@ -1285,7 +1285,11 @@
+ 				//	c->rollingImpulse *= maxLambda / sqrtf( magSqr );
+ 				// }
+ 
+-				b3FloatW mask = b3GreaterThanW( lengthSquared, b3MulAddW( epsilonW, maxImpulse, maxImpulse ) );
++				// Compare without an absolute epsilon, like friction below: the angular impulses
++				// of light bodies (a 0.2 kg ball's are about 1e-4 per substep) square to far
++				// below FLT_EPSILON, which left the limit unapplied and rolling resistance
++				// locked their spin instead of limiting it.
++				b3FloatW mask = b3GreaterThanW( lengthSquared, b3MulW( maxImpulse, maxImpulse ) );
+ 
+ 				// No approximate _mm_rsqrt_ps here to maintain cross-platform determinism
+ 				b3FloatW normalize = b3DivW( maxImpulse, b3AddW( b3SqrtW( lengthSquared ), epsilonW ) );

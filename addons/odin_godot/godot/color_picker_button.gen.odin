@@ -16,7 +16,7 @@ color_picker_button_name :: proc "contextless" () -> String_Name {
 }
 
 new_color_picker_button :: proc "contextless" () -> Color_Picker_Button {
-    return __bindgen_gde.classdb_construct_object(color_picker_button_name_ref())
+    return cast(Color_Picker_Button)__bindgen_gde.classdb_construct_object(color_picker_button_name_ref())
 }
 
 // methods

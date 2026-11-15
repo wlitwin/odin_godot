@@ -49,7 +49,7 @@ rd_shader_spirv_set_stage_bytecode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3514097977)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     bytecode_ := bytecode_
     args := []__bindgen_gde.TypePtr {
         &stage_,
@@ -68,7 +68,7 @@ rd_shader_spirv_get_stage_bytecode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3816765404)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     args := []__bindgen_gde.TypePtr {
         &stage_,
     }
@@ -87,7 +87,7 @@ rd_shader_spirv_set_stage_compile_error :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 620821314)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     compile_error_ := compile_error_
     args := []__bindgen_gde.TypePtr {
         &stage_,
@@ -106,7 +106,7 @@ rd_shader_spirv_get_stage_compile_error :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3354920045)
     }
     self := self
-    stage_ := stage_
+    stage_ := Int(stage_)
     args := []__bindgen_gde.TypePtr {
         &stage_,
     }
@@ -146,6 +146,36 @@ rd_shader_spirv_get_bytecode_compute :: proc "contextless" (self: Rd_Shader_Spir
 rd_shader_spirv_set_bytecode_compute :: proc "contextless" (self: Rd_Shader_Spirv, value: Packed_Byte_Array) {
     rd_shader_spirv_set_stage_bytecode(self, Rendering_Device_Shader_Stage(4), value)
 }
+rd_shader_spirv_get_bytecode_raygen :: proc "contextless" (self: Rd_Shader_Spirv) -> Packed_Byte_Array {
+    return rd_shader_spirv_get_stage_bytecode(self, Rendering_Device_Shader_Stage(5))
+}
+rd_shader_spirv_set_bytecode_raygen :: proc "contextless" (self: Rd_Shader_Spirv, value: Packed_Byte_Array) {
+    rd_shader_spirv_set_stage_bytecode(self, Rendering_Device_Shader_Stage(5), value)
+}
+rd_shader_spirv_get_bytecode_any_hit :: proc "contextless" (self: Rd_Shader_Spirv) -> Packed_Byte_Array {
+    return rd_shader_spirv_get_stage_bytecode(self, Rendering_Device_Shader_Stage(6))
+}
+rd_shader_spirv_set_bytecode_any_hit :: proc "contextless" (self: Rd_Shader_Spirv, value: Packed_Byte_Array) {
+    rd_shader_spirv_set_stage_bytecode(self, Rendering_Device_Shader_Stage(6), value)
+}
+rd_shader_spirv_get_bytecode_closest_hit :: proc "contextless" (self: Rd_Shader_Spirv) -> Packed_Byte_Array {
+    return rd_shader_spirv_get_stage_bytecode(self, Rendering_Device_Shader_Stage(7))
+}
+rd_shader_spirv_set_bytecode_closest_hit :: proc "contextless" (self: Rd_Shader_Spirv, value: Packed_Byte_Array) {
+    rd_shader_spirv_set_stage_bytecode(self, Rendering_Device_Shader_Stage(7), value)
+}
+rd_shader_spirv_get_bytecode_miss :: proc "contextless" (self: Rd_Shader_Spirv) -> Packed_Byte_Array {
+    return rd_shader_spirv_get_stage_bytecode(self, Rendering_Device_Shader_Stage(8))
+}
+rd_shader_spirv_set_bytecode_miss :: proc "contextless" (self: Rd_Shader_Spirv, value: Packed_Byte_Array) {
+    rd_shader_spirv_set_stage_bytecode(self, Rendering_Device_Shader_Stage(8), value)
+}
+rd_shader_spirv_get_bytecode_intersection :: proc "contextless" (self: Rd_Shader_Spirv) -> Packed_Byte_Array {
+    return rd_shader_spirv_get_stage_bytecode(self, Rendering_Device_Shader_Stage(9))
+}
+rd_shader_spirv_set_bytecode_intersection :: proc "contextless" (self: Rd_Shader_Spirv, value: Packed_Byte_Array) {
+    rd_shader_spirv_set_stage_bytecode(self, Rendering_Device_Shader_Stage(9), value)
+}
 rd_shader_spirv_get_compile_error_vertex :: proc "contextless" (self: Rd_Shader_Spirv) -> String {
     return rd_shader_spirv_get_stage_compile_error(self, Rendering_Device_Shader_Stage(0))
 }
@@ -175,6 +205,36 @@ rd_shader_spirv_get_compile_error_compute :: proc "contextless" (self: Rd_Shader
 }
 rd_shader_spirv_set_compile_error_compute :: proc "contextless" (self: Rd_Shader_Spirv, value: String) {
     rd_shader_spirv_set_stage_compile_error(self, Rendering_Device_Shader_Stage(4), value)
+}
+rd_shader_spirv_get_compile_error_raygen :: proc "contextless" (self: Rd_Shader_Spirv) -> String {
+    return rd_shader_spirv_get_stage_compile_error(self, Rendering_Device_Shader_Stage(5))
+}
+rd_shader_spirv_set_compile_error_raygen :: proc "contextless" (self: Rd_Shader_Spirv, value: String) {
+    rd_shader_spirv_set_stage_compile_error(self, Rendering_Device_Shader_Stage(5), value)
+}
+rd_shader_spirv_get_compile_error_any_hit :: proc "contextless" (self: Rd_Shader_Spirv) -> String {
+    return rd_shader_spirv_get_stage_compile_error(self, Rendering_Device_Shader_Stage(6))
+}
+rd_shader_spirv_set_compile_error_any_hit :: proc "contextless" (self: Rd_Shader_Spirv, value: String) {
+    rd_shader_spirv_set_stage_compile_error(self, Rendering_Device_Shader_Stage(6), value)
+}
+rd_shader_spirv_get_compile_error_closest_hit :: proc "contextless" (self: Rd_Shader_Spirv) -> String {
+    return rd_shader_spirv_get_stage_compile_error(self, Rendering_Device_Shader_Stage(7))
+}
+rd_shader_spirv_set_compile_error_closest_hit :: proc "contextless" (self: Rd_Shader_Spirv, value: String) {
+    rd_shader_spirv_set_stage_compile_error(self, Rendering_Device_Shader_Stage(7), value)
+}
+rd_shader_spirv_get_compile_error_miss :: proc "contextless" (self: Rd_Shader_Spirv) -> String {
+    return rd_shader_spirv_get_stage_compile_error(self, Rendering_Device_Shader_Stage(8))
+}
+rd_shader_spirv_set_compile_error_miss :: proc "contextless" (self: Rd_Shader_Spirv, value: String) {
+    rd_shader_spirv_set_stage_compile_error(self, Rendering_Device_Shader_Stage(8), value)
+}
+rd_shader_spirv_get_compile_error_intersection :: proc "contextless" (self: Rd_Shader_Spirv) -> String {
+    return rd_shader_spirv_get_stage_compile_error(self, Rendering_Device_Shader_Stage(9))
+}
+rd_shader_spirv_set_compile_error_intersection :: proc "contextless" (self: Rd_Shader_Spirv, value: String) {
+    rd_shader_spirv_set_stage_compile_error(self, Rendering_Device_Shader_Stage(9), value)
 }
 
 // Only interns the class StringName (used for object construction and as the

@@ -61,12 +61,14 @@ zip_packer_open :: proc "contextless" (
     }
     self := self
     path_ := path_
-    append_ := append_
+    append_ := Int(append_)
     args := []__bindgen_gde.TypePtr {
         &path_,
         &append_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -98,25 +100,61 @@ zip_packer_get_compression_level :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
+    return
+}
+
+zip_packer_add_directory :: proc "contextless" (
+    self: Zip_Packer,
+    path_: String,
+    permissions_: File_Access_Unix_Permission_Flags,
+    modified_time_: Int,
+) -> (ret: Error) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("add_directory", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 934773537)
+    }
+    self := self
+    path_ := path_
+    permissions_ := Int(permissions_)
+    modified_time_ := modified_time_
+    args := []__bindgen_gde.TypePtr {
+        &path_,
+        &permissions_,
+        &modified_time_,
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
 zip_packer_start_file :: proc "contextless" (
     self: Zip_Packer,
     path_: String,
+    permissions_: File_Access_Unix_Permission_Flags,
+    modified_time_: Int,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
         _gde_name := new_string_name_cstring("start_file", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 166001499)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4260848715)
     }
     self := self
     path_ := path_
+    permissions_ := Int(permissions_)
+    modified_time_ := modified_time_
     args := []__bindgen_gde.TypePtr {
         &path_,
+        &permissions_,
+        &modified_time_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -134,7 +172,9 @@ zip_packer_write_file :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &data_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -149,7 +189,9 @@ zip_packer_close_file :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -164,7 +206,9 @@ zip_packer_close :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 

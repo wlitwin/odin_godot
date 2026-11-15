@@ -237,7 +237,11 @@ ExtensionClassRecreateInstance :: #type proc "c" (
     object: ObjectPtr,
 ) -> ExtensionClassInstancePtr
 ExtensionClassGetVirtual :: #type proc "c" (class_user_data: rawptr, name: StringNamePtr) -> ExtensionClassCallVirtual
-ExtensionClassGetVirtual2 :: #type proc "c" (class_user_data: rawptr, name: StringNamePtr, hash: rawptr) -> ExtensionClassCallVirtual
+ExtensionClassGetVirtual2 :: #type proc "c" (
+    class_user_data: rawptr,
+    name: StringNamePtr,
+    hash: rawptr,
+) -> ExtensionClassCallVirtual
 ExtensionClassGetVirtualCallData :: #type proc "c" (class_user_data: rawptr, name: StringNamePtr) -> rawptr
 ExtensionClassGetVirtualCallData2 :: #type proc "c" (class_user_data: rawptr, name: StringNamePtr, hash: u32) -> rawptr
 ExtensionClassCallVirtualWithData :: #type proc "c" (
@@ -343,37 +347,37 @@ ExtensionClassCreationInfo3 :: struct {
 }
 
 ExtensionClassCreationInfo4 :: struct {
-    is_virtual: bool,
-    is_abstract: bool,
-    is_exposed: bool,
-    is_runtime: bool,
-    icon_path: StringPtr,
-    set_func: ExtensionClassSet,
-    get_func: ExtensionClassGet,
-    get_property_list_func: ExtensionClassGetPropertyList,
-    free_property_list_func: ExtensionClassFreePropertyList2,
-    property_can_revert_func: ExtensionClassPropertyCanRevert,
-    property_get_revert_func: ExtensionClassPropertyGetRevert,
-    validate_property_func: ExtensionClassValidateProperty,
-    notification_func: ExtensionClassNotification2,
-    to_string_func: ExtensionClassToString,
-    reference_func: ExtensionClassReference,
-    unreference_func: ExtensionClassUnreference,
-    create_instance_func: ExtensionClassCreateInstance2, // (Default) constructor; mandatory. If the class is not instantiable, consider making it virtual or abstract.
-    free_instance_func: ExtensionClassFreeInstance, // Destructor; mandatory.
-    recreate_instance_func: ExtensionClassRecreateInstance,
+    is_virtual:                  bool,
+    is_abstract:                 bool,
+    is_exposed:                  bool,
+    is_runtime:                  bool,
+    icon_path:                   StringPtr,
+    set_func:                    ExtensionClassSet,
+    get_func:                    ExtensionClassGet,
+    get_property_list_func:      ExtensionClassGetPropertyList,
+    free_property_list_func:     ExtensionClassFreePropertyList2,
+    property_can_revert_func:    ExtensionClassPropertyCanRevert,
+    property_get_revert_func:    ExtensionClassPropertyGetRevert,
+    validate_property_func:      ExtensionClassValidateProperty,
+    notification_func:           ExtensionClassNotification2,
+    to_string_func:              ExtensionClassToString,
+    reference_func:              ExtensionClassReference,
+    unreference_func:            ExtensionClassUnreference,
+    create_instance_func:        ExtensionClassCreateInstance2, // (Default) constructor; mandatory. If the class is not instantiable, consider making it virtual or abstract.
+    free_instance_func:          ExtensionClassFreeInstance, // Destructor; mandatory.
+    recreate_instance_func:      ExtensionClassRecreateInstance,
     // Queries a virtual function by name and returns a callback to invoke the requested virtual function.
-    get_virtual_func: ExtensionClassGetVirtual2,
+    get_virtual_func:            ExtensionClassGetVirtual2,
     // Paired with `call_virtual_with_data_func`, this is an alternative to `get_virtual_func` for extensions that
     // need or benefit from extra data when calling virtual functions.
     // Returns user data that will be passed to `call_virtual_with_data_func`.
     // Returning `NULL` from this function signals to Godot that the virtual function is not overridden.
     // Data returned from this function should be managed by the extension and must be valid until the extension is deinitialized.
     // You should supply either `get_virtual_func`, or `get_virtual_call_data_func` with `call_virtual_with_data_func`.
-    get_virtual_call_data_func: ExtensionClassGetVirtualCallData2,
+    get_virtual_call_data_func:  ExtensionClassGetVirtualCallData2,
     // Used to call virtual functions when `get_virtual_call_data_func` is not null.
     call_virtual_with_data_func: ExtensionClassCallVirtualWithData,
-    class_userdata: rawptr, // Per-class user data, later accessible in instance bindings.
+    class_userdata:              rawptr, // Per-class user data, later accessible in instance bindings.
 }
 
 ExtensionClassCreationInfo5 :: ExtensionClassCreationInfo4
@@ -435,7 +439,7 @@ ExtensionClassMethodInfo :: struct {
     method_user_data:       rawptr,
     call_func:              ExtensionClassMethodCall,
     ptr_call_func:          ExtensionClassMethodPtrCall,
-    // bitfield of ExtensionClassMethodFlags 
+    // bitfield of ExtensionClassMethodFlags
     method_flags:           c.uint32_t,
 
     /* If `has_return_value` is false, `return_value_info` and `return_value_metadata` are ignored.
@@ -749,8 +753,8 @@ ExtensionScriptInstanceInfo3 :: struct {
     free_func:                      ExtensionScriptInstanceFree,
 }
 
-ExtensionWorkerThreadPoolGroupTask :: #type proc "c" (rawptr, c.uint32_t)
-ExtensionWorkerThreadPoolTask :: #type proc "c" (rawptr)
+ExtensionWorkerThreadPoolGroupTask :: #type proc "c" (_: rawptr, _: c.uint32_t)
+ExtensionWorkerThreadPoolTask :: #type proc "c" (_: rawptr)
 
 ExtensionInitializeCallback :: #type proc "c" (user_data: rawptr, level: InitializationLevel)
 ExtensionDeinitializeCallback :: #type proc "c" (user_data: rawptr, level: InitializationLevel)
@@ -809,12 +813,12 @@ GodotVersion2 :: struct {
     version_major:  u32,
     version_minor:  u32,
     version_patch:  u32,
-    hex:            u32,        // Full version encoded as hexadecimal with one byte (2 hex digits) per number (e.g. for "3.1.12" it would be 0x03010C)
-    status:         cstring,    // (e.g. "stable", "beta", "rc1", "rc2")
-    build:          cstring,    // (e.g. "custom_build")
-    hash:           cstring,    // Full Git commit hash.
-    timestamp:      u64,        // Git commit date UNIX timestamp in seconds, or 0 if unavailable.
-    version_string: cstring,    // (e.g. "Godot v3.1.4.stable.official.mono")
+    hex:            u32, // Full version encoded as hexadecimal with one byte (2 hex digits) per number (e.g. for "3.1.12" it would be 0x03010C)
+    status:         cstring, // (e.g. "stable", "beta", "rc1", "rc2")
+    build:          cstring, // (e.g. "custom_build")
+    hash:           cstring, // Full Git commit hash.
+    timestamp:      u64, // Git commit date UNIX timestamp in seconds, or 0 if unavailable.
+    version_string: cstring, // (e.g. "Godot v3.1.4.stable.official.mono")
 }
 
 InitializationLevel :: enum c.int {
@@ -843,13 +847,14 @@ ExtensionMainLoopFrameCallback :: #type proc "c" ()
 
 ExtensionMainLoopCallbacks :: struct {
     // Will be called after Godot is started and is fully initialized.
-    startup_func:   ExtensionMainLoopStartupCallback,
+    startup_func:  ExtensionMainLoopStartupCallback,
     // Will be called before Godot is shutdown when it is still fully initialized.
-    shutdown_func:  ExtensionMainLoopShutdownCallback,
-	// Will be called for each process frame. This will run after all `_process()` methods on Node, and before `ScriptServer::frame()`.
-	// This is intended to be the equivalent of `ScriptLanguage::frame()` for GDExtension language bindings that don't use the script API.
-    frame_func:     ExtensionMainLoopFrameCallback,
+    shutdown_func: ExtensionMainLoopShutdownCallback,
+    // Will be called for each process frame. This will run after all `_process()` methods on Node, and before `ScriptServer::frame()`.
+    // This is intended to be the equivalent of `ScriptLanguage::frame()` for GDExtension language bindings that don't use the script API.
+    frame_func:    ExtensionMainLoopFrameCallback,
 }
+
 /**
  * @name get_godot_version2
  * @since 4.5

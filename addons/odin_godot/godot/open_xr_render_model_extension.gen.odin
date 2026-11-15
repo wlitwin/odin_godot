@@ -16,7 +16,7 @@ open_xr_render_model_extension_name :: proc "contextless" () -> String_Name {
 }
 
 new_open_xr_render_model_extension :: proc "contextless" () -> Open_Xr_Render_Model_Extension {
-    return __bindgen_gde.classdb_construct_object(open_xr_render_model_extension_name_ref())
+    return cast(Open_Xr_Render_Model_Extension)__bindgen_gde.classdb_construct_object(open_xr_render_model_extension_name_ref())
 }
 
 // methods
@@ -171,7 +171,9 @@ open_xr_render_model_extension_render_model_get_confidence :: proc "contextless"
     args := []__bindgen_gde.TypePtr {
         &render_model_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Xr_Pose_Tracking_Confidence(__return_storage)
     return
 }
 
@@ -207,7 +209,9 @@ open_xr_render_model_extension_render_model_get_animatable_node_count :: proc "c
     args := []__bindgen_gde.TypePtr {
         &render_model_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 

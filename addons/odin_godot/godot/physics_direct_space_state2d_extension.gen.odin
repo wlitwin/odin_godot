@@ -16,7 +16,7 @@ physics_direct_space_state2d_extension_name :: proc "contextless" () -> String_N
 }
 
 new_physics_direct_space_state2d_extension :: proc "contextless" () -> Physics_Direct_Space_State2d_Extension {
-    return __bindgen_gde.classdb_construct_object(physics_direct_space_state2d_extension_name_ref())
+    return cast(Physics_Direct_Space_State2d_Extension)__bindgen_gde.classdb_construct_object(physics_direct_space_state2d_extension_name_ref())
 }
 
 // methods
@@ -46,7 +46,7 @@ physics_direct_space_state2d_extension__intersect_ray :: proc "contextless" (
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
     hit_from_inside_: Bool,
-    result_: ^Physics_Server2d_Extension_Ray_Result,
+    r_result_: ^Physics_Server2d_Extension_Ray_Result,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -60,7 +60,7 @@ physics_direct_space_state2d_extension__intersect_ray :: proc "contextless" (
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
     hit_from_inside_ := hit_from_inside_
-    result_ := result_
+    r_result_ := r_result_
     args := []__bindgen_gde.TypePtr {
         &from_,
         &to_,
@@ -68,7 +68,7 @@ physics_direct_space_state2d_extension__intersect_ray :: proc "contextless" (
         &collide_with_bodies_,
         &collide_with_areas_,
         &hit_from_inside_,
-        &result_,
+        &r_result_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -81,7 +81,7 @@ physics_direct_space_state2d_extension__intersect_point :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    results_: ^Physics_Server2d_Extension_Shape_Result,
+    r_results_: ^Physics_Server2d_Extension_Shape_Result,
     max_results_: Int,
 ) -> (ret: i32) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
@@ -95,7 +95,7 @@ physics_direct_space_state2d_extension__intersect_point :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    results_ := results_
+    r_results_ := r_results_
     max_results_ := max_results_
     args := []__bindgen_gde.TypePtr {
         &position_,
@@ -103,10 +103,12 @@ physics_direct_space_state2d_extension__intersect_point :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &results_,
+        &r_results_,
         &max_results_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -119,7 +121,7 @@ physics_direct_space_state2d_extension__intersect_shape :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    result_: ^Physics_Server2d_Extension_Shape_Result,
+    r_result_: ^Physics_Server2d_Extension_Shape_Result,
     max_results_: Int,
 ) -> (ret: i32) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
@@ -135,7 +137,7 @@ physics_direct_space_state2d_extension__intersect_shape :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    result_ := result_
+    r_result_ := r_result_
     max_results_ := max_results_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
@@ -145,10 +147,12 @@ physics_direct_space_state2d_extension__intersect_shape :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &result_,
+        &r_result_,
         &max_results_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -161,8 +165,8 @@ physics_direct_space_state2d_extension__cast_motion :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    closest_safe_: ^f32,
-    closest_unsafe_: ^f32,
+    r_closest_safe_: ^f32,
+    r_closest_unsafe_: ^f32,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -177,8 +181,8 @@ physics_direct_space_state2d_extension__cast_motion :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    closest_safe_ := closest_safe_
-    closest_unsafe_ := closest_unsafe_
+    r_closest_safe_ := r_closest_safe_
+    r_closest_unsafe_ := r_closest_unsafe_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
         &transform_,
@@ -187,8 +191,8 @@ physics_direct_space_state2d_extension__cast_motion :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &closest_safe_,
-        &closest_unsafe_,
+        &r_closest_safe_,
+        &r_closest_unsafe_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -203,9 +207,9 @@ physics_direct_space_state2d_extension__collide_shape :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    results_: rawptr,
+    r_results_: rawptr,
     max_results_: Int,
-    result_count_: ^i32,
+    r_result_count_: ^i32,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -220,9 +224,9 @@ physics_direct_space_state2d_extension__collide_shape :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    results_ := results_
+    r_results_ := r_results_
     max_results_ := max_results_
-    result_count_ := result_count_
+    r_result_count_ := r_result_count_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
         &transform_,
@@ -231,9 +235,9 @@ physics_direct_space_state2d_extension__collide_shape :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &results_,
+        &r_results_,
         &max_results_,
-        &result_count_,
+        &r_result_count_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
@@ -248,7 +252,7 @@ physics_direct_space_state2d_extension__rest_info :: proc "contextless" (
     collision_mask_: Int,
     collide_with_bodies_: Bool,
     collide_with_areas_: Bool,
-    rest_info_: ^Physics_Server2d_Extension_Shape_Rest_Info,
+    r_rest_info_: ^Physics_Server2d_Extension_Shape_Rest_Info,
 ) -> (ret: Bool) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -263,7 +267,7 @@ physics_direct_space_state2d_extension__rest_info :: proc "contextless" (
     collision_mask_ := collision_mask_
     collide_with_bodies_ := collide_with_bodies_
     collide_with_areas_ := collide_with_areas_
-    rest_info_ := rest_info_
+    r_rest_info_ := r_rest_info_
     args := []__bindgen_gde.TypePtr {
         &shape_rid_,
         &transform_,
@@ -272,7 +276,7 @@ physics_direct_space_state2d_extension__rest_info :: proc "contextless" (
         &collision_mask_,
         &collide_with_bodies_,
         &collide_with_areas_,
-        &rest_info_,
+        &r_rest_info_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

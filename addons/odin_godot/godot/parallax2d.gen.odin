@@ -16,7 +16,7 @@ parallax2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_parallax2d :: proc "contextless" () -> Parallax2d {
-    return __bindgen_gde.classdb_construct_object(parallax2d_name_ref())
+    return cast(Parallax2d)__bindgen_gde.classdb_construct_object(parallax2d_name_ref())
 }
 
 // methods
@@ -130,7 +130,9 @@ parallax2d_get_repeat_times :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

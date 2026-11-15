@@ -16,7 +16,7 @@ editor_resource_picker_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_resource_picker :: proc "contextless" () -> Editor_Resource_Picker {
-    return __bindgen_gde.classdb_construct_object(editor_resource_picker_name_ref())
+    return cast(Editor_Resource_Picker)__bindgen_gde.classdb_construct_object(editor_resource_picker_name_ref())
 }
 
 // methods

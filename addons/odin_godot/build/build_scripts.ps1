@@ -14,10 +14,10 @@
 # Pass -SkipCore to build only the scripts; -ScriptsDir to build ONE specific scripts dir (the
 # per-module reload rebuild passes a single modules\<name> dir here, plus -SkipModules).
 #
-# NOTE: the multi-module path below is SYNTAX-REVIEWED but UNVERIFIED on Windows — a best-effort
-# port, the same convention this script was introduced under (this repo is developed on
-# macOS/Linux, where PowerShell isn't available to even parse it). The logic mirrors the
-# exercised bash counterpart (tests/modules_spike drives build_scripts.sh) step for step.
+# NOTE: tests/build_helpers executes this pipeline under PowerShell Core and pins its cache,
+# cleanup, failure-recovery, module, flag, and concurrent-publish behavior against Bash.
+# Native MSVC compilation/runtime still needs a Windows host; the policy code is no longer
+# an unparsed best-effort port.
 #
 # SPACES IN PATHS: Odin's argument parser splits a path at spaces (e.g. a "...\Downloads\foo (1)\..."
 # download folder breaks `-out:`). We sidestep that by running everything FROM the project directory and
@@ -90,6 +90,72 @@ function Run([string]$exe, [string[]]$argv) {
     if ($LASTEXITCODE -ne 0) { throw "command failed (exit $LASTEXITCODE): $exe $($argv -join ' ')" }
 }
 
+# Remove stages abandoned by PowerShell processes that no longer exist. The PID in the
+# directory name protects simultaneous editor/CLI builds; a hard-killed producer is
+# reclaimed by the next build of the same output (the PowerShell twin of
+# odin_gd_prune_stale_stages in build/common.sh).
+function RemoveStaleBuildStages([string]$dir, [string]$base) {
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return }
+    $prefix = ".$base.build."
+    $stages = Get-ChildItem -LiteralPath $dir -Directory -Force |
+        Where-Object { $_.Name.StartsWith($prefix, [System.StringComparison]::Ordinal) }
+    foreach ($stage in $stages) {
+        $tail = $stage.Name.Substring($prefix.Length)
+        $producerText = ($tail -split '\.', 2)[0]
+        $producer = 0
+        if (-not [int]::TryParse($producerText, [ref]$producer)) { continue }
+        if (Get-Process -Id $producer -ErrorAction SilentlyContinue) {
+            continue
+        }
+        Remove-Item -LiteralPath $stage.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Atomically publish one file over an optional existing destination. Move-Item -Force
+# has a check-then-move race (two successful compilers can make one report "already
+# exists"). Modern .NET exposes File.Move(source, destination, overwrite=true). Windows
+# PowerShell 5.1 does not, so its fallback uses same-volume File.Replace when a destination
+# exists and retries the one race where another publisher creates it after our check.
+function PublishFileAtomic([string]$source, [string]$destination) {
+    # PowerShell's provider location and .NET's process working directory can differ
+    # (notably on Unix PowerShell). Resolve through the provider before using System.IO.
+    $providerCwd = (Get-Location).ProviderPath
+    if (-not [System.IO.Path]::IsPathRooted($source)) {
+        $source = [System.IO.Path]::GetFullPath((Join-Path $providerCwd $source))
+    }
+    if (-not [System.IO.Path]::IsPathRooted($destination)) {
+        $destination = [System.IO.Path]::GetFullPath((Join-Path $providerCwd $destination))
+    }
+    $overwriteMove = [System.IO.File].GetMethods() |
+        Where-Object {
+            $_.Name -eq "Move" -and
+            $_.GetParameters().Count -eq 3 -and
+            $_.GetParameters()[2].ParameterType -eq [bool]
+        } |
+        Select-Object -First 1
+    if ($null -ne $overwriteMove) {
+        [void]$overwriteMove.Invoke($null, @($source, $destination, $true))
+        return
+    }
+
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            if (Test-Path -LiteralPath $destination -PathType Leaf) {
+                [System.IO.File]::Replace($source, $destination, $null)
+            } else {
+                [System.IO.File]::Move($source, $destination)
+            }
+            return
+        } catch [System.IO.IOException] {
+            # Destination presence may have flipped between Test-Path and Move/Replace.
+            # The source still exists in that race; observe again and retry.
+            if ($attempt -eq 3 -or -not (Test-Path -LiteralPath $source -PathType Leaf)) {
+                throw
+            }
+        }
+    }
+}
+
 # Build a dll to a TEMP path, then atomically move it into place — mirrors atomic_odin_dll
 # in build/common.sh (KEEP IN SYNC — the bash builds all publish through that one helper).
 # `odin build -out:X` truncates X up front and writes over several seconds;
@@ -101,16 +167,31 @@ function Run([string]$exe, [string[]]$argv) {
 function BuildDll([string]$pkg, [string]$finalOut, [string[]]$extra) {
     $dir  = Split-Path -Parent $finalOut
     $leaf = Split-Path -Leaf   $finalOut
-    $tmp  = Join-Path $dir (".${leaf}.tmp.dll")
+    $base = [System.IO.Path]::GetFileNameWithoutExtension($leaf)
+    RemoveStaleBuildStages $dir $base
+    $stage = Join-Path $dir (".$base.build.$PID." + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Force -Path $stage | Out-Null
+    $tmp  = Join-Path $stage $leaf
     $tmpPdb = [System.IO.Path]::ChangeExtension($tmp, ".pdb")
-    Remove-Item -Force -ErrorAction SilentlyContinue $tmp, $tmpPdb
-    # -use-single-module: keeps the debug info in one build unit so the PDB carries
-    # complete line tables (mirrors atomic_odin_dll in build/common.sh — keep in sync).
-    Run $Odin (@("build", $pkg, "-collection:godot=$RootRel", "-build-mode:dll", "-use-single-module", "-out:$tmp", "-debug") + $extra)
-    # Reached only on success (Run throws on a non-zero exit). Publish the dll + its .pdb.
-    $finalPdb = [System.IO.Path]::ChangeExtension($finalOut, ".pdb")
-    if (Test-Path $tmpPdb) { Move-Item -Force $tmpPdb $finalPdb }
-    Move-Item -Force $tmp $finalOut
+    try {
+        # -use-single-module: keeps the debug info in one build unit so the PDB carries
+        # complete line tables (mirrors atomic_odin_dll in build/common.sh — keep in sync).
+        Run $Odin (@("build", $pkg, "-collection:godot=$RootRel", "-build-mode:dll", "-use-single-module", "-out:$tmp", "-debug") + $extra)
+
+        # Reached only on success (Run throws on a non-zero exit). A build without a
+        # PDB invalidates an older sidecar; never leave symbols describing another DLL.
+        PublishFileAtomic $tmp $finalOut
+        $finalPdb = [System.IO.Path]::ChangeExtension($finalOut, ".pdb")
+        if (Test-Path $tmpPdb) {
+            PublishFileAtomic $tmpPdb $finalPdb
+        } else {
+            Remove-Item -Force -ErrorAction SilentlyContinue $finalPdb
+        }
+    } finally {
+        # One bounded cleanup removes the candidate plus any .obj/.lib/.exp sidecars
+        # Odin/MSVC placed beside it. Unique stages make simultaneous builds independent.
+        Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 # 1. CORE GDExtension dll (native MSVC build — the path that avoids the cross-compile crash).
@@ -119,14 +200,84 @@ if (-not $SkipCore) {
     BuildDll (Join-Path $RootRel "core") $core @()
 }
 
-# 2. scriptgen preprocessor — build to a writable TEMP dir, NOT into the addon (which may be
-#    read-only when installed under res://addons/ and shouldn't collect build artifacts).
-#    KEEP IN SYNC with build/common.sh (build_scriptgen) — the bash builds share one helper;
-#    this is its Windows-native mirror.
-$scriptgenDir = Join-Path ([System.IO.Path]::GetTempPath()) ("odin_godot_sgen_" + [System.Guid]::NewGuid().ToString("N"))
-New-Item -ItemType Directory -Force -Path $scriptgenDir | Out-Null
-$scriptgenExe = Join-Path $scriptgenDir "scriptgen.exe"
-Run $Odin @("build", (Join-Path $RootRel "scriptgen"), "-collection:godot=$RootRel", "-out:$scriptgenExe", "-debug")
+# 2. scriptgen preprocessor — content-addressed in a writable USER cache, never the
+#    addon (which may be read-only and must not collect exported build artifacts).
+#    The key mirrors build/common.sh: exact compiler binary/version + host + every
+#    scriptgen and godot:decl source. SGEN_BIN remains an explicit override for CI.
+function GetStringSha256([string]$text) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($text)
+        return (($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString("x2") }) -join "")
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+if ($env:SGEN_BIN -and (Test-Path -LiteralPath $env:SGEN_BIN -PathType Leaf)) {
+    $scriptgenExe = $env:SGEN_BIN
+    Write-Host "build_scripts.ps1: using prebuilt scriptgen (SGEN_BIN=$scriptgenExe)"
+} else {
+    $odinCommand = (Get-Command $Odin -ErrorAction Stop).Source
+    $odinVersion = (& $Odin version 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw "failed to query Odin version: $odinVersion" }
+    $compilerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $odinCommand).Hash.ToLowerInvariant()
+
+    $sourceRecords = foreach ($sourceRoot in @(
+        (Join-Path $rootAbs "scriptgen"),
+        (Join-Path $rootAbs "decl")
+    )) {
+        Get-ChildItem -LiteralPath $sourceRoot -Filter *.odin -File -Recurse -ErrorAction SilentlyContinue
+    }
+    $sourceRecords = $sourceRecords |
+        Sort-Object FullName |
+        ForEach-Object {
+            $relative = $_.FullName.Substring($rootAbs.Length).TrimStart('\', '/') -replace '\\', '/'
+            $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash.ToLowerInvariant()
+            "$relative`0$digest"
+        }
+    $keyMaterial = @(
+        "odin_godot-scriptgen-cache-v1",
+        "host=windows/$env:PROCESSOR_ARCHITECTURE",
+        "compiler-path=$odinCommand",
+        "compiler-version=$odinVersion",
+        "compiler-sha256=$compilerHash"
+    ) + $sourceRecords
+    $cacheKey = GetStringSha256 ($keyMaterial -join "`0")
+
+    if ($env:ODIN_GODOT_TOOL_CACHE_DIR) {
+        $cacheBase = $env:ODIN_GODOT_TOOL_CACHE_DIR
+    } elseif ($env:LOCALAPPDATA) {
+        $cacheBase = Join-Path $env:LOCALAPPDATA "odin_godot\tools"
+    } else {
+        $cacheBase = Join-Path ([System.IO.Path]::GetTempPath()) "odin_godot-tools"
+    }
+    $scriptgenDir = Join-Path (Join-Path $cacheBase "scriptgen") $cacheKey
+    $scriptgenExe = Join-Path $scriptgenDir "scriptgen.exe"
+    if (Test-Path -LiteralPath $scriptgenExe -PathType Leaf) {
+        Write-Host "build_scripts.ps1: scriptgen cache hit ($cacheKey)"
+    } else {
+        New-Item -ItemType Directory -Force -Path $scriptgenDir | Out-Null
+        RemoveStaleBuildStages $scriptgenDir "scriptgen"
+        $candidateStage = Join-Path $scriptgenDir (".scriptgen.build.$PID." + [System.Guid]::NewGuid().ToString("N"))
+        New-Item -ItemType Directory -Force -Path $candidateStage | Out-Null
+        $candidate = Join-Path $candidateStage "scriptgen.exe"
+        $candidatePdb = [System.IO.Path]::ChangeExtension($candidate, ".pdb")
+        try {
+            Run $Odin @("build", (Join-Path $RootRel "scriptgen"), "-collection:godot=$RootRel", "-out:$candidate", "-debug")
+            $finalPdb = [System.IO.Path]::ChangeExtension($scriptgenExe, ".pdb")
+            PublishFileAtomic $candidate $scriptgenExe
+            if (Test-Path -LiteralPath $candidatePdb) {
+                PublishFileAtomic $candidatePdb $finalPdb
+            } else {
+                Remove-Item -Force -ErrorAction SilentlyContinue $finalPdb
+            }
+        } finally {
+            Remove-Item -LiteralPath $candidateStage -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Host "build_scripts.ps1: cached scriptgen ($cacheKey)"
+    }
+}
 
 # ---------------------------------------------------------------------------
 # Multi-module support — the Windows mirror of build/build_scripts.sh (KEEP IN SYNC):
@@ -145,12 +296,36 @@ function DllLeafForDir([string]$dir) {
     return "libodinscripts.dll"
 }
 
+# Normalize `.`/`..` segments PURELY LEXICALLY (no filesystem access, so a mistyped
+# target that does not exist still normalizes) — the ps1 twin of lex_norm_path in
+# build/common.sh and scriptgen's resolve_lexical. Input must be absolute; the result
+# uses '/' separators, which is all the comparisons below need.
+function LexNormPath([string]$path) {
+    $out = New-Object System.Collections.ArrayList
+    foreach ($seg in ($path -replace '\\', '/').Split('/')) {
+        if ($seg -eq '' -or $seg -eq '.') { continue }
+        if ($seg -eq '..') {
+            if ($out.Count -gt 0) { $out.RemoveAt($out.Count - 1) }
+            continue
+        }
+        [void]$out.Add($seg)
+    }
+    return ($out -join '/')
+}
+
 # HARD RULE: no imports between script modules (mirror of check_module_isolation in
 # build/common.sh — KEEP IN SYNC, including the regex). Odin happily compiles a
 # relative `import "../other_module"` — but a package imported by two script dlls
 # duplicates its package GLOBALS per dll (the shared blackboard would silently fork).
-# So any `..` relative import in a script module is rejected here, at build time.
+# So a `..` relative import in a script module is rejected here, at build time.
 # Cross-module communication goes through the ENGINE: signals, methods, autoloads.
+#
+# THE ONE EXEMPTION: `<project>\shared\…` — read-only VOCABULARY (types, constants,
+# pure procs; no state to fork), importable by every module. A `..` import passes
+# exactly when it RESOLVES into that tree (project dir = the module dir's parent, or
+# its grandparent under `modules`); an unresolvable one is illegal like any other
+# escape. scriptgen then verifies the tree really is state-free.
+#
 # TOP-LEVEL FILES ONLY (no -Recurse), matching common.sh: at the module root a `..`
 # import always escapes; in subdirs it can be a legal sibling-helper import, which
 # only scriptgen's lexical AST check can tell apart.
@@ -159,8 +334,23 @@ function CheckModuleIsolation([string]$dir) {
     $hits = Get-ChildItem -Path $dir -Filter *.odin -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notlike "*.gen.odin" } |
         Select-String -Pattern $pattern
-    if ($hits) {
-        $lines = ($hits | ForEach-Object { "  $($_.Path):$($_.LineNumber): $($_.Line.Trim())" }) -join "`n"
+    if (-not $hits) { return }
+
+    $abs    = (Resolve-Path -LiteralPath $dir).Path
+    $parent = Split-Path -Parent $abs
+    $proj   = if ((Split-Path -Leaf $parent) -eq "modules") { Split-Path -Parent $parent } else { $parent }
+    $shared = LexNormPath (Join-Path $proj "shared")
+
+    $bad = @()
+    foreach ($h in $hits) {
+        $imp = $null
+        if ($h.Line -match '"(\.\.[^"]*)"') { $imp = $Matches[1] }
+        $resolved = if ($imp) { LexNormPath (Join-Path $abs $imp) } else { "" }
+        if ($resolved -eq $shared -or $resolved.StartsWith("$shared/")) { continue }
+        $bad += "  $($h.Path):$($h.LineNumber): $($h.Line.Trim())"
+    }
+    if ($bad.Count -gt 0) {
+        $lines = ($bad -join "`n")
         throw @"
 ILLEGAL cross-module import in '$dir':
 $lines
@@ -168,27 +358,86 @@ $lines
   duplicates its globals per dll (shared state would silently fork). Talk to
   other modules through the engine (signals / methods / autoloads) instead,
   or move the shared state into exactly one module.
+  For types, constants and pure procs — a vocabulary with no state to fork —
+  put the package under '$shared' instead: any module may import it, and
+  scriptgen verifies that tree stays state-free.
 "@
     }
 }
 
 # scriptgen + odin build one scripts dir into its dll (atomic temp+move publish — see
-# BuildDll). The four -custom-attribute flags: KEEP IN SYNC with build/common.sh
+# BuildDll). The -custom-attribute flags: KEEP IN SYNC with build/common.sh
 # (ODIN_GD_ATTRS) — every scripts build (bash native/web/cross + this Windows-native
 # one) must pass the same set, or @(gd_method)/@(gd_connect)/@(gd_rpc)/@(gd_command)
 # fail to compile.
 # (No return value: a PowerShell function's output stream would also capture the odin/
 # scriptgen stdout `& $exe` emits inside Run — the built path is tracked via $builtDlls.)
 $builtDlls = @()
+$scriptAttributes = @(
+    "-custom-attribute:gd_method", "-custom-attribute:gd_connect",
+    "-custom-attribute:gd_rpc", "-custom-attribute:gd_command",
+    "-custom-attribute:gd_tick", "-custom-attribute:gd_input",
+    "-custom-attribute:gd_sample", "-custom-attribute:gd_step",
+    "-custom-attribute:gd_event",
+    "-custom-attribute:gd_half", "-custom-attribute:gd_message"
+)
+$scriptBuildFlags = @()
+if ($env:SCRIPT_BUILD_FLAGS) {
+    # Matches bash's intentional whitespace splitting of SCRIPT_BUILD_FLAGS.
+    $scriptBuildFlags = @($env:SCRIPT_BUILD_FLAGS -split '\s+' | Where-Object { $_ })
+}
+
+function GetAuthoredSourcesFingerprint([string]$dir) {
+    $dirAbs = (Resolve-Path -LiteralPath $dir).Path.TrimEnd('\', '/')
+    $records = Get-ChildItem -LiteralPath $dirAbs -Filter *.odin -File -Recurse -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -notlike "*.gen.odin" -and
+            $_.FullName.Substring($dirAbs.Length).TrimStart('\', '/') -notmatch '(^|[\\/])(\.[^\\/]*|bin)([\\/]|$)'
+        } |
+        Sort-Object FullName |
+        ForEach-Object {
+            $relative = $_.FullName.Substring($dirAbs.Length).TrimStart('\', '/') -replace '\\', '/'
+            try {
+                $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName -ErrorAction Stop).Hash.ToLowerInvariant()
+            } catch {
+                # A delete racing this observation is a changed fingerprint, not a reason
+                # to abort before the generation/build transaction gets its retry.
+                $digest = "missing-during-scan"
+            }
+            "$relative`0$digest"
+        }
+    return (GetStringSha256 ($records -join "`0"))
+}
+
 function BuildOneScriptsDir([string]$dir) {
     CheckModuleIsolation $dir
-    # -godot:<root> lets scriptgen resolve nested `using` bundles imported from godot:kit/*
-    # (nested-replicate-fields Phase 2) — same root the binding compiles against. KEEP IN
-    # SYNC with build/common.sh run_scriptgen.
-    Run $scriptgenExe @($dir, "-godot:$RootRel")
     $out = Join-Path $Bin (DllLeafForDir $dir)
-    BuildDll $dir $out @("-custom-attribute:gd_method", "-custom-attribute:gd_connect", "-custom-attribute:gd_rpc", "-custom-attribute:gd_command")
-    $script:builtDlls += $out
+
+    # Mirror build_scripts.sh's source transaction: create/delete/save bursts can land
+    # between generation and compile. Retry a changed snapshot instead of surfacing the
+    # generated #load_hash guard as a false persistent compiler error.
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        $before = GetAuthoredSourcesFingerprint $dir
+        $buildError = $null
+        try {
+            # -godot:<root> resolves nested `using` bundles imported from godot:kit/*.
+            Run $scriptgenExe @($dir, "-godot:$RootRel", "-project:$projAbs")
+            BuildDll $dir $out ($scriptAttributes + $scriptBuildFlags)
+        } catch {
+            $buildError = $_
+        }
+        $after = GetAuthoredSourcesFingerprint $dir
+        if ($before -ne $after) {
+            if ($attempt -lt 3) {
+                Write-Host "build_scripts.ps1: authored sources changed during build; regenerating (attempt $($attempt + 1)/3)"
+                continue
+            }
+            throw "authored sources kept changing during 3 build attempts; save again when the edit burst settles"
+        }
+        if ($null -ne $buildError) { throw $buildError }
+        $script:builtDlls += $out
+        return
+    }
 }
 
 # 3+4. Build the requested scripts dir; when it is the MAIN one, also build each
@@ -198,7 +447,7 @@ BuildOneScriptsDir $Scripts
 $scriptsParent = Split-Path -Leaf (Split-Path -Parent (Resolve-Path -LiteralPath $Scripts).Path)
 $isModuleDir = ($scriptsParent -eq "modules")
 if (-not $SkipModules -and -not $isModuleDir -and (Test-Path "modules")) {
-    foreach ($mdir in Get-ChildItem -Path "modules" -Directory) {
+    foreach ($mdir in (Get-ChildItem -Path "modules" -Directory | Sort-Object Name)) {
         $mrel = Resolve-Path -LiteralPath $mdir.FullName -Relative
         if (-not (Get-ChildItem -Path $mrel -Filter *.odin -File -ErrorAction SilentlyContinue)) {
             Write-Host "build_scripts: skipping module '$($mdir.Name)' (no .odin sources)"

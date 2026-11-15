@@ -24,7 +24,7 @@ cone_twist_joint3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_cone_twist_joint3d :: proc "contextless" () -> Cone_Twist_Joint3d {
-    return __bindgen_gde.classdb_construct_object(cone_twist_joint3d_name_ref())
+    return cast(Cone_Twist_Joint3d)__bindgen_gde.classdb_construct_object(cone_twist_joint3d_name_ref())
 }
 
 // methods
@@ -57,7 +57,7 @@ cone_twist_joint3d_set_param :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1062470226)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     value_ := value_
     args := []__bindgen_gde.TypePtr {
         &param_,
@@ -76,7 +76,7 @@ cone_twist_joint3d_get_param :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2928790850)
     }
     self := self
-    param_ := param_
+    param_ := Int(param_)
     args := []__bindgen_gde.TypePtr {
         &param_,
     }

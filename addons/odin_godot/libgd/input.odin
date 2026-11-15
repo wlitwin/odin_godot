@@ -9,7 +9,13 @@ import "godot:godot"
 // live for the program's lifetime). With `static = false` it builds refcounted StringNames
 // and frees them after the call — use this for names from `fmt.ctprintf` or other transient
 // buffers, which `gd.get_vector` must NOT be given.
-get_input_vector :: proc "contextless" (negative_x: cstring, positive_x: cstring, negative_y: cstring, positive_y: cstring, static: bool) -> godot.Vector2 {
+get_input_vector :: proc "contextless" (
+    negative_x: cstring,
+    positive_x: cstring,
+    negative_y: cstring,
+    positive_y: cstring,
+    static: bool,
+) -> godot.Vector2 {
     if static {
         return godot.get_vector(negative_x, positive_x, negative_y, positive_y)
     }
@@ -26,7 +32,14 @@ get_input_vector :: proc "contextless" (negative_x: cstring, positive_x: cstring
     positive_y_name := godot.new_string_name(positive_y, false)
     defer godot.free_string_name(positive_y_name)
 
-    return godot.input_get_vector(godot.singleton_input(), negative_x_name, positive_x_name, negative_y_name, positive_y_name, -1.0)
+    return godot.input_get_vector(
+        godot.singleton_input(),
+        negative_x_name,
+        positive_x_name,
+        negative_y_name,
+        positive_y_name,
+        -1.0,
+    )
 }
 
 /*

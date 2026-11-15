@@ -55,14 +55,16 @@ packet_peer_extension__get_packet :: proc "contextless" (
         &r_buffer_,
         &r_buffer_size_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
 packet_peer_extension__put_packet :: proc "contextless" (
     self: Packet_Peer_Extension,
-    p_buffer_: ^u8,
-    p_buffer_size_: Int,
+    buffer_: ^u8,
+    buffer_size_: Int,
 ) -> (ret: Error) {
     @(static) __ptr: __bindgen_gde.MethodBindPtr
     if __ptr == nil {
@@ -70,13 +72,15 @@ packet_peer_extension__put_packet :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3099858825)
     }
     self := self
-    p_buffer_ := p_buffer_
-    p_buffer_size_ := p_buffer_size_
+    buffer_ := buffer_
+    buffer_size_ := buffer_size_
     args := []__bindgen_gde.TypePtr {
-        &p_buffer_,
-        &p_buffer_size_,
+        &buffer_,
+        &buffer_size_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -91,7 +95,9 @@ packet_peer_extension__get_available_packet_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -106,7 +112,9 @@ packet_peer_extension__get_max_packet_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

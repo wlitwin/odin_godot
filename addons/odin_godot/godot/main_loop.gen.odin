@@ -13,6 +13,8 @@ Main_Loop_Constants :: enum {
     NOTIFICATION_APPLICATION_FOCUS_IN = 2016,
     NOTIFICATION_APPLICATION_FOCUS_OUT = 2017,
     NOTIFICATION_TEXT_SERVER_CHANGED = 2018,
+    NOTIFICATION_APPLICATION_PIP_MODE_ENTERED = 2019,
+    NOTIFICATION_APPLICATION_PIP_MODE_EXITED = 2020,
 }
 
 
@@ -26,7 +28,7 @@ main_loop_name :: proc "contextless" () -> String_Name {
 }
 
 new_main_loop :: proc "contextless" () -> Main_Loop {
-    return __bindgen_gde.classdb_construct_object(main_loop_name_ref())
+    return cast(Main_Loop)__bindgen_gde.classdb_construct_object(main_loop_name_ref())
 }
 
 // methods

@@ -15,6 +15,7 @@ Code_Edit_Code_Completion_Kind :: enum int {
     Kind_Node_Path = 7,
     Kind_File_Path = 8,
     Kind_Plain_Text = 9,
+    Kind_Keyword = 10,
 }
 Code_Edit_Code_Completion_Location :: enum int {
     Location_Local = 0,
@@ -34,7 +35,7 @@ code_edit_name :: proc "contextless" () -> String_Name {
 }
 
 new_code_edit :: proc "contextless" () -> Code_Edit {
-    return __bindgen_gde.classdb_construct_object(code_edit_name_ref())
+    return cast(Code_Edit)__bindgen_gde.classdb_construct_object(code_edit_name_ref())
 }
 
 // methods
@@ -136,7 +137,9 @@ code_edit_get_indent_size :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -857,7 +860,9 @@ code_edit_get_line_numbers_min_digits :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1290,7 +1295,9 @@ code_edit_is_in_string :: proc "contextless" (
         &line_,
         &column_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1415,7 +1422,9 @@ code_edit_is_in_comment :: proc "contextless" (
         &line_,
         &column_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1579,7 +1588,7 @@ code_edit_add_code_completion_option :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3944379502)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     display_text_ := display_text_
     insert_text_ := insert_text_
     text_color_ := text_color_
@@ -1659,7 +1668,9 @@ code_edit_get_code_completion_selected_index :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1962,6 +1973,23 @@ code_edit_delete_lines :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+code_edit_join_lines :: proc "contextless" (
+    self: Code_Edit,
+    line_ending_: String,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("join_lines", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 4063782979)
+    }
+    self := self
+    line_ending_ := line_ending_
+    args := []__bindgen_gde.TypePtr {
+        &line_ending_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }

@@ -16,7 +16,7 @@ editor_inspector_name :: proc "contextless" () -> String_Name {
 }
 
 new_editor_inspector :: proc "contextless" () -> Editor_Inspector {
-    return __bindgen_gde.classdb_construct_object(editor_inspector_name_ref())
+    return cast(Editor_Inspector)__bindgen_gde.classdb_construct_object(editor_inspector_name_ref())
 }
 
 // methods
@@ -52,9 +52,9 @@ editor_inspector_instantiate_property_editor :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1429914152)
     }
     object_ := object_
-    type_ := type_
+    type_ := Int(type_)
     path_ := path_
-    hint_ := hint_
+    hint_ := Int(hint_)
     hint_text_ := hint_text_
     usage_ := usage_
     wide_ := wide_
@@ -66,6 +66,22 @@ editor_inspector_instantiate_property_editor :: proc "contextless" (
         &hint_text_,
         &usage_,
         &wide_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
+    return
+}
+
+editor_inspector_create_default_inspector :: proc "contextless" (
+    filter_line_edit_: Line_Edit,
+) -> (ret: Editor_Inspector) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("create_default_inspector", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2419746798)
+    }
+    filter_line_edit_ := filter_line_edit_
+    args := []__bindgen_gde.TypePtr {
+        &filter_line_edit_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, nil, raw_data(args), &ret)
     return
@@ -117,6 +133,48 @@ editor_inspector_get_edited_object :: proc "contextless" (
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return
+}
+
+editor_inspector_collapse_all_folding :: proc "contextless" (
+    self: Editor_Inspector,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("collapse_all_folding", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+editor_inspector_expand_all_folding :: proc "contextless" (
+    self: Editor_Inspector,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("expand_all_folding", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+editor_inspector_expand_revertable :: proc "contextless" (
+    self: Editor_Inspector,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("expand_revertable", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3218959716)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
 

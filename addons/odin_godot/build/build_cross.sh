@@ -75,6 +75,7 @@ esac
 
 OUT_DIR="${3:-$PROJ/bin/$TARGET}"
 mkdir -p "$OUT_DIR"
+BOX3D_RUNTIME_DIR="$OUT_DIR"
 
 if [[ -z "$CC" || ! -x "$(command -v "$CC" 2>/dev/null || echo /nonexistent)" ]]; then
     echo "build_cross.sh: no $TARGET cross C compiler found." >&2
@@ -93,12 +94,26 @@ echo "build_cross.sh: $TARGET cross CC = $CC"
 # ----------------------------------------------------------------------------
 odin_obj_link() {
     local pkg="$1" out="$2"; shift 2
-    local dir leaf tmp obj
+    local dir leaf base stage tmp obj build_rc=0
     dir="$(dirname "$out")"
     leaf="$(basename "$out")"
-    tmp="$dir/.$leaf.tmp$EXT"
-    obj="$dir/.$leaf.tmp.o"
-    rm -f "$tmp" "$obj"
+    base="${leaf%.*}"
+    odin_gd_prune_stale_stages "$dir" "$base"
+    stage="$(mktemp -d "$dir/.$base.build.$$.XXXXXX")"
+    tmp="$stage/$leaf"
+    obj="$stage/$base.o"
+    odin_gd_cleanup_on_exit "$stage"
+
+    odin_gd_box3d_prepare "$pkg" "$out" "$TARGET" || return $?
+    local box3d_link=()
+    if [[ -n "$_ODIN_GD_BOX3D_RUNTIME" ]]; then
+        if [[ "$TARGET" == "linux" ]]; then
+            box3d_link+=("-L$_ODIN_GD_BOX3D_RUNTIME" -logb3 '-Wl,-rpath,$ORIGIN')
+        else
+            echo "build_cross.sh: Box3D Windows cross-link needs a verified target import library; use a native Windows build" >&2
+            return 2
+        fi
+    fi
 
     "$ODIN" build "$pkg" \
         -collection:godot="$ROOT" \
@@ -107,13 +122,25 @@ odin_obj_link() {
         -use-single-module \
         -reloc-mode:pic \
         -out:"$obj" \
-        "$@"
+        "$@" \
+        ${_ODIN_GD_BOX3D_FLAGS[@]+"${_ODIN_GD_BOX3D_FLAGS[@]}"} || build_rc=$?
+    if [[ "$build_rc" != "0" ]]; then
+        rm -rf "$stage"
+        return "$build_rc"
+    fi
 
     # -shared: a loadable module Godot dlopen/LoadLibrary's. The cross gcc wrapper
     # supplies the target crt/libc/libgcc + dynamic linker for us.
-    "$CC" -shared -o "$tmp" "$obj" "${LINK_LIBS[@]}"
+    "$CC" -shared -o "$tmp" "$obj" "${LINK_LIBS[@]}" ${box3d_link[@]+"${box3d_link[@]}"} || build_rc=$?
+    if [[ "$build_rc" != "0" ]]; then
+        rm -rf "$stage"
+        return "$build_rc"
+    fi
+    if [[ -n "$_ODIN_GD_BOX3D_RUNTIME" && "$pkg" != "$ROOT/core" ]]; then
+        python3 "$ROOT/build/box3d_profile.py" --inspect-consumer "$tmp" --target "$TARGET" || { rm -rf "$stage"; return 1; }
+    fi
     mv -f "$tmp" "$out"
-    rm -f "$obj"
+    rm -rf "$stage"
 }
 
 # CORE dll (always built — the stable C-ABI entry the .gdextension points at).
@@ -133,7 +160,7 @@ fi
 # custom attributes as the native/web builds). scriptgen goes to a writable TEMP dir, never
 # into the addon (read-only when installed under res://addons/); SGEN_BIN reuses a prebuilt one.
 build_scriptgen
-run_scriptgen "$SCRIPTS"
+run_scriptgen "$SCRIPTS" "$PROJ"
 SCRIPTS_OUT="$OUT_DIR/libodinscripts$EXT"
 odin_obj_link "$SCRIPTS" "$SCRIPTS_OUT" \
     ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \

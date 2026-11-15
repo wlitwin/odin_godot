@@ -16,7 +16,7 @@ light_occluder2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_light_occluder2d :: proc "contextless" () -> Light_Occluder2d {
-    return __bindgen_gde.classdb_construct_object(light_occluder2d_name_ref())
+    return cast(Light_Occluder2d)__bindgen_gde.classdb_construct_object(light_occluder2d_name_ref())
 }
 
 // methods
@@ -98,7 +98,9 @@ light_occluder2d_get_occluder_light_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

@@ -23,7 +23,7 @@ gd_extension_manager_name :: proc "contextless" () -> String_Name {
 }
 
 new_gd_extension_manager :: proc "contextless" () -> Gd_Extension_Manager {
-    return __bindgen_gde.classdb_construct_object(gd_extension_manager_name_ref())
+    return cast(Gd_Extension_Manager)__bindgen_gde.classdb_construct_object(gd_extension_manager_name_ref())
 }
 
 // methods
@@ -59,7 +59,9 @@ gd_extension_manager_load_extension :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gd_Extension_Manager_Load_Status(__return_storage)
     return
 }
 
@@ -80,7 +82,9 @@ gd_extension_manager_load_extension_from_function :: proc "contextless" (
         &path_,
         &init_func_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gd_Extension_Manager_Load_Status(__return_storage)
     return
 }
 
@@ -98,7 +102,9 @@ gd_extension_manager_reload_extension :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gd_Extension_Manager_Load_Status(__return_storage)
     return
 }
 
@@ -116,7 +122,9 @@ gd_extension_manager_unload_extension :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &path_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Gd_Extension_Manager_Load_Status(__return_storage)
     return
 }
 

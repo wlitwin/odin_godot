@@ -50,7 +50,7 @@ panic_report_hook: Panic_Report_Proc
 // are stderr-only, which is the safe floor.
 @(export)
 odin_scripts_set_panic_report :: proc "c" (report: Panic_Report_Proc) {
-	panic_report_hook = report
+    panic_report_hook = report
 }
 
 // context.assertion_failure_proc for compiled scripts on native. Formats into a stack
@@ -58,22 +58,24 @@ odin_scripts_set_panic_report :: proc "c" (report: Panic_Report_Proc) {
 // best-effort editor route, then trap like the default. `loc` is the script-relevant
 // source location Odin hands every assertion proc (the panic/assert call site).
 native_script_assertion_failure :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
-	buf: [1024]byte
-	// Reserve one byte so the NUL for the cstring view below always fits.
-	msg := fmt.bprintf(
-		buf[:len(buf) - 1],
-		"ODIN_SCRIPT_PANIC %s: %s (%s:%d:%d)",
-		prefix,
-		message,
-		loc.file_path,
-		loc.line,
-		loc.column,
-	)
-	os.write_string(os.stderr, msg)
-	os.write_string(os.stderr, "\n")
-	if panic_report_hook != nil {
-		buf[len(msg)] = 0 // msg starts at buf[0]
-		panic_report_hook(cstring(raw_data(buf[:])))
-	}
-	runtime.trap()
+    buf: [1024]byte
+    // Reserve one byte so the NUL for the cstring view below always fits.
+    msg := fmt.bprintf(
+        buf[:len(buf) - 1],
+        "ODIN_SCRIPT_PANIC %s: %s (%s:%d:%d)",
+        prefix,
+        message,
+        loc.file_path,
+        loc.line,
+        loc.column,
+    )
+    os.write_string(os.stderr, msg)
+    os.write_string(os.stderr, "\n")
+
+    if panic_report_hook != nil {
+        buf[len(msg)] = 0 // msg starts at buf[0]
+        panic_report_hook(cstring(raw_data(buf[:])))
+    }
+
+    runtime.trap()
 }

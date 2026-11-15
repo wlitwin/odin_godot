@@ -16,7 +16,7 @@ v_flow_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_v_flow_container :: proc "contextless" () -> V_Flow_Container {
-    return __bindgen_gde.classdb_construct_object(v_flow_container_name_ref())
+    return cast(V_Flow_Container)__bindgen_gde.classdb_construct_object(v_flow_container_name_ref())
 }
 
 // methods

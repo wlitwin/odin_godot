@@ -16,7 +16,7 @@ popup_menu_name :: proc "contextless" () -> String_Name {
 }
 
 new_popup_menu :: proc "contextless" () -> Popup_Menu {
-    return __bindgen_gde.classdb_construct_object(popup_menu_name_ref())
+    return cast(Popup_Menu)__bindgen_gde.classdb_construct_object(popup_menu_name_ref())
 }
 
 // methods
@@ -120,7 +120,7 @@ popup_menu_add_item :: proc "contextless" (
     self := self
     label_ := label_
     id_ := id_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &label_,
         &id_,
@@ -145,7 +145,7 @@ popup_menu_add_icon_item :: proc "contextless" (
     texture_ := texture_
     label_ := label_
     id_ := id_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &texture_,
         &label_,
@@ -169,7 +169,7 @@ popup_menu_add_check_item :: proc "contextless" (
     self := self
     label_ := label_
     id_ := id_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &label_,
         &id_,
@@ -194,7 +194,7 @@ popup_menu_add_icon_check_item :: proc "contextless" (
     texture_ := texture_
     label_ := label_
     id_ := id_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &texture_,
         &label_,
@@ -218,7 +218,7 @@ popup_menu_add_radio_check_item :: proc "contextless" (
     self := self
     label_ := label_
     id_ := id_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &label_,
         &id_,
@@ -243,7 +243,7 @@ popup_menu_add_icon_radio_check_item :: proc "contextless" (
     texture_ := texture_
     label_ := label_
     id_ := id_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &texture_,
         &label_,
@@ -271,7 +271,7 @@ popup_menu_add_multistate_item :: proc "contextless" (
     max_states_ := max_states_
     default_state_ := default_state_
     id_ := id_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &label_,
         &max_states_,
@@ -513,7 +513,7 @@ popup_menu_set_item_text_direction :: proc "contextless" (
     }
     self := self
     index_ := index_
-    direction_ := direction_
+    direction_ := Int(direction_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &direction_,
@@ -553,7 +553,7 @@ popup_menu_set_item_auto_translate_mode :: proc "contextless" (
     }
     self := self
     index_ := index_
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &mode_,
@@ -673,7 +673,7 @@ popup_menu_set_item_accelerator :: proc "contextless" (
     }
     self := self
     index_ := index_
-    accel_ := accel_
+    accel_ := Int(accel_)
     args := []__bindgen_gde.TypePtr {
         &index_,
         &accel_,
@@ -944,6 +944,26 @@ popup_menu_set_item_shortcut_disabled :: proc "contextless" (
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
 }
 
+popup_menu_set_item_index :: proc "contextless" (
+    self: Popup_Menu,
+    index_: Int,
+    target_index_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_item_index", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3937882851)
+    }
+    self := self
+    index_ := index_
+    target_index_ := target_index_
+    args := []__bindgen_gde.TypePtr {
+        &index_,
+        &target_index_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
 popup_menu_toggle_item_checked :: proc "contextless" (
     self: Popup_Menu,
     index_: Int,
@@ -1010,7 +1030,9 @@ popup_menu_get_item_text_direction :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Control_Text_Direction(__return_storage)
     return
 }
 
@@ -1046,7 +1068,9 @@ popup_menu_get_item_auto_translate_mode :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Node_Auto_Translate_Mode(__return_storage)
     return
 }
 
@@ -1082,7 +1106,9 @@ popup_menu_get_item_icon_max_width :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1136,7 +1162,9 @@ popup_menu_get_item_id :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1154,7 +1182,9 @@ popup_menu_get_item_index :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &id_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1172,7 +1202,9 @@ popup_menu_get_item_accelerator :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Key(__return_storage)
     return
 }
 
@@ -1370,7 +1402,9 @@ popup_menu_get_item_indent :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1388,7 +1422,9 @@ popup_menu_get_item_multistate_max :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1406,7 +1442,9 @@ popup_menu_get_item_multistate :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1438,7 +1476,9 @@ popup_menu_get_focused_item :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1470,7 +1510,9 @@ popup_menu_get_item_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1730,7 +1772,7 @@ popup_menu_set_system_menu :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 600639674)
     }
     self := self
-    system_menu_id_ := system_menu_id_
+    system_menu_id_ := Int(system_menu_id_)
     args := []__bindgen_gde.TypePtr {
         &system_menu_id_,
     }
@@ -1748,7 +1790,141 @@ popup_menu_get_system_menu :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Native_Menu_System_Menus(__return_storage)
+    return
+}
+
+popup_menu_set_search_bar_enabled :: proc "contextless" (
+    self: Popup_Menu,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+popup_menu_is_search_bar_enabled :: proc "contextless" (
+    self: Popup_Menu,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_search_bar_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+popup_menu_set_search_bar_min_item_count :: proc "contextless" (
+    self: Popup_Menu,
+    count_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_min_item_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    count_ := count_
+    args := []__bindgen_gde.TypePtr {
+        &count_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+popup_menu_get_search_bar_min_item_count :: proc "contextless" (
+    self: Popup_Menu,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_search_bar_min_item_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
+    return
+}
+
+popup_menu_set_search_bar_fuzzy_search_enabled :: proc "contextless" (
+    self: Popup_Menu,
+    enabled_: Bool,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_fuzzy_search_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2586408642)
+    }
+    self := self
+    enabled_ := enabled_
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+popup_menu_is_search_bar_fuzzy_search_enabled :: proc "contextless" (
+    self: Popup_Menu,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("is_search_bar_fuzzy_search_enabled", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 36873697)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+popup_menu_set_search_bar_fuzzy_search_max_misses :: proc "contextless" (
+    self: Popup_Menu,
+    max_misses_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_search_bar_fuzzy_search_max_misses", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    max_misses_ := max_misses_
+    args := []__bindgen_gde.TypePtr {
+        &max_misses_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+popup_menu_get_search_bar_fuzzy_search_max_misses :: proc "contextless" (
+    self: Popup_Menu,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_search_bar_fuzzy_search_max_misses", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1835,6 +2011,12 @@ popup_menu_set_system_menu_id :: proc "contextless" (self: Popup_Menu, value: Na
 }
 popup_menu_get_prefer_native_menu :: proc "contextless" (self: Popup_Menu) -> Bool {
     return popup_menu_is_prefer_native_menu(self)
+}
+popup_menu_get_search_bar_enabled :: proc "contextless" (self: Popup_Menu) -> Bool {
+    return popup_menu_is_search_bar_enabled(self)
+}
+popup_menu_get_search_bar_fuzzy_search_enabled :: proc "contextless" (self: Popup_Menu) -> Bool {
+    return popup_menu_is_search_bar_fuzzy_search_enabled(self)
 }
 
 // Only interns the class StringName (used for object construction and as the

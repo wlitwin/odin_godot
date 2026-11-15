@@ -16,7 +16,7 @@ sub_viewport_container_name :: proc "contextless" () -> String_Name {
 }
 
 new_sub_viewport_container :: proc "contextless" () -> Sub_Viewport_Container {
-    return __bindgen_gde.classdb_construct_object(sub_viewport_container_name_ref())
+    return cast(Sub_Viewport_Container)__bindgen_gde.classdb_construct_object(sub_viewport_container_name_ref())
 }
 
 // methods
@@ -116,7 +116,9 @@ sub_viewport_container_get_stretch_shrink :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

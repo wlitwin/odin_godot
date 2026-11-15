@@ -34,6 +34,12 @@ Canvas_Item_Clip_Children_Mode :: enum int {
     Clip_Children_And_Draw = 2,
     Clip_Children_Max = 3,
 }
+Canvas_Item_Oversampling_With_Scale :: enum int {
+    Oversampling_With_Scale_Parent_Node = 0,
+    Oversampling_With_Scale_Disabled = 1,
+    Oversampling_With_Scale_Enabled = 2,
+    Oversampling_With_Scale_Max = 3,
+}
 
 
 
@@ -46,7 +52,7 @@ canvas_item_name :: proc "contextless" () -> String_Name {
 }
 
 new_canvas_item :: proc "contextless" () -> Canvas_Item {
-    return __bindgen_gde.classdb_construct_object(canvas_item_name_ref())
+    return cast(Canvas_Item)__bindgen_gde.classdb_construct_object(canvas_item_name_ref())
 }
 
 // methods
@@ -260,7 +266,9 @@ canvas_item_get_light_mask :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -356,7 +364,9 @@ canvas_item_get_z_index :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -1065,13 +1075,13 @@ canvas_item_draw_string :: proc "contextless" (
     font_ := font_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     modulate_ := modulate_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &font_,
@@ -1114,15 +1124,15 @@ canvas_item_draw_multiline_string :: proc "contextless" (
     font_ := font_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     max_lines_ := max_lines_
     modulate_ := modulate_
-    brk_flags_ := brk_flags_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    brk_flags_ := Int(brk_flags_)
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &font_,
@@ -1166,14 +1176,14 @@ canvas_item_draw_string_outline :: proc "contextless" (
     font_ := font_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     size_ := size_
     modulate_ := modulate_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &font_,
@@ -1218,16 +1228,16 @@ canvas_item_draw_multiline_string_outline :: proc "contextless" (
     font_ := font_
     pos_ := pos_
     text_ := text_
-    alignment_ := alignment_
+    alignment_ := Int(alignment_)
     width_ := width_
     font_size_ := font_size_
     max_lines_ := max_lines_
     size_ := size_
     modulate_ := modulate_
-    brk_flags_ := brk_flags_
-    justification_flags_ := justification_flags_
-    direction_ := direction_
-    orientation_ := orientation_
+    brk_flags_ := Int(brk_flags_)
+    justification_flags_ := Int(justification_flags_)
+    direction_ := Int(direction_)
+    orientation_ := Int(orientation_)
     oversampling_ := oversampling_
     args := []__bindgen_gde.TypePtr {
         &font_,
@@ -1865,7 +1875,9 @@ canvas_item_get_visibility_layer :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -1917,7 +1929,7 @@ canvas_item_set_texture_filter :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1037999706)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1935,7 +1947,9 @@ canvas_item_get_texture_filter :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Texture_Filter(__return_storage)
     return
 }
 
@@ -1949,7 +1963,7 @@ canvas_item_set_texture_repeat :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1716472974)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1967,7 +1981,9 @@ canvas_item_get_texture_repeat :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Texture_Repeat(__return_storage)
     return
 }
 
@@ -1981,7 +1997,7 @@ canvas_item_set_clip_children_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1319393776)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -1999,7 +2015,43 @@ canvas_item_get_clip_children_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Clip_Children_Mode(__return_storage)
+    return
+}
+
+canvas_item_set_oversampling_with_scale :: proc "contextless" (
+    self: Canvas_Item,
+    enabled_: Canvas_Item_Oversampling_With_Scale,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_oversampling_with_scale", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 872218804)
+    }
+    self := self
+    enabled_ := Int(enabled_)
+    args := []__bindgen_gde.TypePtr {
+        &enabled_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+canvas_item_get_oversampling_with_scale :: proc "contextless" (
+    self: Canvas_Item,
+) -> (ret: Canvas_Item_Oversampling_With_Scale) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_oversampling_with_scale", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2026097197)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Canvas_Item_Oversampling_With_Scale(__return_storage)
     return
 }
 

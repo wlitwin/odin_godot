@@ -152,7 +152,7 @@ multi_mesh_set_transform_format :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2404750322)
     }
     self := self
-    format_ := format_
+    format_ := Int(format_)
     args := []__bindgen_gde.TypePtr {
         &format_,
     }
@@ -170,7 +170,9 @@ multi_mesh_get_transform_format :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Multi_Mesh_Transform_Format(__return_storage)
     return
 }
 
@@ -202,7 +204,9 @@ multi_mesh_get_instance_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -234,7 +238,9 @@ multi_mesh_get_visible_instance_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -248,7 +254,7 @@ multi_mesh_set_physics_interpolation_quality :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1819488408)
     }
     self := self
-    quality_ := quality_
+    quality_ := Int(quality_)
     args := []__bindgen_gde.TypePtr {
         &quality_,
     }
@@ -266,7 +272,9 @@ multi_mesh_get_physics_interpolation_quality :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Multi_Mesh_Physics_Interpolation_Quality(__return_storage)
     return
 }
 

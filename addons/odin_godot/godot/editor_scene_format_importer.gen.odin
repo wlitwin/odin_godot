@@ -3,15 +3,17 @@ package godot
 import __bindgen_gde "godot:gdext"
 
 Editor_Scene_Format_Importer_Constants :: enum {
-    IMPORT_SCENE = 1,
-    IMPORT_ANIMATION = 2,
-    IMPORT_FAIL_ON_MISSING_DEPENDENCIES = 4,
-    IMPORT_GENERATE_TANGENT_ARRAYS = 8,
-    IMPORT_USE_NAMED_SKIN_BINDS = 16,
-    IMPORT_DISCARD_MESHES_AND_MATERIALS = 32,
-    IMPORT_FORCE_DISABLE_MESH_COMPRESSION = 64,
 }
 
+Editor_Scene_Format_Importer_Import_Flags :: enum i64 {
+    Import_Scene = 1,
+    Import_Animation = 2,
+    Import_Fail_On_Missing_Dependencies = 4,
+    Import_Generate_Tangent_Arrays = 8,
+    Import_Use_Named_Skin_Binds = 16,
+    Import_Discard_Meshes_And_Materials = 32,
+    Import_Force_Disable_Mesh_Compression = 64,
+}
 
 
 editor_scene_format_importer_name_ref :: proc "contextless" () -> ^String_Name {
@@ -160,10 +162,10 @@ editor_scene_format_importer_add_import_option_advanced :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3674075649)
     }
     self := self
-    type_ := type_
+    type_ := Int(type_)
     name_ := name_
     default_value_ := default_value_
-    hint_ := hint_
+    hint_ := Int(hint_)
     hint_string_ := hint_string_
     usage_flags_ := usage_flags_
     args := []__bindgen_gde.TypePtr {

@@ -63,7 +63,7 @@ navigation_path_query_parameters2d_set_pathfinding_algorithm :: proc "contextles
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2783519915)
     }
     self := self
-    pathfinding_algorithm_ := pathfinding_algorithm_
+    pathfinding_algorithm_ := Int(pathfinding_algorithm_)
     args := []__bindgen_gde.TypePtr {
         &pathfinding_algorithm_,
     }
@@ -81,7 +81,9 @@ navigation_path_query_parameters2d_get_pathfinding_algorithm :: proc "contextles
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Navigation_Path_Query_Parameters2d_Pathfinding_Algorithm(__return_storage)
     return
 }
 
@@ -95,7 +97,7 @@ navigation_path_query_parameters2d_set_path_postprocessing :: proc "contextless"
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2864409082)
     }
     self := self
-    path_postprocessing_ := path_postprocessing_
+    path_postprocessing_ := Int(path_postprocessing_)
     args := []__bindgen_gde.TypePtr {
         &path_postprocessing_,
     }
@@ -113,7 +115,9 @@ navigation_path_query_parameters2d_get_path_postprocessing :: proc "contextless"
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Navigation_Path_Query_Parameters2d_Path_Post_Processing(__return_storage)
     return
 }
 
@@ -241,7 +245,9 @@ navigation_path_query_parameters2d_get_navigation_layers :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = u32(__return_storage)
     return
 }
 
@@ -255,7 +261,7 @@ navigation_path_query_parameters2d_set_metadata_flags :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 24274129)
     }
     self := self
-    flags_ := flags_
+    flags_ := Int(flags_)
     args := []__bindgen_gde.TypePtr {
         &flags_,
     }
@@ -273,7 +279,9 @@ navigation_path_query_parameters2d_get_metadata_flags :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Navigation_Path_Query_Parameters2d_Path_Metadata_Flags(__return_storage)
     return
 }
 
@@ -497,7 +505,9 @@ navigation_path_query_parameters2d_get_path_search_max_polygons :: proc "context
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

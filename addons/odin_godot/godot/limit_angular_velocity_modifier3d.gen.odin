@@ -16,7 +16,7 @@ limit_angular_velocity_modifier3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_limit_angular_velocity_modifier3d :: proc "contextless" () -> Limit_Angular_Velocity_Modifier3d {
-    return __bindgen_gde.classdb_construct_object(limit_angular_velocity_modifier3d_name_ref())
+    return cast(Limit_Angular_Velocity_Modifier3d)__bindgen_gde.classdb_construct_object(limit_angular_velocity_modifier3d_name_ref())
 }
 
 // methods
@@ -110,7 +110,9 @@ limit_angular_velocity_modifier3d_get_root_bone :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -186,7 +188,9 @@ limit_angular_velocity_modifier3d_get_end_bone :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &index_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -218,7 +222,9 @@ limit_angular_velocity_modifier3d_get_chain_count :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

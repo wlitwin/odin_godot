@@ -16,7 +16,7 @@ physics_body3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_physics_body3d :: proc "contextless" () -> Physics_Body3d {
-    return __bindgen_gde.classdb_construct_object(physics_body3d_name_ref())
+    return cast(Physics_Body3d)__bindgen_gde.classdb_construct_object(physics_body3d_name_ref())
 }
 
 // methods
@@ -127,7 +127,7 @@ physics_body3d_set_axis_lock :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1787895195)
     }
     self := self
-    axis_ := axis_
+    axis_ := Int(axis_)
     lock_ := lock_
     args := []__bindgen_gde.TypePtr {
         &axis_,
@@ -146,7 +146,7 @@ physics_body3d_get_axis_lock :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2264617709)
     }
     self := self
-    axis_ := axis_
+    axis_ := Int(axis_)
     args := []__bindgen_gde.TypePtr {
         &axis_,
     }

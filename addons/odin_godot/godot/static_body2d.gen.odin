@@ -16,7 +16,7 @@ static_body2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_static_body2d :: proc "contextless" () -> Static_Body2d {
-    return __bindgen_gde.classdb_construct_object(static_body2d_name_ref())
+    return cast(Static_Body2d)__bindgen_gde.classdb_construct_object(static_body2d_name_ref())
 }
 
 // methods

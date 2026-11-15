@@ -108,7 +108,7 @@ compositor_effect_set_effect_callback_type :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1390728419)
     }
     self := self
-    effect_callback_type_ := effect_callback_type_
+    effect_callback_type_ := Int(effect_callback_type_)
     args := []__bindgen_gde.TypePtr {
         &effect_callback_type_,
     }
@@ -126,7 +126,9 @@ compositor_effect_get_effect_callback_type :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Compositor_Effect_Effect_Callback_Type(__return_storage)
     return
 }
 

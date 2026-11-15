@@ -16,7 +16,7 @@ instance_placeholder_name :: proc "contextless" () -> String_Name {
 }
 
 new_instance_placeholder :: proc "contextless" () -> Instance_Placeholder {
-    return __bindgen_gde.classdb_construct_object(instance_placeholder_name_ref())
+    return cast(Instance_Placeholder)__bindgen_gde.classdb_construct_object(instance_placeholder_name_ref())
 }
 
 // methods

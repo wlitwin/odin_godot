@@ -184,24 +184,6 @@ script_extension__placeholder_instance_create :: proc "contextless" (
     return
 }
 
-script_extension__instance_has :: proc "contextless" (
-    self: Script_Extension,
-    object_: Object,
-) -> (ret: Bool) {
-    @(static) __ptr: __bindgen_gde.MethodBindPtr
-    if __ptr == nil {
-        _gde_name := new_string_name_cstring("_instance_has", true)
-        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 397768994)
-    }
-    self := self
-    object_ := object_
-    args := []__bindgen_gde.TypePtr {
-        &object_,
-    }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
-    return
-}
-
 script_extension__has_source_code :: proc "contextless" (
     self: Script_Extension,
 ) -> (ret: Bool) {
@@ -263,7 +245,9 @@ script_extension__reload :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &keep_state_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Error(__return_storage)
     return
 }
 
@@ -571,7 +555,9 @@ script_extension__get_member_line :: proc "contextless" (
     args := []__bindgen_gde.TypePtr {
         &member_,
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -630,6 +616,24 @@ script_extension__get_rpc_config :: proc "contextless" (
     }
     self := self
     args := []__bindgen_gde.TypePtr {
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    return
+}
+
+script_extension__instance_has :: proc "contextless" (
+    self: Script_Extension,
+    object_: Object,
+) -> (ret: Bool) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("_instance_has", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 397768994)
+    }
+    self := self
+    object_ := object_
+    args := []__bindgen_gde.TypePtr {
+        &object_,
     }
     __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
     return

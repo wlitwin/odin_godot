@@ -1,0 +1,39 @@
+--- a/src/core.c
++++ b/src/core.c
+@@ -230,6 +230,10 @@
+ 
+ void* b3AllocZero( size_t size )
+ {
++	if ( size == 0 )
++	{
++		return NULL;
++	}
+ 	void* mem = b3Alloc( size );
+ 	memset( mem, 0, size );
+ 	return mem;
+--- a/src/compound.c
++++ b/src/compound.c
+@@ -585,7 +585,10 @@
+ 	}
+ 
+ 	b3HullInstance* destinationHullInstances = (b3HullInstance*)( (intptr_t)compound + hullArrayOffset );
+-	memcpy( destinationHullInstances, hullInstances, hullCount * sizeof( b3HullInstance ) );
++	if ( hullCount > 0 )
++	{
++		memcpy( destinationHullInstances, hullInstances, hullCount * sizeof( b3HullInstance ) );
++	}
+ 
+ 	for ( int i = 0; i < sharedHullCount; ++i )
+ 	{
+@@ -609,7 +612,10 @@
+ 	}
+ 
+ 	b3MeshInstance* destinationMeshInstances = (b3MeshInstance*)( (intptr_t)compound + meshArrayOffset );
+-	memcpy( destinationMeshInstances, meshInstances, meshCount * sizeof( b3MeshInstance ) );
++	if ( meshCount > 0 )
++	{
++		memcpy( destinationMeshInstances, meshInstances, meshCount * sizeof( b3MeshInstance ) );
++	}
+ 
+ 	if ( meshMaterialTotal > 0 )
+ 	{

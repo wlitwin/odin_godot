@@ -8,5 +8,5 @@ import "godot:godot"
 // stays correctly typed. Windows would use `CaptureStackBackTrace` + `SymFromAddr`; web has
 // no native stack to walk. See core/debug.odin for the darwin/linux implementation.
 debug_capture_odin_stack :: proc(skip := 0) -> godot.Array {
-	return godot.new_array_default()
+    return godot.new_array_default()
 }

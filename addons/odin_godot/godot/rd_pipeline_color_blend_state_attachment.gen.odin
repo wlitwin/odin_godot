@@ -94,7 +94,7 @@ rd_pipeline_color_blend_state_attachment_set_src_color_blend_factor :: proc "con
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2251019273)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -112,7 +112,9 @@ rd_pipeline_color_blend_state_attachment_get_src_color_blend_factor :: proc "con
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Blend_Factor(__return_storage)
     return
 }
 
@@ -126,7 +128,7 @@ rd_pipeline_color_blend_state_attachment_set_dst_color_blend_factor :: proc "con
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2251019273)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -144,7 +146,9 @@ rd_pipeline_color_blend_state_attachment_get_dst_color_blend_factor :: proc "con
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Blend_Factor(__return_storage)
     return
 }
 
@@ -158,7 +162,7 @@ rd_pipeline_color_blend_state_attachment_set_color_blend_op :: proc "contextless
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3073022720)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -176,7 +180,9 @@ rd_pipeline_color_blend_state_attachment_get_color_blend_op :: proc "contextless
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Blend_Operation(__return_storage)
     return
 }
 
@@ -190,7 +196,7 @@ rd_pipeline_color_blend_state_attachment_set_src_alpha_blend_factor :: proc "con
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2251019273)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -208,7 +214,9 @@ rd_pipeline_color_blend_state_attachment_get_src_alpha_blend_factor :: proc "con
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Blend_Factor(__return_storage)
     return
 }
 
@@ -222,7 +230,7 @@ rd_pipeline_color_blend_state_attachment_set_dst_alpha_blend_factor :: proc "con
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2251019273)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -240,7 +248,9 @@ rd_pipeline_color_blend_state_attachment_get_dst_alpha_blend_factor :: proc "con
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Blend_Factor(__return_storage)
     return
 }
 
@@ -254,7 +264,7 @@ rd_pipeline_color_blend_state_attachment_set_alpha_blend_op :: proc "contextless
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3073022720)
     }
     self := self
-    p_member_ := p_member_
+    p_member_ := Int(p_member_)
     args := []__bindgen_gde.TypePtr {
         &p_member_,
     }
@@ -272,7 +282,9 @@ rd_pipeline_color_blend_state_attachment_get_alpha_blend_op :: proc "contextless
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Rendering_Device_Blend_Operation(__return_storage)
     return
 }
 

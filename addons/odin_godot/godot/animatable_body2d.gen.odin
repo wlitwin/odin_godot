@@ -16,7 +16,7 @@ animatable_body2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_animatable_body2d :: proc "contextless" () -> Animatable_Body2d {
-    return __bindgen_gde.classdb_construct_object(animatable_body2d_name_ref())
+    return cast(Animatable_Body2d)__bindgen_gde.classdb_construct_object(animatable_body2d_name_ref())
 }
 
 // methods

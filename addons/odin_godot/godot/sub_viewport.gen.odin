@@ -28,7 +28,7 @@ sub_viewport_name :: proc "contextless" () -> String_Name {
 }
 
 new_sub_viewport :: proc "contextless" () -> Sub_Viewport {
-    return __bindgen_gde.classdb_construct_object(sub_viewport_name_ref())
+    return cast(Sub_Viewport)__bindgen_gde.classdb_construct_object(sub_viewport_name_ref())
 }
 
 // methods
@@ -146,6 +146,40 @@ sub_viewport_is_size_2d_override_stretch_enabled :: proc "contextless" (
     return
 }
 
+sub_viewport_set_view_count :: proc "contextless" (
+    self: Sub_Viewport,
+    view_count_: Int,
+) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("set_view_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1286410249)
+    }
+    self := self
+    view_count_ := view_count_
+    args := []__bindgen_gde.TypePtr {
+        &view_count_,
+    }
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), nil)
+}
+
+sub_viewport_get_view_count :: proc "contextless" (
+    self: Sub_Viewport,
+) -> (ret: i32) {
+    @(static) __ptr: __bindgen_gde.MethodBindPtr
+    if __ptr == nil {
+        _gde_name := new_string_name_cstring("get_view_count", true)
+        __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 3905245786)
+    }
+    self := self
+    args := []__bindgen_gde.TypePtr {
+    }
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
+    return
+}
+
 sub_viewport_set_update_mode :: proc "contextless" (
     self: Sub_Viewport,
     mode_: Sub_Viewport_Update_Mode,
@@ -156,7 +190,7 @@ sub_viewport_set_update_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 1295690030)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -174,7 +208,9 @@ sub_viewport_get_update_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Sub_Viewport_Update_Mode(__return_storage)
     return
 }
 
@@ -188,7 +224,7 @@ sub_viewport_set_clear_mode :: proc "contextless" (
         __ptr = __bindgen_gde.classdb_get_method_bind(&__class_name, &_gde_name, 2834454712)
     }
     self := self
-    mode_ := mode_
+    mode_ := Int(mode_)
     args := []__bindgen_gde.TypePtr {
         &mode_,
     }
@@ -206,7 +242,9 @@ sub_viewport_get_clear_mode :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = Sub_Viewport_Clear_Mode(__return_storage)
     return
 }
 

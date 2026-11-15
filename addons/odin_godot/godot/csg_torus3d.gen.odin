@@ -16,7 +16,7 @@ csg_torus3d_name :: proc "contextless" () -> String_Name {
 }
 
 new_csg_torus3d :: proc "contextless" () -> Csg_Torus3d {
-    return __bindgen_gde.classdb_construct_object(csg_torus3d_name_ref())
+    return cast(Csg_Torus3d)__bindgen_gde.classdb_construct_object(csg_torus3d_name_ref())
 }
 
 // methods
@@ -130,7 +130,9 @@ csg_torus3d_get_sides :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 
@@ -162,7 +164,9 @@ csg_torus3d_get_ring_sides :: proc "contextless" (
     self := self
     args := []__bindgen_gde.TypePtr {
     }
-    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &ret)
+    __return_storage: Int
+    __bindgen_gde.object_method_bind_ptrcall(__ptr, self, raw_data(args), &__return_storage)
+    ret = i32(__return_storage)
     return
 }
 

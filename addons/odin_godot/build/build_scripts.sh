@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Build the Phase 3.5 dlls via the codegen pipeline:
 #   1. build the `scriptgen` preprocessor
-#   2. run it over the scripts dir to emit `*.gen.odin` build artifacts
-#   3. build the scripts dll (nice-form sources + generated *.gen.odin together)
+#   2. run it over the scripts dir to emit its `*.gen.odin` build artifacts
+#   3. build the scripts dll (nice-form sources + the generated *.gen.odin together)
 #   4. build the core ScriptLanguageExtension dll
 #
 # SINGLE-FILE: the authored `res://scripts/*.odin` are themselves the resources attached
-# to nodes (the loader binds them via their `//gd:class` marker); no resource stubs.
+# to nodes (the loader binds them by canonical source path); no resource stubs.
 #
 # Generalizes build/build_phase3.sh. Run inside the Nix dev shell, e.g.:
 #   nix develop --command bash -c 'bash build/build_scripts.sh'
@@ -25,6 +25,19 @@ PROJ="${1:-$ROOT/tests/phase35}"
 SCRIPTS="${2:-$PROJ/scripts}"
 BIN="$PROJ/bin"
 mkdir -p "$BIN"
+
+# Every module must resolve the same backend as the core, including installed
+# addons whose prebuilt core lives outside the consumer's scripts/bin folder.
+CORE_DLL="$BIN/libodin_godot.$DLL_EXT"
+if [[ "$ROOT" == */addons/odin_godot ]]; then
+    case "$DLL_EXT" in
+        dylib) CORE_PLAT=macos ;;
+        so) CORE_PLAT=linux ;;
+        dll) CORE_PLAT=windows ;;
+    esac
+    CORE_DLL="$ROOT/bin/$CORE_PLAT/libodin_godot.$DLL_EXT"
+fi
+BOX3D_RUNTIME_DIR="$(dirname "$CORE_DLL")"
 
 # Actionable failure when there are no scripts to compile (the #1 first-run snag): odin_godot
 # ships the engine CORE prebuilt — your .odin gameplay scripts are YOURS and live in a
@@ -77,14 +90,40 @@ dll_leaf_for_dir() {
 # forwards extra odin flags to the scripts builds ONLY — e.g. `-define:RELOAD_V=2`.
 BUILT_DLLS=()
 build_one_scripts_dir() {
-    local dir="$1" out
+    local dir="$1" out attempt before after gen_rc build_rc
     check_module_isolation "$dir"
-    run_scriptgen "$dir"
     out="$BIN/$(dll_leaf_for_dir "$dir")"
-    atomic_odin_dll "$dir" "$out" \
-        ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
-        -debug ${SCRIPT_BUILD_FLAGS:-}
-    BUILT_DLLS+=("$out")
+
+    # Treat generation + compilation as one source-tree transaction. Editor saves are
+    # coalesced, but files can still be created/deleted while this process is compiling.
+    # The generated #load_hash guard correctly rejects that stale snapshot; retry it here
+    # (at most twice) instead of reporting a false compiler failure to the editor.
+    for attempt in 1 2 3; do
+        before="$(authored_sources_fingerprint "$dir" 2>/dev/null || true)"
+        gen_rc=0
+        run_scriptgen "$dir" "$PROJ" || gen_rc=$?
+        build_rc="$gen_rc"
+        if [[ "$gen_rc" == "0" ]]; then
+            atomic_odin_dll "$dir" "$out" \
+                ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
+                -debug ${SCRIPT_BUILD_FLAGS:-} || build_rc=$?
+        fi
+        after="$(authored_sources_fingerprint "$dir" 2>/dev/null || true)"
+
+        if [[ -n "$before" && -n "$after" && "$before" != "$after" ]]; then
+            if [[ "$attempt" -lt "3" ]]; then
+                echo "build_scripts: authored sources changed during build; regenerating (attempt $((attempt + 1))/3)" >&2
+                continue
+            fi
+            echo "build_scripts: authored sources kept changing during 3 build attempts; save again when the edit burst settles" >&2
+            return 1
+        fi
+        if [[ "$build_rc" != "0" ]]; then
+            return "$build_rc"
+        fi
+        BUILT_DLLS+=("$out")
+        return 0
+    done
 }
 
 # 2+3. Build the requested scripts dir; when it is the MAIN one, also build each
@@ -110,6 +149,9 @@ if [[ "$IS_MODULE_DIR" == "0" && "${BUILD_MODULES:-1}" != "0" && -d "$PROJ/modul
 fi
 
 if [[ "${SKIP_CORE:-0}" == "1" ]]; then
+    if [[ -n "${BOX3D_NATIVE_LIBRARY:-}" ]]; then
+        python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
+    fi
     echo "Built (scripts only):"
     for d in "${BUILT_DLLS[@]}"; do echo "  $d"; done
     exit 0
@@ -117,9 +159,18 @@ fi
 
 # 4. Build the core ScriptLanguageExtension dll (same atomic temp+mv publish as the scripts
 #    dlls above, so a failed/interrupted core build never deletes the live core dll either).
-CORE_DLL="$BIN/libodin_godot.$DLL_EXT"
+# CONSUMER LAYOUT: an addon install's .gdextension loads the core from
+# addons/odin_godot/bin/<platform>/ — a core built to the project's bin/ is
+# dead weight there (a fixed core "didn't take" for a full debugging hour).
+# Publish the core where the manifest actually points.
 atomic_odin_dll "$ROOT/core" "$CORE_DLL" -debug
+if [[ -n "${BOX3D_NATIVE_LIBRARY:-}" ]]; then
+    python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
+fi
 
 echo "Built:"
 echo "  $CORE_DLL"
 for d in "${BUILT_DLLS[@]}"; do echo "  $d"; done
+
+# Optional Replay authoring UI; projects opt in with replay_authoring.json.
+if [[ -f "$PROJ/replay_authoring.json" ]];then python3 "$ROOT/replay/editor/install.py" "$PROJ";fi

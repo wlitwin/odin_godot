@@ -16,7 +16,7 @@ script_create_dialog_name :: proc "contextless" () -> String_Name {
 }
 
 new_script_create_dialog :: proc "contextless" () -> Script_Create_Dialog {
-    return __bindgen_gde.classdb_construct_object(script_create_dialog_name_ref())
+    return cast(Script_Create_Dialog)__bindgen_gde.classdb_construct_object(script_create_dialog_name_ref())
 }
 
 // methods

@@ -16,7 +16,7 @@ marker2d_name :: proc "contextless" () -> String_Name {
 }
 
 new_marker2d :: proc "contextless" () -> Marker2d {
-    return __bindgen_gde.classdb_construct_object(marker2d_name_ref())
+    return cast(Marker2d)__bindgen_gde.classdb_construct_object(marker2d_name_ref())
 }
 
 // methods

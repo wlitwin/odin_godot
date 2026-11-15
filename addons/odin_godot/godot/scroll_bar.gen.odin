@@ -16,7 +16,7 @@ scroll_bar_name :: proc "contextless" () -> String_Name {
 }
 
 new_scroll_bar :: proc "contextless" () -> Scroll_Bar {
-    return __bindgen_gde.classdb_construct_object(scroll_bar_name_ref())
+    return cast(Scroll_Bar)__bindgen_gde.classdb_construct_object(scroll_bar_name_ref())
 }
 
 // methods
