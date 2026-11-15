@@ -74,17 +74,18 @@ receive-only observer through its separate invitation.
 | Input | Action |
 | --- | --- |
 | WASD / arrows | Drive relative to the camera |
-| Aim and hold left mouse | Pull eligible cargo within reach |
+| Hold left mouse | Grab the nearest available load to your robot and haul it within reach |
 | Space | Acknowledged boost action with cooldown |
-| 1 / 2 / 3 | Select a load for aim height; hold to aim directly at it |
 | F2 | Local sound, camera distance and reduced-effects settings |
 | Escape | Crew / leave menu while the shared job continues |
 | F3 | Actual session diagnostics |
 
-Mint is player1; coral is player2. Pull together up the ramp and match each load
-to its bay. Release the magnet and allow two seconds to latch. The long load
-benefits from both players. Robots recover after a fall; lost cargo reduces the
-payout. Jobs have a150-second deadline, three loads and payouts. At results the
+Mint is player1; coral is player2. Holding left mouse keeps the same load selected
+until you release; the mouse position does not affect the magnet. Pull together
+up the ramp and match each load to its bay. Release the magnet and allow two
+seconds to latch. The long load benefits from both players. Robots recover after
+a fall; lost cargo reduces the payout. Jobs have a150-second deadline, three loads
+and payouts. At results the
 host can retry or select the next of three arrangements through a Replay action.
 
 Host loss or expired hosting permission ends the job and offers **Start a New

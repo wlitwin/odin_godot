@@ -1,5 +1,17 @@
 # Presentation evidence
 
+`controls.py` stages the actual view, authored visuals and display settings in a
+temporary project and exercises real Godot input events with a copied-state
+fixture and control sink. It checks nearest-load selection for each robot,
+retaining a moving load until release, reacquisition, delivered/lost exclusions,
+menu/settings/observer suppression, movement/boost while hauling and instruction
+layout at seven window sizes. It requires no Native library and supplies no
+physics or network verdict.
+
+```sh
+python3 -B tests/replay_dockyard/presentation/controls.py --godot "$GODOT"
+```
+
 `run.py` reuses the bounded online runner and actual production menu inputs. It
 opens two headed Chrome processes with rendering enabled and without software-GL
 fallback flags, records the actual WebGL renderer/viewport/DPR, captures play and

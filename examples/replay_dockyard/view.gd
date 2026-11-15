@@ -14,7 +14,7 @@ var result: Label
 var result_box: VBoxContainer
 var retry_button: Button
 var next_button: Button
-var selected_cargo := 0
+var grabbed_cargo := ""
 var local_host := true
 var cargo_clamps: Dictionary = {}
 var bay_materials: Array[StandardMaterial3D] = []
@@ -324,9 +324,9 @@ func _ready() -> void:
 	rows.add_child(vertical_space)
 	var help := panel(rows,650)
 	help_panel = help.get_parent()
-	hint = text(help,"WASD / arrows   MOVE     ·     mouse + hold   MAGNET",16,Color("e6f1f2"))
+	hint = text(help,"WASD / arrows   MOVE     ·     hold left mouse   GRAB NEAREST",16,Color("e6f1f2"))
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var help_detail := text(help,"Space  BOOST    ·    1 / 2 / 3  AIM    ·    Match each load to its bay; release to latch.",14,Color("9bb9c6"))
+	var help_detail := text(help,"Space  BOOST    ·    Hold to haul the nearest load; release in its matching bay to latch.",14,Color("9bb9c6"))
 	help_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var help_flow := text(help,"1 GRAB  /  2 HAUL TO THE MATCHING BAY  /  3 RELEASE & SETTLE.     F2 settings · Esc crew · F3 diagnostics",13,Color("b1d8d2"))
 	help_flow.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -544,12 +544,40 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		settings_box.get_parent().visible=not settings_box.get_parent().visible
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_ESCAPE:
 		menu_open=not menu_open
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode>=KEY_1 and event.keycode<=KEY_3:
-			selected_cargo=event.keycode-KEY_1
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_F3:
 		debug_visible = not debug_visible
 		debug.visible = debug_visible
+
+func magnet_target(value: Dictionary, held: bool) -> String:
+	if not held or str(value.get("phase",""))!="Working":
+		grabbed_cargo=""
+		return ""
+	var cargo_names := ["cargo_a","cargo_b","cargo_long"]
+	var delivered: Array=value.get("delivered",[false,false,false])
+	var lost: Array=value.get("lost",[false,false,false])
+	if grabbed_cargo.is_empty():
+		var robot := "robot_a" if local_host else "robot_b"
+		if not last_positions.has(robot):
+			return ""
+		var origin: Vector3=last_positions[robot]+Vector3(0,.25,0)
+		var nearest_distance := INF
+		for index in range(3):
+			var key: String=cargo_names[index]
+			if bool(delivered[index]) or bool(lost[index]) or not last_positions.has(key):
+				continue
+			var position: Vector3=last_positions[key]
+			var distance := origin.distance_squared_to(position)
+			if distance<nearest_distance:
+				nearest_distance=distance
+				grabbed_cargo=key
+	if grabbed_cargo.is_empty():
+		return ""
+	var selected := cargo_names.find(grabbed_cargo)
+	if bool(delivered[selected]) or bool(lost[selected]) or not last_positions.has(grabbed_cargo):
+		return ""
+	# Keep aiming at this load until release, even as another load gets closer.
+	# The simulation's Native ray still enforces magnet reach and obstruction.
+	return grabbed_cargo
 
 func _process(_dt: float) -> void:
 	if not pending_transition.is_empty():
@@ -630,7 +658,7 @@ func _process(_dt: float) -> void:
 			bay_materials[index].albedo_color=Color("8ce8b2") if bool(delivered[index]) else Color("4b8b83")
 		var cooldown: Array=value.get("cooldown",[0,0])
 		var seat_index := 0 if local_host else 1
-		hint.text="WASD / arrows  MOVE   ·   mouse + hold  MAGNET   ·   BOOST %s" % ("READY" if int(cooldown[seat_index])==0 else "CHARGING")
+		hint.text="WASD / arrows  MOVE   ·   hold left mouse  GRAB NEAREST   ·   BOOST %s" % ("READY" if int(cooldown[seat_index])==0 else "CHARGING")
 		result_box.get_parent().visible=phase=="Results"
 		result.text=("PERFECT HAUL!" if score==3 else "SHIFT COMPLETE")+"\n%d / 3 LOADS  ·  $%d" % [score,payout]
 		if not local_host:
@@ -663,6 +691,7 @@ func _process(_dt: float) -> void:
 	if OS.get_environment("BOX3D_SAMPLE_SCRIPTED")=="1" or OS.get_environment("DOCKYARD_AUTOCAPTURE")=="1" or (OS.has_feature("web") and str(JavaScriptBridge.eval("new URLSearchParams(location.search).get('scripted')||'0'",true))=="1"):
 		return
 	if in_menu or settings_box.get_parent().visible or (status is Dictionary and str(status.get("role",""))=="observer"):
+		grabbed_cargo=""
 		sample.call("control",0,0,0,0,0,false,false)
 		return
 	var axes := Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
@@ -673,15 +702,6 @@ func _process(_dt: float) -> void:
 	var move := right.normalized()*axes.x + back.normalized()*axes.y
 	if move.length()>1:
 		move=move.normalized()
-	var mouse := get_viewport().get_mouse_position()
-	var selected_key: String=["cargo_a","cargo_b","cargo_long"][selected_cargo]
-	var selected_position: Vector3=last_positions.get(selected_key,Vector3(0,.5,0))
-	var aim: Variant = Plane(Vector3.UP,selected_position.y).intersects_ray(camera.project_ray_origin(mouse),camera.project_ray_normal(mouse))
-	var point: Vector3 = aim if aim is Vector3 else Vector3.ZERO
-	# Keyboard cargo selection is an aiming aid over copied presentation only.
-	# Native ray queries still decide what the magnet can actually grab.
-	if Input.is_physical_key_pressed(KEY_1) or Input.is_physical_key_pressed(KEY_2) or Input.is_physical_key_pressed(KEY_3):
-		var cargo: String=["cargo_a","cargo_b","cargo_long"][selected_cargo]
-		if last_positions.has(cargo):
-			point=last_positions[cargo]
-	sample.call("control",roundi(move.x*100),roundi(move.z*100),roundi(point.x*100),roundi(point.y*100),roundi(point.z*100),Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT),Input.is_physical_key_pressed(KEY_SPACE))
+	var target := magnet_target(value if value is Dictionary else {},Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
+	var point: Vector3=last_positions[target] if not target.is_empty() else Vector3.ZERO
+	sample.call("control",roundi(move.x*100),roundi(move.z*100),roundi(point.x*100),roundi(point.y*100),roundi(point.z*100),not target.is_empty(),Input.is_physical_key_pressed(KEY_SPACE))
