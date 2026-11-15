@@ -8,6 +8,7 @@
 #include "box3d/collision.h"
 #include "broad_phase.h"
 #include "contact.h"
+#include "core.h"
 #include "joint.h"
 #include "owned_snapshot.h"
 #include "physics_world.h"
@@ -1019,6 +1020,8 @@ int main(void) {
   ogb3_world initialize = world_new();
   OK(ogb3_world_destroy(initialize));
   b3SetAllocator(alloc_fn, free_fn);
+  CHECK(b3AllocZero(0) == NULL);
+  CHECK(active_bytes == 0);
   block_allocator_alignment();
   broadphase_last_move_destroy();
   dump_contract();

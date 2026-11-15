@@ -81,6 +81,19 @@
       "output_files": {
         "src/world_snapshot.c": "13ec30c5f0a1ece40d8c00269fc497595f332c27c3321220bda897ab6daf8a49"
       }
+    },
+    {
+      "path": "box3d/native/patches/zero_size_memory.patch",
+      "sha256": "1937fc22108d6eccff91ab8e1f1308a7dd0a66be526866b2a018d7e40b093f4b",
+      "reason": "Preserve the allocator null result for zero-byte requests without clearing it, and skip absent hull/mesh instance copies in compound geometries; avoid null C library arguments at the shared allocation/copy boundaries.",
+      "base_files": {
+        "src/core.c": "61a7fd150194f960304388ddbaca425f2a1e2739813bd9497d5256b741895a0c",
+        "src/compound.c": "4e25b9ee118dc0e83f9a58e01300ffcff0ebc2261afd300876b7a682d7759059"
+      },
+      "output_files": {
+        "src/core.c": "2d309c472ca70191e1d08d279a735055cf3c392ee190920c543af3fc4cebdd29",
+        "src/compound.c": "e3c70227f63331b203951ed846bf25ed5a0c1212fb9d57f84e58b1aeddb59360"
+      }
     }
   ]
 }
