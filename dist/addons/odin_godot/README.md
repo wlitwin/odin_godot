@@ -4,6 +4,10 @@ Attach [Odin](https://odin-lang.org) `.odin` scripts to nodes in Godot 4.7+.
 The addon registers `_ready`, `_process`, signals, `@export`, and methods
 with the engine. The scripts compile into a native library.
 
+Prebuilt desktop cores target macOS arm64, Linux x86-64, and Windows x86-64.
+The release consumer check runs on macOS; Linux and Windows cores are
+cross-build checked, with runtime validation still required on those targets.
+
 This guide is for an installed addon at `res://addons/odin_godot/`. Godot
 discovers `odin_godot.gdextension`; install the Odin toolchain and build a
 scripts library using the steps below. The full reference is in

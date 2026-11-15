@@ -9,7 +9,7 @@ export target. See [exporting.md](exporting.md) for the export procedure.
 >
 > | Platform | Cross-BUILD | Runtime |
 > |----------|-------------|---------|
-> | macOS (arm64/universal) | native | **verified** (full test suite + exported `.app`) |
+> | macOS arm64 | native | **verified** (full test suite + exported `.app`) |
 > | Web / WASM | native (emscripten) | **verified in a real browser** |
 > | Linux x86-64 | **cross-build verified** (ELF `.so`, entry symbol exported) | **not run here** (needs a Linux host / CI) |
 > | Windows x86-64 | **cross-build verified** (PE `.dll`, entry symbol exported) | **not run here** (needs Windows / CI) |
