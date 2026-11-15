@@ -84,6 +84,18 @@ if ! grep -q "BTPROBE_OK" <<<"$BT_OUT"; then
     exit 1
 fi
 
+# Keep malformed ELF bounds, cache reuse, and generation retirement covered in
+# the required native job as well as the live stack/symbol probe above.
+SYMBOL_LOG="$ROOT/tests/.logs/debug-symbol-tests.log"
+if ! odin test "$ROOT/tests/debug_symbols" -collection:godot="$ROOT" \
+    -define:ODIN_TEST_THREADS=1 -out:"$ROOT/tests/.logs/debug-symbol-tests" \
+    >"$SYMBOL_LOG" 2>&1; then
+    cat "$SYMBOL_LOG"
+    echo "debug: FAIL — symbol parser/cache regressions failed"
+    exit 1
+fi
+echo "DEBUG_SYMBOLS_OK"
+
 # ---------------------------------------------------------------------------
 # (B) LLDB — break on coin_collect under a real physics collect. GATED.
 # ---------------------------------------------------------------------------
