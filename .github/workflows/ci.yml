@@ -80,10 +80,11 @@ jobs:
       - name: Verify Bash and PowerShell build-helper parity
         run: nix develop .#build-parity --command bash tests/build_helpers/run.sh
 
-      - name: Verify suite reporting and native fixture selection
+      - name: Verify suite reporting and native fixture helpers
         run: |
           nix develop --command python3 -m unittest discover -s tests/suite_runner -v
           nix develop --command python3 -m unittest discover -s tests -p platform_test.py -v
+          nix develop --command python3 -m unittest discover -s tests -p import_project_test.py -v
 
       - name: Run the suite
         run: xvfb-run -a -s '-screen 0 1280x720x24' env SKIP_WEB=1 LIBGL_ALWAYS_SOFTWARE=1 nix develop --command bash tests/run_all.sh

@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 PROJ="$ROOT/examples/replay_scrapyard"
 COORD="$ROOT/tests/replay_migration"
 expected_content="$(python3 -c 'import re,sys;print(re.search(r"CONTENT :: u64\(0x([0-9a-fA-F]+)\)",open(sys.argv[1]).read())[1].lower())' "$PROJ/shared/game/game.odin")"
@@ -17,8 +18,7 @@ case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac
 if [[ "${REPLAY_PREBUILT:-0}" != 1 ]]; then
 for project in "$PROJ" "$COORD"; do
   import_log="$work/import-${project##*/}.log"
-  if ! ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext" "$GODOT" --headless --path "$project" --editor --quit-after 120 >"$import_log" 2>&1; then cat "$import_log"; exit 1; fi
-  if grep -Eq 'SCRIPT ERROR|ERROR:' "$import_log"; then cat "$import_log"; exit 1; fi
+  odin_godot_test_import "$project" "$project/bin/libodinscripts.$ext" "$import_log"
   python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/import-build-${project##*/}.json"
   bash "$ROOT/build/build_scripts.sh" "$project"
 done

@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 PROJ="$ROOT/examples/replay_slopball3d"
 COORD="$ROOT/tests/replay_migration"
 work="$(mktemp -d)"
@@ -14,8 +15,7 @@ trap cleanup EXIT
 if [[ "${REPLAY_PREBUILT:-0}" != 1 ]]; then bash "$ROOT/build/build_scripts.sh" "$PROJ"; bash "$ROOT/build/build_scripts.sh" "$COORD"; fi
 case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac
 for project in "$PROJ" "$COORD"; do
-  if ! ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext" "$GODOT" --headless --path "$project" --editor --quit-after 120 >"$work/import.log" 2>&1; then cat "$work/import.log"; exit 1; fi
-  if grep -Eq 'SCRIPT ERROR|ERROR:' "$work/import.log"; then cat "$work/import.log"; exit 1; fi
+  odin_godot_test_import "$project" "$project/bin/libodinscripts.$ext" "$work/import-${project##*/}.log"
 done
 export REPLAY_MIGRATION_GAME=slopball3d
 modes=(planned crash)
