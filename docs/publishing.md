@@ -59,10 +59,13 @@ Suggested asset description:
 # 1. bump `version` in build/dist.nix, commit everything
 # 2.
 bash build/release.sh --tag
-git push origin main release --tags
+git push --atomic origin main release refs/tags/vVERSION
 # 3. Asset Library -> your asset -> "Edit" -> bump version + new download commit.
 #    Updates to an accepted asset are reviewed much faster than first submissions.
 ```
+
+Replace `VERSION` with the version in `build/dist.nix`, for example `0.4.0`.
+Release tags are immutable: `release.sh --tag` refuses an existing version.
 
 ## Consumer-facing notes
 

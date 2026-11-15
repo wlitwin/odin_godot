@@ -29,6 +29,10 @@ TAG=0
 VERSION="$(sed -nE 's/^ *version = "([^"]+)";/\1/p' build/dist.nix | head -1)"
 [[ -n "$VERSION" ]] || { echo "release.sh: couldn't parse version from build/dist.nix" >&2; exit 1; }
 MAIN_SHA="$(git rev-parse --short HEAD)"
+if [[ "$TAG" == "1" ]] && git show-ref --verify --quiet "refs/tags/v$VERSION"; then
+    echo "release.sh: v$VERSION already exists; bump the version before cutting another release." >&2
+    exit 1
+fi
 
 # The flake builds from the GIT state of the worktree: dirty tracked files are
 # included as-is, but UNTRACKED files are INVISIBLE to nix (a recurring gotcha).
@@ -74,12 +78,16 @@ else
 fi
 
 if [[ "$TAG" == "1" ]]; then
-    git tag -f "v$VERSION" release
+    git tag -a "v$VERSION" -m "odin_godot v$VERSION" release
     echo "release.sh: tagged v$VERSION"
 fi
 
 echo
 echo "Next (nothing has been pushed):"
-echo "  git push origin main release --tags"
+if [[ "$TAG" == "1" ]]; then
+    echo "  git push --atomic origin main release refs/tags/v$VERSION"
+else
+    echo "  git push --atomic origin main release"
+fi
 echo "  # then set the Asset Library entry's download commit to:"
 git rev-parse release

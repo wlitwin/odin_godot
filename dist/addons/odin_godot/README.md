@@ -7,7 +7,8 @@ with the engine. The scripts compile into a native library.
 This guide is for an installed addon at `res://addons/odin_godot/`. Godot
 discovers `odin_godot.gdextension`; install the Odin toolchain and build a
 scripts library using the steps below. The full reference is in
-[`docs/`](docs/index.md).
+[documentation website](https://wlitwin.github.io/odin_godot/), including the
+searchable API reference. Bundled Markdown guides are in [`docs/`](docs/index.md).
 
 Kit (`godot:kit/*`) provides multiplayer sessions, replication with prediction,
 items/combat/NPCs, save/resume, live host migration, and ENet + Steam + WebRTC
@@ -18,6 +19,13 @@ The addon also includes **Replay**, an experimental simulation-first multiplayer
 library beside Kit, and `template/replay/` as a separate starter project. See the
 [Replay guide](docs/replay.md) for its API model, supported configurations,
 and limitations.
+
+Box3D's source APIs, shared capacity profiles, and guides are included. Native
+Box3D and the current Replay Session starter use the
+[source-checkout setup](https://wlitwin.github.io/odin_godot/box3d/building.html)
+to build and select a matching backend; this addon does not include prebuilt
+Box3D backends. The ordinary Hello starter and native-free Kit/Replay libraries
+use the bundled core directly.
 
 ---
 

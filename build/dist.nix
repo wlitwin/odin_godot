@@ -24,7 +24,7 @@ let
 in
 stdenvNoCC.mkDerivation ({
   pname = "odin_godot-addon";
-  version = "0.3.0";
+  version = "0.4.0";
   inherit src;
 
   nativeBuildInputs = [ odin ]
@@ -96,6 +96,7 @@ stdenvNoCC.mkDerivation ({
     # auto-imports the godot_lldb.py pretty-printers from beside itself. The .py is not
     # a `source`d .sh, so the self-guard below can't catch a miss — keep the pair here.
     cp build/debug_game.sh build/godot_lldb.py $A/build/
+    cp build/box3d_profile.py build/box3d_capacity.py build/box3d_web_link.py $A/build/
 
     # Self-guard: every `source .../<file>` in a shipped script must resolve inside the
     # addon — a helper added to build/ but forgotten here should fail THIS build, not a
@@ -171,7 +172,7 @@ stdenvNoCC.mkDerivation ({
     # destabilizes the editor. A `.gdignore` makes Godot skip a dir (odin's path-based
     # collection resolution is unaffected). The addon root stays scannable so Godot still
     # discovers odin_godot.gdextension.
-    for d in core godot gdext libgd runtime decl flow flowgd events kit play replay scriptgen template build docs; do
+    for d in core godot gdext libgd runtime decl flow flowgd events kit play replay box3d scriptgen template build docs; do
       touch "$A/$d/.gdignore"
     done
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT
