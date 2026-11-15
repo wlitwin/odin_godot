@@ -29,10 +29,28 @@ Read [Choosing Kit or Replay](../multiplayer/index.md) before committing a new
 game's state model. A framework tutorial teaches its own concepts; learning Kit
 is not a prerequisite for Replay.
 
+## Understand multiplayer before adding features
+
+Follow [the conceptual reading path](../multiplayer/concepts/index.md) from
+authority and state through ticks, prediction, and presentation. Continue with
+the [feature walkthroughs](../multiplayer/recipes/index.md) for one problem in
+your game: movement, a contested pickup, a weapon, spawning, joining, or a round
+change.
+
+When a prototype moves beyond localhost, use the articles on
+[connections](../multiplayer/concepts/connections-and-compatibility.md),
+[bandwidth](../multiplayer/concepts/bandwidth-and-relevance.md),
+[scale](../multiplayer/concepts/performance-and-scale.md),
+[testing](../multiplayer/concepts/testing-and-debugging.md), and
+[recovery](../multiplayer/concepts/recovery-and-trust.md). These explain the
+decisions behind settings you will find in the framework references.
+
 ## Add physics or a small library
 
 - [Knock down a tower](../box3d/quickstart.md), then learn
   [who owns physics](../box3d/ownership.md) and [author collision](../box3d/authoring.md).
+- [Understand a physics world](../box3d/concepts/index.md): bodies, queries,
+  solver history, authored identity, joints, and character movement.
 - [Run a timed sequence](../libraries/flow.md), then add
   [Godot Tween steps](../libraries/flowgd.md).
 - [Publish a typed event](../events.md) for scripts inside the same library.

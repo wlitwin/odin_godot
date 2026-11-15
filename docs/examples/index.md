@@ -4,6 +4,20 @@ Choose an example for the next behavior you want to build. Start with a small
 project in your chosen framework before reading a complete game. Commands below
 run from the repository root inside `nix develop`.
 
+## Play a game first
+
+Try a complete game before opening its source, then choose one feature to trace
+through input, gameplay state, and presentation.
+
+| Game | Play in the browser | What to study next |
+| --- | --- | --- |
+| `examples/replay_dockyard` | [Dockyard on itch.io](https://itchyitches.itch.io/dockyard) | Shared cargo, cooperative hauling, and [physics simulation](../box3d/concepts/simulation-and-rollback.md) |
+| `examples/replay_scrapyard` | [Scrapyard on itch.io](https://itchyitches.itch.io/scrapyard) | Combat, pickups, and [feature walkthroughs](../multiplayer/recipes/index.md) |
+
+The [multiplayer concepts](../multiplayer/concepts/index.md) explain the design
+problems behind those features. Use the smaller projects below to learn each
+part before navigating a full game.
+
 ## Learn in steps
 
 | Step | Project | What to learn | Run or read |
@@ -44,6 +58,7 @@ additional content or native libraries.
 | `examples/replay_hello` | Replay | Copied views and occurrence cancellation |
 | `examples/replay_cavecrawl` | Replay | Party, Room, recovery, and authored content |
 | `examples/replay_scrapyard` | Replay | Feature work across content, World, actions, and presentation |
+| `examples/replay_dockyard` | Replay and Box3D | Shared physics, hauling, and game state separated from Godot presentation |
 | `examples/replay_duel` | Replay P2P | Deterministic fixed-roster input exchange |
 
 The [Scrapyard contributor guide](https://github.com/wlitwin/odin_godot/blob/main/examples/replay_scrapyard/contributor-guide.md)

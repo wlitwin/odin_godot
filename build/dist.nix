@@ -132,8 +132,12 @@ stdenvNoCC.mkDerivation ({
     mkdir -p $A/docs
     cp docs/*.md $A/docs/
     for section in scripting kit replay box3d libraries examples multiplayer learn contributing onboarding; do
-      mkdir -p $A/docs/$section
-      cp docs/$section/*.md $A/docs/$section/
+      # Preserve nested learning paths without packaging contributor run records.
+      while IFS= read -r -d "" page; do
+        case "$page" in docs/replay/results/*) continue ;; esac
+        mkdir -p "$A/$(dirname "$page")"
+        cp "$page" "$A/$page"
+      done < <(find "docs/$section" -type f '(' -name '*.md' -o -name '*.svg' -o -name '*.png' ')' -print0)
     done
     cp -r docs/img $A/docs/img
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/

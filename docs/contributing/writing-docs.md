@@ -22,6 +22,7 @@ can learn one of these without adopting the others.
 | Section | Directory | Covers |
 | --- | --- | --- |
 | Scripting | `docs/scripting/` | Writing Godot scripts in Odin: install, script structs, exports, signals, the editor loop, debugging, export. No multiplayer framework required. |
+| Multiplayer learning | `docs/multiplayer/` | Shared concepts and feature walkthroughs, with distinct Kit and Replay implementation paths. |
 | Kit | `docs/kit/` | The Kit multiplayer framework: sessions, replicated fields, commands, the simulation lane, and Kit's gameplay packages. |
 | Replay | `docs/replay/` | The Replay multiplayer framework: a replayable World, timelines, sessions, rooms, peer-to-peer rollback, and Godot presentation. |
 | Box3D | `docs/box3d/` | Box3D physics: authoring worlds and bodies in the editor, stepping, queries, characters, joints, and using it with Kit or Replay. |

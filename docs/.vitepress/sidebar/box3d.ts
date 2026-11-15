@@ -15,6 +15,35 @@ const sidebar: DefaultTheme.SidebarItem[] = [
     ]
   },
   {
+    "text": "Physics concepts",
+    "items": [
+      {
+        "text": "Reading path",
+        "link": "/box3d/concepts/"
+      },
+      {
+        "text": "Bodies and motion",
+        "link": "/box3d/concepts/bodies-shapes-and-motion"
+      },
+      {
+        "text": "Collision and queries",
+        "link": "/box3d/concepts/collision-and-queries"
+      },
+      {
+        "text": "Simulation and rollback",
+        "link": "/box3d/concepts/simulation-and-rollback"
+      },
+      {
+        "text": "Authoring and identity",
+        "link": "/box3d/concepts/authoring-and-world-identity"
+      },
+      {
+        "text": "Joints and characters",
+        "link": "/box3d/concepts/joints-and-characters"
+      }
+    ]
+  },
+  {
     "text": "Guides",
     "items": [
       {

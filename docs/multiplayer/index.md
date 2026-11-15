@@ -7,6 +7,16 @@ prediction. Kit and Replay have independent runtime owners and protocols.
 Complete [your first Odin scene](../scripting/first-scene.md) before either
 multiplayer tutorial.
 
+## Understand the design problems
+
+The [multiplayer learning path](concepts/index.md) introduces authority, state,
+clocks, prediction, presentation, and the practical costs of running a game over
+a network. Read it before choosing a framework if these ideas are new to you.
+
+[Feature walkthroughs](recipes/index.md) then apply those ideas to movement,
+pickups, combat, object lifetime, joining, and rounds. They connect design
+decisions to each framework's APIs and examples.
+
 ## Compare the models
 
 | Decision | Kit | Replay |

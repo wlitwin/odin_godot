@@ -34,6 +34,35 @@ the whole map or use your browser's Find command to locate a subject.
 | [Exporting](exporting.md) | Desktop and browser builds, WebAssembly, export presets, and serving headers |
 | [Distribution](distribution.md) | Installing the addon, compiler compatibility, cross-compilation, and platform support |
 
+## Multiplayer concepts
+
+| Page | Topics |
+| --- | --- |
+| [Multiplayer learning path](multiplayer/concepts/index.md) | A reading order from a shared game model to deployment and recovery |
+| [Authority and ownership](multiplayer/concepts/authority.md) | Input permission, authority, listen hosts, trust, and validation |
+| [State and input](multiplayer/concepts/state-and-inputs.md) | Persistent state, tick controls, discrete actions, events, and ordering |
+| [Ticks and clocks](multiplayer/concepts/clocks.md) | Simulation, packet arrival, prediction, confirmation, and display time |
+| [Prediction and correction](multiplayer/concepts/prediction.md) | Guessed inputs, repair, history boundaries, and interaction dependencies |
+| [Determinism](multiplayer/concepts/determinism.md) | Replayable dependencies, RNG, ordering, state boundaries, and physics targets |
+| [Presentation and effects](multiplayer/concepts/presentation-and-effects.md) | Event identity, interpolation, speculative feedback, cancellation, and smoothing |
+| [Connections and compatibility](multiplayer/concepts/connections-and-compatibility.md) | Reachability, transport, admission, identity, baselines, and compatible content |
+| [Bandwidth and relevance](multiplayer/concepts/bandwidth-and-relevance.md) | Recipient cost, update rates, filtering, privacy, deltas, and baseline recovery |
+| [Performance and scale](multiplayer/concepts/performance-and-scale.md) | Active work, interaction cost, correction CPU, history memory, and capacity |
+| [Testing and debugging](multiplayer/concepts/testing-and-debugging.md) | Gameplay assertions, impaired networks, accepted histories, audits, and recordings |
+| [Recovery and trust](multiplayer/concepts/recovery-and-trust.md) | Reconnect, persistence, checkpoint loss, succession, fencing, and external effects |
+
+### Feature walkthroughs
+
+| Page | Topics |
+| --- | --- |
+| [Feature map](multiplayer/recipes/index.md) | Choosing one behavior to implement inside a working Kit or Replay project |
+| [Player movement](multiplayer/recipes/movement.md) | Input, authority, collision dependencies, prediction, and display |
+| [Pickups and inventories](multiplayer/recipes/pickups-and-inventories.md) | Contested requests, item conservation, target mutations, and accepted consequences |
+| [Weapons and damage](multiplayer/recipes/weapons-and-damage.md) | Shot identity, validation, historical aim, projectiles, and health |
+| [Spawning and lifetime](multiplayer/recipes/spawning-and-lifetime.md) | Entity identity, generations, membership, despawn, and view cleanup |
+| [Joining and reconnecting](multiplayer/recipes/joining-and-reconnecting.md) | Readiness, reservations, baselines, pending decisions, and host loss |
+| [Scenes and rounds](multiplayer/recipes/scenes-and-rounds.md) | Simulation phases, content readiness, transition barriers, and stale actions |
+
 ## Kit multiplayer
 
 ### Tutorials and concepts
@@ -114,6 +143,17 @@ the whole map or use your browser's Find command to locate a subject.
 | [API map and limits](box3d/reference.md) | Packages, lifecycle calls, schemas, geometry constraints, and identities |
 | [Support](box3d/support.md) | Platforms, determinism, complete-state bounds, memory, and deployment limits |
 | [Authoring topics](box3d-authoring.md) | A compact index of Box3D authoring guides |
+
+### Physics concepts
+
+| Page | Topics |
+| --- | --- |
+| [Physics reading path](box3d/concepts/index.md) | How the conceptual guides relate to the offline and multiplayer tutorials |
+| [Bodies and motion](box3d/concepts/bodies-shapes-and-motion.md) | Body types, shapes, mass, impulses, prescribed motion, and Godot views |
+| [Collision and queries](box3d/concepts/collision-and-queries.md) | Category and mask filtering, sensors, motion queries, and result capacity |
+| [Simulation and rollback](box3d/concepts/simulation-and-rollback.md) | Fixed stepping, complete solver history, correction, and display state |
+| [Authoring and identity](box3d/concepts/authoring-and-world-identity.md) | Editor definitions, baking, catalogs, durable IDs, content, and native keys |
+| [Joints and characters](box3d/concepts/joints-and-characters.md) | Constraint choices, prescribed character motion, contacts, and stored mover state |
 
 ## Libraries
 

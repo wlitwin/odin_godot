@@ -5,6 +5,10 @@ Kit, or with Replay. The SDK includes low-level bodies and queries, Godot
 authoring nodes and shape Resources, character movement, joints, and separate
 framework adapters for complete physics history.
 
+Use [the physics concepts](concepts/index.md) alongside this section's tutorial
+to understand bodies, collision, solver history, and the roles of joints and
+character movement.
+
 Learn [Odin scripting](../scripting/index.md) first. Multiplayer knowledge is
 needed only for a framework integration.
 

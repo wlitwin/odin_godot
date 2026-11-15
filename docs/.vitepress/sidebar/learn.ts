@@ -6,6 +6,23 @@ const sidebar: DefaultTheme.SidebarItem[] = [
     "link": "/learn/"
   },
   {
+    "text": "Understand the design",
+    "items": [
+      {
+        "text": "Multiplayer concepts",
+        "link": "/multiplayer/concepts/"
+      },
+      {
+        "text": "Feature walkthroughs",
+        "link": "/multiplayer/recipes/"
+      },
+      {
+        "text": "Physics concepts",
+        "link": "/box3d/concepts/"
+      }
+    ]
+  },
+  {
     "text": "Build something",
     "items": [
       {

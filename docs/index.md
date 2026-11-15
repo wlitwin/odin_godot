@@ -54,11 +54,14 @@ adapter. The [framework guide](multiplayer/index.md) explains the choice.
 
 | I want to… | Read |
 | --- | --- |
+| Understand how multiplayer games work | [Multiplayer concepts](multiplayer/concepts/index.md) |
+| Plan movement, pickups, combat, or reconnects | [Feature walkthroughs](multiplayer/recipes/index.md) |
 | Learn how Godot calls an Odin script | [Scripting overview](scripting/index.md) |
 | Move players in two windows | [Kit multiplayer tutorial](kit/quickstart.md) |
 | Add authoritative movement and prediction | [Kit simulation tutorial](kit/quickstart-sim.md) |
 | Restore and replay a gameplay interaction | [Replay tutorial](replay/quickstart.md) |
 | Add physics without networking | [Box3D offline tutorial](box3d/quickstart.md) |
+| Understand bodies, collisions, and solver history | [Box3D concepts](box3d/concepts/index.md) |
 | Find a signal or sequencing helper | [Libraries](libraries/index.md) |
 | Build a desktop or browser release | [Exporting](exporting.md) |
 

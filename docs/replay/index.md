@@ -13,6 +13,12 @@ The local Timeline is engine-free. The current Godot Session package also links
 the Box3D presentation adapter; its [setup guide](godot.md) includes the required
 backend build even for a value-only game.
 
+For the background behind the framework, start with
+[multiplayer concepts](../multiplayer/concepts/index.md), then use
+[feature walkthroughs](../multiplayer/recipes/index.md) to plan an interaction.
+You can also [play Dockyard and Scrapyard](../examples/index.md) before studying
+their source.
+
 ## The model
 
 A **World** contains mutable values needed for the next tick: positions, health,

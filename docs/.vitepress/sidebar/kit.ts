@@ -6,6 +6,19 @@ const sidebar: DefaultTheme.SidebarItem[] = [
     "link": "/kit/"
   },
   {
+    "text": "Learning background",
+    "items": [
+      {
+        "text": "Multiplayer concepts",
+        "link": "/multiplayer/concepts/"
+      },
+      {
+        "text": "Feature walkthroughs",
+        "link": "/multiplayer/recipes/"
+      }
+    ]
+  },
+  {
     "text": "Tutorials",
     "items": [
       {

@@ -60,6 +60,7 @@ export default withMermaid(
 
       nav: [
         { text: 'Scripting', link: '/scripting/', activeMatch: '^/(scripting/|getting-started|authoring-guide|workflow|debugging|modules|exporting|distribution)' },
+        { text: 'Multiplayer', link: '/multiplayer/concepts/', activeMatch: '^/multiplayer/' },
         { text: 'Kit', link: '/kit/', activeMatch: '^/kit/' },
         { text: 'Replay', link: '/replay/', activeMatch: '^/replay/' },
         { text: 'Box3D', link: '/box3d/', activeMatch: '^/box3d/' },

@@ -12,6 +12,11 @@ the authority. A player can host the session, or the authority can run as a
 dedicated server. ENet, WebRTC, and Steam use the same session and replication
 layers; only the transport adapter changes.
 
+Read [multiplayer concepts](../multiplayer/concepts/index.md) for the reasoning
+behind authority, prediction, and presentation. The
+[feature walkthroughs](../multiplayer/recipes/index.md) apply those ideas to
+common game tasks and keep Kit and Replay's implementation paths distinct.
+
 ## Choose a replication model
 
 Kit supports two complementary models. A game can use either one or combine them
