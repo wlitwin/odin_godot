@@ -122,21 +122,23 @@ static void query_and_mover(void){
  OK(ogb3_world_destroy(scratch));OK(ogb3_world_destroy(w));
  w=world();make_body(w,OGB3_STATIC,0,-.5f,0,(ogb3_vec3){10,.5f,10});make_body(w,OGB3_STATIC,2,2,0,(ogb3_vec3){.5f,2,10});
  ogb3_character_config config={.version=1,.max_slides=8,.capsule={{0,.3f,0},{0,.9f,0},.3f},.up={0,1,0},.floor_cosine=.7f,.filter=filter};
- ogb3_character_state state={.position={0,.01f,0},.velocity={180,-1,60}};ogb3_character_result result;
+ /* Keep the same requested displacement so each profile exercises the same
+  * wall slide and floor contact instead of a different geometric sweep. */
+ ogb3_character_state state={.position={0,.01f,0},.velocity={3.0f/OGB3_FIXED_SECONDS,-.016666667f/OGB3_FIXED_SECONDS,1.0f/OGB3_FIXED_SECONDS}};ogb3_character_result result;
  uint64_t full,motion;OK(ogb3_state_digest(w,&full,&motion));OK(ogb3_character_step(w,&config,&state,0,&result));assert(!memcmp(&state,&result.state,sizeof(state))&&result.iterations==0);
- OK(ogb3_character_step(w,&config,&state,1.0f/60,&result));assert(result.state.position.x<1.25f&&result.state.position.z>.5f&&result.state.position.y>=-.02f&&result.state.grounded&&result.plane_count>0);
+ OK(ogb3_character_step(w,&config,&state,OGB3_FIXED_SECONDS,&result));assert(result.state.position.x<1.25f&&result.state.position.z>.5f&&result.state.position.y>=-.02f&&result.state.grounded&&result.plane_count>0);
  uint64_t full_after,motion_after;OK(ogb3_state_digest(w,&full_after,&motion_after));assert(full==full_after&&motion==motion_after);
  ogb3_character_result unchanged;memset(&unchanged,0xa5,sizeof(unchanged));result=unchanged;assert(ogb3_character_step(w,&config,&state,NAN,&result)==OGB3_INVALID_ARGUMENT&&!memcmp(&result,&unchanged,sizeof(result)));
- assert(ogb3_character_step(w,&config,&state,.02f,&result)==OGB3_INVALID_ARGUMENT&&!memcmp(&result,&unchanged,sizeof(result)));
- config.capsule.radius=-1;assert(ogb3_character_step(w,&config,&state,1.0f/60,&result)==OGB3_INVALID_ARGUMENT&&!memcmp(&result,&unchanged,sizeof(result)));
+ assert(ogb3_character_step(w,&config,&state,2.0f*OGB3_FIXED_SECONDS,&result)==OGB3_INVALID_ARGUMENT&&!memcmp(&result,&unchanged,sizeof(result)));
+ config.capsule.radius=-1;assert(ogb3_character_step(w,&config,&state,OGB3_FIXED_SECONDS,&result)==OGB3_INVALID_ARGUMENT&&!memcmp(&result,&unchanged,sizeof(result)));
  OK(ogb3_world_destroy(w));
  /* A genuine inclined box tests floor-angle classification, not a fabricated
   * normal. The same geometry is walkable at cos=.7 and steep at cos=.95. */
  w=world();ogb3_body slope=make_body(w,OGB3_STATIC,0,-.5f,0,(ogb3_vec3){10,.5f,10});ogb3_pose pose={{0,-.5f,0},{0,0,sinf(.2617994f),cosf(.2617994f)}};OK(ogb3_body_set_pose(slope,&pose));
  config.capsule=capsule;config.capsule.center1=(ogb3_vec3){0,.3f,0};config.capsule.center2=(ogb3_vec3){0,.9f,0};config.capsule.radius=.3f;
- state=(ogb3_character_state){.position={0,.4f,0},.velocity={0,-30,0}};config.floor_cosine=.7f;
- OK(ogb3_character_step(w,&config,&state,1.0f/60,&result));assert(result.state.grounded&&result.state.ground_normal.y>.8f&&result.state.ground_normal.y<.9f);
- config.floor_cosine=.95f;OK(ogb3_character_step(w,&config,&state,1.0f/60,&result));assert(!result.state.grounded);OK(ogb3_world_destroy(w));
+ state=(ogb3_character_state){.position={0,.4f,0},.velocity={0,-.5f*OGB3_TICK_HZ,0}};config.floor_cosine=.7f;
+ OK(ogb3_character_step(w,&config,&state,OGB3_FIXED_SECONDS,&result));assert(result.state.grounded&&result.state.ground_normal.y>.8f&&result.state.ground_normal.y<.9f);
+ config.floor_cosine=.95f;OK(ogb3_character_step(w,&config,&state,OGB3_FIXED_SECONDS,&result));assert(!result.state.grounded);OK(ogb3_world_destroy(w));
  /* Exact equal-distance ties sort by world-independent key; sensor selection
   * is explicit. The complete-hit read publishes nothing on short capacity. */
  w=world();make_body(w,OGB3_STATIC,0,0,0,box);ogb3_body sensor=make_body(w,OGB3_STATIC,0,0,0,box);

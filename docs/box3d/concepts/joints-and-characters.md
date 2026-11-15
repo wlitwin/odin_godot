@@ -100,7 +100,7 @@ own movement queries and define how its pose follows the saved movement state.
 
 ## Keep the character on the framework tick
 
-Offline code can call the native character helper at the fixed 1/60-second
+Offline code can call the native character helper at the selected fixed-duration
 step boundary and then advance its world according to its chosen schedule.
 Kit's helper reads the staged participant world; the Lane performs the
 participant's fixed physics step. Replay's helper reads its execution

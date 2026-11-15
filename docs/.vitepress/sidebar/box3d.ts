@@ -73,6 +73,10 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       {
         "text": "Configure capacities",
         "link": "/box3d/capacities"
+      },
+      {
+        "text": "Configure timing and history",
+        "link": "/box3d/timing"
       }
     ]
   },

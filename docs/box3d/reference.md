@@ -26,7 +26,7 @@ Start with [the tutorial](quickstart.md) for a running project.
 | `shape_def_default()` | Default material/filter settings; density 1000 kg/m³ |
 | `shape_box(body, def, half_extents)` | Shape handle and status |
 | `body_get_pose(body)` | Copied pose and status |
-| `world_step_fixed(world)` | Status; advances 1/60 second with four substeps |
+| `world_step_fixed(world)` | Status; advances the build profile's fixed tick, default 1/60 second with four substeps |
 | `world_destroy(&world)` | Status; destroys the world's bodies and shapes |
 
 Check status before reading returned values. Native handles are local to their

@@ -110,7 +110,7 @@ Body_Def :: struct {
     is_awake:                  u32,
     is_bullet:                 u32,
     is_enabled:                u32,
-    // Lift Box3D's angular speed cap (a quarter turn per step, 47 rad/s at
+    // Lift Box3D's angular speed cap (one eighth turn per step, 47 rad/s at
     // 60 Hz) for round bodies that roll fast, such as wheels and balls.
     allow_fast_rotation:       u32,
     motion_locks:              Motion_Locks, // 0 = free

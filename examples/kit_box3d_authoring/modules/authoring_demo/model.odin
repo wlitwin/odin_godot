@@ -32,7 +32,7 @@ sample_control :: proc(user: rawptr, tick: u64, out: rawptr) {
 
     if rt.scripted {
         value = {}
-        axis := i16((tick / 60) % 2 == 0 ? 1 : -1)
+        axis := i16((tick / u64(b.FIXED_HZ)) % 2 == 0 ? 1 : -1)
 
         if rt.seat == 1 {
             value.x = axis
@@ -185,7 +185,7 @@ model_create :: proc(rt: ^Demo) -> bool {
         return false
     }
 
-    k.lane_init(&rt.lane, &rt.ses, size_of(Control), cfg = {slots = 128, snap_every = 3}, allocator = rt.allocator)
+    k.lane_init(&rt.lane, &rt.ses, size_of(Control), cfg = k.world_lane_config_default(), allocator = rt.allocator)
     rt.lane_ready = true
     k.lane_set_sim(&rt.lane, rt, sample_control, model_step)
     k.lane_class_set_type(&rt.lane, 0, Control)

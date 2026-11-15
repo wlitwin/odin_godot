@@ -55,7 +55,8 @@ the runner's configured work bounds.
 At 60 ticks per second, one tick represents about 16.7 milliseconds. A cooldown
 of 30 ticks represents half a second of simulated time. These numbers illustrate
 the relationship; use the rate configured for your runner. Box3D's current
-framework profile specifically requires 60 Hz and four native substeps per tick.
+framework profile defaults to 60 Hz and four native substeps per tick. Those
+values are [build settings](../../box3d/timing.md), and its runner must match them.
 Those substeps are internal physics work, rather than four gameplay ticks.
 
 Movement rules should use a fixed step consistent with that configuration.

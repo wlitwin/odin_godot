@@ -87,7 +87,7 @@ kit_setup :: proc(t: ^testing.T, box: ^Kit_Box, scene: ^ba.Baked_Scene) -> bool 
     }
 
     box.built = built
-    k.lane_init(&box.lane, &box.ses, size_of(u8), cfg = {slots = 128, snap_every = 3})
+    k.lane_init(&box.lane, &box.ses, size_of(u8), cfg = k.world_lane_config_default())
     k.lane_set_sim(&box.lane, box, kit_sample, kit_step)
     k.lane_class_set_type(&box.lane, 0, u8)
     error := kp.authoring_attach(&box.physics, &box.lane, &box.built, State{}, nil, {})
@@ -194,13 +194,13 @@ kit_authored_six_shapes_and_sensor_canonical_welcome_and_reset :: proc(t: ^testi
     }
 
     for _ in 0 ..< 3 {
-        _ = k.lane_frame(&client.lane, 1.0 / 60)
+        _ = k.lane_frame(&client.lane, 1.0 / f64(b.FIXED_HZ))
     }
 
     kit_pump({host, client})
 
     for _ in 0 ..< 3 {
-        testing.expect_value(t, k.lane_frame(&host.lane, 1.0 / 60), 1)
+        testing.expect_value(t, k.lane_frame(&host.lane, 1.0 / f64(b.FIXED_HZ)), 1)
     }
 
     kit_pump({host, client})
@@ -291,6 +291,7 @@ replay_authored_six_shapes_and_sensor_canonical_welcome_and_confirmation :: proc
 // Shared test driver: exercise the existing runner/transport for either the
 // small authoring fixture or a larger scene, including multi-pump welcomes.
 replay_network_scene :: proc(t: ^testing.T, scene: ^ba.Baked_Scene, minimum_parts: int = 1) {
+    tick_ms := u64((1000 + b.FIXED_HZ - 1) / b.FIXED_HZ)
     cfg, ce := rp.authoring_config(scene)
     testing.expect_value(t, ce, r.Error.None)
 
@@ -408,7 +409,7 @@ replay_network_scene :: proc(t: ^testing.T, scene: ^ba.Baked_Scene, minimum_part
     welcome_now := u64(0)
 
     for pump in 0 ..< 256 {
-        now := u64(pump * 17)
+        now := u64(pump * int(tick_ms))
         welcome_now = now
         tr.memory_advance(memory, now)
         testing.expect_value(t, rn.client_pump(client, now), rn.Error.None)
@@ -431,12 +432,12 @@ replay_network_scene :: proc(t: ^testing.T, scene: ^ba.Baked_Scene, minimum_part
         testing.expect_value(t, rn.server_step(server), rn.Error.None)
 
         for _ in 0 ..< 4 {
-            tr.memory_advance(memory, welcome_now + tick * 17)
-            testing.expect_value(t, rn.client_pump(client, welcome_now + tick * 17), rn.Error.None)
+            tr.memory_advance(memory, welcome_now + tick * tick_ms)
+            testing.expect_value(t, rn.client_pump(client, welcome_now + tick * tick_ms), rn.Error.None)
             changes: [512]view.Change(rn.Net_Event(u8))
             view.drain(&client.journal, changes[:])
-            tr.memory_advance(memory, welcome_now + tick * 17)
-            _ = rn.server_pump(server, welcome_now + tick * 17)
+            tr.memory_advance(memory, welcome_now + tick * tick_ms)
+            _ = rn.server_pump(server, welcome_now + tick * tick_ms)
 
             if client.timeline.confirmed >= tick {
                 break

@@ -245,7 +245,7 @@ packet_receipt :: proc(t: ^testing.T, packet: f.Parcel, player: u64) -> Receipt 
         return {}
     }
 
-    testing.expect_value(t, n.read_u32(&r), u32(2))
+    testing.expect_value(t, n.read_u32(&r), k.WORLD_NETWORK_REV)
 
     for _ in 0 ..< 32 {
         _ = n.read_u8(&r)

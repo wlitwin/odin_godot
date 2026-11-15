@@ -65,7 +65,9 @@ The [Kit simulation quickstart](../../kit/quickstart-sim.md) demonstrates a
 constrained two-axis input, sampling, and the fixed-tick mutation. Its movement
 constant is derived from a 60 Hz lane. If you change the rate, derive movement
 from the same configuration. That tuning applies to the ordinary Kit lane;
-managed Box3D integration requires 60 Hz with four native substeps per tick.
+managed Box3D integration uses a shared [timing profile](../../box3d/timing.md),
+defaulting to 60 Hz and four native substeps per tick. Its Lane must match that
+profile rather than choosing a different rate independently.
 In Replay, the Session adapter supplies sampled
 controls to the runner; device reads stay outside the model step.
 

@@ -87,7 +87,9 @@ def main():
             run_step(output, name + '-runtime', argv, report)
         run_step(output, 'independent-reference', [sys.executable,
                  str(ROOT / 'tests/box3d_recovery/reference.py'),
-                 str(output / 'recovery-fixture.bin')], report)
+                 str(output / 'recovery-fixture.bin'),
+                 '--tick-hz', str(info['capacity_profile']['tick_hz']),
+                 '--substeps', str(info['capacity_profile']['substeps'])], report)
         report['source_fence_unchanged'] = before == source_inputs(ROOT, engine)
         report['test_fence_unchanged'] = tests_before == {path: sha(ROOT / path) for _, path in CASES}
         report['archive_fence_unchanged'] = report['archive_sha256'] == sha(archive)

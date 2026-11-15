@@ -105,7 +105,7 @@ typedef struct {
   uint32_t iterations,plane_count;
 } ogb3_character_result;
 /* Pure world-read + POD output; state is caller-owned Game/Side. dt=0 is an
- * exact no-op; otherwise dt must be the existing fixed 1/60 f32. Actual engine
+ * exact no-op; otherwise dt must equal the profile's OGB3_FIXED_SECONDS f32. Actual engine
  * CastMover/CollideMover/SolvePlanes/ClipVector; no body writes or clock.
  * Any error leaves out unchanged, including plane capacity/iteration failure. */
 OGB3_API ogb3_status ogb3_character_step(ogb3_world,const ogb3_character_config *,const ogb3_character_state *,float dt,ogb3_character_result *out);

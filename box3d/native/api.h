@@ -86,7 +86,7 @@ typedef struct {
   ogb3_vec3 linear_velocity, angular_velocity;
   float linear_damping, angular_damping, gravity_scale, sleep_threshold;
   uint32_t enable_sleep, is_awake, is_bullet, is_enabled;
-  /* Box3D caps angular speed at a quarter turn per step (47 rad/s at 60 Hz)
+  /* Box3D caps angular speed at one eighth turn per step (47 rad/s at 60 Hz)
    * unless a body allows fast rotation; meant for round bodies that roll fast,
    * such as wheels and balls (a 3.5 cm ball rolls at 1.6 m/s at the cap). ABI 2. */
   uint32_t allow_fast_rotation;
@@ -293,7 +293,8 @@ OGB3_API ogb3_status ogb3_joint_resolve(ogb3_world, ogb3_joint_key,
                                         ogb3_joint *);
 OGB3_API ogb3_status ogb3_world_step(ogb3_world, float seconds,
                                      uint32_t substeps);
-OGB3_API ogb3_status ogb3_world_step_fixed(ogb3_world); /* 1/60 s, 4 substeps */
+/* One build-profile tick: OGB3_FIXED_SECONDS with OGB3_SUBSTEPS solver steps. */
+OGB3_API ogb3_status ogb3_world_step_fixed(ogb3_world);
 OGB3_API ogb3_status ogb3_world_get_gravity(ogb3_world, ogb3_vec3 *);
 OGB3_API ogb3_status ogb3_world_set_gravity(ogb3_world, const ogb3_vec3 *);
 OGB3_API ogb3_status ogb3_body_create(ogb3_world, const ogb3_body_def *,

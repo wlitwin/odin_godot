@@ -100,7 +100,7 @@ character_step :: proc(
         return {}, error
     }
 
-    result, status := b.character_step(work.stage.world, config, value, f32(1.0 / 60))
+    result, status := b.character_step(work.stage.world, config, value, b.FIXED_SECONDS)
 
     if status != .Ok {
         return {}, r.execution_fail(capability, status_error(status))

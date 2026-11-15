@@ -686,19 +686,22 @@ demo_frame :: proc(rt: ^Demo, delta: f64) {
             return
         }
 
-        room := 8 - min(u64(8), head - cf)
-        remaining := rt.target == 0 ? u64(8) : rt.target - min(rt.target, head)
+        window := u64(k.WORLD_REPAIR_TICKS)
+        room := window - min(window, head - cf)
+        remaining := rt.target == 0 ? window : rt.target - min(rt.target, head)
         dt, scale, acc := rt.lane.ticker.dt, rt.lane.ticker.scale, rt.lane.ticker.acc
+        bootstrap_ticks := min(u64(4), window)
+        bootstrap_delta := f64(bootstrap_ticks) / f64(b.FIXED_HZ)
 
         if pending_ingress(rt) ||
-           room < 4 ||
-           remaining < 4 ||
-           acc + (4.0 / 60) * scale > f64(min(room, remaining)) * dt {
+           room < bootstrap_ticks ||
+           remaining < bootstrap_ticks ||
+           acc + bootstrap_delta * scale > f64(min(room, remaining)) * dt {
             return
         }
 
         before_seq := rt.lane.world.network.received_sequence
-        returned := k.lane_frame(&rt.lane, 4.0 / 60)
+        returned := k.lane_frame(&rt.lane, bootstrap_delta)
         receipt := rt.lane.ticker.acc - acc + f64(returned) * dt
 
         if rt.lane.world.network.received_sequence != before_seq ||
@@ -708,7 +711,7 @@ demo_frame :: proc(rt: ^Demo, delta: f64) {
             return
         }
 
-        if abs(receipt - (4.0 / 60) * scale) <= 1e-12 {
+        if abs(receipt - bootstrap_delta * scale) <= 1e-12 {
             rt.lead_applied = true
             rt.wait_fresh = 0
         } else if returned != 0 || receipt != 0 {
@@ -724,7 +727,12 @@ demo_frame :: proc(rt: ^Demo, delta: f64) {
     dt := rt.lane.ticker.dt
     scale := rt.lane.ticker.scale
 
-    if dt != 1.0 / 60 || math.is_nan(scale) || math.is_inf(scale) || scale < 0.98 || scale > 1.02 || head < cf {
+    if dt != 1.0 / f64(b.FIXED_HZ) ||
+       math.is_nan(scale) ||
+       math.is_inf(scale) ||
+       scale < 0.98 ||
+       scale > 1.02 ||
+       head < cf {
         fail(rt, "caller.domain", .Unsupported)
         return
     }
@@ -732,7 +740,7 @@ demo_frame :: proc(rt: ^Demo, delta: f64) {
     room := u64(2)
 
     if !rt.host {
-        room = min(room, 8 - min(u64(8), head - cf))
+        room = min(room, u64(k.WORLD_REPAIR_TICKS) - min(u64(k.WORLD_REPAIR_TICKS), head - cf))
     }
 
     if rt.target > 0 {

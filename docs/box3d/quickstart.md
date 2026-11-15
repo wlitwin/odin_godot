@@ -53,9 +53,11 @@ Follow these procedures in that file:
 | `box_tower_process` | Update camera controls once per rendered frame |
 | `destroy_world` | Destroy the world and clear body handles on reset or scene exit |
 
-`world_step_fixed` advances 1/60 second with four substeps. Keep Godot's physics
-rate at 60 Hz for this one-call-per-physics-frame loop. A different rate requires
-an explicit scheduling policy; passing a frame delta does not change this call.
+With the default build profile, `world_step_fixed` advances 1/60 second with four
+substeps. Keep Godot's physics rate at 60 Hz for this loop. A custom
+[timing profile](timing.md) changes that fixed duration and substep count; match
+the callback rate or use an explicit fixed-step accumulator. Passing a frame
+delta does not change `world_step_fixed`.
 
 The mesh nodes display solver results. Moving one of them manually does not move
 its physics body. Read [Physics ownership](ownership.md) before adding a second

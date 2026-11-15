@@ -102,6 +102,15 @@ Operation :: struct {
     owned_total, sdk_mark: u64,
 }
 
+// Local complete Timeline settings matching the selected physics history.
+// For a networked Session, set Session_Options.network to
+// net.physics_config_default(); its network configuration is a different type.
+timeline_config_default :: proc() -> r.Config {
+    cfg := r.DEFAULT_CONFIG
+    cfg.history_frames = bcap.HISTORY_FRAMES
+    return cfg
+}
+
 config_default :: proc(asset_id, build_id: u64) -> Config {
     config := Config {
         asset_id               = asset_id,
@@ -971,10 +980,10 @@ participant :: proc(
         clock = clock,
         require_step = true,
         limits = {
-            history_frames = 128,
+            history_frames = bcap.HISTORY_FRAMES,
             max_prediction_ticks = net.PHYSICS_WINDOW,
             max_repair_ticks = net.PHYSICS_WINDOW,
-            max_audit_ticks = 127,
+            max_audit_ticks = bcap.HISTORY_FRAMES - 1,
             max_bytes = b.ALPHA_RESOURCE_BYTES,
         },
     }

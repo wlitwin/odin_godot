@@ -85,8 +85,10 @@ maximum admission bounds. Changing those sizes requires rebuilding the backend
 and modules. A recovery catalog can choose lower body, shape, contact, joint,
 and byte limits through `Recovery_Config`; it cannot exceed its backend profile.
 
-The 128-tick history, fixed timestep, caller contract, and framework prediction
-windows remain separate [runtime requirements](support.md).
+The same profile also selects history, prediction/repair ceilings, tick rate,
+and native substeps. See [Configure timing](timing.md) for their defaults,
+relationships, and framework setup. These are build settings; the single-caller
+execution contract remains required.
 
 ## Measure the workload
 

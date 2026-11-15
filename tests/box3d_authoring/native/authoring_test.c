@@ -102,7 +102,7 @@ static void advanced(ogb3_recovery_config *cfg) {
   ogb3_shape bad=99;d.is_sensor=1;assert(ogb3_recovery_catalog_shape(c,5,bodies[4],&d,&bad)==OGB3_UNSUPPORTED && !bad);d.is_sensor=0;
   d.enable_sensor_events=1;assert(ogb3_recovery_catalog_shape(c,5,bodies[4],&d,&bad)==OGB3_UNSUPPORTED && !bad);d.enable_sensor_events=0;
   assert(ogb3_recovery_catalog_shape(c,5,bodies[0],&d,&bad)==OGB3_INVALID_ARGUMENT && !bad);
-  for(unsigned i=0;i<90;i++)OK(ogb3_world_step(w,1.0f/60,4));
+  for(unsigned i=0;i<(3u*OGB3_TICK_HZ+1)/2;i++)OK(ogb3_world_step_fixed(w));
   ogb3_snapshot *source=NULL;OK(ogb3_snapshot_capture(w,&source));uint64_t n=0;
   ogb3_recovery_diagnostic diag={0};ogb3_status write_status=ogb3_recovery_write(c,source,NULL,0,&n,&diag);
   if(write_status)fprintf(stderr,"advanced write status%d section%u record%u field%u reason%u\n",write_status,diag.section,diag.record,diag.field,diag.reason);
@@ -131,7 +131,7 @@ static void advanced(ogb3_recovery_config *cfg) {
   /* Native world and detached snapshots both survive catalog/source release. */
   ogb3_snapshot_release(source);source=NULL;
   OK(ogb3_world_destroy(w));ogb3_world another=world();OK(ogb3_snapshot_restore(another,decoded));equal(r,another);
-  for(unsigned i=0;i<8;i++){OK(ogb3_world_step(r,1.0f/60,4));OK(ogb3_world_step(another,1.0f/60,4));equal(r,another);}
+  for(unsigned i=0;i<8;i++){OK(ogb3_world_step_fixed(r));OK(ogb3_world_step_fixed(another));equal(r,another);}
   ogb3_snapshot_release(decoded);OK(ogb3_world_destroy(r));OK(ogb3_world_destroy(another));
   free(bytes);free(again);free(mut);puts("authoring Hull/Mesh/baked-Mesh/canonical/cache-malformed/lifetime/continuation PASS");
 }

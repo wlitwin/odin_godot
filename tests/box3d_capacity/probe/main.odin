@@ -17,6 +17,8 @@ main :: proc() {
         fmt.printfln("CAPACITY_MATCH_OK bodies=%d joints=%d", limits.MAX_BODIES, limits.MAX_JOINTS)
     } else {
         assert(status == .Incompatible)
+        world, error := b.world_create({})
+        assert(error == .Incompatible && world == 0)
         fmt.println("CAPACITY_MISMATCH_REJECTED before_world_construction=true")
     }
 }

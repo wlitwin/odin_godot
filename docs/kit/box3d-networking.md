@@ -55,7 +55,9 @@ a transaction cannot roll back arbitrary external callbacks.
 
 ## Actual session path
 
-The existing Lane route on `SES_APP` carries four optional message kinds:
+Wire revision 3 binds the selected profile fingerprint into the input schema.
+Peers must agree on the native profile, game schema, and protocol before ordinary
+input can be accepted. The existing Lane route on `SES_APP` carries four optional message kinds:
 
 - `SIM_WORLD_INPUT`: client proposals for its roster entries, with wire revision,
   input-schema digest, epoch, contiguous tick window and per-source sequence.
@@ -71,7 +73,7 @@ stable sequence is its tick; redundant or reordered copies cannot equivocate.
 All rows in an input message decode and validate before a ledger changes.
 Authority decisions for a simulated tick are immutable: a late proposal never
 retroactively replaces a held decision. Its accepted decision is replicated.
-The authority emits the trailing eight decision rows each tick; clients emit
+The authority emits up to the selected `sim.WORLD_REPAIR_TICKS` trailing decision rows each tick (eight by default); clients emit
 only their immutable sampled controls, rather than echoing accepted hold values
 back as fresh proposals.
 
@@ -90,7 +92,7 @@ from confirmed state, verifies complete native/Side/fields/occurrences at the
 authority tick while still staged, then finishes the speculative suffix. Ledger changes, solver, Side,
 registered fields, history and deferred effects commit together. Failure leaves
 the previously published pair and accepted ledger unchanged. Ordinary repair
-and prediction are limited to eight ticks; missing/lapped state or older repair
+and prediction use the selected timing ceiling (eight ticks by default); missing/lapped state or older repair
 returns explicit hold/resync. No rewind truncation or live-solver fallback exists.
 
 ## Complete state and recovery
@@ -106,7 +108,7 @@ The complete envelope is:
 2. A little-endian u32 canonical native recovery length and independent recovery
    attachment. Only the native verifier/reconstructor imports this attachment.
 3. Signed full logical `Solver` dump-v3 bytes, canonical registered `Game` fields
-   plus the complete trailing eight accepted control/action/decision rows (including
+   plus the bounded trailing accepted control/action/decision rows (eight by default, including
    the hold baseline), canonical `Side` (including the initial-body
    declaration), completed `Observations`, and canonical `Occurrences`.
 

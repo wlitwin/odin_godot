@@ -132,12 +132,12 @@ Client_Physics :: struct($S, $C, $A, $E: typeid, $N: int) {
 
 physics_config_default :: proc() -> Config {
     cfg := DEFAULT_CONFIG
-    cfg.history = 128
-    cfg.hz = 60
+    cfg.history = PHYSICS_HISTORY
+    cfg.hz = bcap.TICK_HZ
     cfg.lead = 2
     cfg.max_prediction = PHYSICS_DEFAULT_WINDOW
     cfg.max_future = PHYSICS_DEFAULT_WINDOW
-    cfg.max_rewind = 8
+    cfg.max_rewind = min(8, PHYSICS_WINDOW)
     cfg.max_view_span = 8
     cfg.snapshot_every = 3
     cfg.watch_delay = 0
@@ -151,8 +151,8 @@ physics_config_valid :: proc(model: Model($S, $C, $A, $E, $N), cfg: Config) -> b
     return(
         model.complete_state &&
         complete_codec_valid(model.complete_codec) &&
-        cfg.history == 128 &&
-        cfg.hz == 60 &&
+        cfg.history == PHYSICS_HISTORY &&
+        cfg.hz == bcap.TICK_HZ &&
         cfg.max_prediction <= PHYSICS_WINDOW &&
         cfg.max_future <= PHYSICS_WINDOW &&
         cfg.lead <= PHYSICS_WINDOW - 2 &&

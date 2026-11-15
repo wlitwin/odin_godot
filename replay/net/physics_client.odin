@@ -156,7 +156,7 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
     c.last_received = c.now
 
     // Coalesce partial prefixes at the existing pump presentation boundary.
-    // Apply a complete predicted tail now, before farther facts can reach H128.
+    // Apply a complete predicted tail before farther facts exhaust history.
     if c.facts_contiguous >= c.timeline.head {
         return client_physics_apply_accepted(c)
     }

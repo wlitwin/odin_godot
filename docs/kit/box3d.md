@@ -56,7 +56,8 @@ error := physics.attach(&instance, &lane, &world, initial_side, fields[:],
 ```
 
 The native `world` owner transfers and is cleared only on successful attach.
-Attach requires a new lane at tick zero, exact H=128/60 Hz configuration,
+Attach requires a new lane at tick zero with the build profile's history and
+tick rate. Initialize it with `sim.world_lane_config_default()`, then supply
 fixed non-watched proxies and a nonzero immutable predeclared asset ID. It
 verifies the actual initial dynamic count through the snapshot body cache and
 retains that declaration with every image/execution. A completed checkpoint
@@ -70,9 +71,9 @@ The local alpha tick order is:
 2. Restore canonical proxy fields and typed Side. Sample local input once for a
    normal tick; replay reads existing stamped input. Run the existing lane tick
    path and authored world pass. No presentation runs speculatively.
-3. Check counts/resources before the provider's one fixed 60 Hz/four-substep
-   solver step. Run `World_Config.settle` afterward to copy poses, consume that
-   step's actual physics outputs and derive deterministic Side/events.
+3. Check counts/resources before the provider's one solver step at the selected
+   rate and substep count. Run `World_Config.settle` afterward to copy poses,
+   consume that step's actual physics outputs and derive deterministic Side/events.
 4. Capture complete native+Side image and registered field bytes into a bounded
    staging suffix. Check actual resources/counts. An optional commit gate may
    authorize, not mutate, the candidate; a successful mutating gate is rejected.
@@ -157,8 +158,10 @@ state restoration. Author stable keys must include logical identity/generation
 when native allocation numbers can recur.
 
 World counts and byte budgets come from the shared [capacity profile](../box3d/capacities.md).
-The native build and Odin modules use matching settings. History remains 128
-frames and Kit prediction/ordinary repair remains bounded to eight ticks.
+The native build and Odin modules use matching settings. History and the
+prediction/repair ceiling are [timing profile settings](../box3d/timing.md),
+defaulting to 128 frames and eight ticks. Input batch size must also fit the
+per-message budget for the selected driver codecs.
 Asset identity declares immutable content; it does not establish a frame-time
 budget for arbitrary geometry and joint topology.
 

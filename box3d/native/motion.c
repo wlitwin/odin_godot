@@ -353,7 +353,7 @@ static ogb3_status gather(ogb3_world w,const ogb3_character_config *cfg,ogb3_vec
  for(uint32_t i=0;i<p->count;i++)solver[i]=p->planes[i].plane;return OGB3_OK;
 }
 ogb3_status ogb3_character_step(ogb3_world w,const ogb3_character_config *cfg,const ogb3_character_state *state,float dt,ogb3_character_result *out){
- REQUIRE(cfg&&state&&out&&cfg->version==1&&cfg->max_slides>=1&&cfg->max_slides<=8&&capsule_ok(&cfg->capsule)&&finite_v(cfg->up)&&finite_v(state->position)&&finite_v(state->velocity)&&finite_v(state->ground_normal)&&state->grounded<=1&&!state->reserved&&isfinite(cfg->floor_cosine)&&cfg->floor_cosine>=0&&cfg->floor_cosine<=1&&isfinite(dt)&&(dt==0||dt==1.0f/60.0f));
+ REQUIRE(cfg&&state&&out&&cfg->version==1&&cfg->max_slides>=1&&cfg->max_slides<=8&&capsule_ok(&cfg->capsule)&&finite_v(cfg->up)&&finite_v(state->position)&&finite_v(state->velocity)&&finite_v(state->ground_normal)&&state->grounded<=1&&!state->reserved&&isfinite(cfg->floor_cosine)&&cfg->floor_cosine>=0&&cfg->floor_cosine<=1&&isfinite(dt)&&(dt==0||dt==OGB3_FIXED_SECONDS));
  float norm=b3Dot(v3(cfg->up),v3(cfg->up));REQUIRE(fabsf(norm-1)<.0001f);
  Query q;ogb3_status s=query_begin(w,&cfg->filter,&q);if(s)return s;
  ogb3_character_result result={.state=*state};if(dt==0){*out=result;return OGB3_OK;}

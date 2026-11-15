@@ -40,7 +40,8 @@ if rp.step(ctx.execution) != .None {return}
 These are callback excerpts, with the provider, configuration, and game state
 supplied by the adapter setup. The movement helper reads the staged world;
 Kit still performs its participant step and Replay still requires exactly one
-`rp.step`. Both use the fixed 1/60-second contract.
+`rp.step`. Both use the selected profile's fixed duration, 1/60 second by
+default. See [Configure timing](timing.md).
 
 ## Queries
 

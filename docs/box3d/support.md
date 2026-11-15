@@ -43,18 +43,26 @@ lower per-world limits within the selected capacities.
 The resource allowance is a quota, not a 1 GiB preallocation. Actual storage
 depends on the scene, retained solver images, metadata, and temporary work.
 
-## Timing and ownership requirements
+<a id="timing-and-ownership-requirements"></a>
 
-These are separate from world capacities:
+## Timing settings and ownership
 
-| Setting | Requirement |
-| --- | --- |
-| Retained history | 128 ticks |
-| Kit prediction and ordinary repair | Up to 8 ticks |
-| Replay prediction | 30 ticks by default; configurable up to 32 |
-| Replay synchronous repair | Up to 32 ticks, within the active runner window |
-| Fixed tick | 60 Hz, four substeps |
-| Caller | One main-thread caller |
+History, timing, and window ceilings come from the same build profile as world
+capacities. These are the defaults; use [Configure timing](timing.md) to change
+them and initialize matching framework settings.
+
+| Setting | Default | Configuration |
+| --- | --- | --- |
+| Retained history | 128 frames | Build profile `history_frames` |
+| Kit prediction and ordinary repair ceiling | 8 ticks | Build profile `kit_repair_ticks` |
+| Replay prediction | 30 ticks | Build default `replay_prediction_ticks`; network runners can choose a smaller active window |
+| Replay prediction and synchronous repair ceiling | 32 ticks | Build profile `replay_window_ticks`; repair stays within the active runner window |
+| Simulation tick rate | 60 Hz | Build profile `tick_hz` |
+| Native substeps per simulation tick | 4 | Build profile `substeps` |
+
+The caller contract remains one main-thread caller. The managed adapters and
+shared backend rely on serialized execution and retained code/data ownership;
+thread count is not a profile setting.
 
 Capacity, missing history, incompatible identity, and unsupported operations
 must be handled explicitly. Missing predecessor history cannot be replaced by

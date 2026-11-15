@@ -7,6 +7,7 @@ import net "godot:replay/net"
 import view "godot:replay/view"
 import rgd "godot:replay/godot"
 import r "godot:replay"
+import bcap "godot:box3d/limits"
 import audit "accepted_audit"
 
 replay_authoring_demo_process :: proc(self: ^ReplayAuthoringDemo, dt: f64) {
@@ -63,7 +64,7 @@ replay_authoring_demo_process :: proc(self: ^ReplayAuthoringDemo, dt: f64) {
     elapsed := self.go && running && (self.target == 0 || head < self.target) ? dt : f64(0)
 
     if bootstrap {
-        elapsed = 1.0 / 60.0 + 1e-9
+        elapsed = 1.0 / f64(bcap.TICK_HZ) + 1e-9
         control = {}
     }
 

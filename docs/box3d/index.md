@@ -40,6 +40,7 @@ and [authoring API](../api/generated/box3d/authoring.md).
 | [Multiplayer integration](multiplayer.md) | Choose an adapter, prepare its sample, and preserve complete state |
 | [Build and export](building.md) | Build and select the backend, deploy it with the SDK, and export a project |
 | [Configure capacities](capacities.md) | Select body, shape, joint, asset, and byte budgets for the game |
+| [Configure timing](timing.md) | Select history, prediction/repair ceilings, tick rate, and substeps |
 | [API map and limits](reference.md) | Find package entry points, shape rules, identity rules, and supported bounds |
 | [Support](support.md) | Check platform, determinism, and runtime restrictions |
 

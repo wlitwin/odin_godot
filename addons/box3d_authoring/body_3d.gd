@@ -17,7 +17,7 @@ extends Node3D
 @export var sensor: bool = false
 @export var shapes: Array[Box3DShape3D] = []
 @export_group("Motion")
-## Lift Box3D's spin cap (a quarter turn per physics step, 47 rad/s at 60 Hz) for
+## Lift Box3D's spin cap (one eighth turn per physics step, 47 rad/s at 60 Hz) for
 ## round bodies that roll fast, such as wheels and balls.
 @export var allow_fast_rotation: bool = false
 ## Axes the body cannot move along or turn about.

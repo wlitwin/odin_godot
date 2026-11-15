@@ -10,6 +10,7 @@ import k "godot:kit/sim"
 import ks "godot:kit/session"
 import r "godot:replay"
 import rp "godot:replay/physics"
+import bcap "godot:box3d/limits"
 import f "godot:tests/box3d_authoring/frameworks"
 
 BODIES :: 1000
@@ -190,7 +191,11 @@ replay_large_world_corrects_input_and_retains_a_full_history :: proc(t: ^testing
     }
 
     timeline: r.Timeline(State, u8, u8)
-    testing.expect_value(t, r.init_complete(&timeline, &initial, replay_step), r.Error.None)
+    testing.expect_value(
+        t,
+        r.init_complete(&timeline, &initial, replay_step, rp.timeline_config_default()),
+        r.Error.None,
+    )
     defer r.destroy(&timeline)
 
     for _ in 0 ..< 8 {
@@ -204,7 +209,7 @@ replay_large_world_corrects_input_and_retains_a_full_history :: proc(t: ^testing
     testing.expect(t, found && state.state.tick == 8 && state.state.changed == 1)
     testing.expect_value(t, r.confirm_through(&timeline, 8), r.Error.None)
 
-    for tick in 9 ..= 128 {
+    for tick in 9 ..= bcap.HISTORY_FRAMES {
         result := r.advance(&timeline, 0)
         testing.expect_value(t, result.error, r.Error.None)
 
@@ -215,7 +220,7 @@ replay_large_world_corrects_input_and_retains_a_full_history :: proc(t: ^testing
         testing.expect_value(t, r.confirm_through(&timeline, u64(tick)), r.Error.None)
     }
 
-    checkpoint, checkpoint_error := r.capture_complete(&timeline, 128)
+    checkpoint, checkpoint_error := r.capture_complete(&timeline, u64(bcap.HISTORY_FRAMES))
     testing.expect_value(t, checkpoint_error, r.Error.None)
     defer r.complete_checkpoint_destroy(&checkpoint)
     states := make([]b.Body_State, BODIES)
@@ -223,7 +228,7 @@ replay_large_world_corrects_input_and_retains_a_full_history :: proc(t: ^testing
     count, count_error := rp.body_states(&checkpoint, states)
     testing.expect_value(t, count_error, r.Error.None)
     testing.expect_value(t, count, u32(BODIES))
-    fmt.println("CAPACITY_REPLAY_OK bodies=1000 joints=100 history=128 revised_tick=3")
+    fmt.printfln("CAPACITY_REPLAY_OK bodies=1000 joints=100 history=%d revised_tick=3", bcap.HISTORY_FRAMES)
 }
 
 @(test)
@@ -267,13 +272,13 @@ kit_large_authored_world_transfers_complete_state_and_resets :: proc(t: ^testing
     testing.expect(t, f.kit_same(t, host, client, 0))
 
     for _ in 0 ..< 3 {
-        _ = k.lane_frame(&client.lane, 1.0 / 60)
+        _ = k.lane_frame(&client.lane, 1.0 / f64(b.FIXED_HZ))
     }
 
     f.kit_pump({host, client})
 
     for _ in 0 ..< 3 {
-        testing.expect_value(t, k.lane_frame(&host.lane, 1.0 / 60), 1)
+        testing.expect_value(t, k.lane_frame(&host.lane, 1.0 / f64(b.FIXED_HZ)), 1)
     }
 
     f.kit_pump({host, client})

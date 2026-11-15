@@ -38,9 +38,10 @@ state from another tick does not describe a coherent point in the game.
 
 ## Give each world one clock owner
 
-The managed Box3D integration advances at 60 Hz with four substeps. Each tick
-represents 1/60 second of game time. Four substeps divide the solver's work
-inside that tick; they do not give game input four independent network ticks.
+The managed Box3D integration defaults to 60 Hz with four substeps. Its shared
+[timing profile](../timing.md) selects the rate and substeps for the build.
+Substeps divide the solver's work inside a tick; they do not create additional
+gameplay or network ticks.
 
 | Use | Tick owner | Physics work |
 | --- | --- | --- |
@@ -50,7 +51,8 @@ inside that tick; they do not give game input four independent network ticks.
 
 Rendering can run faster or slower than simulation. A 120 Hz display does not
 turn the fixed simulation into a 120 Hz world. The offline tower's
-one-call-per-physics-frame schedule relies on Godot being configured for 60 Hz.
+one-call-per-physics-frame schedule relies on Godot matching the selected rate,
+60 Hz by default.
 Other offline schedules need an explicit policy for accumulating elapsed time.
 The managed adapters keep their existing fixed-step contract.
 
@@ -98,11 +100,12 @@ need a simulation budget as well as a rendering budget.
 
 ## Budget history and correction separately
 
-The current complete-state integrations retain 128 ticks of history. Kit's
-prediction and ordinary repair window is up to eight ticks. Replay defaults
-to 30 predicted ticks and permits up to 32; its synchronous repair follows the
-active runner window. These windows serve different policies, so the same
-history length does not make the two protocols interchangeable.
+The default complete-state profiles retain 128 frames of history. Kit's default
+prediction/repair ceiling is eight ticks. Replay defaults to 30 predicted ticks
+with a build ceiling of 32; synchronous repair follows the active runner window.
+All these bounds are configurable through [the timing profile](../timing.md).
+They serve different policies, so the same history length does not make the two
+protocols interchangeable.
 
 More bodies, shapes, contacts, and joints increase the state that each retained
 image can own and the work required to resimulate a suffix. A count allowance

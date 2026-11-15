@@ -53,6 +53,39 @@ class CapacityProfileTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertNotEqual(capacity.fingerprint(profile), fingerprint)
 
+    def test_timing_constraints_are_checked_together(self):
+        for overrides in (
+            {'history_frames': 31}, {'history_frames': 2048},
+            {'kit_repair_ticks': 0}, {'kit_repair_ticks': 256},
+            {'kit_repair_ticks': 126}, {'replay_window_ticks': 3},
+            {'replay_window_ticks': 126}, {'replay_prediction_ticks': 33},
+            {'tick_hz': 0}, {'tick_hz': 241}, {'substeps': 0}, {'substeps': 129},
+        ):
+            profile = capacity.load()
+            profile.update(overrides)
+            with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                capacity.validate(profile)
+        profile = capacity.load()
+        profile.update(history_frames=256, kit_repair_ticks=16,
+                       replay_prediction_ticks=60, replay_window_ticks=64,
+                       tick_hz=120, substeps=3)
+        self.assertIs(capacity.validate(profile), profile)
+        self.assertIn('-define:BOX3D_TICK_HZ=120', capacity.odin_flags(profile))
+        self.assertIn('-DOGB3_SUBSTEPS=3', capacity.cmake_flags(profile))
+        profile = capacity.load()
+        profile['history_frames'] = 96
+        self.assertIs(capacity.validate(profile), profile)
+
+    def test_legacy_project_profiles_gain_default_timing(self):
+        with tempfile.TemporaryDirectory() as work:
+            path = Path(work) / 'legacy.json'
+            path.write_text('{"schema_version": 1, "max_bodies": 2048}')
+            selected = capacity.load(path)
+            self.assertEqual(selected['schema_version'], 2)
+            self.assertEqual(selected['max_bodies'], 2048)
+            self.assertEqual(selected['tick_hz'], 60)
+            self.assertEqual(selected['history_frames'], 128)
+
     def test_authoring_copy_uses_the_verified_selected_profile(self):
         with tempfile.TemporaryDirectory() as work:
             addon = Path(work) / 'addons/box3d_authoring'

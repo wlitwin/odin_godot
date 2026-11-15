@@ -6,15 +6,18 @@ import os
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+SCHEMA_VERSION = 2
 FIELDS = ('max_bodies', 'max_shapes', 'max_contacts', 'max_joints', 'max_assets',
           'max_sensor_pairs', 'memory_bytes', 'recovery_bytes', 'dto_bytes',
-          'snapshot_bytes', 'network_bytes', 'debug_lines')
+          'snapshot_bytes', 'network_bytes', 'debug_lines', 'history_frames',
+          'kit_repair_ticks', 'replay_prediction_ticks', 'replay_window_ticks',
+          'tick_hz', 'substeps')
 
 
 def validate(profile):
     if (set(profile) != {'schema_version', *FIELDS} or
-            type(profile['schema_version']) is not int or profile['schema_version'] != 1):
-        raise ValueError('capacity profile needs schema_version 1 and the documented capacity fields')
+            type(profile['schema_version']) is not int or profile['schema_version'] != SCHEMA_VERSION):
+        raise ValueError('capacity profile needs schema_version 2 and the documented profile fields')
     for name in FIELDS:
         value = profile[name]
         maximum = (1 << 63) - 1 if name == 'memory_bytes' else (1 << 30) - 1
@@ -26,6 +29,19 @@ def validate(profile):
         raise ValueError('network_bytes must cover recovery_bytes + snapshot_bytes')
     if profile['memory_bytes'] < profile['network_bytes'] + profile['dto_bytes']:
         raise ValueError('memory_bytes must cover network_bytes + dto_bytes')
+    history = profile['history_frames']
+    if not 32 <= history <= 1024:
+        raise ValueError('history_frames must be from 32 through 1024')
+    if not 1 <= profile['kit_repair_ticks'] <= min(255, history - 3):
+        raise ValueError('kit_repair_ticks must be from 1 through min(255, history_frames - 3)')
+    if not 4 <= profile['replay_window_ticks'] <= history - 3:
+        raise ValueError('replay_window_ticks must be from 4 through history_frames - 3')
+    if not 4 <= profile['replay_prediction_ticks'] <= profile['replay_window_ticks']:
+        raise ValueError('replay_prediction_ticks must be from 4 through replay_window_ticks')
+    if not 1 <= profile['tick_hz'] <= 240:
+        raise ValueError('tick_hz must be from 1 through 240 for the managed frameworks')
+    if not 1 <= profile['substeps'] <= 128:
+        raise ValueError('substeps must be from 1 through 128')
     return profile
 
 
@@ -37,6 +53,10 @@ def load(filename=None):
         if unknown:
             raise ValueError('unknown capacity fields: ' + ', '.join(sorted(unknown)))
         profile.update(overrides)
+        # Capacity-only project files remain usable; resolve them into the
+        # current complete profile before hashing or passing compiler flags.
+        if type(profile['schema_version']) is int and profile['schema_version'] == 1:
+            profile['schema_version'] = SCHEMA_VERSION
     return validate(profile)
 
 
@@ -112,6 +132,7 @@ fingerprint :: proc() -> u64 {
 }
 '''
     header += '''#define OGB3_MAX_SENSOR_EVENTS (2u * OGB3_MAX_SENSOR_PAIRS)
+#define OGB3_FIXED_SECONDS (1.0f / (float)OGB3_TICK_HZ)
 #define OGB3_CAP_MAX(a,b) ((a) > (b) ? (a) : (b))
 #define OGB3_MAX_SPARSE_SLOTS OGB3_CAP_MAX(512u, (4u * OGB3_CAP_MAX(OGB3_CAP_MAX(OGB3_MAX_BODIES, OGB3_MAX_SHAPES), OGB3_CAP_MAX(OGB3_MAX_CONTACTS, OGB3_MAX_JOINTS))))
 #define OGB3_MAX_TREE_NODES OGB3_CAP_MAX(512u, (4u * OGB3_MAX_SHAPES))

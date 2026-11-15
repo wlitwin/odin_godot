@@ -16,11 +16,20 @@ The codec must stay at a stable address while server/client or recovery transfer
 
 ## Accepted history and correction
 
-The authority records the exact `Batch` used by the existing model callback and versioned decisions: every seat's controls, actions, sequence/rejection/verdict, joins/leaves/fresh bits, view inputs, authority observations and driver binding. History is H128. The client keeps a bounded knowledge ledger alongside the Timeline's existing predicted inputs; it is not another solver or rollback ring.
+The authority records the exact `Batch` used by the existing model callback and versioned decisions: every seat's controls, actions, sequence/rejection/verdict, joins/leaves/fresh bits, view inputs, authority observations and driver binding. History uses the shared build profile (128 frames by default). The client keeps a bounded knowledge ledger alongside the Timeline's existing predicted inputs; it is not another solver or rollback ring.
 
 Input admission validates the transport source, seat, epoch, generation/serial, sequence and tick window before mutation. Exact repeats are idempotent. Conflicting repeats are rejected, including altered control view stamps and changed pending/retained action values. Bounded receipt metadata survives durable recovery. Known accepted values replace predictions. Only unknown remote values use `hold`; unknown remote actions are cleared. Action callbacks use the existing solver/Game/event savepoint path, including actual predicate rejection.
 
-Ordinary prediction and correction are limited to the configured window, `Config.max_prediction` (default `net.PHYSICS_DEFAULT_WINDOW`, 30 ticks or 500 ms; ceiling `net.PHYSICS_WINDOW`, 32), including any later predicted suffix. The window must cover the round trip plus the input arrival reserve: the original eight-tick window was already full on a single machine and could not keep a client's inputs on time past roughly 80 ms of round trip ([network harness](https://github.com/wlitwin/odin_godot/blob/main/tests/replay_dockyard/netsim/README.md)). Missing retained history or a larger correction requests complete resynchronization; it never silently truncates or opens the live solver as a historical substitute. View admission in physical mode uses issued-frame proofs and tick bounds, rather than RTT-derived gameplay bounds. Timing observations never change model input, state or admission identity.
+Ordinary prediction and correction use the runner's active `Config.max_prediction`
+window, bounded by `net.PHYSICS_WINDOW`. The build profile selects that ceiling
+and its default prediction window: 32 and 30 ticks respectively by default.
+At 60 Hz, thirty ticks represent half a second; changing the tick rate changes
+the duration of that window. Use [Configure timing](../box3d/timing.md) to select
+history, rate, and horizons together. The active window needs enough room for
+input arrival and authority feedback. Missing history or a larger correction
+requests complete resynchronization. View admission uses issued-frame proofs
+and tick bounds; timing observations do not change model input or admission
+identity.
 
 `revise_inputs_checked` uses the existing staged suffix loop, starting at the first tick whose rewritten input is not step-equivalent to the recorded one (`Input_Rewrite.equivalent`; the runner compares every `Batch` field the step, actions and verdicts read). A complete step is a pure function of its predecessor image and input, so an equivalent prefix keeps its records and only has its accepted inputs recorded; when every input matches, nothing executes and the published execution stays. `Result.steps` and `last_executed_steps` count executed ticks; `Stats.reused_correction_ticks` counts the rest, and a confirmation that executes nothing is not a correction. The check runs exactly once at a requested retained tick before publication, on the committed record when that tick lies in the unchanged prefix. It borrows an independent owning complete clone; the callback must not consume, destroy or modify that borrow. It can explicitly clone it to retain another owner. Core destroys its clone. Clone, callback, admission or later suffix failure aborts the whole operation. No operation-local callback context is retained.
 

@@ -14,12 +14,27 @@ import bg "godot:box3d/godot"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 
-WORLD_HISTORY_FRAMES :: 128
-WORLD_REPAIR_TICKS :: 8
+WORLD_HISTORY_FRAMES :: bcap.HISTORY_FRAMES
+WORLD_REPAIR_TICKS :: bcap.KIT_REPAIR_TICKS
 WORLD_EFFECTS_PER_TICK :: 32
 WORLD_EFFECT_BYTES :: 128
 WORLD_WORK_NS :: u64(4_000_000)
 WORLD_MEMORY_BYTES :: u64(bcap.MEMORY_BYTES)
+
+// Start a complete-world Lane with timing and storage matching its backend.
+// Generic Lane_Config defaults remain independent of the optional participant.
+world_lane_config_default :: proc() -> Lane_Config {
+    snapshots := min(3, WORLD_REPAIR_TICKS)
+    return {
+        hz          = bcap.TICK_HZ,
+        slots       = WORLD_HISTORY_FRAMES,
+        snap_every  = snapshots,
+        margin      = min(2, WORLD_REPAIR_TICKS),
+        lead_max    = WORLD_REPAIR_TICKS,
+        rewind_max  = 1, // Field-only lag compensation is unavailable while attached.
+        watch_delay = min(2 * snapshots, min(31, WORLD_HISTORY_FRAMES - 1)),
+    }
+}
 
 World_Error :: enum {
     Ok,
@@ -527,7 +542,9 @@ lane_world_attach :: proc(
     if len(l.entries) > bcap.MAX_BODIES ||
        l.ticker.tick != 0 ||
        l.slots != WORLD_HISTORY_FRAMES ||
-       abs(l.ticker.dt - 1.0 / 60.0) > 1e-12 ||
+       abs(l.ticker.dt - 1.0 / f64(bcap.TICK_HZ)) > 1e-12 ||
+       l.snap_every > WORLD_REPAIR_TICKS ||
+       l.margin > WORLD_REPAIR_TICKS ||
        l.echo_on ||
        l.tolerance != 0 ||
        l.step_auth != nil ||
@@ -576,7 +593,8 @@ lane_world_attach :: proc(
     estimate := u64(size_of(World_History) + size_of(Lane)) + cfg.additional_owned_bytes + world_all_owned_bytes()
 
     for e in l.entries {
-        if e.hist.size < 0 || e.hist.size > int(WORLD_MEMORY_BYTES / 256) {
+        if e.hist.size < 0 ||
+           u64(e.hist.size) > WORLD_MEMORY_BYTES / u64(WORLD_HISTORY_FRAMES + WORLD_REPAIR_TICKS + 2) {
             return .Budget
         }
 
@@ -1243,9 +1261,10 @@ lane_world_emit :: proc(l: ^Lane, key: u64, fire: World_Effect_Proc, user: rawpt
 
 // Optional accepted-input/complete-state protocol. All local pointer-bearing
 // codecs remain process-local. Only their canonical descriptors enter identity.
-WORLD_NETWORK_REV :: u32(2)
+WORLD_NETWORK_REV :: u32(3)
 WORLD_NETWORK_BYTES :: bcap.NETWORK_BYTES
 WORLD_NETWORK_CHUNK :: 32 * 1024
+WORLD_PACKET_BYTES :: 64 * 1024
 WORLD_NETWORK_DRIVERS :: 16
 WORLD_NETWORK_QUEUE :: max(16, bcap.NETWORK_PARTS)
 WORLD_NETWORK_TRANSFERS :: 8 // complete receive staging, not simulation/history depth
@@ -1342,7 +1361,7 @@ World_Net_Packet :: struct {
     peer:  ksess.Peer_Id, // original authenticated peer, never later reconstructed
 }
 
-// v2 normal traffic carries no recovery image. A receipt is local proposal
+// Normal traffic carries no recovery image. A receipt is local proposal
 // validation, not an accepted gameplay outcome or remote delivery certificate.
 World_Protocol_Status :: struct {
     wire_revision:                                                                        u32,

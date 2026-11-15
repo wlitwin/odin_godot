@@ -100,7 +100,7 @@ character_step :: proc(
         return {}, error
     }
 
-    result, status := b.character_step(w, config, value, f32(1.0 / 60))
+    result, status := b.character_step(w, config, value, b.FIXED_SECONDS)
 
     if !require(a, status) {
         return {}, map_status(status)

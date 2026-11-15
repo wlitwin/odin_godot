@@ -327,7 +327,7 @@ world_operation :: proc(
     }
 
     // One ticket covers admitted staged ticks plus open/final verification work.
-    // The configured 2 MiB remains a primitive allowance, not an eight-tick total.
+    // The configured allowance covers one primitive rather than a whole suffix.
     primitive_count := max(u64(1), head - source.tick) + 3
 
     if w.config.reservation_bytes > WORLD_MEMORY_BYTES / primitive_count {
@@ -990,6 +990,8 @@ lane_world_network_attach :: proc(l: ^Lane, cfg: World_Network_Config) -> World_
     }
 
     bytes := 0
+    wire_row_bytes := 0
+    receipt_count := 0
 
     for d, i in cfg.drivers {
         if d.player == knet.PLAYER_ID_INVALID {
@@ -1025,6 +1027,12 @@ lane_world_network_attach :: proc(l: ^Lane, cfg: World_Network_Config) -> World_
                 }
 
                 bytes += c.codec.local_bytes
+                wire_row_bytes += 10 + c.codec.wire_bytes
+
+                if d.class == 0 {
+                    receipt_count += 1
+                }
+
                 found = true
             }
         }
@@ -1032,6 +1040,16 @@ lane_world_network_attach :: proc(l: ^Lane, cfg: World_Network_Config) -> World_
         if !found {
             return .Incompatible
         }
+    }
+
+    // Keep the redundant input batch within the complete-world packet ceiling.
+    // The count byte bounds the build profile, while actual codec
+    // widths and roster size determine whether this game's batch fits.
+    // Proposals include bootstrap identity; accepted batches include receipts.
+    packet_header := max(71, 64 + 25 * receipt_count)
+
+    if wire_row_bytes > (WORLD_PACKET_BYTES - packet_header) / WORLD_REPAIR_TICKS {
+        return .Capacity
     }
 
     for b, index in w.bindings {
@@ -1388,7 +1406,7 @@ world_network_receive :: proc(l: ^Lane, from: knet.Player_Id, peer: ksess.Peer_I
 
     blob := knet.reader_remaining(r)
 
-    if len(blob) > 64 * 1024 ||
+    if len(blob) > WORLD_PACKET_BYTES ||
        n.queue_count == WORLD_NETWORK_QUEUE ||
        n.queue_bytes > 2 * WORLD_NETWORK_BYTES - len(blob) {
         world_network_fail(l, .Capacity, !l.ses.is_host)
@@ -2053,7 +2071,7 @@ world_network_accept_packet :: proc(l: ^Lane, p: World_Net_Packet, validate_only
         }
     }
 
-    // v2 repairs only inside a full-signature verification transaction. Merely
+    // Repair runs only inside a full-signature verification transaction. Merely
     // receiving accepted rows is not a state/confirmation publication boundary.
     world_protocol_accept_receipt(l, sequence, receipts[:])
     world_protocol_advance_accepted(l)
@@ -2918,7 +2936,7 @@ lane_world_protocol_peer_disconnected :: proc(l: ^Lane, peer: ksess.Peer_Id) -> 
     return .Ok
 }
 
-// World v2: ordinary accepted traffic contains authenticated receipt feedback;
+// Ordinary accepted traffic contains admitted receipt feedback;
 // full state remains explicit bootstrap/recovery traffic.
 @(private)
 world_protocol_invalidate :: proc(n: ^World_Network) {

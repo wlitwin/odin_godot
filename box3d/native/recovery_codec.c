@@ -1449,10 +1449,14 @@ static int validate_world(Codec *c, const b3World *w) {
              w->hitEventThreshold >= 0 && w->contactRecycleDistance >= 0 &&
              w->contactRecycleDistance <= 1e6f,
          121);
-  float fixed_dt = 1.0f / 60.0f, fixed_h = fixed_dt / 4.0f;
+  /* Match the engine's f32 operation order. Inverting dt/substeps can round
+   * differently for non-power-of-two substep counts. */
+  float fixed_dt = OGB3_FIXED_SECONDS;
+  float fixed_inv_dt = 1.0f / fixed_dt;
+  float fixed_inv_h = (float)OGB3_SUBSTEPS * fixed_inv_dt;
   VERIFY((w->inv_h == 0 && w->inv_dt == 0) ||
-             (float_equal(w->inv_h, 1.0f / fixed_h) &&
-              float_equal(w->inv_dt, 1.0f / fixed_dt)),
+             (float_equal(w->inv_h, fixed_inv_h) &&
+              float_equal(w->inv_dt, fixed_inv_dt)),
          122);
   int nb = w->bodies.count, ns = w->shapes.count, nc = w->contacts.count,
       nj = w->joints.count, ni = w->islands.count, nt = w->solverSets.count;

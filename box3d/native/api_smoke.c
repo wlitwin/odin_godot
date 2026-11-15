@@ -98,13 +98,15 @@ static void body_type_roundtrip(void) {
   OK(ogb3_world_destroy(w));
   puts("PASS body type: invalid refusal, kinematic cache/source-free restore, dynamic mass and stable identity");
 }
-/* Box3D caps spin at a quarter turn per step unless a body allows fast
+/* Box3D caps spin at one eighth turn per step unless a body allows fast
  * rotation. The flag must survive a snapshot restore and a Kinematic to
  * Dynamic switch, which is how Replay steps and how games put balls in play. */
 static void fast_rotation(void) {
   ogb3_world_def wd;
   OK(ogb3_world_def_default(&wd));
   wd.gravity = (ogb3_vec3){0, 0, 0};
+  const float capped_speed = .78539816339f / OGB3_FIXED_SECONDS;
+  const float requested_speed = 4.0f * capped_speed;
   for (uint32_t allow = 0; allow <= 1; ++allow) {
     ogb3_world w;
     OK(ogb3_world_create(&wd, &w));
@@ -130,7 +132,7 @@ static void fast_rotation(void) {
     OK(ogb3_body_resolve(w, key, &body));
     OK(ogb3_body_set_type(body, OGB3_DYNAMIC));
     OK(ogb3_body_set_velocity(body, &(ogb3_vec3){0, 0, 0},
-                              &(ogb3_vec3){200, 0, 0}));
+                              &(ogb3_vec3){requested_speed, 0, 0}));
     OK(ogb3_world_step_fixed(w));
     ogb3_snapshot *after = NULL;
     OK(ogb3_snapshot_capture(w, &after));
@@ -138,7 +140,8 @@ static void fast_rotation(void) {
     OK(ogb3_snapshot_body_state(after, key, &state));
     ogb3_snapshot_release(after);
     float spin = state.angular_velocity.x;
-    assert(allow ? spin > 190 : spin < 50);
+    assert(allow ? spin > .95f * requested_speed
+                 : fabsf(spin - capped_speed) < .01f * capped_speed);
     OK(ogb3_world_destroy(w));
   }
   ogb3_world w;
@@ -149,7 +152,7 @@ static void fast_rotation(void) {
   ogb3_body body;
   assert(ogb3_body_create(w, &bad, &body) == OGB3_INVALID_ARGUMENT);
   OK(ogb3_world_destroy(w));
-  puts("PASS fast rotation: capped at a quarter turn per step without the flag, "
+  puts("PASS fast rotation: capped at one eighth turn per step without the flag, "
        "kept with it through restore and a Kinematic to Dynamic switch");
 }
 /* A sphere rolling (or resting) on a static floor for one second; returns its
@@ -182,7 +185,7 @@ static ogb3_vec3 roll_on_floor(float rolling_resistance, ogb3_vec3 conveyor,
   OK(ogb3_shape_def_default(&sd));
   sd.rolling_resistance = rolling_resistance;
   OK(ogb3_shape_sphere(ball, &sd, &(ogb3_vec3){0, 0, 0}, .25f, &shape));
-  for (int i = 0; i < 60; ++i)
+  for (int i = 0; i < OGB3_TICK_HZ; ++i)
     OK(ogb3_world_step_fixed(w));
   ogb3_vec3 v, wv;
   OK(ogb3_body_get_velocity(ball, &v, &wv));
@@ -274,7 +277,7 @@ static void light_ball_rolls(void) {
   /* Rolling (spin x radius matches speed) within 1/6 s. A box floor stops it
    * soon after: against hulls Box3D scales rolling resistance by a quarter of
    * the hull's inner radius when that exceeds the ball's. */
-  for (int i = 0; i < 10; ++i)
+  for (int i = 0; i < (OGB3_TICK_HZ + 5) / 6; ++i)
     OK(ogb3_world_step_fixed(w));
   ogb3_vec3 v, wv;
   OK(ogb3_body_get_velocity(ball, &v, &wv));
@@ -314,7 +317,7 @@ int main(void) {
   OK(ogb3_world_valid(w, &valid));
   assert(valid);
   assert(ogb3_world_step(w, NAN, 4) == OGB3_INVALID_ARGUMENT);
-  assert(ogb3_world_step(w, 1.0f / 60, 0) == OGB3_INVALID_ARGUMENT);
+  assert(ogb3_world_step(w, OGB3_FIXED_SECONDS, 0) == OGB3_INVALID_ARGUMENT);
   ogb3_body_def bd;
   OK(ogb3_body_def_default(&bd));
   ogb3_body ground, body;
@@ -335,7 +338,7 @@ int main(void) {
   float mass;
   OK(ogb3_body_get_mass(body, &mass));
   assert(mass > 0);
-  for (int tick = 0; tick < 180; tick++)
+  for (int tick = 0; tick < 3 * OGB3_TICK_HZ; tick++)
     OK(ogb3_world_step_fixed(w));
   ogb3_pose p;
   OK(ogb3_body_get_pose(body, &p));
@@ -397,7 +400,7 @@ int main(void) {
   hd.max_motor_torque = 100;
   ogb3_joint joint;
   OK(ogb3_joint_hinge_create(w, &hd, &joint));
-  for (int i = 0; i < 30; i++)
+  for (int i = 0; i < (OGB3_TICK_HZ + 1) / 2; i++)
     OK(ogb3_world_step_fixed(w));
   float angle;
   OK(ogb3_joint_hinge_get_angle(joint, &angle));

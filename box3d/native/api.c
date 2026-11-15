@@ -651,7 +651,7 @@ ogb3_status ogb3_world_step(ogb3_world w, float dt, uint32_t substeps) {
 }
 ogb3_status ogb3_world_step_fixed(ogb3_world w) {
   OGB3_OBS_BEGIN(observe_fixed, OGB3_OBS_STEP_FIXED_V1);
-  OGB3_OBS_RETURN(observe_fixed, ogb3_world_step(w, 1.0f / 60.0f, 4));
+  OGB3_OBS_RETURN(observe_fixed, ogb3_world_step(w, OGB3_FIXED_SECONDS, OGB3_SUBSTEPS));
 }
 ogb3_status ogb3_world_get_gravity(ogb3_world w, ogb3_vec3 *out) {
   ARG(out);

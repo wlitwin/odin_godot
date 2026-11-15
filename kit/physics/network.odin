@@ -580,6 +580,7 @@ network_attach :: proc(
     // Ordered roster, accepted decision header, prediction semantics and each
     // actual typed schema are all part of the input contract.
     knet.write_u32(&input_catalog, sim.WORLD_NETWORK_REV)
+    knet.write_u64(&input_catalog, bcap.fingerprint())
     knet.write_u32(&input_catalog, u32(len(drivers)))
 
     for d in drivers {
@@ -594,7 +595,7 @@ network_attach :: proc(
     }
 
     input_hash, ie := bd.hash_descriptors(
-        "kit-physics-input-v2",
+        "kit-physics-input-v3",
         []bd.Descriptor{{"accepted-batch-control-action-decision", knet.writer_bytes(&input_catalog)}},
     )
 

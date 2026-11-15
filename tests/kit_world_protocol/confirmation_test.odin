@@ -55,7 +55,7 @@ matching_signature_confirms_without_normal_full_state_and_effects_repeat :: proc
     }
 
     final := k.lane_world_protocol_status(&pair.host.lane)
-    testing.expect_value(t, final.wire_revision, u32(2))
+    testing.expect_value(t, final.wire_revision, k.WORLD_NETWORK_REV)
     testing.expect_value(t, final.full_states_sent, initial.full_states_sent)
     testing.expect_value(t, final.signatures_sent - initial.signatures_sent, u64(2))
     before := pair.client.effects

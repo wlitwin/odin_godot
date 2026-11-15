@@ -34,3 +34,24 @@ jobs:
             ${{ runner.temp }}/box3d-capacity/capacity-profile.json
             ${{ runner.temp }}/box3d-capacity-custom/*.log
             ${{ runner.temp }}/box3d-capacity-custom/capacity-profile.json
+
+  timing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [high, low, nonpower]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v31
+      - name: Verify history and timing profile
+        run: nix develop .#capacity --command python3 tests/box3d_timing/run.py --profile "tests/box3d_timing/${{ matrix.profile }}.json" --out "$RUNNER_TEMP/box3d-timing"
+      - name: Preserve timing logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: box3d-timing-${{ matrix.profile }}
+          path: |
+            ${{ runner.temp }}/box3d-timing/*.log
+            ${{ runner.temp }}/box3d-timing/profile.json

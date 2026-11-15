@@ -30,7 +30,9 @@ if err != .None {return}
 defer replay.complete_checkpoint_destroy(&initial)
 
 timeline: replay.Timeline(State, Input, Event)
-err = replay.init_complete(&timeline, &initial, step, {128, events_per_tick})
+timeline_config := physics.timeline_config_default()
+timeline_config.events_per_tick = events_per_tick
+err = replay.init_complete(&timeline, &initial, step, timeline_config)
 if err != .None {return}
 defer replay.destroy(&timeline)
 ```
@@ -70,7 +72,7 @@ storage. Capability and provider callbacks must remain loaded while in use.
 
 Commands resolve world-independent keys in the current disposable world. The
 model must call `physics.step(ctx.execution)` exactly once per successful tick;
-it always uses 60 Hz and four substeps. Skipping or repeating the step rejects
+it uses the selected build profile, defaulting to 60 Hz and four substeps. Skipping or repeating the step rejects
 the candidate. A native command error poisons staging even if gameplay ignores
 the returned error. `abort` and commit rejection leave the published solver,
 game values, history, inputs and occurrences unchanged.
@@ -100,14 +102,13 @@ capture/open failure, resource refusal or a rejected gate never falls back to th
 live solver or truncates a suffix.
 
 Ordinary prediction and synchronous repair are limited to `net.PHYSICS_WINDOW`
-(32 ticks) by the provider; a runner's active window is its configured
-`max_prediction` (default 30). Image capture, clone and restore keep every seal
+(32 ticks by default, selected by the build profile) by the provider; a runner's active window is its configured
+`max_prediction` (default 30, selected by the build profile). Image capture, clone and restore keep every seal
 validation, but the process-local seal is a word-parallel hash and the exact
 FNV-1a complete digest is computed on first request. Deeper
 required repair returns an explicit limit/history error and needs a complete
 recovery policy. `correct_reusing` returns `Reuse_Disabled` for managed state.
-Offline audit has a separate bound of the replayable retained window (127 ticks
-with H=128); it compares solver bytes, the completed observation cache, game
+Offline audit has a separate bound of the replayable retained window (H-1 transitions); it compares solver bytes, the completed observation cache, game
 values and events, then releases each temporary image immediately. It does not
 retain a second solver image ring or replace the published world.
 
@@ -131,7 +132,8 @@ P2P remains unchanged.
 
 Count and byte limits use the shared [capacity profile](../../docs/box3d/capacities.md),
 defaulting to 1024 bodies, 4096 shapes, 16384 contacts, 256 joints and 128 assets.
-H=128 and single-caller native use remain fixed contracts. The initial dynamic
+History and fixed cadence follow the shared [timing profile](../../docs/box3d/timing.md),
+defaulting to H=128 and 60 Hz/four substeps. Single-caller native use remains required. The initial dynamic
 declaration is checked against actual cached body types. Every allocating
 operation preflights a future reservation derived from the selected snapshot and
 DTO budgets (64 MiB by default); actual cumulative engine/wrapper/Odin ownership

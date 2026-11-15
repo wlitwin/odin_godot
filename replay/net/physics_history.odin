@@ -1,5 +1,7 @@
 package replay_net
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import "core:reflect"
 import r "godot:replay"
@@ -12,15 +14,15 @@ ACCEPTED_PHYSICS_VERSION :: u32(1)
 // Welcome, explicit mismatch requests and spectators. Peers on another
 // revision reject each other's facts instead of half-working.
 PHYSICS_WIRE_VERSION :: u32(2)
-PHYSICS_HISTORY :: 128
+PHYSICS_HISTORY :: bcap.HISTORY_FRAMES
 // Ceiling for a complete-physics runner's prediction/repair window
 // (Config.max_prediction, max_future). Each side's active window is its
-// configured max_prediction. Prediction depth must cover the round trip plus
-// the input arrival reserve, so the ceiling sits well past ordinary RTTs.
-PHYSICS_WINDOW :: 32
-// Default window: 500 ms at 60 Hz, enough lead and confirmation lag for
-// round trips up to roughly 400 ms before the client stalls.
-PHYSICS_DEFAULT_WINDOW :: 30
+// configured max_prediction. Select that depth for the expected round trip and
+// input arrival reserve at the profile's tick rate.
+PHYSICS_WINDOW :: bcap.REPLAY_WINDOW_TICKS
+// The build profile selects the default. A runtime Config may choose a smaller
+// active horizon within the compiled ceiling and history constraints.
+PHYSICS_DEFAULT_WINDOW :: bcap.REPLAY_PREDICTION_TICKS
 
 Control_Origin :: enum u8 {
     Neutral,
