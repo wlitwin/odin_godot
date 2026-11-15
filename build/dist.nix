@@ -81,7 +81,9 @@ stdenvNoCC.mkDerivation ({
     # declaration schema — the gd: tag vocabulary and the id-hash law — and it is NOT
     # optional: `runtime` and `scriptgen` both import it, so a bundle without it fails to
     # compile at the consumer's first build.
-    cp -r core godot gdext libgd runtime decl flow flowgd events kit play replay $A/
+    # Kit/Replay's native-free diagnostics and capacity types also belong to the
+    # Box3D collection; consumers need these sources even without a backend.
+    cp -r core godot gdext libgd runtime decl flow flowgd events kit play replay box3d $A/
     cp -r scriptgen $A/scriptgen
     # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.

@@ -45,13 +45,13 @@ jobs:
       - name: Publish verified immutable source archive (never build outputs/verdicts)
         shell: bash
         run: python3 build/box3d_ci.py store --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --archive "$RUNNER_TEMP/ogb3/box3d.tar"
-      - name: Require the actual registered thirteen-test matrix
+      - name: Require the actual registered fourteen-test matrix
         shell: bash
         run: |
           python3 - "$RUNNER_TEMP/ogb3/build/${{ matrix.configuration }}/build-manifest.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1]))
-          expected={'domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
+          expected={'capacity','domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
           assert d['ctest']=='passed' and set(d['test_names'])==expected,d
           PY
       - name: Inspect exported flat API and C-only dependencies
@@ -111,12 +111,12 @@ jobs:
         run: bash build/build_box3d.sh Debug "$RUNNER_TEMP/ogb3-sanitizers"
       - name: Store immutable checked archive
         run: python3 build/box3d_ci.py store --cache "$RUNNER_TEMP/box3d-source-archives" --key '${{ steps.archive.outputs.key }}' --archive "$RUNNER_TEMP/ogb3-sanitizers/box3d.tar"
-      - name: Require all thirteen sanitizer tests
+      - name: Require all fourteen sanitizer tests
         run: |
           python3 - "$RUNNER_TEMP/ogb3-sanitizers/build/Debug/build-manifest.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1]))
-          expected={'domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
+          expected={'capacity','domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
           assert d['ctest']=='passed' and set(d['test_names'])==expected,d
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

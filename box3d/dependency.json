@@ -70,6 +70,17 @@
         "src/contact_solver.c": "a58641ed1857ceb7e29e74cded3d5b276b6c917c4748025c31f7c6fa9d21f0dc",
         "src/contact_solver_wide.inl": "2b9775103057378627d26e0c6686790c38a734edb190929ba453a1200c32a1ec"
       }
+    },
+    {
+      "path": "box3d/native/patches/snapshot_empty_arrays.patch",
+      "sha256": "074d628cb29d241961c17fc4a9f0153be1f4b74bdd3799265d5c8644d152b51a",
+      "reason": "Skip zero-length snapshot reads and array clears whose storage may be null; preserve empty-world/sensor restore semantics without undefined C library calls.",
+      "base_files": {
+        "src/world_snapshot.c": "b6fb6babdd5c95787791043211b2f6ccfc9093d4653e295a952899a8f3fb90ea"
+      },
+      "output_files": {
+        "src/world_snapshot.c": "13ec30c5f0a1ece40d8c00269fc497595f332c27c3321220bda897ab6daf8a49"
+      }
     }
   ]
 }

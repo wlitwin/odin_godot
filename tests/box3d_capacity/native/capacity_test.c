@@ -24,7 +24,27 @@ static void equal_worlds(ogb3_world left, ogb3_world right) {
   free(x); free(y);
 }
 
+static void empty_snapshot_roundtrip(void) {
+  ogb3_world_def definition;
+  OK(ogb3_world_def_default(&definition));
+  ogb3_world source = 0, target = 0;
+  ogb3_snapshot *image = NULL;
+  OK(ogb3_world_create(&definition, &source));
+  OK(ogb3_world_create(&definition, &target));
+  OK(ogb3_snapshot_capture(source, &image));
+  // Empty arrays may have null storage. Exercise their restore under UBSan.
+  OK(ogb3_snapshot_restore(target, image));
+  equal_worlds(source, target);
+  OK(ogb3_world_step_fixed(source));
+  OK(ogb3_world_step_fixed(target));
+  equal_worlds(source, target);
+  ogb3_snapshot_release(image);
+  OK(ogb3_world_destroy(source));
+  OK(ogb3_world_destroy(target));
+}
+
 int main(void) {
+  empty_snapshot_roundtrip();
   ogb3_recovery_config config;
   OK(ogb3_recovery_config_default(&config));
   const uint32_t bodies = config.max_bodies < 1000 ? config.max_bodies : 1000;
