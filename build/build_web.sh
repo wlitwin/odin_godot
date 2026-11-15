@@ -17,7 +17,7 @@
 #   nix develop --command bash -c 'bash build/build_web.sh'
 #
 # EMSCRIPTEN VERSION: Godot 4.6.2's web templates were built with emscripten 4.0.20.
-# VERIFIED (docs/design/web-internals.md): a module linked with the dev shell's emscripten (5.0.6)
+# VERIFIED (docs/contributing/architecture.md): a module linked with the dev shell's emscripten (5.0.6)
 # ALSO loads and runs in the browser against the 4.0.20-built engine — with
 # `-sSUPPORT_LONGJMP=wasm` the longjmp ABI is self-contained in the wasm and the dylink
 # format is cross-compatible. 4.0.20 remains the exact-match (use `EMCC=/path/to/4.0.20/emcc

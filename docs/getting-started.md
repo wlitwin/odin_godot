@@ -35,8 +35,13 @@ odin_godot dev shell  (target: Godot 4.7.1 stable)
 develop`. Confirm it works headless:
 
 ```sh
-nix develop --command bash tests/run_all.sh    # the full suite — should end "ALL GREEN"
+odin version
+"$GODOT" --headless --version
 ```
+
+The commands should print the pinned compiler version and Godot 4.7.1. To build
+a complete visible scene from an empty project, follow
+[Your first Odin scene](scripting/first-scene.md).
 
 <a id="2-how-a-project-is-wired"></a>
 

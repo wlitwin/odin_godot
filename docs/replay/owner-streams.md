@@ -1,8 +1,7 @@
 # Owner observations and engine physics
 
-This contract explains how Replay records externally simulated motion and
-transfers its producer between participants. The acceptance sequence retains
-the M4 implementation scope; see [progress](progress.md) for passed gates.
+Record motion from a trusted external physics owner and transfer that producer
+between participants. This guide assumes [Replay sessions](godot.md).
 
 An engine-owned body is an external observation producer. A Godot solver may run on
 the currently authorized participant; Replay records accepted pose/velocity samples
@@ -53,40 +52,19 @@ smoothing. Provisional possession may run a speculative local solver, but only a
 authority-issued revision can publish accepted samples. Score, goals, inventory and
 other shared decisions remain ordinary authority gameplay over accepted values.
 
-## Acceptance sequence
-
-1. Native latest-observation policy tests, contract mismatch and archive/recovery
-   checks, preserving existing scheduled-input gates.
-2. Native owner-state tests: prepare/commit, cancellation, expiry, old-owner and
-   recycled-entity rejection, monotonic samples, atomic validation, epoch recovery.
-3. Real Godot 2D solver adapter and separate Replay Slopball port: autonomous
-   character ownership, ball handoff with momentum, goals and three-process viewing.
-4. Prediction/smoothing, reconnect and migrating physics acceptance, matched against
-   the original feel/scenario ledger. Then the same primitives and a separate 3D port.
-
-Original Slopball, Slopball3D, Kit and their assets/run commands remain independently
-available. Assets reused by a Replay port require provenance and hashes. A synthetic
-pose test does not establish physics-game parity or the completed M4 milestone.
-
 ## Cavecrawl profile
 
-The separate [owner-motion Cavecrawl](../../examples/replay_cavecrawl_owned/README.md)
+The separate [owner-motion Cavecrawl](https://github.com/wlitwin/odin_godot/blob/main/examples/replay_cavecrawl_owned/README.md)
 composes the existing gameplay World with versioned avatar/relic observations.
-It shares inventory/combat/progression code with the server-simulated C8 port while
-keeping a distinct content contract and isolated app state. The original manual
-producer supplies poses; this is not an engine-physics or deterministic-P2P claim.
-Native interaction/handoff/migration and typed service-checkpoint gates are recorded
-in [the acceptance result](results/cave-owner-2026-09-19/README.md). [Local Chrome migration and saves](results/cave-owner-browser-2026-09-19/README.md)
-pass with actual RTC traffic and isolated storage. Other browsers/public networks,
-full original-rule/presentation parity and paired ergonomic comparison remain open.
+It shares gameplay code with the server-simulated example while keeping distinct
+content identity and app state. Its manual producer supplies poses. Use the
+[support guide](support.md) to select a runtime, transport, and deployment target.
 
 
 ## Reliable interaction context
 
-[Scoped action context](../../replay/owned/README.md#context-carried-by-a-reliable-action)
+[Scoped action context](https://github.com/wlitwin/odin_godot/blob/main/replay/owned/README.md#context-carried-by-a-reliable-action)
 separates an action's claimed owner pose from the coalesced motion stream.
-Cavecrawl O2 uses issued positions for range checks and the original 64-pixel
-throw-origin leash, without moving its current avatar pose. The [acceptance result](results/owner-action-context-2026-09-20/README.md)
-includes real suppressed-motion/reliable-action delivery, overtaking motion,
-old-scope refusal, checkpoint preservation and explicit O1 conversion. This is
-cooperative claimed context, not a certified historical collision query.
+Cavecrawl uses issued positions for range checks and a 64-pixel throw-origin
+leash without moving its current avatar pose. Treat this as cooperative claimed
+context. Historical collision queries require their own validated history.

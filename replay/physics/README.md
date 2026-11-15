@@ -6,8 +6,8 @@ This optional package supplies Box3D participation in Replay's existing
 archive. Default value-only frames, steps and schema policy retain their behavior.
 
 The initial mode is a bounded local alpha for one exact build and target. It
-uses the [shared contract](../../docs/design/box3d/framework-contract.md) and the
-[Gate A envelope](../../docs/design/box3d/gate-a.md). This package does not supply
+uses the [shared contract](../../box3d/docs/framework-contract.md) and the
+[Gate A envelope](../../docs/box3d/support.md). This package does not supply
 a replacement runner or authority policy. Complete server-authoritative wire and
 recovery support is opt-in through `Network_Codec`; see
 [Box3D networking](../../docs/replay/box3d-networking.md).

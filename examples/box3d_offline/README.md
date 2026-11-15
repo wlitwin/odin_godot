@@ -18,11 +18,12 @@ A pyramid of 15 boxes stands on the ground. The HUD counts the boxes knocked dow
 From the repository root:
 
 ```sh
-nix develop --command bash examples/box3d_offline/play.sh
+nix develop --command bash examples/box3d_offline/play.sh -e
 ```
 
 `play.sh` builds the Box3D native library into the ignored `.box3d-cache` (about
-15 seconds the first time), builds the scripts, and opens the game. To use a native
+15 seconds the first time), builds the scripts, and opens the editor with `-e`. Let the first import finish,
+then press F6 to run. Later launches can omit `-e` to open the game directly. To use a native
 library you already built, set `BOX3D_NATIVE_LIBRARY` to its `libogb3.dylib` or
 `libogb3.so`. The build copies that library into `bin/` next to the SDK core, which
 loads it at startup.
@@ -101,5 +102,5 @@ densities explicitly: with the default, a small ball barely moves a large box.
 - Add interpolation if you render faster than 60 Hz: the nodes currently move only
   on physics frames.
 - For editor-authored worlds, saved checkpoints, rollback or multiplayer, use the
-  [Kit and Replay samples](../../docs/design/box3d/samples.md). The raw API is
+  [Kit and Replay samples](../../docs/box3d/multiplayer.md). The raw API is
   described in [box3d/README.md](../../box3d/README.md).

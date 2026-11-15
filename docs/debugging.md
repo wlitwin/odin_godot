@@ -34,7 +34,7 @@ launched from Finder has no visible terminal for them. odin_godot reports
 panics and fatal signals through different paths:
 
 - **Odin `panic` / failed `assert`** (including failed type assertions): the script context's
-  assertion proc ([`runtime/panic_native.odin`](../runtime/panic_native.odin)) prints
+  assertion proc ([`runtime/panic_native.odin`](https://github.com/wlitwin/odin_godot/blob/main/runtime/panic_native.odin)) prints
   `ODIN_SCRIPT_PANIC <prefix>: <message> (file:line:col)` to stderr and sends it
   through `push_error`. The editor Output displays that line in red with the
   script location:
@@ -44,7 +44,7 @@ panics and fatal signals through different paths:
   ```
 
 - **Fatal signal** (SIGSEGV/SIGBUS/SIGILL/SIGFPE, typically from calling an engine method on
-  a nil object handle): a crash reporter ([`core/crash.odin`](../core/crash.odin),
+  a nil object handle): a crash reporter ([`core/crash.odin`](https://github.com/wlitwin/odin_godot/blob/main/core/crash.odin),
   macOS + Linux; installed only in the *game* process, never the editor) prints to stderr:
 
   ```
@@ -122,6 +122,8 @@ writes a `cppvsdbg` launch.json
 (the standard C/C++ extension) that debugs the editor's binary directly against the
 `.pdb`s the builds emit; no re-signing needed there.
 
+<a id="jetbrains-ides-rider-clion-idea-ultimate-"></a>
+
 ### JetBrains IDEs (Rider, CLion, IDEA Ultimate, …)
 
 For editing in JetBrains IDEs, install the
@@ -153,7 +155,7 @@ Debugging support depends on the IDE:
 ## 1. Logging and errors: `gd.print` / `gd.error` / `gd.warn`
 
 Logging helpers live in
-[`godot/Ergonomics_Debug.odin`](../godot/Ergonomics_Debug.odin), mirrored in
+[`godot/Ergonomics_Debug.odin`](https://github.com/wlitwin/odin_godot/blob/main/godot/Ergonomics_Debug.odin), mirrored in
 `bindgen/upstream/godot/` so they survive binding regeneration. They convert
 `cstring -> String -> Variant -> gd_*` in a single call:
 
@@ -340,7 +342,7 @@ A no-lldb alternative for repeatable crashes: macOS writes a `.ips` crash report
 
 `OdinLanguage` implements the `_debug_get_current_stack_info` script-language
 virtual by capturing a native backtrace
-([`core/debug.odin`](../core/debug.odin)). When called, it:
+([`core/debug.odin`](https://github.com/wlitwin/odin_godot/blob/main/core/debug.odin)). When called, it:
 
 1. Walks the native stack with libunwind's **`_Unwind_Backtrace`**.
 2. Resolves each return address with **`dladdr`** → `dli_sname` (e.g.
@@ -389,7 +391,7 @@ errors or crashes in the editor. Use lldb `bt` (section 2/3) for routine stack
 inspection.
 
 `backtrace()`/`dladdr` are POSIX-ish and present on darwin/linux. Windows and the web/wasm
-build use a stub that returns an empty Array ([`core/debug_other.odin`](../core/debug_other.odin)).
+build use a stub that returns an empty Array ([`core/debug_other.odin`](https://github.com/wlitwin/odin_godot/blob/main/core/debug_other.odin)).
 
 ---
 
@@ -397,7 +399,7 @@ build use a stub that returns an empty Array ([`core/debug_other.odin`](../core/
 
 In the browser there is no `dlopen`, no native stack to walk, and no lldb. Debug web builds
 with **logging** (`gd.print` → the JS console) and the browser devtools. The native
-stack-info capture is stubbed to empty on wasm. See [`docs/exporting.md`](./exporting.md).
+stack-info capture is stubbed to empty on wasm. See [`docs/exporting.md`](exporting.md).
 
 ---
 

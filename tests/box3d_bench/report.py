@@ -215,7 +215,7 @@ and verification metadata into persistent task storage. These checks do not
 claim that framework adapters, portable transfer, editor authoring, export/runtime
 parity or production hardening are implemented.
 """
-    path = ROOT / "docs/design/box3d/gate-a-measurements.md"
+    path = stage / "gate-a-measurements.md"
     path.write_text(report.replace("`", chr(96)))
     machine = {"totals": dict(totals), "evidence": evidence,
                "cross_target_comparison": comparison, "datasets": documents}

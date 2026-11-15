@@ -25,9 +25,11 @@ for tree in trees:
         files.append(path)
 for name in ['flake.nix','flake.lock','LICENSE','NOTICE']:
     files.append(root/name)
-for name in ['authoring-guide.md','workflow.md','exporting.md','debugging.md','modules.md','events.md','recipes.md','design/native-boundary.md']:
-    files.append(root/'docs'/name)
-files.extend(p for p in (root/'docs/kit').rglob('*') if p.is_file() and p.suffix in ['.md','.svg','.png'])
+files.extend((root/'docs').glob('*.md'))
+for section in ['scripting','kit','replay','box3d','libraries','examples','multiplayer','learn','contributing','onboarding','img']:
+    files.extend(p for p in (root/'docs'/section).rglob('*')
+                 if p.is_file() and 'results' not in p.relative_to(root/'docs').parts
+                 and p.suffix in ['.md','.svg','.png'])
 manifest=[]
 for source in sorted(set(files)):
     relative=source.relative_to(root)

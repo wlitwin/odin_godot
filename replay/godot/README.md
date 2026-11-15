@@ -69,7 +69,7 @@ Godot child references and skip unchanged property writes.
 
 [Definition baking](../definitions/README.md) converts authored Resources and scene
 markers to validated immutable values with content identity and retained versions.
-Further boundary work is tracked in the [bridge plan](../../docs/replay/godot-bridge-plan.md).
+Further boundary work is tracked in the [bridge plan](../../docs/replay/support.md).
 
 [Local diagnostic overlay](debug/debug.md) adds optional runtime counters and explicit
 recent-history audits without game-specific reporting code.

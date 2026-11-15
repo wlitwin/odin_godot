@@ -146,7 +146,7 @@ Known differences/gaps:
   effects, and the full migration failure matrix remain open. The full old `cave_test.gd` scenario
   inventory has not been ported yet.
 
-See [parity.md](parity.md) and the repository [roadmap](../../docs/replay/roadmap.md).
+See [parity.md](parity.md) and the repository [Replay guide](../../docs/replay/index.md).
 
 
 ## Browser authority migration
@@ -171,7 +171,7 @@ Each run also records driver timestamps and a timing summary; these include
 waiting for leases and fresh browser startup that the local Room timer can omit.
 The `signaling` case drops host/client signaling sockets, verifies unchanged
 connection generations and epoch, and performs a new accepted game action.
-TLS/TURN, richer browser workloads and other browser/OS combinations remain open. See the [browser migration work](../../docs/replay/browser-migration.md).
+TLS/TURN, richer browser workloads and other browser/OS combinations remain open. See the [browser migration work](../../docs/replay/recovery.md).
 
 
 Set the scene’s `debug_enabled` inspector property or launch with `REPLAY_DEBUG=1`

@@ -63,7 +63,7 @@ This checks pose/velocity recovery; Godot solver contact caches are not restored
 The separate native game test verifies that old-epoch body samples cannot overwrite
 the recovered value and that fresh scoped samples can resume it.
 
-See [owner streams](../../docs/replay/owner-streams.md) and the [roadmap](../../docs/replay/roadmap.md).
+See [owner streams](../../docs/replay/owner-streams.md) and the [Replay guide](../../docs/replay/index.md).
 
 The UI world/action schema uses content B24 (`0x52534c4f50423234`), intentionally
 incompatible with B21/B22/B23. Names/start commands do not drive the Godot solver; Body2

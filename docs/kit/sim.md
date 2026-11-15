@@ -348,6 +348,8 @@ but the tick anchor and state ledgers remain tied to the previous authority.
 Call `lane_destroy` then `lane_init` to reset them. Destruction zeroes the lane;
 calling `lane_init` on a live lane asserts.
 
+<a id="simulation-blocks-in-godotplaysim"></a>
+
 ## Simulation blocks in `godot:play/sim`
 
 Embed a `godot:play/sim` block to add reusable simulated behavior to an entity.

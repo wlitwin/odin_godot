@@ -7,10 +7,10 @@ mode; whole-world correction is the complete-state path beside legacy
 field-only `reconcile`. The legacy wire, owner-streamed physics and ordinary
 field-only modes retain their existing behavior.
 
-This is the bounded Gate A alpha integration, not arbitrary scene rollback or a
-network/recovery codec. Kit and Replay are separate sibling adapters over the
-same native backend. Replay files and its default integer-schema P2P policy are
-not changed by this Kit integration.
+This page describes local complete-state integration. Use
+[physics networking](box3d-networking.md) for accepted input, canonical
+transfer, and recovery, and [the authored sample](../box3d/multiplayer.md)
+for project setup. Kit and Replay retain separate adapters.
 
 ## Explicit authoring boundary
 
@@ -41,7 +41,7 @@ not changed by this Kit integration.
   explicit error/invalid result. Do not invoke engine/boot spawn doors during a
   tick: they may allocate presentation objects before reaching the lane guard.
   Dynamic native/game entity spawn/despawn **inside Side** is supported; pooled
-  or dynamic scene presentation can follow accepted state after commit in P5.
+  or dynamic scene presentation can follow accepted state after commit.
 
 ## Installation and staged tick order
 
@@ -126,8 +126,7 @@ Ordinary correction obeys a confirmed frontier:
 instant, clears incompatible history/input stamps only after acceptance, and
 starts a new presentation epoch (`lane_world_epoch`). It can resume detached
 checkpoints into a fresh lane or perform explicit recovery; it is not permission
-to ordinary-rewrite settled history. The complete-state recovery protocol and
-network authority rules are P3 work, not implied by the local reset API.
+to ordinary-rewrite settled history. Network authority and complete recovery use the [network integration](box3d-networking.md).
 
 Read-only complete diagnostics and presentation queries need no live source:
 
@@ -157,7 +156,7 @@ presentation. Already played cosmetic effects cannot be unplayed by arbitrary
 state restoration. Author stable keys must include logical identity/generation
 when native allocation numbers can recur.
 
-The deterministic alpha checks enforce initial dynamics<=32, total bodies<=35,
+The runtime profile checks enforce initial dynamics<=32, total bodies<=35,
 shapes<=35, contacts<=147, joints<=1, H=128 and prediction/ordinary repair<=8.
 Asset identity is an immutable declaration of bounded predeclared content,
 not certification that arbitrary geometry with the same counts is affordable.
@@ -187,31 +186,14 @@ This mode does not call the legacy snapshot sender or accept its pose-only
 packets. A legacy packet/pending batch has no complete attachment and produces
 `Missing_Attachment`/resync before applying field-only truth. Scheduled verbs
 and scene spawn APIs are rejected rather than silently replayed through their
-legacy field/delta patches. Canonical transfer, accepted-input network policy,
-late join, mixed-target corrections, P2P and editor/export/runtime parity remain
-unsupported here. Mac/Linux final solver digests previously differed; same-build,
+legacy field/delta patches. Use [the network adapter](box3d-networking.md) for canonical transfer,
+accepted input, and late join. Mixed-target physics and P2P are unsupported. Mac/Linux final solver digests previously differed; same-build,
 same-target policy remains strict. Linux runs under Podman/Rosetta are executed
 function tests, not certified native-hardware throughput.
 
-## Build/domain and validation
 
-Actual Godot core/gameplay modules must use one loaded native `ogb3` DSO domain;
-linking the archive separately into modules is not that integration. World IDs,
-allocator state, snapshots and geometry leases must share that instance, which
-must stay loaded until all owners are released. Standalone static tests do not
-prove cross-module identity/reload lifetime. Core `kit/sim` imports no Box3D and
-legacy suites require no native link.
+## Project setup
 
-Run real native lane tests with a test-enabled exact archive:
-
-```sh
-nix develop --command bash tests/kit_box3d/run.sh /absolute/libogb3.a /tmp/kit-physics Debug
-nix develop --command bash tests/kitsim/run.sh
-```
-
-The suite drives actual lane ticks/correction, equal-pose hidden-state changes,
-settled-frontier controls, post-commit effect dedup, source-provider destruction,
-H128 wrap/native lifecycle and world-independent keys, actual native failure
-injection, field/input history preservation, workload/memory refusal, unsupported
-mutation/wire paths, timing observation and allocation teardown. The post-step
-sensor regression requires the refreshed normalized-v3 native helper build.
+Use the [Box3D multiplayer guide](../box3d/multiplayer.md) for authored sample
+preparation, runtime ownership, and teardown. Read [Support](../box3d/support.md)
+for the active integration profile.

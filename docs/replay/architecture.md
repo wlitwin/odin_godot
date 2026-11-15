@@ -1,8 +1,8 @@
-# Replay architecture and initial API
+# World and history
 
-Status: experimental. See the [framework audit](framework-audit.md) for implemented
-contracts and remaining work. The original [Kit](../kit/index.md)
-remains a separate supported implementation.
+Design a World that can return to an earlier tick and run forward from recorded
+input. This guide assumes the [Replay tutorial](quickstart.md). See
+[Support](support.md) for runtime and compatibility limits.
 
 <a id="objective"></a>
 
@@ -25,12 +25,12 @@ may be shown speculatively.
 Input sampling and intent delivery have separate contracts. Scheduled controls
 belong to a simulation tick and can arrive too late to use. Discrete actions carry
 sequence IDs and settled authority results. A game can classify actions as
-scheduled or receipt-time through a versioned [action schedule](../../replay/net/README.md):
+scheduled or receipt-time through a versioned [action schedule](https://github.com/wlitwin/odin_godot/blob/main/replay/net/README.md):
 for example, preserve a shot's deadline while delivering an interaction without
 that deadline. Prediction still reconciles against the authority's recorded
 decision. Receipt-time delivery does not override game predicates or FIFO order.
 
-## Decisions for the experiment
+## State and simulation boundaries
 
 1. **Simulation state is independently restorable.** Entity membership, allocation
    counters, timers, and RNG are state. Rendering resources and connections are
@@ -43,17 +43,12 @@ decision. Receipt-time delivery does not override game predicates or FIFO order.
    code. The default group is the public world; an authored client projection can
    remove nonmembers and retain explicit timestamped boundary values. Replay
    restores that complete group. Multiple independent groups remain later work;
-   see the [implemented group contract](../../replay/net/groups.md).
+   see the [implemented group contract](https://github.com/wlitwin/odin_godot/blob/main/replay/net/groups.md).
 4. **Typed state before code generation.** The API is usable without scriptgen.
    Generated authoring must use a documented public API.
 5. **Presentation receives copies or explicitly read-only views.** It never
    temporarily overwrites simulation fields. The initial API uses copies because
    Odin does not provide a general deeply immutable borrowed view.
-6. **Independent library and game ports.** No aliasing the new API onto Kit's
-   session/lane internals, no replacing old games, and no hidden fallback between
-   implementations. Engine bindings and suitable pure utility algorithms may be
-   shared through explicit dependencies.
-
 These principles are informed by the complete-state and independent-step
 contracts in [GGPO](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md)
 and [Quantum](https://doc.photonengine.com/quantum/v3/manual/quantum-ecs/systems).
@@ -96,9 +91,6 @@ Implemented package boundaries:
 | `replay/godot` | Godot transport/view/scene integration | Session, Party/Room, P2P setup, scene/body/audio adapters and tools |
 | `replay/play` | Replayable movement, collision, abilities, inventory helpers | Value-based motion/query, timers, gun/effect/director helpers |
 
-Create subpackages only when implemented responsibility warrants them. The table
-does not reserve a permanent layout or require empty scaffolding packages.
-
 ## Current local API
 
 `Timeline(State, Input, Event)` is a runtime owner. `State`, `Input`, and `Event`
@@ -131,7 +123,7 @@ u64 tick limit, `advance` reports `Tick_Overflow`.
 of N frames can replay at most N-1 transitions without another checkpoint.
 Values must be 2..4096. `events_per_tick` is 0..4096; zero intentionally disables
 event capacity. `DEFAULT_CONFIG` is 128 frames and 32 events per tick. These are
-prototype resource limits, not supported multiplayer scale envelopes.
+allocation limits; measure your own workload before selecting a history size.
 
 `Result.steps` counts successfully staged steps, even if a later step failed.
 `Result.tick` is the failing tick or final processed tick. Only a successful
@@ -192,7 +184,7 @@ unrelated emits does not change identity. Duplicate keys fail the tick instead
 of ambiguously correlating two occurrences.
 
 Replaying replaces the tick's occurrence batch. It does not invoke effect
-callbacks. The [presentation journal](../../replay/view/README.md) compares previous
+callbacks. The [presentation journal](https://github.com/wlitwin/odin_godot/blob/main/replay/view/README.md) compares previous
 and replacement batches by ID and payload and produces begin/update/cancel/confirm
 notifications. Confirmation follows an explicit authority/commit frontier and
 watched effects also wait for their display tick. Effects that require durable
@@ -214,7 +206,7 @@ validates gameplay-specific input and state policies.
 
 The canonical schema describes logical fields independently of compiler layout
 and applies bounds. Its envelope carries schema/content/version/epoch metadata.
-Authority/public codecs and explicit [recipient views](../../replay/net/replication.md)
+Authority/public codecs and explicit [recipient views](https://github.com/wlitwin/odin_godot/blob/main/replay/net/replication.md)
 are implemented, including state/control/event filtering and separate prediction
 groups. Alternative replica carriers and broader migration/deployment profiles
 remain additional work.
@@ -224,7 +216,7 @@ Strict P2P mode requires cross-target reproducibility: math,
 collision algorithms, iteration order, allocation, RNG, and input ordering. The
 integer Duel example has native arm64/WASM execution equality and a separate
 peer-input runner. That evidence is scoped to its tested corpus, not arbitrary
-models or every target; see [P2P](../../replay/p2p/README.md).
+models or every target; see [P2P](https://github.com/wlitwin/odin_godot/blob/main/replay/p2p/README.md).
 Server-authoritative mode can tolerate numerical discrepancies but still needs
 replayable state and useful correction limits.
 
@@ -243,21 +235,11 @@ A complete migration checkpoint combines a full authority frame,
 content/protocol versions, session membership/ownership, action deduplication
 frontiers, and an authority term. Host selection and transport rendezvous remain
 separate services. They must establish a unique accepted term before simulation
-resumes. Read [the migration milestone](roadmap.md#m5--session-recovery-and-host-migration)
-for failure cases and acceptance gates.
+resumes. Read [Recovery](recovery.md) for the owner lifecycle and failure policy.
 
-## Diagnostic and performance direction
+## Diagnostics and cost
 
-The initial performance direction was to start with value copies and explicit
-step order, then measure snapshot bytes, copy cost, replay cost, event backlog,
-and allocation pressure before implementing page sharing or incremental snapshots. A typed arena or component store can
-replace fixed pools without changing the frame contract, but requires restore,
-allocation-order, and codec tests first.
-
-The diagnostic goals included an audit report with a field path such as
-`players[1].inventory[3].count`, both values, the triggering input, and a reusable
-reproduction file. They also called for deliberate replay during offline play
-and recorded multiplayer fault schedules so failures could be reproduced
-independently of live packet arrival timing. See the current
-[diagnostics guide](../../replay/diagnostics.md) for implemented capture,
-field-difference, recording, and playback APIs.
+Measure World size, retained history, replay work, and event backlog with your
+actual model. Keep profiling callbacks outside simulation decisions. The
+[diagnostics reference](https://github.com/wlitwin/odin_godot/blob/main/replay/diagnostics.md)
+covers captures, field differences, recordings, and playback.

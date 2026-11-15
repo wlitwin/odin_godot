@@ -1,5 +1,10 @@
 # Starting a Replay game
 
+For the current Godot Session build, follow
+[the checkout setup](../docs/replay/godot.md) first. It includes the native
+backend required by the Session package's Box3D presentation import, even for a
+value-only model. The local Timeline remains engine-free.
+
 Store all mutable simulation state in an Odin `World` value. Replay retains its
 history and runs the game's rules offline or under a selected multiplayer
 policy. Device input, networking, Godot scenes, and persistence connect to that
@@ -76,7 +81,7 @@ reusing its replay, action, journal and ownership protocols. Start with explicit
 typed callbacks; code generation is not required.
 
 Run the focused bridge gate with `nix develop --command bash tests/replay_bridge/run.sh`.
-The [performance assessment](../docs/replay/godot-bridge-performance.md) explains
+The [Replay guide](../docs/replay/support.md) explains
 measured improvements, memory costs and why COW history was deferred.
 
 ## First run
@@ -187,6 +192,6 @@ configuration requires a verified confidential service connection.
   a speculative gameplay occurrence is not an exactly-once external transaction.
 
 Read [compatibility](compatibility.md) before changing schemas or gameplay rules.
-Use [the framework audit](../docs/replay/framework-audit.md) for actual test scopes
+Use [Replay guide](../docs/replay/support.md) for actual test scopes
 and the remaining release assessment. Experimental support is not a claim that
 all engines, platforms, public networks or arbitrary physics are deterministic.

@@ -7,8 +7,8 @@ individual receipts below retain their original workloads and failures.
 Original repository: `../../../scrapyard`, revision
 `6bdef4f437d9a4e2c98f1d49472f840879301ccf`. Its project, source, saves and run commands
 remain independent. This project reimplements the game against Replay while
-retaining the original Kit version. The full [Replay roadmap](../../docs/replay/roadmap.md) records the
-original parity scope. The later [framework completion plan](../../docs/replay/framework-completion.md)
+retaining the original Kit version. The full [Replay guide](../../docs/replay/index.md) records the
+original parity scope. The later [framework completion plan](../../docs/replay/support.md)
 defers exhaustive game parity and governs the framework's release scope.
 
 | Slice | Concrete requirements | Status |

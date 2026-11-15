@@ -1,6 +1,6 @@
 # Kit complete physics networking
 
-P3.1 implementation, same native build and target only. `kit/sim` remains
+Use the same native build and target on all peers. `kit/sim` remains
 native-free. `kit/physics` is the optional Box3D provider and canonical codec;
 it imports the pure `replay/schema` utility, never the Replay runtime.
 The native recovery catalog currently admits declared Box/Sphere/Capsule assets.
@@ -190,37 +190,9 @@ Actual Godot modules must share one loaded native DSO domain and retain code
 that owns typed callbacks; standalone static network tests do not prove module
 load/reload deployment.
 
-## Functional proof and remaining performance gate
 
-Phase 3 establishes accepted-input history, complete canonical transport/recovery,
-transaction integrity and ownership for this declared profile. It does **not**
-establish playable CPU acceptance. The measured whole-call 4 ms correction
-requirement remains **UNMET** and is carried into Gate B (`P4.4`); P5 and complete
-goal acceptance remain gated on its resolution. No core-only result is a whole
-correction pass, and no measured clock result is a gameplay admission rule.
+## Build and support
 
-On the frozen FNV/read-info Release candidate, the isolated unchanged 32-initial/
-35-peak-body, H128 run passes all eight functional tests. Its 160 normal whole
-calls have p95 0.561500 ms and maximum 0.761042 ms. One actual changed-input
-8-tick repair takes 3.433375 ms whole. The nineteen actual 8-tick complete
-checkpoint prefix corrections have median 4.860584 ms and maximum 8.957208 ms;
-all nineteen exceed 4 ms. The corresponding core maximum is 7.676291 ms. No
-cause is inferred for the larger samples. Earlier isolated negative baselines
-are retained in the stored report; they are not relabeled as accepted.
-
-The measured primitive profile reaches 35 bodies, 35 shapes, 141 allocated
-reference contacts and one hinge. Framework admission observations peak at
-38,550,012 charged bytes; the conservative sum of separate engine, wrapper and
-external component maxima is 41,683,242 bytes. Those are distinct observations,
-not an invented simultaneous peak. The 2 MiB primitive reservation and 8 MiB
-canonical-write headroom pass within the shared 64 MiB limit; all requested
-engine/wrapper/provider/checkpoint ownership returns to zero. The isolated
-process reports maximum RSS 106,151,936 bytes and peak memory footprint
-49,726,976 bytes separately. Neither RSS nor the difference between these
-non-simultaneous observations is presented as exact backend ownership overhead.
-
-The final stored P3.1 report records exact current source, target/archive/manifest,
-raw log and first-conflict artifact hashes. Linux results are x86-64 execution
-through Podman/Rosetta, not native hardware throughput certification. Independent
-impaired multi-process testing belongs to P3.5; actual Godot module deployment
-and playable performance remain later required evidence.
+Use [Build and export](../box3d/building.md) to select the backend and
+[Support](../box3d/support.md) for runtime and target limits. Measure whole-frame
+and correction cost with your content and target hardware.

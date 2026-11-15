@@ -98,6 +98,8 @@ after a full resynchronization when that jump should become the new baseline.
 presentation cadence; simulation-lane cooldowns should use `psim.Cool` so their
 state participates in replay.
 
+<a id="owner-simulated-physics-with-playpuppet"></a>
+
 ## Owner-simulated physics with `play.Puppet`
 
 Godot's rigid-body solver cannot be rewound by Kit. A `Puppet` instead assigns

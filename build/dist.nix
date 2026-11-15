@@ -127,14 +127,21 @@ stdenvNoCC.mkDerivation ({
     # resolved_default_icon -> res://addons/odin_godot/icon.svg).
     cp dist/addons/odin_godot/icon.svg $A/icon.svg
     mkdir -p $A/docs
+    cp docs/*.md $A/docs/
+    for section in scripting kit replay box3d libraries examples multiplayer learn contributing onboarding; do
+      mkdir -p $A/docs/$section
+      cp docs/$section/*.md $A/docs/$section/
+    done
+    cp -r docs/img $A/docs/img
     cp build/addon-docs/getting-started.md build/addon-docs/index.md $A/docs/
     cp build/addon-docs/replay.md $A/docs/replay.md
-    cp docs/authoring-guide.md docs/workflow.md docs/exporting.md docs/debugging.md docs/modules.md docs/events.md docs/recipes.md $A/docs/
-    mkdir -p $A/docs/design
-    cp docs/design/native-boundary.md $A/docs/design/
-    # The friendslop toolkit's pages ride along — the kit/ collection is in the
-    # addon, so its documentation must be too (one page per package + tutorial).
-    cp -r docs/kit $A/docs/kit
+    mkdir -p $A/docs/api/generated
+    cp build/addon-docs/api.md $A/docs/api/index.md
+    cp build/addon-docs/api-packages.md $A/docs/api/generated/index.md
+    # Generated API pages belong to the website. Bundled Markdown links to that
+    # reference without requiring the parser tool or generated files in the addon.
+    find $A/docs -name '*.md' -type f -exec sed -i -E \
+      's|\]\((\.\./)*api/generated/([^#)]+)\.md([^)]*)\)|](https://wlitwin.github.io/odin_godot/api/generated/\2.html\3)|g' {} +
 
     # Stamp the TESTED Odin release used to build the bundled core into the docs'
     # @ODIN_VERSION@ placeholders. Compatible releases may pass the complete native ABI

@@ -70,7 +70,7 @@ Use the authoritative receipt or confirmed presentation change when game logic
 needs an accepted outcome; a successful send alone does not establish it.
 
 See [Kit conventions](kit/conventions.md) and the
-[Replay starting path](../replay/getting-started.md) for each model's concrete
+[Replay starting path](replay/godot.md) for each model's concrete
 lifetimes, defaults and extension points.
 
 ## Single-file authoring
@@ -408,7 +408,7 @@ hp: i32 `gd:"export,rnage=0:100"`
 // scriptgen: error: Player.hp: unknown export spec "rnage" — did you mean `range`?
 ```
 
-The recognized spec set is [`decl/decl.odin`](../decl/decl.odin)'s `EXPORT_SPECS`, and
+The recognized spec set is [`decl/decl.odin`](https://github.com/wlitwin/odin_godot/blob/main/decl/decl.odin)'s `EXPORT_SPECS`, and
 `tests/scriptgen` asserts it against the registrar's own switches, so the two tiers agree
 on which names exist.
 
@@ -1129,6 +1129,8 @@ if gd.object_has_method(enemy, gd.sname("take_damage")) {
 `gd.sname` uses `static = true` (intern once, keep), correct for the string *literals* these
 calls almost always use.
 
+<a id="common-2d-transforms--moving--rotating-a-node2d"></a>
+
 ### Common 2D transforms — moving / rotating a Node2D
 
 `gd.Vector2` is an Odin `[2]f32`, so it supports Odin's vector operations: component access
@@ -1791,5 +1793,5 @@ script pointer. `present` is required, `validate`/`retired` are optional, and
 `appearance`/`configure` must be paired. Unknown/duplicate options, missing fields
 and incompatible callbacks fail generation/compilation. Generated descriptors and
 handwritten descriptors share the same implementation. See
-[adapter bindings](../replay/godot/scene/adapter-bindings.md) for ownership, lifetimes,
+[adapter bindings](https://github.com/wlitwin/odin_godot/blob/main/replay/godot/scene/adapter-bindings.md) for ownership, lifetimes,
 scene validation and the distinct permanent-runner and entity-enemy examples.

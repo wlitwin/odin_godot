@@ -5,11 +5,6 @@ the resulting library into the exported game. Players do not need an Odin
 compiler. Native desktop and web/WASM exports use different library layouts,
 described below.
 
-Implementation notes on plugin registration, per-platform bundling, and the
-`when WEB` split are in
-[design/export-internals.md](design/export-internals.md) and
-[design/web-internals.md](design/web-internals.md).
-
 ## How export works (both targets)
 
 Two GDExtension classes in `core/export_plugin.odin` are registered at editor
@@ -47,29 +42,22 @@ warns that their classes will be absent. Use it for scoped builds or CI checks,
 not release exports. On web, all modules link into the single wasm. See
 [Script Modules — Exporting](modules.md#exporting-with-modules).
 
-**Optional Box3D profile.** The normal exporter also deploys the profile's
-verified shared Native library beside Core and the script modules. The authored
-Kit and Replay samples passed actual exported Host/Client runs on macOS arm64
-and translated Linux x86-64. Core discovers the Native API through its stable
-host service; it need not import the engine directly. Gameplay consumers share
-one Native image. See [Gate C](design/box3d/gate-c.md) for records, architecture
-boundaries, memory requirements and unsupported claims. These results do not
-extend Box3D qualification to Windows or web. The current per-target table,
-toolchain/format identities and minimum-OS limits are in
-[desktop compatibility](design/box3d/desktop-compatibility.md); maintainer changes
-follow the [pinned upgrade workflow](design/box3d/upgrade.md). Native Linux x86
-hardware CI is not inferred from Rosetta execution or workflow source.
+**Box3D.** The normal exporter deploys the selected shared backend beside
+Core and the script modules. Use a backend built for the export target, keep
+its build environment available to the exporter, and retain the deployed files
+together. See [Box3D build and export](box3d/building.md) and
+[platform support](box3d/support.md).
 
-## Native desktop (macOS) — verified
+## Native desktop on macOS
 
-The macOS export test verifies that the exported `.app` loads the extension
-and runs an Odin script compiled during export.
+The macOS export bundles the core and scripts into the application. The export
+host needs the compiler; the player does not.
 
 ```sh
 $GODOT --headless --path your_project --export-release "macOS" out/Game.app
 ```
 
-A verified bundle looks like:
+The bundle layout is:
 
 ```
 out/Game.app/Contents/MacOS/Game                          (universal template, ad-hoc signed)
@@ -78,17 +66,10 @@ out/Game.app/Contents/Frameworks/libodin_godot.dylib      (core — auto-exporte
 out/Game.app/Contents/Frameworks/libodinscripts.dylib     (scripts — bundled by the plugin)
 ```
 
-`tests/phase5/run.sh` reproduces this headless end to end (`PHASE5_OK`): it builds core, runs a
-headless `--export-release "macOS"` export (the plugin compiles and bundles the scripts dll),
-then runs the exported `.app` headless and asserts the Odin `_ready` ran.
-
-For the current authored Box3D samples, `macOS arm64` is the preset **name**;
-its official launcher selector is `universal`. Actual SDK Core/scripts/modules
-and shared Native are ARM64, and only ARM64 execution was validated. The launcher
-plist minimum11.0 does not apply to the whole bundle: the actual exported
-SDK/Native consumers declare minos14.0 (SDK14.4); tested host macOS15.8. Do not
-claim macOS11..13 or Intel support from the launcher alone. These current records
-use strict logs and do not grant a blanket waiver for older fixture warnings.
+For the authored Box3D samples, the `macOS arm64` preset uses a universal
+Godot launcher with arm64 SDK/backend libraries. Check every bundled library's
+architecture and minimum OS; a universal launcher alone does not make the
+whole application universal.
 
 **macOS export gotchas:**
 
@@ -101,25 +82,7 @@ use strict logs and do not grant a blanket waiver for older fixture warnings.
 - Two non-fatal `Required virtual method … _update_exports / _get_script_signal_list` warnings
   may print during the export's class scan. These are harmless.
 
-## Box3D supported-desktop orchestration
-
-`tests/box3d_desktop/run.py` accepts explicit `--target macos-arm64|linux-x86_64`,
-`--framework kit|replay`, `--godot`, `--odin`, `--native-library`,
-`--native-sha256`, `--out` (NEW and outside the repository), `--port` and
-`--ticks 120`. Default execution is `STAGED_ONLY`; `--execute` reuses the normal
-Gate C exporter and actual exported-pair controller. Linux also needs an explicit
-`--execution-mode native|translated-linux-x86_64` and `--toolchain-report`.
-Plans/configuration, successful export and successful runtime are separate facts.
-Do not force a project `--path` or `ODIN_SCRIPTS_DLL` override to make an exported
-binary appear runnable. Keep actual artifact/native/domain/source/loader fences.
-See [upgrade.md](design/box3d/upgrade.md#desktop-orchestration-and-ci) for a concrete
-plan command and CI/release qualifications; no remote CI run is claimed by this
-documentation.
-
-The following generic SDK cross-build section retains its earlier scope; it is
-not the current Box3D Linux exported-run record and does not qualify Windows.
-
-## Cross-compile (Linux / Windows) — build-verified
+## Cross-compile for Linux or Windows
 
 odin_godot cross-builds the Linux `.so` and Windows `.dll` (core + scripts) from macOS.
 Odin's own driver refuses to *cross-link* a dll, so `build/build_cross.sh` emits a single
@@ -138,14 +101,10 @@ verify builds; they do not run Linux/Windows Godot or load the resulting
 libraries on those targets. See [distribution.md](distribution.md) for the
 status table, packaged addon, and target-host runtime checks.
 
-## Web / WASM — verified in a real browser
+## Browser export
 
 The core `ScriptLanguageExtension`, generated binding, and compiled scripts
 link into one Emscripten `SIDE_MODULE` wasm bundled by Godot's web exporter.
-A headless-Chrome test checks that a script's `_ready` runs in the browser and
-a `@(gd_method)` returns the expected value. `tests/web_showcase/` also checks
-the pure-Odin coin-collector game loop in-browser.
-
 ### Toolchain setup (one-time)
 
 Web export needs the Odin compiler and Emscripten on the export host. The Nix
@@ -239,14 +198,12 @@ Use the same two headers in deployment. On itch.io, enable
   longjmp ABI self-contained and the dylink format is cross-compatible). To pin the exact
   version anyway: `EMCC=/path/to/emsdk/.../emcc bash build/build_web.sh`.
 
-## Verify it headless
+## Check the exported game
 
-```sh
-nix develop --command bash -c 'bash tests/phase5/run.sh'        # native -> PHASE5_OK
-nix develop --command bash -c 'bash tests/web/run.sh'           # web    -> PHASEWEB_OK
-nix develop --command bash -c 'bash tests/web_showcase/run.sh'  # web game loop -> PHASEWEBSHOWCASE_OK
-```
+Run the exported application from a clean directory with only its packaged
+files. Exercise script startup, input, and a gameplay interaction. For web,
+serve the export with the required headers and inspect the browser console.
+A successful file export alone does not establish that scripts ran.
 
-The web tests are **browser-gated**: with Chrome + `puppeteer-core` present they run in a
-headless browser and assert the Odin script ran; without them they still build + web-export and
-report a non-fatal `SKIP`. The full suite (`tests/run_all.sh`) wires all of these in.
+SDK contributors can use the focused export fixtures described in
+[Contributing](contributing/index.md).

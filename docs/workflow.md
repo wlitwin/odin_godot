@@ -146,17 +146,15 @@ once and the editor continues running.
 The editor displays Odin compiler errors as inline squiggles and Errors-panel
 entries. Syntax checking uses the compiler's parser in-process. A missing
 brace or incomplete expression is reported on the first debounce, and a
-buffer with syntax errors does not proceed to type checking. The recorded
-parser time is ~0.1 ms.
+buffer with syntax errors does not proceed to type checking.
 
 Type checking runs on the package because a single `.odin` file is not a
 compilation unit. The worker copies the package and its relative imports to
 a temporary overlay, replaces the edited file with the unsaved buffer, and
 runs `odin check`. It maps `‹file›(‹line›:‹col›) Error: ‹msg›` diagnostics back
 to the editor. A result cache lets the editor return while the background
-check runs. Recorded first-call latency is ~0.03 ms; the warm package check
-is ~0.5 s on a game-sized package. Squiggles update on the next debounce
-after completion.
+check runs. Squiggles update on the next debounce after completion; type-check
+latency depends on the package and compiler workload.
 
 The `godot` collection root resolves in this order: `odin_godot/root` setting,
 `ODIN_GODOT_ROOT` environment variable, then the installed addon's location.

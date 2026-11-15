@@ -76,4 +76,4 @@ placement/cover/capacity, late correction, occupied checkpoint continuation,
 content-50 import, native/WASM equality, the authored workbench, three real peers
 and occupied host-crash recovery. Browser compilation and pure WASM execution are
 covered; this feature has not had a separate interactive browser or human balance
-playtest. See the [implementation receipt](../../docs/replay/turret-progress.md).
+playtest. See the [implementation receipt](../../docs/replay/support.md).

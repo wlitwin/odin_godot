@@ -1,43 +1,29 @@
 # odin_godot documentation
 
-Write Godot scripts in compiled Odin. Start with the addon
-[README](../README.md) for installation, then choose a guide below for setup,
-authoring, multiplayer, or export.
+Start with the addon [README](../README.md) and [Getting started](getting-started.md)
+to install Odin and build the included starter. The online
+[documentation](https://wlitwin.github.io/odin_godot/) has the same guides with
+navigation and search.
 
-## Start here
+## Choose a layer
 
-- **[Getting Started](getting-started.md)** — install the Odin toolchain, copy the starter,
-  build, and write + attach your first `.odin` script (a Node that moves on `_process`).
+| Layer | Read | Prerequisite |
+| --- | --- | --- |
+| Odin and Godot | [Scripting](scripting/index.md) and [authoring reference](authoring-guide.md) | Godot scenes and basic programming |
+| Kit multiplayer | [Kit overview](kit/index.md), then [two-player tutorial](kit/quickstart.md) | Working Odin scripts |
+| Replay multiplayer | [Replay overview](replay/index.md) and [addon starter](replay.md) | Working Odin scripts; Kit is optional |
+| Box3D | [Physics overview](box3d/index.md), [authoring](box3d/authoring.md), and [support](box3d/support.md) | Working Odin scripts; multiplayer is optional |
+| Libraries | [Library map](libraries/index.md) | Depends on the selected package |
 
-## Reference
+Some tutorials use example projects from a repository checkout. They say so at
+the start; use the addon's packaged templates for a project without a checkout.
+Box3D requires its target backend and matching native setup.
 
-- **[Authoring Guide](authoring-guide.md)** — the complete feature reference: the script
-  struct convention (`owner` first field) and `//gd:` markers, `@export` of every type,
-  lifecycle, methods, signals, resources, autoloads, cross-script access, and the `gd.*`
-  helper catalog.
-- **[Workflow](workflow.md)** — the build/edit/iterate loop and editor tools
-  (autocomplete, goto-definition, rebuild-on-save), with the limits of ahead-of-time scripting.
+## Development and export
 
-## Build multiplayer
-
-- **[Replay](replay.md)** — the experimental value-world, rollback and session
-  library, with a separately included offline/native multiplayer starter.
-
-- **[Kit](kit/index.md)** — reusable multiplayer systems under
-  `godot:kit/*`: host-authoritative sessions with reconnect identity, declarative
-  replication with client prediction, chat, items, combat, NPCs, save/resume,
-  moderation, and ENet + Steam transports — for 2-8 player co-op games.
-- **[Build a game in a day](kit/build-a-game-in-a-day.md)** — the tutorial arc.
-- **[Gameplay recipes](recipes.md)** — embedding `play` fields in entities and
-  assigning State, Cadence, Intent, Authority, Prediction, Reconcile, and Cue
-  responsibilities across peers and clocks. A gun example and five gameplay
-  items illustrate the pattern. The page identifies older API examples that
-  remain as design references.
-
-## Ship
-
-- **[Exporting](exporting.md)** — compiling and bundling scripts for desktop and web exports.
-- **[Debugging](debugging.md)** — `gd.print`/`gd.error` logging, native `lldb`, and reading
-  crash backtraces with Odin proc names.
-- **[Native boundary](design/native-boundary.md)** — compiler compatibility, the pre-boot ABI
-  fingerprint, ownership, and performance characteristics of the core↔scripts split.
+- [Workflow](workflow.md): build, reload, editor settings, and completion.
+- [Debugging](debugging.md): logging, native breakpoints, and crash reports.
+- [Script modules](modules.md): independently built gameplay libraries.
+- [Exporting](exporting.md): desktop and browser packaging.
+- [Distribution](distribution.md): compiler and platform compatibility.
+- [Core and scripts boundary](contributing/native-boundary.md): ABI and ownership.

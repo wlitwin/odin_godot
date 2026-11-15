@@ -11,7 +11,7 @@ the [Room driver](../godot/room.md) for live-session integration, and the
 [admission backend](../provision/README.md) for durable invite/join transactions.
 The validation sections below retain the scope of the initial M5 integration
 gates. Use the [compatibility map](../compatibility.md) for current formats and the
-[framework audit](../../docs/replay/framework-audit.md) for the current failure matrix.
+[Replay guide](../../docs/replay/support.md) for the current failure matrix.
 
 ## Decision model
 

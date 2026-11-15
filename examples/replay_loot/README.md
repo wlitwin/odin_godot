@@ -40,4 +40,4 @@ REPLAY_LOOT_OK
 
 The [Godot loot view](../replay_hello/README.md) uses this same model and tests
 effect cancellation while correcting the winner.
-The complete port and comparison sequence is in the [roadmap](../../docs/replay/roadmap.md).
+The complete port and comparison sequence is in the [Replay guide](../../docs/replay/index.md).

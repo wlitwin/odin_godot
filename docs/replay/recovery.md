@@ -6,14 +6,18 @@ combines that state with an authorized successor, a newer authority epoch, and
 a handshake that reconciles surviving clients. An archive alone does not elect
 an authority or recover work accepted after its capture tick.
 
-The implementation includes bounded replication to an explicitly trusted peer,
-authenticated coordinator RPCs with SQLite storage, durable provisioning,
-checkpoint publication, and cold restore. Native and browser gates cover planned
-and crash handoff, old-owner return, repeated handoff, control partition, and
-successor loss. The [framework audit](framework-audit.md) records the evidence
-and remaining deployment/recovery limits.
+Use a direct Session for local or direct host/client play. Add Party for
+invitations and enrollment; open Room after admission when coordinated authority
+recovery is required. Room owns and pumps its Session, so drive `party_frame`
+then `room_frame`, rather than also calling `session_frame` yourself.
 
-The [explicit protocol-6 to 7 archive bridge](../../replay/net/checkpoint_upgrade.md)
+Keep these runtime owners at stable addresses and close the outer owners before
+releasing their transport, storage, catalogs, and callbacks. The
+[Session tutorial](godot.md) is the starting point; the
+[Room reference](https://github.com/wlitwin/odin_godot/blob/main/replay/godot/room.md)
+describes the complete options and lifecycle.
+
+The [explicit protocol-6 to 7 archive bridge](https://github.com/wlitwin/odin_godot/blob/main/replay/net/checkpoint_upgrade.md)
 preserves compatible Worlds while validating the old contract. It grants no
 new lease; coordinated upgrade remains an application transition. Normal loaders
 continue to reject incompatible versions.
@@ -151,71 +155,14 @@ The tested boundary is process crash/restart on native macOS. Power-loss durabil
 directory fsync behavior, concurrent writers, and browser persistence are not
 established by these tests.
 
-<a id="verified-gates"></a>
+## Recovery policy
 
-## Initial archive and save verification
+A planned handoff settles accepted work and transfers the approved final
+checkpoint before authority changes. A crash takeover uses the newest usable
+approved checkpoint and can lose later unreplicated work. The coordinator must
+fence the old authority and grant a newer term before the successor resumes.
 
-```sh
-nix develop --command bash tests/replay_net/run.sh
-nix develop --command bash examples/replay_cavecrawl/save_run.sh
-nix develop --command bash examples/replay_cavecrawl/recovery_run.sh
-```
-
-The initial runner gate recorded 24 native tests with allocator tracking and an
-instantiated WASM type-check. Seven checkpoint scenarios cover canonical roundtrip, hidden authority
-fields, promotion, pending actions, malformed/count/content/contract failures,
-policy and ban restoration, new-epoch rejection, and fresh clients reclaiming
-reserved seats without resetting loot. A local host credential cannot reserve a
-second remote seat.
-
-The solo Godot gate creates/replaces a save after looting, opening a door, and
-throwing a rock; leaves a deliberately incomplete staging file; kills the writer;
-and starts a fresh process using the saved profile. The entire restored frame's
-canonical hash/tick match, and the next action succeeds without repeating old
-outcomes. The co-op gate runs a host and guest at 120 ms receive delay each, saves
-the guest's looted world, kills/replaces the processes, and checks guest identity,
-inventory conservation, door state, and continued actions under epoch 2. It
-supplies the new epoch explicitly. These gates are registered in `tests/run_all.sh`.
-
-<a id="next-m5-implementation-sequence"></a>
-
-## Original M5 implementation sequence
-
-This sequence records the work planned after the initial archive/save gates.
-The implementation and test counts below describe that stage.
-
-1. **Bounded checkpoint transfer — implemented component:** explicit trusted-peer
-   scope, indexed chunks, duplicate/reorder handling, complete validation,
-   acknowledgement, and retention of the authority's last acknowledged checkpoint
-   now pass eight native tests and a real ENet large-archive gate. See the
-   [replication package](../../replay/recovery/README.md). Integration with gameplay
-   packet routing/traffic budgets and reusable archive schema metadata now also
-   exists as `recovery.Link` and the Godot Session facade. A live Cavecrawl gate
-   validates gameplay and repeated backups on one connection under network faults.
-2. **Authority decision service — implemented component:** the
-   [authority package](../../replay/authority/README.md) defines durable CAS decisions,
-   eligible successors, conservative leases, planned retirement, restart quarantine,
-   and runner enforcement. [Authenticated RPCs and SQLite storage](../../replay/authority/service.md)
-   now have real-process handoff and coordinator crash/restart gates. The test
-   transfers the simulation. The Room driver additionally passes live Cavecrawl
-   client migration; dynamic provisioning and the full failure matrix remain open.
-   Dedicated competitive failover stays within trusted
-   infrastructure.
-3. **Recovery handshake:** coordinator-approved authority/epoch discovery, reconnect
-   retries, old/new frontier reconciliation, deliberate retirement of unreplicated
-   actions, and local presentation reset/cancellation at the recovered tick.
-4. **Planned handoff:** freeze admission at a final tick/frontier, replicate and
-   acknowledge that checkpoint, authorize the successor, reconnect, and resume.
-   Verify no accepted work is omitted and old authority packets remain rejected.
-5. **Abrupt takeover:** restore the newest acknowledged eligible checkpoint,
-   explicitly report the lost tick interval, handle successor failure/consecutive
-   migrations/old-host return, and keep divergent partitions from silently merging.
-6. **Gameplay acceptance:** real-process kills during Cavecrawl combat and loot,
-   then a competitive replayed example. Record interruption, rollback distance,
-   checkpoint age and size, restore cost, and responsiveness after recovery.
-
-The initial sequence deferred checkpoint-plus-log recovery, service outboxes,
-and broader schema upgrades until after snapshot-based acceptance. It left M5
-open until the driver, fencing, partition policy, and real successor takeover
-gates existed. The [framework audit](framework-audit.md) records the later
-implemented recovery paths and their remaining limits.
+Reconnecting clients reconcile their action outcomes and presentation against
+that recovered frontier. A newer epoch alone does not recover missing actions
+or authorize a host. Only a trusted successor may receive complete private
+authority state. See [Support](support.md) for deployment and persistence limits.

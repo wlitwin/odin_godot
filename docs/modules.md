@@ -307,6 +307,8 @@ Choose a communication mechanism according to the data being exchanged:
 | Shared types, constants, pure procs | **A [`res://shared/`](#shared) package**: imported directly by every module, verified state-free |
 | Typed struct access | **`rt.script_of`: module-local only** (below) |
 
+<a id="rtscript_of-across-modules"></a>
+
 ### `rt.script_of` across modules
 
 Use `rt.script_of(obj, T)` for typed access without dispatch overhead within
@@ -410,7 +412,7 @@ policy; this does not add automatic hoisting through arrays or pointers.
 Accepting a runtime-owner alias does not make that owner copyable or serializable.
 For example, Replay Timeline allocations still have one owner and must be used by
 pointer. The pure shared package remains subject to the same no-globals/no-script
-rules. See [focused and application acceptance](../tests/replay_shared_alias/README.md).
+rules. See [focused and application acceptance](https://github.com/wlitwin/odin_godot/blob/main/tests/replay_shared_alias/README.md).
 
 
 ### Reload: one shared edit rebuilds every module

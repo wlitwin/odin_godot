@@ -1,7 +1,7 @@
 # Prospective target evaluation
 
 This is an evaluation, not a browser or mobile platform port. See the
-[decision and remaining proof](../../docs/design/box3d/web-mobile-evaluation.md)
+[decision and remaining proof](../../docs/box3d/support.md)
 and [bound observations](report.json). Existing desktop results retain their own
 scope.
 

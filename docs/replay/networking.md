@@ -1,92 +1,63 @@
-# Replay networking implementation notes
+# Replay networking
 
-This record describes the initial M3 implementation and the work still open at
-that stage. The initial [server/client runner](../../replay/net/README.md) combined
-schema/codecs, transports, admission, reliable actions, authority facts/snapshots,
-prediction, correction, and reconnect. Engine-free fault scenarios and the
-four-process Hello network scene passed, along with acknowledged baselines,
-delta compression, compact facts, and outbound budgets. Further admission/recovery
-review was required before M3 completion. The linked runner reference describes
-the current API and capabilities.
+Choose who settles gameplay, what the client predicts, and how processes connect.
+Use [the Session starter](godot.md) before configuring a custom runner.
 
-## Authoritative correction API
+## Choose authority and history together
 
-`correct(&timeline, truth, events)` accepts a complete authoritative frame plus
-its complete occurrence batch. Callers first verify sender authority, epoch,
-schema/content, timing, and game invariants. The function validates event identity,
-stages the checkpoint and every subsequent replayed input, and commits the whole
-operation only if every step succeeds. Its confirmation frontier advances to the
-truth tick. Duplicate settled checkpoints are idempotent; conflicting settled
-state is rejected.
+| Game model | Runtime | Consequence |
+| --- | --- | --- |
+| Authoritative host or dedicated server | Session with Host/Server/Client/Observer roles | Authority validates inputs and settles results; clients predict within the chosen scope |
+| Trusted cooperative engine physics | Owner observation policy and Body2/Body3 adapters | Replay records accepted outputs; it does not rewind Godot's contact solver |
+| Deterministic fixed-roster peers | P2P runner and admitted peer setup | Peers must reproduce the same model from the same inputs |
 
-The generating authority input at the checkpoint is unknown, so that record is
-a new replay boundary. `read_input` reports it as unavailable and `audit` cannot
-cross it using invented input. Audit from the following tick remains meaningful.
+Content identity, schema, tick rate, and policy must match before admission.
+Player identity comes from the authenticated connection-to-seat mapping; a
+payload naming another player cannot establish ownership.
 
-`reset_checkpoint(&timeline, frame, epoch)` is explicit full resync/recovery. It
-reuses allocations and discards speculative input/event history. A same-epoch
-reset cannot move behind confirmed state; a newer authorized epoch may restore
-an older checkpoint. The function does not elect/authenticate the authority.
+## Controls and actions
 
-## Runner design decisions
+Continuous controls belong to ticks. The selected policy defines how an absent
+sample is held or replaced. A discrete action carries sequence identity and a
+settled outcome, so retransmission does not repeat the gameplay operation.
 
-1. Build an engine-free typed server/client runner around `Transport`, canonical
-   schemas, and `Timeline`. Keep the transport callback API usable with both the
-   deterministic memory adapter and ENet.
-2. Establish a version/content/schema handshake, stable seats, transport-peer
-   binding, reconnect credentials, role/admission rules, and bounded work/traffic.
-   A wire field naming a player must never substitute for the authenticated
-   transport-to-seat mapping.
-3. Use tick-stamped redundant control windows and an explicit hold policy.
-   Continuous controls may hold; discrete actions need identity/deduplication and
-   must not become repeated actions because an input packet was lost.
-4. Deliver joins/leaves as tick-stamped system inputs to simulation. This keeps
-   entity lifetime in the frame. Send the initial client checkpoint after its
-   admission/spawn has been applied, avoiding a welcome that names a nonexistent
-   avatar. Do not repeatedly overwrite replayed historical membership from a
-   current roster value.
-5. Keep authoritative event batches on a reliable ordered path and snapshots on
-   an unreliable superseding path. State snapshots need the matching confirmed
-   occurrence history before presentation can settle it. Empty tick ranges can
-   be represented compactly, but must not be guessed after message loss.
-6. On correction, feed authoritative occurrence batches through the settled
-   prefix, then reconcile the newly replayed speculative suffix. Simulation and
-   presentation confirmation counters remain separate. Preserve authoritative
-   snapshot history for remote views rather than treating predicted old frames
-   as observations of authority state.
-7. Implement a full resync request for history exhaustion, baseline loss, or
-   prolonged blackout. Preserve/retire unacknowledged actions explicitly; resetting
-   a timeline alone does not provide reconnect or exactly-once execution.
-8. Integrate the runner into the separate Hello project and test actual
-   server/client/observer gameplay under recorded network faults.
+Choose action scheduling deliberately. A shot may need its tick deadline, while
+an interaction may be admitted at receipt time. Both still need gameplay
+validation and ordering. The [runner reference](https://github.com/wlitwin/odin_godot/blob/main/replay/net/README.md)
+documents scheduling, action outcomes, prediction groups, and recipient views.
 
-The first prediction runner was scoped to one complete public group with held
-remote controls. Prediction of self/contested subgroups and historical boundary
-inputs were left for M6. If private state is omitted from a public projection, a
-client cannot automatically predict code that depends on it; require a suitable
-public simulation model/projection or reject that configuration explicitly.
+## Correction and recovery
 
-## Implemented evidence and remaining work
+An accepted authority checkpoint replaces the corresponding state and occurrence
+batch, then stages the predicted suffix before committing. Older settled state
+cannot be rewritten by ordinary correction. Missing history, baseline loss, or
+a long outage requires the explicit resync/recovery path.
 
-`tests/replay_net/run.sh` covers initial admission, controls, contested/rejected
-actions, retries/deduplication, malformed input and sender binding, loss/jitter,
-blackout resync, reconnect, and WASM type-checking. The initial gameplay gate is
-`examples/replay_hello/network_run.sh`: a real dedicated authority, two predicting
-players, and an observer at 120 ms receive delay on every process. It checks local
-motion response, one accepted firing action per player, and matching shot/effect
-counts. The ENet echo test remains a separate lower-level transport check.
+The confirmation frontier marks settled simulation. Presentation can select a
+different display time and must consume occurrence changes separately. Read
+[Presentation](presentation.md) before adding speculative effects.
 
-Acknowledged baselines/deltas, compact facts, outbound scheduling, ACK-loss recovery,
-and a real jitter/loss/duplication run passed at this stage. Broader
-hostile/recovery review, a wider clock/latency matrix, richer admission/moderation,
-and deliberate seat replacement remained open M3 work. The initial runner
-reserved stable seats for the session lifetime.
-Bearer reconnect credentials do not supply account identity or transport encryption.
+A recipient-filtered public snapshot does not contain everything needed to
+become authority. Keep complete private backups restricted to trusted successors.
+Use [Party and Room recovery](recovery.md) when authority can change.
 
-Host migration requires all M5 checkpoint/session/authority-fencing work. No
-owner-streamed co-op, deterministic P2P, full-game parity, browser runtime, or
-arbitrary-scale claim follows from the initial runner tests.
+## Transports
 
-Public content can use [asset references and exchange](../../replay/assets/README.md)
-through the Session application lane. The reusable [blob transfer](../../replay/transfer/README.md)
-keeps content outside snapshots and shares transport work/bandwidth budgets.
+Native direct sessions use ENet. Browser sessions use WebRTC, with signaling and
+relay configuration supplied by the deployment. A native ENet peer cannot
+directly connect to a browser RTC peer; mixed-platform sessions need a common
+backend and a native RTC extension.
+
+Plain ENet is unencrypted. Session tokens and checksums do not provide transport
+confidentiality. Use the authenticated/confidential transport configuration
+appropriate to the chosen network and trust model.
+
+## Keep work bounded
+
+Use the runner's packet, queue, ingress/egress, history, and prediction limits.
+Measure World size and full replay cost on the deployment hardware. Application
+queues, asset exchange, and persistence need their own bounds.
+
+See [Support](support.md) for the supported configurations and
+[the Godot package map](https://github.com/wlitwin/odin_godot/blob/main/replay/godot/README.md)
+for optional transport, input, scene, storage, and diagnostic imports.

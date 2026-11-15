@@ -8,8 +8,11 @@ guaranteed to remain stable. Kit and its authoring model remain available indepe
 ## Start with the included project
 
 Copy the contents of `template/replay/` into a new project that contains this addon.
-Build using the packaged `build/build_scripts.sh` (or PowerShell counterpart) with
-`ODIN_GODOT_ROOT` pointing at the addon. No source-repository checkout is needed.
+Use [the checkout Session tutorial](replay/godot.md) for this source revision.
+The current `replay/godot` package imports Box3D presentation code even for a
+value-only model, so its build also needs the matching native backend and setup.
+The template alone does not supply that dependency. Native adapter packaging
+requires separate validation from the local Timeline library.
 The starter moves two value-owned players and atomically transfers a shared coin
 into one bag. Its default mode is offline; host/client/observer native modes use
 the same simulation model.

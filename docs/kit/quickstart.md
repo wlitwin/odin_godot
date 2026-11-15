@@ -11,8 +11,8 @@ default Kit stack:
 - the stock lobby, chat, transport, and reconnect flow.
 
 The guide uses focused excerpts. The complete, buildable sources are
-[`hello.odin`](../../examples/hello_net/scripts/hello.odin) and
-[`player.odin`](../../examples/hello_net/scripts/player.odin).
+[`hello.odin`](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_net/scripts/hello.odin) and
+[`player.odin`](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_net/scripts/player.odin).
 
 ## Prerequisite
 
@@ -27,6 +27,7 @@ From the repository root:
 
 ```sh
 bash build/build_scripts.sh examples/hello_net
+"$GODOT" --headless --editor --path examples/hello_net --import
 $GODOT --path examples/hello_net &
 $GODOT --path examples/hello_net
 ```
@@ -34,6 +35,9 @@ $GODOT --path examples/hello_net
 Select **Host** in the first window and **Join** in the second. Arrow keys move
 the square owned by the active window. A remote square is deliberately rendered
 slightly behind its owner so that Kit can interpolate between received samples.
+
+The import command lets a fresh project discover the extension before launching
+the game. You can also open it in the editor and wait for the initial import.
 
 If this checkpoint fails, check the build output first, then confirm that both
 processes use the same build and that port `4242` is available.
@@ -330,6 +334,8 @@ own position directly. It is appropriate for cooperative play among invited
 peers, but the host cannot use these coordinates as cheat-resistant truth. Use
 the [simulation quickstart](quickstart-sim.md) when the authority must derive
 movement from validated inputs.
+
+<a id="8-release-the-stack-on-scene-exit"></a>
 
 ## 8. Release the stack on scene exit
 

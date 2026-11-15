@@ -10,7 +10,7 @@ gameplay.
 
 The evidence below describes the service fixture's tests, including planned
 simulation transfer and coordinator crash/restart. Broader integration results
-belong to the Room gates and [framework audit](../../docs/replay/framework-audit.md).
+belong to the Room gates and [Replay guide](../../docs/replay/support.md).
 
 ## Trust and message contract
 

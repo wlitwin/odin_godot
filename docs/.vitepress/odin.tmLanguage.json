@@ -1,0 +1,319 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "odin",
+  "scopeName": "source.odin",
+  "fileTypes": [
+    "odin"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#attributes"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#calls"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#operators"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "comment": "odin_godot script markers: //gd:extends Node2D, //gd:class Coin, //gd:tool",
+          "match": "^\\s*(//)(gd:[a-z_]+)(?:[ \\t]+([^\\s/][^/]*?))?[ \\t]*(//.*)?$",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.comment.odin"
+            },
+            "2": {
+              "name": "keyword.other.marker.odin"
+            },
+            "3": {
+              "name": "entity.name.type.marker.odin"
+            },
+            "4": {
+              "name": "comment.line.double-slash.odin"
+            }
+          }
+        },
+        {
+          "name": "comment.line.double-slash.odin",
+          "begin": "//",
+          "end": "$"
+        },
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "block-comment": {
+      "name": "comment.block.odin",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [
+        {
+          "include": "#block-comment"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.odin",
+          "begin": "\"",
+          "end": "\"|$",
+          "patterns": [
+            {
+              "include": "#escapes"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.raw.odin",
+          "begin": "`",
+          "end": "`"
+        },
+        {
+          "name": "string.quoted.single.odin",
+          "match": "'(?:[^'\\\\]|\\\\(?:[abefnrtv0\\\\'\"]|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-7]{3}))'"
+        }
+      ]
+    },
+    "escapes": {
+      "name": "constant.character.escape.odin",
+      "match": "\\\\(?:[abefnrtv0\\\\'\"]|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8}|[0-7]{3})"
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "name": "meta.attribute.odin",
+          "begin": "(@)\\(",
+          "beginCaptures": {
+            "1": {
+              "name": "punctuation.definition.attribute.odin"
+            }
+          },
+          "end": "\\)",
+          "patterns": [
+            {
+              "include": "#strings"
+            },
+            {
+              "include": "#numbers"
+            },
+            {
+              "include": "#constants"
+            },
+            {
+              "name": "entity.other.attribute-name.odin",
+              "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+            }
+          ]
+        },
+        {
+          "match": "(@)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "punctuation.definition.attribute.odin"
+            },
+            "2": {
+              "name": "entity.other.attribute-name.odin"
+            }
+          }
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "comment": "name :: proc",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(::)\\s*(?:#[a-z_]+\\s+)*(proc)\\b",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.odin"
+            },
+            "2": {
+              "name": "keyword.operator.declaration.odin"
+            },
+            "3": {
+              "name": "keyword.other.odin"
+            }
+          }
+        },
+        {
+          "comment": "Name :: struct / union / enum / distinct / bit_set / bit_field",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(::)\\s*(?=(?:struct|union|enum|distinct|bit_set|bit_field)\\b)",
+          "captures": {
+            "1": {
+              "name": "entity.name.type.odin"
+            },
+            "2": {
+              "name": "keyword.operator.declaration.odin"
+            }
+          }
+        },
+        {
+          "comment": "package name / import alias \"path\"",
+          "match": "\\b(package)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.other.odin"
+            },
+            "2": {
+              "name": "entity.name.namespace.odin"
+            }
+          }
+        },
+        {
+          "match": "\\b(import)\\s+([A-Za-z_][A-Za-z0-9_]*)(?=\\s+\")",
+          "captures": {
+            "1": {
+              "name": "keyword.other.odin"
+            },
+            "2": {
+              "name": "entity.name.namespace.odin"
+            }
+          }
+        }
+      ]
+    },
+    "directives": {
+      "name": "keyword.other.directive.odin",
+      "match": "#[A-Za-z_][A-Za-z0-9_]*"
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.odin",
+          "match": "\\b0[xXh][0-9A-Fa-f_]+\\b"
+        },
+        {
+          "name": "constant.numeric.binary.odin",
+          "match": "\\b0[bB][01_]+\\b"
+        },
+        {
+          "name": "constant.numeric.octal.odin",
+          "match": "\\b0[oO][0-7_]+\\b"
+        },
+        {
+          "name": "constant.numeric.float.odin",
+          "match": "\\b[0-9][0-9_]*(?:\\.[0-9][0-9_]*)?(?:[eE][+-]?[0-9_]+)?[ijk]?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.odin",
+          "match": "\\b(?:if|else|for|switch|case|when|where|break|continue|fallthrough|return|defer|do|in|not_in|or_else|or_return|or_break|or_continue)\\b"
+        },
+        {
+          "name": "keyword.other.odin",
+          "match": "\\b(?:package|import|foreign|proc|struct|union|enum|map|bit_set|bit_field|matrix|dynamic|distinct|using|cast|auto_cast|transmute|context|asm|typeid)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.builtin.odin",
+          "match": "\\b(?:bool|b8|b16|b32|b64|int|i8|i16|i32|i64|i128|uint|u8|u16|u32|u64|u128|uintptr|i16le|i32le|i64le|i128le|u16le|u32le|u64le|u128le|i16be|i32be|i64be|i128be|u16be|u32be|u64be|u128be|f16|f32|f64|f16le|f32le|f64le|f16be|f32be|f64be|complex32|complex64|complex128|quaternion64|quaternion128|quaternion256|rune|string|cstring|string16|cstring16|rawptr|any|byte)\\b"
+        },
+        {
+          "comment": "ALL_CAPS constants",
+          "name": "constant.other.odin",
+          "match": "\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*\\b(?![a-z(])"
+        },
+        {
+          "comment": "Ada_Case identifiers are types by Odin convention",
+          "name": "entity.name.type.odin",
+          "match": "\\b[A-Z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)*\\b"
+        }
+      ]
+    },
+    "calls": {
+      "patterns": [
+        {
+          "comment": "package-qualified call: gd.node_queue_free(",
+          "match": "\\b([a-z_][a-z0-9_]*)(\\.)([a-z_][A-Za-z0-9_]*)(?=\\s*\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.namespace.odin"
+            },
+            "2": {
+              "name": "punctuation.accessor.odin"
+            },
+            "3": {
+              "name": "entity.name.function.call.odin"
+            }
+          }
+        },
+        {
+          "name": "support.function.builtin.odin",
+          "match": "\\b(?:len|cap|size_of|align_of|offset_of|offset_of_selector|offset_of_member|offset_of_by_string|type_of|type_info_of|typeid_of|swizzle|complex|quaternion|real|imag|jmag|kmag|conj|expand_values|compress_values|min|max|abs|clamp|soa_zip|soa_unzip|new|new_clone|make|delete|free|free_all|append|append_elem|append_elems|inject_at|assign_at|pop|pop_front|clear|reserve|resize|remove_range|ordered_remove|unordered_remove|copy|panic|assert|unreachable|unimplemented|raw_data|card|incl|excl)(?=\\s*\\()"
+        },
+        {
+          "name": "entity.name.function.call.odin",
+          "match": "\\b[a-z_][A-Za-z0-9_]*(?=\\s*\\()"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.odin",
+          "match": "\\b(?:true|false|nil)\\b"
+        },
+        {
+          "name": "constant.language.uninitialized.odin",
+          "match": "---"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.declaration.odin",
+          "match": "::|:="
+        },
+        {
+          "name": "keyword.operator.range.odin",
+          "match": "\\.\\.[=<]|\\.\\."
+        },
+        {
+          "name": "keyword.operator.arrow.odin",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.odin",
+          "match": "==|!=|<=|>=|&&|\\|\\||<<|>>|&~|[-+*/%&|~^<>!=?]"
+        }
+      ]
+    }
+  }
+}

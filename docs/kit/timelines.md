@@ -86,7 +86,7 @@ instantaneously. Simulated objects should integrate their own state between
 snapshots, and contact resolution must be replay-safe.
 
 `examples/speedball` demonstrates this model. Compare it with
-[`examples/slopball`](../../examples/slopball/README.md), which implements a
+[`examples/slopball`](https://github.com/wlitwin/odin_godot/blob/main/examples/slopball/README.md), which implements a
 similar game using owner-simulated physics.
 
 <a id="hybrid-games-are-expected"></a>

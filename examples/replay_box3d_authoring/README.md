@@ -79,7 +79,7 @@ process exit and checked cleanup remain separate. Optional Replay
 `Profile_Clock`/`Profile_Metric` values use microseconds; Physics Inspect/Decode/
 Repair/Compare and snapshot subphases can nest inside Pump/outer calls. Missing
 clocks are unavailable; histogram bounds are not raw percentiles or extra costs
-to add. See [production diagnostics](../../docs/design/box3d/production-diagnostics.md).
+to add. See [production diagnostics](../../box3d/docs/production-diagnostics.md).
 
 The authored UI exposes Host/Client only. Replay Session `.Observer`/public
 `spectator=true` is receive-only and rejects step/action; SDK Client/Observer
@@ -87,12 +87,12 @@ uses ordinary `session_open`, not authority-only `session_open_complete`.
 Same-token reconnect preserves published complete state until a real replacement
 Welcome. Canonical hard resync follows actual window loss through public pumps;
 same-scope signed-fact healing is separate. Manual UI Reset remains unsupported.
-Use [recovery contracts](../../docs/design/box3d/recovery-hardening.md); no private
+Use [recovery contracts](../../docs/box3d/support.md); no private
 resync call, fake notice or second networking loop is a supported workaround.
 
 Inspect a saved trace with `"$INSPECTOR" "$TRACE"`. For bounded offline
 `tools/box3d_diagnostics.py collect/verify/inspect`, use the exact commands and
-explicit labelled attachments in the [release procedure](../../docs/design/box3d/release.md).
+explicit labelled attachments in the [release procedure](../../box3d/docs/release.md).
 Inspection decodes/re-encodes bytes without Native physics or simulation; it
 does not reproduce gameplay or infer a report verdict.
 
@@ -103,12 +103,12 @@ Keep the [original sample proof](../../tests/box3d_samples/report.json),
 Replay SDK observer run preserved by P6.4 is still FAIL; passing public observer
 contracts do not relabel it. Historical8.894ms CPU failure/cause unknown also
 remains unchanged. Use the [desktop CLI](../../tests/box3d_desktop/README.md) for
-actual normal exports and the [compatibility table](../../docs/design/box3d/desktop-compatibility.md)
+actual normal exports and the [compatibility table](../../docs/box3d/support.md)
 for ARM64 SDK/universal launcher, effective macOS14+ floor and translated Linux
 x86_64 limits. No native-x86 hardware, Windows/web/mobile or remote-CI claim.
 
-Follow [upgrade](../../docs/design/box3d/upgrade.md) and
-[deployment](../../docs/design/box3d/runtime-deployment.md) before source or Native
+Follow [upgrade](../../box3d/docs/upgrade.md) and
+[deployment](../../box3d/docs/runtime-deployment.md) before source or Native
 changes. Preserve callback temporary scopes, owning-return/borrowed-argument
 annotations, checked lifetime order, shared content bytes and failed evidence.
 The older stress example and exact CPU workloads remain separate and unchanged.

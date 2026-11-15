@@ -96,6 +96,13 @@
           '';
         };
 
+        # API documentation parses source; it needs no Godot, native physics,
+        # Emscripten, or platform cross toolchains.
+        devShells.docs = pkgs.mkShell {
+          name = "odin_godot-docs";
+          packages = with pkgs; [ odin clang nodejs ];
+        };
+
         # Cross-compile shell: the default toolchain PLUS the Linux/Windows cross C
         # compilers, exposed as env vars (NOT on PATH — they keep their triple prefix so
         # they never shadow the native `cc`/`clang`). Enter with:

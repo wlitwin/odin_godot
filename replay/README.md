@@ -21,21 +21,18 @@ also includes optional advanced mechanisms and tools. Kit (v1)
 and Replay (v2) share [Odin/API conventions](../docs/authoring-guide.md#api-conventions-shared-by-kit-and-replay)
 while retaining their different gameplay models.
 
-The library remains experimental. Use the [framework completion audit](../docs/replay/framework-audit.md)
-to distinguish implemented contracts, tested combinations and remaining framework
-work. Full parity across every ported game is not its completion gate.
+The library remains experimental. Start with the
+[Replay manual](../docs/replay/index.md) and
+[support and compatibility](../docs/replay/support.md).
 
-- [Roadmap and implementation plan](../docs/replay/roadmap.md)
 - [Getting started and choosing a runner](getting-started.md)
 - [Compatibility and upgrade policy](compatibility.md)
 - [Experimental support and release assessment](support.md)
 - [Architecture and current API](../docs/replay/architecture.md)
-- [Game ports and comparison protocol](../docs/replay/comparison.md)
 - [Runnable loot example](../examples/replay_loot/README.md)
 - [Godot Hello and Loot scenes](../examples/replay_hello/README.md)
 - [Presentation contract](view/README.md)
 - [Explicit event folding](event_folding.md)
-- [Implementation progress](../docs/replay/progress.md)
 - [Editor authoring workflow and tools](editor/README.md)
 - [Typed scene adapters and view declarations](godot/scene/adapter-bindings.md)
 - [Authored archetypes and scene ownership](godot/scene/archetypes.md)

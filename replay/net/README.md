@@ -9,7 +9,7 @@ presentation journal. The journal matches predicted and authority occurrences
 so effects can be confirmed or cancelled after correction.
 
 The API remains experimental. The sections below describe implemented behavior
-and its tests; the [framework audit](../../docs/replay/framework-audit.md) tracks
+and its tests; the [Replay guide](../../docs/replay/support.md) tracks
 broader admission, recovery and release acceptance.
 
 `Model.control_timing` defaults to `Scheduled`. The `Latest_Observation` mode

@@ -47,7 +47,7 @@ review remain pending. Ownership intent uses accepted ground-plane
 displacement at arbitration passes, matching the original measure and threshold. Handoff still uses
 prepare/commit rather than immediate SETOWNER. Solver contacts/joints
 are not serialized or replayed. Broader browser deployment and independent platform testing
-remain open. See [Body3](../../replay/godot/scene/body3.md) and the [roadmap](../../docs/replay/roadmap.md).
+remain open. See [Body3](../../replay/godot/scene/body3.md) and the [Replay guide](../../docs/replay/index.md).
 
 The UI's world/action changes use content D4 (`0x52534c4f50334434`), intentionally
 incompatible with D1/D2/D3. The shared coordinator reads this model constant. See the

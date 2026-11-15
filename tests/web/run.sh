@@ -13,7 +13,7 @@
 #
 # Pin emscripten 4.0.20 (the engine's exact version) with EMCC=/path/to/4.0.20/emcc; the
 # dev shell's emcc also produces a browser-loadable module (verified — see docs/exporting.md
-# and docs/design/web-internals.md).
+# and docs/contributing/architecture.md).
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"

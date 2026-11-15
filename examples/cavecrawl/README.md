@@ -12,9 +12,9 @@ walkthrough, then use the file table below to find each feature's implementation
 
 The example contains about 4,500 hand-written lines and shows these patterns
 working together. For the
-smallest complete kit game read [slopball](../slopball/) first; for the
-server-authority model read [quickdraw](../quickdraw/) and
-[speedball](../speedball/) ([choosing a model](../../docs/kit/timelines.md)).
+smallest complete kit game read [slopball](../slopball) first; for the
+server-authority model read [quickdraw](../quickdraw) and
+[speedball](../speedball) ([choosing a model](../../docs/kit/timelines.md)).
 
 Author multiplayer behavior in the entity files: a struct declares replicated
 fields with `gd:"replicate"` tags, `@(gd_command)` procedures request validated

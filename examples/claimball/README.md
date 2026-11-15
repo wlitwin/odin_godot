@@ -7,8 +7,8 @@ world. These three soccer examples use different authority and display policies:
 
 | example | model | the ball |
 |---|---|---|
-| [slopball](../slopball/)   | co-op, peer-authoritative | owned by the last toucher (`play.Puppet`) |
-| [speedball](../speedball/) | predict-**world** (`echo_inputs`) | every avatar echoed; one predicted timeline |
+| [slopball](../slopball)   | co-op, peer-authoritative | owned by the last toucher (`play.Puppet`) |
+| [speedball](../speedball) | predict-**world** (`echo_inputs`) | every avatar echoed; one predicted timeline |
 | **claimball** | predict-**self** + the **claim** | only your avatar predicted; the ball predicted and *claimed* |
 
 Claimball keeps the ball `@(gd_tick = "contested")`, so each peer predicts the

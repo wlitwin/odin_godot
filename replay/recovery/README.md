@@ -201,7 +201,7 @@ door. Save/resume and restarted-host/guest recovery gates remain separate.
 The [Room driver](../godot/room.md) installs coordinator-approved successor and
 fencing decisions, then performs planned or abrupt takeover with surviving-client
 frontier reconciliation. See the [recovery contract](../../docs/replay/recovery.md)
-and [roadmap](../../docs/replay/roadmap.md) for its guarantees and remaining work.
+and [Replay guide](../../docs/replay/index.md) for its guarantees and remaining work.
 
 ## Independent application consumers
 

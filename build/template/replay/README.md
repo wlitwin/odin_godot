@@ -1,5 +1,12 @@
 # Replay starter
 
+The current Godot Session package also links Box3D presentation code, including
+for this value-only model. Use the
+[checkout setup](https://wlitwin.github.io/odin_godot/replay/godot.html)
+to select the required native backend. The packaged template alone does not
+provide that dependency; the command below assumes a coherent addon and backend
+setup. The engine-free local Timeline does not require Box3D.
+
 This is a separate optional starter for the experimental `godot:replay` library.
 It does not replace the addon's ordinary Hello template or the Kit framework.
 Copy this directory's contents into a **new** project root containing the installed

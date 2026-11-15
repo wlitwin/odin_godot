@@ -2,7 +2,7 @@
 
 # speedball — whole-pitch prediction with Kit
 
-Compare this game with [slopball](../slopball/) to choose a simulation policy.
+Compare this game with [slopball](../slopball) to choose a simulation policy.
 Slopball hands the ball's physics simulation to the last toucher using
 `play.Puppet`. Speedball keeps one authority and lets each peer predict the
 ball locally. Kit's simulation lane schedules fixed ticks and retains history

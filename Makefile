@@ -1,7 +1,7 @@
 # odin_godot — top-level convenience targets. All real work happens inside the Nix dev
 # shell (toolchain: odin, emcc, godot). These targets wrap `nix develop --command`.
 
-.PHONY: test showcase web bindings api-dump format help
+.PHONY: test showcase web bindings api-dump format docs docs-check help
 
 help:
 	@echo "odin_godot targets:"
@@ -11,6 +11,14 @@ help:
 	@echo "  make bindings  - regenerate the godot/ binding from extension_api.json"
 	@echo "  make api-dump  - dump extension_api.json + gdextension_interface.h from \$$GODOT"
 	@echo "  make format    - format the hand-written Odin code (tools/format/format.sh)"
+	@echo "  make docs      - preview the documentation locally"
+	@echo "  make docs-check - check links and build the documentation"
+
+docs:
+	cd docs && npm run dev
+
+docs-check:
+	cd docs && npm run check && npm run build
 
 # Full suite. One command, everything green (web is browser-gated — see tests/run_all.sh).
 test:

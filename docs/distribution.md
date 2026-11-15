@@ -70,10 +70,16 @@ collections are hidden from Godot's scene scanner using `.gdignore`; the Odin
 compiler still resolves imports from them. The default Hello starter does not
 use Replay.
 
-The [Replay distribution gate](../tests/replay_distribution/README.md) builds an
+For current Box3D and Replay Godot Session workflows, use the
+[checkout setup](replay/godot.md). The Session package currently links Box3D
+presentation code, including for a value-only game. Its native backend and
+adapter packaging need separate validation; a copied template alone does not
+provide that setup.
+
+The [Replay distribution gate](https://github.com/wlitwin/odin_godot/blob/main/tests/replay_distribution/README.md) builds an
 isolated source snapshot, installs the Nix-produced addon into an external project,
 compiles with only that addon's collection path and runs native solo/network and
-actual browser acceptance. It includes current untracked implementation files in
+browser behavior. It includes current untracked implementation files in
 the snapshot without modifying the shared Git index. Normal Git-flake release
 builds still require all intended files to be committed; this test does not publish,
 tag or bypass the release runbook.
@@ -151,7 +157,7 @@ Compiling scripts requires an `odin` compiler on `PATH`. Use the bundled
 release by default. The native loader can accept a different compiler release
 when both its semantic ABI generation and complete layout fingerprint match;
 it does not decide compatibility from the release-name string alone. See
-[Native core ↔ scripts boundary](design/native-boundary.md).
+[Native core ↔ scripts boundary](contributing/native-boundary.md).
 
 The suite's `splitaddon` test on macOS verifies the split layout: the core is
 in `addons/odin_godot/bin/<platform>/` and scripts are in `res://bin/`.

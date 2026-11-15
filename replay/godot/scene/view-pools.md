@@ -3,7 +3,7 @@
 Use view pools to give live entities Godot scenes and retire those scenes when
 the entity identity ends. `Nodes2` manages scene instances by key; typed pools
 add entity generation handles, detached display values and callback bindings.
-The [Godot bridge goal](../../../docs/replay/godot-bridge-plan.md) describes that
+The [Godot bridge goal](../../../docs/replay/support.md) describes that
 layering.
 
 `Nodes2` uses bounded indexed identity lookup, with a separate preflight index

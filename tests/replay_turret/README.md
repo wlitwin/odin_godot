@@ -22,4 +22,4 @@ current codecs. The frozen catalog/action source and schemas live under
 `examples/replay_scrapyard/shared/revisions/content50`.
 
 See [feature documentation](../../examples/replay_scrapyard/shared-turret.md)
-and [recorded evidence](../../docs/replay/turret-progress.md).
+and [recorded evidence](../../docs/replay/support.md).

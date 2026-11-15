@@ -137,5 +137,5 @@ Actual Godot two-module/reload acceptance belongs to the coordinator. C/fake-gat
 controls alone do not certify it. The separate cold editor-import failure in
 Godot 4.7.1 is recorded with original-binary cold/warm controls and LLDB evidence;
 it has no SDK workaround or accepted cold-import pass here. The declared macOS reference Gate B is recorded separately in
-`docs/design/box3d/gate-b.md`; functional host tests alone do not establish CPU
+the current Box3D support guide; functional host tests alone do not establish CPU
 or whole-application performance.

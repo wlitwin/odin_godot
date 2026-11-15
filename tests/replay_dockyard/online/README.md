@@ -88,4 +88,4 @@ separately from the real native/browser room checks.
 Local functional results do not qualify Internet reachability, browser rendering
 budgets, long recovery or human playability. The configured public endpoint's
 independent outside-network acceptance remains separate. The lifecycle/performance/release
-cards remain separate on the [roadmap](../../../docs/design/box3d/web-showcase-roadmap.md).
+cards remain separate on the [support guide](../../../docs/box3d/support.md).

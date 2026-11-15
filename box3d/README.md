@@ -126,7 +126,7 @@ The existing raw query functions retain their earlier behavior.
 capsule casts and collision-plane solver; it neither mutates a body nor steps
 the world. Store that value in Game/Side and call it from the existing framework
 tick. The accepted time step is zero or the existing fixed 1/60. See the
-[motion contract](../docs/design/box3d/motion.md) for the distinct Kit and Replay
+[motion contract](../docs/box3d/motion.md) for the distinct Kit and Replay
 entry points and the authored node/resource surface.
 
 Both the sensor and convex visitor shapes must enable sensor events. This initial

@@ -91,6 +91,9 @@ examples/claimball/.clblogs/
 
 # Pinned Box3D sources/build cache (explicit external caches are also supported)
 /.box3d-cache/
+/docs/.vitepress/cache/
+/docs/.vitepress/dist/
+/docs/api/generated/
 /box3d/native/libogb3.a
 /box3d/native/libogb3.dylib
 /box3d/native/libogb3.so

@@ -12,7 +12,7 @@ rejected. The public Room service is deployed and passed relay/recovery checks
 from the reference network. Independent off-network acceptance and two-human
 co-op feedback remain open.
 See the [current build status](../../tests/replay_dockyard/online/current-handoff-status.json)
-and [handoff](../../docs/design/box3d/showcase-candidate.md).
+and [handoff](../../docs/box3d/support.md).
 The newer [invite usability update](../../tests/replay_dockyard/online/invite-usability-report.json)
 adds short room codes and browser-native copy/paste. Its two-player and native
 checks pass; the public spectator terminal audit remains unresolved. The earlier

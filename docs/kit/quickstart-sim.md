@@ -182,6 +182,7 @@ factory tracks `Player` entities on the lane because their descriptor contains
 
 ```sh
 bash build/build_scripts.sh examples/hello_sim
+"$GODOT" --headless --editor --path examples/hello_sim --import
 $GODOT --path examples/hello_sim &
 HELLO_LATENCY=120 $GODOT --path examples/hello_sim
 ```

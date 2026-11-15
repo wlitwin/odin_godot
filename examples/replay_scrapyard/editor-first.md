@@ -162,5 +162,5 @@ The gate builds an isolated project, checks native/WASM script compilation,
 independent scene previews, edited child offsets/Resources, script/component
 rejection, catalog baking, actor/feedback/audio/HUD behavior, and combat/revive
 host-client-observer agreement. Recovery/performance receipts and exact limits are
-recorded in the [delivery assessment](../../docs/replay/editor-first-progress.md).
+recorded in the [Replay guide](../../docs/replay/support.md).
 No original game or simulation schema is replaced by this workflow.

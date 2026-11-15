@@ -1,5 +1,8 @@
 # Kit multiplayer toolkit
 
+For a declaration listing, browse the [API package index](../api/generated/index.md)
+or search the [API reference](../api/index.md).
+
 Kit is a set of Odin packages for building multiplayer Godot games. It provides
 session management, replicated entities, reconnectable player identities,
 transport adapters, common gameplay systems, and integration-test support.
@@ -97,6 +100,7 @@ example in two windows:
 
 ```sh
 bash build/build_scripts.sh examples/slopball
+"$GODOT" --headless --editor --path examples/slopball --import
 $GODOT --path examples/slopball &
 $GODOT --path examples/slopball
 ```
@@ -163,7 +167,7 @@ as required reading for game authors.
   AI packages use dimension-independent data.
 - macOS is verified end to end. Windows has prebuilt cores with limited runtime
   verification, and Linux is build-verified. See the repository
-  [platform status](../../README.md#platform-status) before choosing deployment
+  [platform support](../distribution.md) before choosing deployment
   targets.
 - The framework bounds malformed input and per-peer traffic with protocol-wide
   packet, field, container, and item ceilings. Deterministic decoder fuzz and

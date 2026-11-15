@@ -1,0 +1,4 @@
+package api_docs_fixture
+
+Broken :: struct {
+    field:

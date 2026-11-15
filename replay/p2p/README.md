@@ -217,6 +217,6 @@ for arbitrarily long matches. Broader recording tools and field-level diffs rema
 debugger work.
 
 See [Replay Duel](../../examples/replay_duel/README.md) and the full
-[roadmap](../../docs/replay/roadmap.md). These tests cover the implemented
+[Replay guide](../../docs/replay/index.md). These tests cover the implemented
 fixed-roster behavior; remaining P2P capabilities and roadmap work need separate
 acceptance.

@@ -70,18 +70,18 @@ memory measurement. Validated recovery scope/count is distinct from a head jump.
 `SAMPLE_ACK` is the Host's actual verified terminal-signature ACK; final part
 bytes and `SAMPLE_RESULT` cleanup remain independent requirements. Replay's
 profile clock markers are not Kit timing counters; use the documented whole-call
-Kit fixtures and [diagnostic boundaries](../../docs/design/box3d/production-diagnostics.md).
+Kit fixtures and [diagnostic boundaries](../../box3d/docs/production-diagnostics.md).
 
 The authored UI exposes Host/Client only. Generic Kit Session spectator
 enrollment does not itself disable positive World stepping: the tested observer
 policy is receive-only/zero-delta. Existing-identity peer replacement, late
 observer enrollment and a fresh logical driver after GO have distinct contracts;
 the legacy Kit example refuses that fresh driver. There is no `reconnect()` UI
-method here. Use [current recovery contracts](../../docs/design/box3d/recovery-hardening.md)
+method here. Use [current recovery contracts](../../docs/box3d/support.md)
 rather than inventing a head setter, input reissue or another Session.
 
 For a saved trace, `"$INSPECTOR" "$TRACE"` performs native-free bounded exact
-inspection. The [release procedure](../../docs/design/box3d/release.md) gives the
+inspection. The [release procedure](../../box3d/docs/release.md) gives the
 published `tools/box3d_diagnostics.py collect/verify/inspect` commands, explicit
 attachments and limits. No sample environment flag automatically produces a
 bundle or upgrades a retained mismatch/report to current acceptance.
@@ -93,8 +93,8 @@ The [original sample proof](../../tests/box3d_samples/report.json),
 candidate/workload scope and failures. Mac execution uses ARM64 SDK/Native with
 a universal Godot launcher; the bundle requires macOS14+, not the launcher's11.0
 minimum. Linux evidence is translated x86_64 functional. See
-[compatibility](../../docs/design/box3d/desktop-compatibility.md) and
-[upgrade/deployment](../../docs/design/box3d/upgrade.md) before changing artifacts.
+[compatibility](../../docs/box3d/support.md) and
+[upgrade/deployment](../../box3d/docs/upgrade.md) before changing artifacts.
 Retain checked lifecycle ownership, callback temp scopes/owning-return semantics,
 shared content and old failure bytes; no Native hot replacement or automatic
 physics in authoring/view nodes.

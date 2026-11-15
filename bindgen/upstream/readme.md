@@ -11,7 +11,7 @@ Checkout releases for each Godot version here: https://github.com/dresswithpocke
 
 ## Base GDExtension Bindings
 
-The bindings to the C Interface are in `gdextension`. Check out [hello-gdextension](examples/hello-gdextension/) for example usage of these bindings.
+The bindings to the C Interface are in `gdextension`. Check out [hello-gdextension](examples/hello-gdextension) for example usage of these bindings.
 
 ## Generating Complete Bindings
 

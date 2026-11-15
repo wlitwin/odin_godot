@@ -1,0 +1,19 @@
+{
+  "name": "odin-godot-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "api": "node .vitepress/api/generate.mjs",
+    "test:api": "node --test .vitepress/api/generate.test.mjs",
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview",
+    "check": "node .vitepress/check-links.mjs"
+  },
+  "devDependencies": {
+    "markdown-it": "14.1.0",
+    "mermaid": "11.17.2",
+    "vitepress": "1.6.4",
+    "vitepress-plugin-mermaid": "2.0.17"
+  }
+}

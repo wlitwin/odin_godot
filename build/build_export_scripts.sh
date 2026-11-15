@@ -20,7 +20,7 @@
 # PATH (lld is in the dev shell; a full sysroot may still be needed). Verified here:
 # macOS arm64 and translated Linux x86_64 Box3D exports have functional Gate C
 # evidence. Windows remains build-only here; see docs/exporting.md and
-# docs/design/export-internals.md for the separate scopes.
+# docs/contributing/architecture.md for the separate scopes.
 set -euo pipefail
 
 # Root derived from this script's location (build/ -> root), overridable. Never hardcode a

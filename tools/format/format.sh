@@ -18,9 +18,8 @@
 #   3. prep verify  the result must have the original's tokens, comments and AST shape.
 # Only verified files are copied back; a file that fails is left as it was and reported.
 #
-# Skipped: *.gen.odin (generated: the godot/ bindings and scriptgen's build output),
-# docs/visual-guide/dist/ (source snapshots — docs/visual-guide/prepare.mjs regenerates
-# them) and bindgen/upstream/ (vendored). Untracked files are included unless gitignored.
+# Skipped: *.gen.odin (generated bindings and scriptgen output) and bindgen/upstream/
+# (vendored). Untracked files are included unless gitignored.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -62,7 +61,7 @@ if [[ ${#paths[@]} -eq 0 ]]; then
     (cd "$ROOT" && git ls-files -co --exclude-standard --full-name -- '*.odin')
 else
     git ls-files -co --exclude-standard --full-name -- "${paths[@]}"
-fi | grep '\.odin$' | grep -v -e '\.gen\.odin$' -e '^bindgen/upstream/' -e '^docs/visual-guide/dist/' | sort -u |
+fi | grep '\.odin$' | grep -v -e '\.gen\.odin$' -e '^bindgen/upstream/' | sort -u |
     while IFS= read -r rel; do
         if [[ -f "$ROOT/$rel" ]]; then # -c also lists files deleted from the working tree
             echo "$rel"
