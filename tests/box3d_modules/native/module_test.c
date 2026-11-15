@@ -1,4 +1,10 @@
 #include "api.h"
+
+/* Exercise the selected profile's actual quota, including reduced profiles. */
+#define QUOTA_A_LIVE (OGB3_HOST_LIMIT_BYTES / 4)
+#define QUOTA_RESERVE (OGB3_HOST_LIMIT_BYTES / 8)
+#define QUOTA_B_LIVE (OGB3_HOST_LIMIT_BYTES - QUOTA_A_LIVE - 2 * QUOTA_RESERVE)
+#define QUOTA_A_TOTAL (QUOTA_A_LIVE + QUOTA_RESERVE)
 #include <assert.h>
 #include <dlfcn.h>
 #include <stdio.h>
@@ -53,15 +59,15 @@ int main(int argc, char **argv) {
   ogb3_host_owner oa, ob;
   OK(a.open(ca.cookie, 101, 1, &oa));
   OK(b.open(cb.cookie, 202, 1, &ob));
-  OK(a.set(ca.cookie, oa, 16 * 1024 * 1024, 8 * 1024 * 1024));
-  OK(b.set(cb.cookie, ob, 32 * 1024 * 1024, 8 * 1024 * 1024));
+  OK(a.set(ca.cookie, oa, QUOTA_A_LIVE, QUOTA_RESERVE));
+  OK(b.set(cb.cookie, ob, QUOTA_B_LIVE, QUOTA_RESERVE));
   ogb3_host_ledger_stats sa, sb, sd;
   OK(a.stats(ca.cookie, &sa));
   OK(b.stats(cb.cookie, &sb));
   assert(!memcmp(&sa, &sb, sizeof sa) && sa.owner_count == 2);
   assert(sa.admitted_bytes == OGB3_HOST_LIMIT_BYTES && !sa.engine_live_bytes &&
          !sa.snapshot_live_bytes);
-  assert(b.set(cb.cookie, ob, 32 * 1024 * 1024 + 1, 8 * 1024 * 1024) ==
+  assert(b.set(cb.cookie, ob, QUOTA_B_LIVE + 1, QUOTA_RESERVE) ==
          OGB3_CAPACITY);
   OK(a.stats(ca.cookie, &sb));
   assert(!memcmp(&sa, &sb, sizeof sa));

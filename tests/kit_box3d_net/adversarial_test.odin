@@ -147,7 +147,7 @@ source_epoch_sequence_duplicate_conflict_and_bounds_precede_effects :: proc(t: ^
     testing.expect_value(t, (cast(^Control)raw_data(accepted)).axis, i32(1))
     prior := k.lane_world_network_status(&host.lane).rejected
 
-    for _ in 0 ..< 20 {
+    for _ in 0 ..< k.WORLD_NETWORK_QUEUE + 4 {
         proposal(&client, 2, 0)
     }
 

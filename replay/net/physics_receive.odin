@@ -1,5 +1,7 @@
 package replay_net
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import bd "godot:box3d/diagnostics"
 import r "godot:replay"
@@ -28,7 +30,7 @@ client_physics_part :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
        (purpose != .Welcome && purpose != .Snapshot) ||
        header.parts != u32((int(header.total) + COMPLETE_PART_BYTES - 1) / COMPLETE_PART_BYTES) ||
        header.parts == 0 ||
-       header.parts > 32 ||
+       header.parts > bcap.NETWORK_PARTS ||
        header.index >= header.parts ||
        len(body) - size != min(COMPLETE_PART_BYTES, int(header.total) - int(header.index) * COMPLETE_PART_BYTES) {
         c.stats.rejected_packets += 1
@@ -101,9 +103,10 @@ client_physics_part :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
 
     start := int(header.index) * COMPLETE_PART_BYTES
     source := body[size:]
-    bit := u64(1) << uint(header.index)
+    word := int(header.index / 64)
+    bit := u64(1) << uint(header.index % 64)
 
-    if assembly.mask[0] & bit != 0 {
+    if assembly.mask[word] & bit != 0 {
         if string(assembly.data.bytes[start:start + len(source)]) != string(source) {
             complete_data_destroy(&assembly.data)
             assembly^ = {}
@@ -114,7 +117,7 @@ client_physics_part :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
     }
 
     copy(assembly.data.bytes[start:start + len(source)], source)
-    assembly.mask[0] |= bit
+    assembly.mask[word] |= bit
     assembly.received += 1
 
     if assembly.received != assembly.parts {

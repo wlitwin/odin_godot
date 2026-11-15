@@ -1,5 +1,7 @@
 package kit_sim
 
+import bcap "godot:box3d/limits"
+
 // Optional whole-world participant. This file imports no native backend. Every
 // opaque image owns complete solver+typed Side state; field bytes stay in Kit's
 // existing prediction/history path. Callers must not copy owning checkpoints.
@@ -17,7 +19,7 @@ WORLD_REPAIR_TICKS :: 8
 WORLD_EFFECTS_PER_TICK :: 32
 WORLD_EFFECT_BYTES :: 128
 WORLD_WORK_NS :: u64(4_000_000)
-WORLD_MEMORY_BYTES :: u64(64 * 1024 * 1024)
+WORLD_MEMORY_BYTES :: u64(bcap.MEMORY_BYTES)
 
 World_Error :: enum {
     Ok,
@@ -522,7 +524,7 @@ lane_world_attach :: proc(
         return .Unsupported
     }
 
-    if len(l.entries) > 35 ||
+    if len(l.entries) > bcap.MAX_BODIES ||
        l.ticker.tick != 0 ||
        l.slots != WORLD_HISTORY_FRAMES ||
        abs(l.ticker.dt - 1.0 / 60.0) > 1e-12 ||
@@ -1242,10 +1244,10 @@ lane_world_emit :: proc(l: ^Lane, key: u64, fire: World_Effect_Proc, user: rawpt
 // Optional accepted-input/complete-state protocol. All local pointer-bearing
 // codecs remain process-local. Only their canonical descriptors enter identity.
 WORLD_NETWORK_REV :: u32(2)
-WORLD_NETWORK_BYTES :: 1024 * 1024
+WORLD_NETWORK_BYTES :: bcap.NETWORK_BYTES
 WORLD_NETWORK_CHUNK :: 32 * 1024
 WORLD_NETWORK_DRIVERS :: 16
-WORLD_NETWORK_QUEUE :: 16
+WORLD_NETWORK_QUEUE :: max(16, bcap.NETWORK_PARTS)
 WORLD_NETWORK_TRANSFERS :: 8 // complete receive staging, not simulation/history depth
 SIM_WORLD_INPUT :: u8(16)
 SIM_WORLD_ACCEPTED :: u8(17)
@@ -1386,7 +1388,7 @@ World_Completed_Transfer :: struct {
 
 World_Network :: struct {
     protocol:                                               World_Protocol_State,
-    owned_codecs:                                           [35 + WORLD_NETWORK_DRIVERS + WORLD_EFFECTS_PER_TICK]World_Value_Codec,
+    owned_codecs:                                           [bcap.MAX_BODIES + WORLD_NETWORK_DRIVERS + WORLD_EFFECTS_PER_TICK]World_Value_Codec,
     owned_codec_count:                                      int,
     wire_owned:                                             bool,
     config:                                                 World_Network_Config,
@@ -1409,7 +1411,7 @@ World_Network :: struct {
     queue_count:                                            int,
     queue_bytes:                                            int,
     transfer:                                               []u8,
-    transfer_seen:                                          [32]bool,
+    transfer_seen:                                          [bcap.NETWORK_PARTS]bool,
     transfer_hash:                                          bd.Digest,
     transfer_sequence, transfer_epoch, transfer_tick:       u64,
     transfer_mode:                                          World_Transfer_Mode,

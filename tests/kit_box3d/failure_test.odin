@@ -102,7 +102,7 @@ counts_memory_missing_attachment_and_gate_purity :: proc(t: ^testing.T) {
     defer destroy(&f)
     cp0 := checkpoint(t, &f, 0)
     defer sim.world_checkpoint_destroy(&cp0)
-    f.extra_bodies = 33
+    f.extra_bodies = int(b3.ALPHA_TOTAL_BODIES)
     testing.expect_value(t, sim.lane_frame(&f.lane, 1.0 / 60), 0)
     testing.expect_value(t, sim.lane_world_status(&f.lane), sim.World_Error.Budget)
     testing.expect_value(t, f.lane.ticker.tick, u64(0))

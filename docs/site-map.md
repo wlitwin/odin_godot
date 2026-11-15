@@ -110,6 +110,7 @@ the whole map or use your browser's Find command to locate a subject.
 | [Characters, queries, and joints](box3d/motion.md) | Character movement, collision queries, joint families, and restorable motion state |
 | [Kit and Replay integration](box3d/multiplayer.md) | Authored samples, host/client setup, adapters, and teardown |
 | [Build and export](box3d/building.md) | Backend builds, native library selection, deployment, reload, and export |
+| [Configure capacities](box3d/capacities.md) | Body, shape, joint, asset, memory, and transfer capacities shared by all layers |
 | [API map and limits](box3d/reference.md) | Packages, lifecycle calls, schemas, geometry constraints, and identities |
 | [Support](box3d/support.md) | Platforms, determinism, complete-state bounds, memory, and deployment limits |
 | [Authoring topics](box3d-authoring.md) | A compact index of Box3D authoring guides |

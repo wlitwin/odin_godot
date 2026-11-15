@@ -129,17 +129,19 @@ P2P remains unchanged.
 
 ## Admission and observations
 
-The shared hard checks cover 32 initial dynamic/35 total bodies, 35 shapes,
-147 contact allocations, one hinge, H=128 and single-caller native use. The
-initial dynamic declaration is checked against actual cached body types.
-Every allocating operation preflights a 2 MiB future reservation; actual
-cumulative engine/wrapper/Odin ownership requests are checked afterward. A
-reservation overrun rejects publication and is an alpha test failure. Each
-captured image is capped at 512 KiB, retaining the eager native normalized cache.
-These reservations/caps are explicit adapter bounds validated by the integrated
-fixture, not an allocator-level hard cap or recoverable upstream-engine OOM claim.
+Count and byte limits use the shared [capacity profile](../../docs/box3d/capacities.md),
+defaulting to 1024 bodies, 4096 shapes, 16384 contacts, 256 joints and 128 assets.
+H=128 and single-caller native use remain fixed contracts. The initial dynamic
+declaration is checked against actual cached body types. Every allocating
+operation preflights a future reservation derived from the selected snapshot and
+DTO budgets (64 MiB by default); actual cumulative engine/wrapper/Odin ownership
+requests are checked afterward. A reservation overrun rejects publication.
+Opaque native source images and canonical recovery payloads have separate bounds
+(16 MiB and 8 MiB by default); the retained image also owns its eager normalized
+cache. These are adapter bounds, not an allocator-level hard cap or recoverable
+upstream-engine OOM claim.
 
-The 64 MiB admission total includes native engine and snapshot-wrapper live
+The shared admission total (1 GiB by default) includes native engine and snapshot-wrapper live
 requests plus provider ownership, typed game/checkpoint payload and both existing
 ring/event arenas. Core checks storage arithmetic and the declared byte budget
 before allocating rings/staging/events, including large fixed-value State/Event
@@ -190,6 +192,8 @@ Tests exercise the existing network callback rather than a copied action model.
 The native fixture checks exact normalized solver bytes, detached ownership,
 sensor/end behavior, contacts/sleep/lifecycle/hinge, history wrap, full-window
 streaming audit, count/step limits and a 32-body/H=128/eight-tick staging run.
+The [capacity suite](../../tests/box3d_capacity/README.md) adds 1000-body/100-joint
+recovery, full-history revision/audit and compound-body network cases.
 
 For measured timing acceptance, run the optimized native archive and Odin
 `-o:speed` with `-define:REPLAY_PHYSICS_ACCEPT_TIMING=true`. That opt-in test
@@ -198,11 +202,12 @@ execution; it does not alter or truncate simulation. Debug and emulated-target
 tests report their observations without asserting native Release throughput.
 # Private provider ABI
 
-Working objects and owned images use `REPLB3D2` after adding checked pose/type
-changes and world-point impulses. Configuration contracts include this identity.
-The existing execution/image checks refuse `REPLB3D1` objects before casting or
-accessing a producer command table. This is separate from the unchanged Native
-C ABI1, logical dump4, snapshot resource2 and canonical wire format versions.
+Working objects and owned images derive their identity from `REPLB3D3` and the
+profile's asset/sensor array dimensions. Configuration contracts also include the
+complete capacity fingerprint. Execution/image checks refuse older or differently
+sized producer layouts before casting or accessing a command table. This is
+separate from Native C ABI2, logical dump4, snapshot resource2 and canonical wire
+format versions.
 Rebuild producers and consumers together; code ownership alone does not make an
 older private layout compatible. Serialized recovery still uses its explicit
 build/target/schema checks and constructs current objects.

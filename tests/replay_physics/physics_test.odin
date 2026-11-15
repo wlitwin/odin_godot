@@ -196,7 +196,7 @@ actual_limits_fixed_step_and_native_handle_state_rejection :: proc(t: ^testing.T
     defer r.destroy(&timeline)
     before := save(t, &timeline, 0)
     defer r.complete_checkpoint_destroy(&before)
-    testing.expect_value(t, r.advance(&timeline, f.Input{spawn = 2}).error, r.Error.Resource_Limit)
+    testing.expect_value(t, r.advance(&timeline, f.Input{overflow_capacity = true}).error, r.Error.Resource_Limit)
     testing.expect_value(t, r.advance(&timeline, f.Input{skip_step = true}).error, r.Error.Step_Limit)
     testing.expect_value(t, r.advance(&timeline, f.Input{double_step = true}).error, r.Error.Step_Limit)
     after := save(t, &timeline, 0)

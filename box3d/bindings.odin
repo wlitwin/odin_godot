@@ -1,5 +1,7 @@
 package box3d
 
+import bcap "godot:box3d/limits"
+
 import bg "godot:box3d/godot"
 import intrinsics "base:intrinsics"
 
@@ -446,7 +448,9 @@ abi_check :: proc() -> Status {
 // logical snapshot/dump contract differs. Cleanup calls remain available.
 @(private)
 native_version_check :: proc() -> Status {
-    if c_abi_version() != ABI_VERSION || c_state_version() != STATE_DUMP_VERSION {
+    if c_abi_version() != ABI_VERSION ||
+       c_state_version() != STATE_DUMP_VERSION ||
+       raw_capacity_fingerprint() != bcap.fingerprint() {
         return .Incompatible
     }
 
@@ -660,6 +664,8 @@ foreign native {
 
     @(link_name = "ogb3_abi_version")
     raw_abi_version :: proc() -> u32 ---
+    @(link_name = "ogb3_capacity_fingerprint")
+    raw_capacity_fingerprint :: proc() -> u64 ---
     @(link_name = "ogb3_abi_layout")
     raw_abi_layout :: proc(type_id, field: u32, size, alignment, offset: ^u32) -> Status ---
     @(link_name = "ogb3_build_fingerprint")

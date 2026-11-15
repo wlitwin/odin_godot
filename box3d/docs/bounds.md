@@ -1,5 +1,10 @@
 # Box3D bounds and authoritative state validation
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 Status: the bounded P6.3 checks pass on native macOS arm64 and translated Linux
 x86_64. The [bounds report](../../tests/box3d_bounds/report.json) binds the
 actual baseline failures, repairs, source/tool/Native hashes and results. This is

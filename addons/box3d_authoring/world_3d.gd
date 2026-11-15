@@ -59,7 +59,7 @@ func _snapshot() -> Dictionary:
 					d.issue(errors,path+".stable_key","Duplicate","Duplicate body key: "+node.stable_key)
 				keys[node.stable_key]=true
 				if bodies.size()>=d.MAX_BODIES:
-					d.issue(errors,path,"Capacity","Body count exceeds35.")
+					d.issue(errors,path,"Capacity","Body capacity (%d) exceeded." % d.MAX_BODIES)
 					break
 				var body: Dictionary = node.box3d_body_definition(self,path,errors)
 				bodies.append(body)
@@ -70,17 +70,17 @@ func _snapshot() -> Dictionary:
 				var path: String = "joints["+d.relative_name(node,self)+"]"
 				if joint_keys.has(node.stable_key):d.issue(errors,path+".stable_key","Duplicate","Duplicate joint key.")
 				joint_keys[node.stable_key]=true
-				if joints.size()>=d.MAX_JOINTS:d.issue(errors,path,"Capacity","Current profile permits one joint at a time.")
+				if joints.size()>=d.MAX_JOINTS:d.issue(errors,path,"Capacity","Joint capacity (%d) exceeded." % d.MAX_JOINTS)
 				else:joints.append(node.box3d_joint_definition(self,path,errors))
 			elif node is Box3DCharacterMover3D:
 				var path: String = "characters["+d.relative_name(node,self)+"]"
 				if character_keys.has(node.stable_key):d.issue(errors,path+".stable_key","Duplicate","Duplicate character key.")
 				character_keys[node.stable_key]=true
-				if characters.size()>=d.MAX_CHARACTERS:d.issue(errors,path,"Capacity","Character count exceeds35.")
+				if characters.size()>=d.MAX_CHARACTERS:d.issue(errors,path,"Capacity","Character capacity (%d) exceeded." % d.MAX_CHARACTERS)
 				else:characters.append(node.box3d_character_definition(self,path,errors))
 			for child in node.get_children():pending.append(child)
-	if shapes_count>d.MAX_SHAPES:d.issue(errors,"bodies.shapes","Capacity","Total shape count exceeds35.")
-	if dynamic_count>32:d.issue(errors,"bodies.body_type","Capacity","Dynamic body count exceeds32.")
+	if shapes_count>d.MAX_SHAPES:d.issue(errors,"bodies.shapes","Capacity","Total shape capacity (%d) exceeded." % d.MAX_SHAPES)
+	if dynamic_count>d.MAX_BODIES:d.issue(errors,"bodies.body_type","Capacity","Dynamic body capacity (%d) exceeded." % d.MAX_BODIES)
 	for joint in joints:
 		if not body_types.has(joint.body_a) or not body_types.has(joint.body_b):
 			d.issue(errors,"joints["+joint.stable_key+"].body_a/body_b","Reference","References must name bodies in this World namespace, not another World/NodePath.")
@@ -113,7 +113,7 @@ func _snapshot() -> Dictionary:
 	if errors.is_empty():
 		encoded=JSON.stringify(definition,"",true,true)
 		if encoded.to_utf8_buffer().size()>d.MAX_BYTES:
-			d.issue(errors,"definition","Capacity","Detached definition exceeds the shared2MiB input limit.")
+			d.issue(errors,"definition","Capacity","Detached definition exceeds the configured input-byte capacity.")
 	return {"definition":definition,"errors":errors,"encoded":encoded}
 
 func box3d_diagnostics() -> Array:

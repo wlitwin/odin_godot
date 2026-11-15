@@ -37,7 +37,13 @@ static void joints(void){
   bad=d;bad.constraint_hertz=NAN;assert(ogb3_motion_joint_create(w,&bad,&out)==OGB3_INVALID_ARGUMENT&&!out);
   bad=d;bad.reserved=1;assert(ogb3_motion_joint_create(w,&bad,&out)==OGB3_INVALID_ARGUMENT&&!out);
   uint64_t after,mode2;OK(ogb3_state_digest(w,&after,&mode2));assert(after==hash&&mode2==mode);
-  ogb3_joint_key key=0;OK(ogb3_motion_joint_create(w,&d,&key));assert(key);assert(ogb3_motion_joint_create(w,&d,&out)==OGB3_CAPACITY&&!out);
+  ogb3_joint_key key=0;OK(ogb3_motion_joint_create(w,&d,&key));assert(key);
+  ogb3_recovery_config quota;OK(ogb3_recovery_config_default(&quota));
+  ogb3_joint_key *extra=calloc(quota.max_joints,sizeof(*extra));assert(extra);
+  for(uint32_t i=1;i<quota.max_joints;i++)OK(ogb3_motion_joint_create(w,&d,extra+i));
+  assert(ogb3_motion_joint_create(w,&d,&out)==OGB3_CAPACITY&&!out);
+  for(uint32_t i=1;i<quota.max_joints;i++){ogb3_joint more;OK(ogb3_joint_resolve(w,extra[i],&more));OK(ogb3_joint_destroy(more));}
+  free(extra);
   for(int i=0;i<8;i++)OK(ogb3_world_step_fixed(w));
   ogb3_snapshot *snapshot=NULL,*clone=NULL;OK(ogb3_snapshot_capture(w,&snapshot));OK(ogb3_snapshot_clone(snapshot,&clone));
   OK(ogb3_snapshot_restore(r,snapshot));equal(w,r);OK(ogb3_snapshot_restore(w,clone));equal(w,r);
@@ -139,7 +145,8 @@ static void query_and_mover(void){
  OK(ogb3_query_ray(w,&origin,&translation,&filter,hits,256,&n));assert(n==2&&hits[0].fraction==hits[1].fraction&&hits[0].shape<hits[1].shape);
  lo=(ogb3_vec3){-1,-1,-1};hi=(ogb3_vec3){1,1,1};filter.include_sensors=1;OK(ogb3_query_aabb(w,&lo,&hi,&filter,hits,256,&n));assert(n==3);filter.include_sensors=0;OK(ogb3_query_aabb(w,&lo,&hi,&filter,hits,256,&n));assert(n==2);
  OK(ogb3_world_destroy(w));
- w=world();for(int i=0;i<36;i++)make_body(w,OGB3_STATIC,(float)i*2,0,0,box);hits[0]=sentinel;n=99;
+ ogb3_recovery_config quota;OK(ogb3_recovery_config_default(&quota));
+ w=world();for(uint32_t i=0;i<quota.max_bodies+1;i++)make_body(w,OGB3_STATIC,(float)i*2,0,0,box);hits[0]=sentinel;n=99;
  assert(ogb3_query_aabb(w,&lo,&hi,&filter,hits,256,&n)==OGB3_CAPACITY&&n==99&&!memcmp(hits,&sentinel,sizeof(sentinel)));OK(ogb3_world_destroy(w));
  puts("motion deterministic keys/ties/complete-capacity/filter/self-exclude/capsule/actual-mover-slide-floor-slope/read-only PASS");
 }

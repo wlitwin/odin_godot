@@ -60,7 +60,7 @@ Allocators and callback contexts must outlive the owners that retain them.
 | Hull | 4–256 points |
 | Mesh | Up to 4096 vertices and 24576 indices |
 | Heightfield | Up to 64 × 64 samples |
-| Authoring input | Up to 2 MiB |
+| Authoring input | Selected `dto_bytes` capacity; 32 MiB by default |
 | Authored logical IDs | 64-bit namespace/key-derived values |
 | Native catalog IDs | 32-bit content-derived geometry identities |
 

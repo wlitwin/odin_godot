@@ -16,6 +16,7 @@ Game :: struct {
 }
 
 Input :: struct {
+    overflow_capacity:                                                   bool,
     impulse:                                                             f32,
     spawn:                                                               u32,
     despawn, sleep, wake, abort, skip_step, double_step, change_gravity: bool,
@@ -124,6 +125,20 @@ step :: proc(game: ^Game, input: Input, ctx: ^r.Step(Event)) {
         if err := ph.body_impulse(ctx.execution, game.bodies[0], {input.impulse, 0.1, 0}); err != .None {
             ctx.error = err
             return
+        }
+    }
+
+    if input.overflow_capacity {
+        def := b.body_def_default()
+        def.type = .Dynamic
+
+        for i in 0 ..= b.ALPHA_TOTAL_BODIES {
+            def.pose.position = {(f32(i % 16) - 8) * .6, 10 + f32(i / 256) * .6, (f32(i / 16 % 16) - 8) * .6}
+
+            if _, error := ph.spawn(ctx.execution, 2, def); error != .None {
+                ctx.error = error
+                return
+            }
         }
     }
 

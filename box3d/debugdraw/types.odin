@@ -1,17 +1,19 @@
 // Detached debug values only. No Native, Godot, allocator, live world or clock.
 package box3d_debugdraw
 
+import bcap "godot:box3d/limits"
+
 import p "godot:box3d/presentation"
 
 VERSION :: u32(1)
-MAX_GEOMETRIES :: 8
-MAX_BINDINGS :: 35
+MAX_GEOMETRIES :: bcap.MAX_ASSETS
+MAX_BINDINGS :: bcap.MAX_SHAPES
 MAX_VERTICES :: 4096
 MAX_TRIANGLES :: 4096
 MAX_HULL_POINTS :: 256
-MAX_LINES :: 8192 // preview budget only; never changes a simulation/profile cap
-MAX_CHARACTERS :: 35
-MAX_JOINTS :: 1
+MAX_LINES :: bcap.DEBUG_LINES // preview budget only; never changes a simulation/profile cap
+MAX_CHARACTERS :: bcap.MAX_BODIES
+MAX_JOINTS :: bcap.MAX_JOINTS
 
 Vec3 :: [3]f32
 Color :: [4]f32

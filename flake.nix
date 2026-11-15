@@ -100,7 +100,12 @@
         # Emscripten, or platform cross toolchains.
         devShells.docs = pkgs.mkShell {
           name = "odin_godot-docs";
-          packages = with pkgs; [ odin clang nodejs ];
+          packages = with pkgs; [ odin clang nodejs python3 ];
+        };
+
+        devShells.capacity = pkgs.mkShell {
+          name = "odin_godot-capacity";
+          packages = with pkgs; [ odin clang cmake gnumake python3 ];
         };
 
         # Cross-compile shell: the default toolchain PLUS the Linux/Windows cross C

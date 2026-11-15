@@ -362,6 +362,12 @@ odin_gd_box3d_prepare() {
     # An unprefixed digest beginning with e.g. 9e41 is inferred as a numeric
     # -define value by Odin. The explicit scheme forces a string on every target.
     _ODIN_GD_BOX3D_FLAGS+=("-define:BOX3D_EXPECTED_BUILD=sha256:${fields[1]}" "-define:BOX3D_EXPECTED_TARGET=sha256:${fields[2]}")
+    while IFS= read -r value; do _ODIN_GD_BOX3D_FLAGS+=("$value"); done < <(
+        python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["odin_capacity_flags"]))' "$state"
+    )
+    if [[ -n "${PROJ:-}" ]]; then
+        python3 "$ROOT/build/box3d_capacity.py" --manifest "$state" --install-authoring "$PROJ"
+    fi
     if [[ "$pkg" == "$ROOT/core" ]]; then
         _ODIN_GD_BOX3D_FLAGS+=(-define:BOX3D_HOST_ENABLED=true)
     elif [[ "$target" == "linux" ]]; then

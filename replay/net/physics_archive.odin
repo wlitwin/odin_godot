@@ -1,5 +1,7 @@
 package replay_net
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import bd "godot:box3d/diagnostics"
 import r "godot:replay"
@@ -45,7 +47,7 @@ checkpoint_encode_physics :: proc(
     body_bytes := 16 + len(metadata) + len(cp.complete.bytes) + 32
     total := sc.HEADER_BYTES + body_bytes
 
-    if total > MAX_CHECKPOINT_BYTES {
+    if total > (bcap.NETWORK_BYTES + MAX_CHECKPOINT_BYTES) {
         return nil, .Capacity
     }
 
@@ -131,7 +133,7 @@ checkpoint_decode_physics :: proc(
 
     if !complete_codec_valid(model.complete_codec) ||
        len(bytes) < sc.HEADER_BYTES + 48 ||
-       len(bytes) > MAX_CHECKPOINT_BYTES {
+       len(bytes) > (bcap.NETWORK_BYTES + MAX_CHECKPOINT_BYTES) {
         return .Invalid_Checkpoint
     }
 

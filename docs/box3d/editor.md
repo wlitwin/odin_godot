@@ -49,9 +49,10 @@ Converting a 64-bit ID to a JSON floating-point number can lose identity.
 with the expected epoch, tick, revision, and source. Stale batches clear prior
 drawing. The renderer owns no physics clock and does not query the live solver.
 
-Preview limits are eight geometries, 35 bindings, one joint, 35 character
-overlays, 4096 mesh vertices/triangles, and 8192 lines. A capacity error is
-explicit; the tool does not publish a truncated shape or increase runtime limits.
+Preview capacities follow the selected [capacity profile](capacities.md): catalog
+geometries, shape bindings, joints, character overlays, and line output share its
+corresponding bounds. Per-geometry limits remain 4096 mesh vertices/triangles.
+A capacity error is explicit; the tool does not publish a truncated shape.
 
 See [the source API](https://github.com/wlitwin/odin_godot/blob/main/box3d/debugdraw/API.md)
 for line generation and [the authoring API](reference.md) for artifact procedures.

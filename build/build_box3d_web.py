@@ -14,6 +14,7 @@ import shutil
 import subprocess
 
 from box3d_source import prepare_source
+import box3d_capacity as capacity
 
 
 def sha(path):
@@ -25,7 +26,7 @@ def encoded_hash(value):
 
 
 def source_inputs(repo, engine):
-    paths = [repo / 'box3d/dependency.json', repo / 'build/box3d_source.py',
+    paths = [repo / 'box3d/dependency.json', repo / 'box3d/capacity.json', repo / 'build/box3d_capacity.py', repo / 'build/box3d_source.py',
              repo / 'build/build_box3d_web.py', repo / 'build/build_box3d.sh']
     paths += [p for p in (repo / 'box3d/native').rglob('*') if p.is_file()]
     paths += [p for folder in [engine / 'src', engine / 'include']
@@ -35,6 +36,8 @@ def source_inputs(repo, engine):
 
 
 def build(repo, cache, variant, testing=False, jobs=4):
+    capacity.check_generated()
+    capacity_profile = capacity.load(os.environ.get('BOX3D_CAPACITY_PROFILE'))
     cache.mkdir(parents=True, exist_ok=True)
     manifest = json.loads((repo / 'box3d/dependency.json').read_text())
     engine = prepare_source(repo, cache, manifest)
@@ -50,6 +53,7 @@ def build(repo, cache, variant, testing=False, jobs=4):
              '-fno-fast-math', '-ffp-contract=off', '-sSUPPORT_LONGJMP=wasm']
     flags += ['-msimd128', '-msse2'] if variant == 'WebSIMD' else ['-DBOX3D_DISABLE_SIMD']
     flags += ['-DOGB3_HAS_SNAPSHOTS', '-DOGB3_HAS_STATE_DUMP', '-DOGB3_HAS_RECOVERY']
+    flags += capacity.c_flags(capacity_profile)
     if testing:
         flags += ['-DOGB3_TESTING=1']
     inputs = source_inputs(repo, engine)
@@ -111,6 +115,7 @@ def build(repo, cache, variant, testing=False, jobs=4):
     result = dict(schema_version=1, result='ARCHIVE_BUILT_TESTS_NOT_RUN', variant=variant,
                   build=build_id, target=target_id, target_contract=target_contract,
                   testing_enabled=testing, observation_enabled=False,
+                  capacity_profile=capacity_profile,
                   dependency_manifest=manifest, source_inputs=inputs,
                   source_fence_unchanged=True, archive_sha256=sha(archive),
                   resolved_simulation_macros=macros, compiler=str(compiler),

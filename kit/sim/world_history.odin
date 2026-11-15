@@ -1,6 +1,7 @@
 package kit_sim
 
 import "core:math"
+import bcap "godot:box3d/limits"
 import "core:mem"
 import "core:time"
 import bd "godot:box3d/diagnostics"
@@ -1387,7 +1388,9 @@ world_network_receive :: proc(l: ^Lane, from: knet.Player_Id, peer: ksess.Peer_I
 
     blob := knet.reader_remaining(r)
 
-    if len(blob) > 64 * 1024 || n.queue_count == WORLD_NETWORK_QUEUE || n.queue_bytes > 64 * 1024 - len(blob) {
+    if len(blob) > 64 * 1024 ||
+       n.queue_count == WORLD_NETWORK_QUEUE ||
+       n.queue_bytes > 2 * WORLD_NETWORK_BYTES - len(blob) {
         world_network_fail(l, .Capacity, !l.ses.is_host)
         return
     }
@@ -1442,7 +1445,7 @@ world_network_chunk :: proc(l: ^Lane, r: ^knet.Reader) {
        total < bd.SIGNATURE_BYTES ||
        total > WORLD_NETWORK_BYTES ||
        count != (total + WORLD_NETWORK_CHUNK - 1) / WORLD_NETWORK_CHUNK ||
-       count > 32 ||
+       count > bcap.NETWORK_PARTS ||
        index >= count ||
        len(blob) != min(WORLD_NETWORK_CHUNK, total - index * WORLD_NETWORK_CHUNK) {
         world_network_fail(l, .Invalid)

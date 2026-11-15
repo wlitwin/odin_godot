@@ -1,5 +1,7 @@
 package replay_net
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import bd "godot:box3d/diagnostics"
 import r "godot:replay"
@@ -56,7 +58,7 @@ Physics_Assembly :: struct {
     purpose:                      Complete_Purpose,
     digest:                       bd.Digest,
     data:                         Complete_Data,
-    mask:                         [32]u64,
+    mask:                         [(bcap.NETWORK_PARTS + 63) / 64]u64,
     received, parts:              int,
 }
 

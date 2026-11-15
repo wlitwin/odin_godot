@@ -1,5 +1,7 @@
 package replay_net
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import bd "godot:box3d/diagnostics"
 import r "godot:replay"
@@ -7,7 +9,7 @@ import sc "godot:replay/schema"
 import tf "godot:replay/transfer"
 
 COMPLETE_WIRE_VERSION :: u32(1)
-COMPLETE_MAX_BYTES :: 1024 * 1024
+COMPLETE_MAX_BYTES :: bcap.NETWORK_BYTES
 COMPLETE_PART_BYTES :: 32 * 1024
 
 // Optional native-free adapter surface. Context is an immutable retained codec/

@@ -21,4 +21,6 @@ uses frameB Z, matching the pinned engine. No second constraint or mover solver.
 Unused named settings are exact zero records. Pin/Spherical target quaternion is
 identity. Only motion-containing Worlds emit schema2; unchanged body/shape-only
 Worlds retain schema1 JSON. Existing shared parser/baker owns IDs/content/bounds
-and actual native construction. Current profile permits one joint at a time.
+and actual native construction. Joint families share the selected backend's
+capacity, which defaults to 256. The SDK builder writes matching capacities into
+the project's addon copy; see [Configure capacities](../../docs/box3d/capacities.md).

@@ -22,7 +22,7 @@ static int finite_q(ogb3_quat q){return isfinite(q.x)&&isfinite(q.y)&&isfinite(q
 static int pose_ok(ogb3_pose p){return finite_v(p.position)&&finite_q(p.rotation);}
 static int nonnegative(float v){return isfinite(v)&&v>=0;}
 static int zero(const void *p,size_t n){const unsigned char *b=p;for(size_t i=0;i<n;i++)if(b[i])return 0;return 1;}
-static ogb3_status world_check(ogb3_world w){uint32_t valid=0;ogb3_status s=ogb3_world_valid(w,&valid);if(s)return s;if(!valid)return OGB3_INVALID_HANDLE;b3World *world=b3GetWorldFromId(wid(w));if(world->locked)return OGB3_INVALID_ARGUMENT;ogb3_world_counters c;s=ogb3_world_get_counters(w,&c);if(s)return s;uint32_t dynamic=0;for(int i=0;i<world->bodies.count;i++)if(world->bodies.data[i].id==i&&world->bodies.data[i].type==b3_dynamicBody)dynamic++;return c.body_count>35||c.shape_count>35||dynamic>32?OGB3_CAPACITY:OGB3_OK;}
+static ogb3_status world_check(ogb3_world w){uint32_t valid=0;ogb3_status s=ogb3_world_valid(w,&valid);if(s)return s;if(!valid)return OGB3_INVALID_HANDLE;b3World *world=b3GetWorldFromId(wid(w));if(world->locked)return OGB3_INVALID_ARGUMENT;ogb3_world_counters c;s=ogb3_world_get_counters(w,&c);if(s)return s;uint32_t dynamic=0;for(int i=0;i<world->bodies.count;i++)if(world->bodies.data[i].id==i&&world->bodies.data[i].type==b3_dynamicBody)dynamic++;return c.body_count>OGB3_MAX_BODIES||c.shape_count>OGB3_MAX_SHAPES||dynamic>OGB3_MAX_BODIES?OGB3_CAPACITY:OGB3_OK;}
 static void base_out(ogb3_motion_joint_def *d,b3JointDef b){
  d->local_frame_a=(ogb3_pose){ov(b.localFrameA.p),oq(b.localFrameA.q)};
  d->local_frame_b=(ogb3_pose){ov(b.localFrameB.p),oq(b.localFrameB.q)};
@@ -143,7 +143,7 @@ static int joint_ok(const ogb3_motion_joint_def *d){
 }
 ogb3_status ogb3_motion_joint_create(ogb3_world w,const ogb3_motion_joint_def *d,ogb3_joint_key *out){
  REQUIRE(out);*out=0;REQUIRE(joint_ok(d));ogb3_status s=world_check(w);if(s)return s;
- ogb3_world_counters counters;s=ogb3_world_get_counters(w,&counters);if(s)return s;if(counters.joint_count>=1)return OGB3_CAPACITY;
+ ogb3_world_counters counters;s=ogb3_world_get_counters(w,&counters);if(s)return s;if(counters.joint_count>=OGB3_MAX_JOINTS)return OGB3_CAPACITY;
  ogb3_body a=0,c=0;s=ogb3_body_resolve(w,d->body_a,&a);if(s)return s;s=ogb3_body_resolve(w,d->body_b,&c);if(s)return s;
  REQUIRE(b3Body_GetType(bid(a))!=b3_staticBody||b3Body_GetType(bid(c))!=b3_staticBody);
  b3JointId id={0};switch(d->kind){
@@ -249,7 +249,8 @@ ogb3_status ogb3_motion_joint_create(ogb3_world w,const ogb3_motion_joint_def *d
 
 typedef struct {
  ogb3_motion_filter filter;
- ogb3_motion_hit hits[OGB3_MOTION_MAX_HITS];
+ ogb3_motion_hit *hits;
+ uint32_t capacity;
  uint32_t count;ogb3_status status;
 } Query;
 static ogb3_status query_begin(ogb3_world w,const ogb3_motion_filter *f,Query *q){
@@ -268,7 +269,7 @@ static int shape_info(Query *q,b3ShapeId id,ogb3_motion_hit *hit){
  q->status=ogb3_shape_get_key(shape,&hit->shape);return !q->status;
 }
 static void add_hit(Query *q,const ogb3_motion_hit *h){
- if(q->count<OGB3_MOTION_MAX_HITS)q->hits[q->count]=*h;
+ if(q->hits && q->count<q->capacity)q->hits[q->count]=*h;
  if(q->count==UINT32_MAX)q->status=OGB3_CAPACITY;else q->count++;
 }
 static bool overlap_cb(b3ShapeId id,void *ctx){Query *q=ctx;ogb3_motion_hit hit={0};if(shape_info(q,id,&hit))add_hit(q,&hit);return !q->status;}
@@ -288,31 +289,43 @@ static int hit_order(const void *a,const void *b){const ogb3_motion_hit *x=a,*y=
  if(x->child!=y->child)return (x->child>y->child)-(x->child<y->child);
  c=vec_order(x->point,y->point);if(!c)c=vec_order(x->normal,y->normal);return c;
 }
-static ogb3_status query_end(Query *q,ogb3_motion_hit *out,uint32_t capacity,uint32_t *count){
- if(q->status)return q->status;
- *count=q->count;if(q->count>OGB3_MOTION_MAX_HITS||capacity<q->count)return OGB3_CAPACITY;
- qsort(q->hits,q->count,sizeof(q->hits[0]),hit_order);
- if(q->count)memcpy(out,q->hits,(size_t)q->count*sizeof(*out));return OGB3_OK;
-}
+/* Validate and count before touching caller storage, then repeat the pure
+ * traversal into that storage. Results no longer need a capacity-sized stack
+ * array or an unrelated global hit ceiling. The one-caller world is stable
+ * throughout both traversals. */
+#define QUERY_RUN(expression) do { \
+ expression; \
+ if(q.status)return q.status; \
+ *count=q.count; \
+ if(capacity<q.count)return OGB3_CAPACITY; \
+ if(!q.count)return OGB3_OK; \
+ const uint32_t expected=q.count; \
+ q.hits=out;q.capacity=capacity;q.count=0; \
+ expression; \
+ if(q.status)return q.status; \
+ if(q.count!=expected||q.count>capacity)return OGB3_CORRUPT; \
+ qsort(out,q.count,sizeof(*out),hit_order); \
+ return OGB3_OK; \
+} while(0)
 static b3QueryFilter native_filter(const ogb3_motion_filter *f){return (b3QueryFilter){.categoryBits=f->category_bits,.maskBits=f->mask_bits};}
 static int capsule_ok(const ogb3_motion_capsule *c){return c&&finite_v(c->center1)&&finite_v(c->center2)&&isfinite(c->radius)&&c->radius>0&&c->radius<=1e6f;}
 ogb3_status ogb3_query_aabb(ogb3_world w,const ogb3_vec3 *lo,const ogb3_vec3 *hi,const ogb3_motion_filter *f,ogb3_motion_hit *out,uint32_t capacity,uint32_t *count){
  REQUIRE(lo&&hi&&finite_v(*lo)&&finite_v(*hi)&&lo->x<=hi->x&&lo->y<=hi->y&&lo->z<=hi->z&&count&&(!capacity||out));
- Query q;ogb3_status s=query_begin(w,f,&q);if(s)return s;b3World_OverlapAABB(wid(w),(b3AABB){v3(*lo),v3(*hi)},native_filter(f),overlap_cb,&q);return query_end(&q,out,capacity,count);
+ Query q;ogb3_status s=query_begin(w,f,&q);if(s)return s;QUERY_RUN(b3World_OverlapAABB(wid(w),(b3AABB){v3(*lo),v3(*hi)},native_filter(f),overlap_cb,&q));
 }
 ogb3_status ogb3_query_ray(ogb3_world w,const ogb3_vec3 *origin,const ogb3_vec3 *translation,const ogb3_motion_filter *f,ogb3_motion_hit *out,uint32_t capacity,uint32_t *count){
  REQUIRE(origin&&translation&&finite_v(*origin)&&finite_v(*translation)&&count&&(!capacity||out));
- Query q;ogb3_status s=query_begin(w,f,&q);if(s)return s;b3World_CastRay(wid(w),v3(*origin),v3(*translation),native_filter(f),cast_cb,&q);return query_end(&q,out,capacity,count);
+ Query q;ogb3_status s=query_begin(w,f,&q);if(s)return s;QUERY_RUN(b3World_CastRay(wid(w),v3(*origin),v3(*translation),native_filter(f),cast_cb,&q));
 }
 ogb3_status ogb3_query_capsule(ogb3_world w,const ogb3_vec3 *origin,const ogb3_motion_capsule *capsule,const ogb3_motion_filter *f,ogb3_motion_hit *out,uint32_t capacity,uint32_t *count){
  REQUIRE(origin&&finite_v(*origin)&&capsule_ok(capsule)&&count&&(!capacity||out));
  Query q;ogb3_status s=query_begin(w,f,&q);if(s)return s;b3Vec3 points[]={v3(capsule->center1),v3(capsule->center2)};b3ShapeProxy proxy={points,2,capsule->radius};
- b3World_OverlapShape(wid(w),v3(*origin),&proxy,native_filter(f),overlap_cb,&q);return query_end(&q,out,capacity,count);
+ QUERY_RUN(b3World_OverlapShape(wid(w),v3(*origin),&proxy,native_filter(f),overlap_cb,&q));
 }
 ogb3_status ogb3_query_capsule_cast(ogb3_world w,const ogb3_vec3 *origin,const ogb3_motion_capsule *capsule,const ogb3_vec3 *translation,const ogb3_motion_filter *f,ogb3_motion_hit *out,uint32_t capacity,uint32_t *count){
  REQUIRE(origin&&translation&&finite_v(*origin)&&finite_v(*translation)&&capsule_ok(capsule)&&count&&(!capacity||out));
  Query q;ogb3_status s=query_begin(w,f,&q);if(s)return s;b3Vec3 points[]={v3(capsule->center1),v3(capsule->center2)};b3ShapeProxy proxy={points,2,capsule->radius};
- b3World_CastShape(wid(w),v3(*origin),&proxy,v3(*translation),native_filter(f),cast_cb,&q);return query_end(&q,out,capacity,count);
+ QUERY_RUN(b3World_CastShape(wid(w),v3(*origin),&proxy,v3(*translation),native_filter(f),cast_cb,&q));
 }
 typedef struct {b3CollisionPlane plane;ogb3_shape_key shape;ogb3_vec3 point;} Plane;
 typedef struct {Query query;Plane planes[OGB3_MOTION_MAX_PLANES];uint32_t count;} Planes;

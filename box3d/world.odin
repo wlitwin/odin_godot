@@ -1,5 +1,7 @@
 package box3d
 
+import bcap "godot:box3d/limits"
+
 FIXED_HZ :: 60
 FIXED_SECONDS: f32 : 1.0 / FIXED_HZ
 FIXED_SUBSTEPS: u32 : 4
@@ -107,17 +109,17 @@ world_counters :: proc(world: World) -> (counts: World_Counters, status: Status)
     return
 }
 
-ALPHA_INITIAL_DYNAMIC_BODIES :: 32
-ALPHA_TOTAL_BODIES :: 35
-ALPHA_SHAPES :: 35
-ALPHA_CONTACTS :: 147
-ALPHA_JOINTS :: 1
+ALPHA_INITIAL_DYNAMIC_BODIES :: bcap.MAX_BODIES
+ALPHA_TOTAL_BODIES :: bcap.MAX_BODIES
+ALPHA_SHAPES :: bcap.MAX_SHAPES
+ALPHA_CONTACTS :: bcap.MAX_CONTACTS
+ALPHA_JOINTS :: bcap.MAX_JOINTS
 ALPHA_HISTORY_FRAMES :: 128
 ALPHA_MAX_PREDICTION_TICKS :: 8
 ALPHA_MAX_CORRECTION_TICKS :: 8
 ALPHA_NORMAL_WORK_NS :: 4_000_000
 ALPHA_CORRECTION_WORK_NS :: 4_000_000
-ALPHA_RESOURCE_BYTES :: 64 * 1024 * 1024
+ALPHA_RESOURCE_BYTES :: bcap.MEMORY_BYTES
 
 Alpha_Request :: struct {
     initial_dynamic_bodies, history_frames, prediction_ticks, correction_ticks: u32,

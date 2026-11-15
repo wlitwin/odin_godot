@@ -50,7 +50,7 @@ func geometry_for(node: Node3D) -> Dictionary:
 		if not inspected.get("ok",false):return {"ok":false,"error":"SharedPreviewUnavailable","diagnostic":inspected.get("diagnostic",{})}
 		var preview: Dictionary=inspected.get("preview",{})
 		if not preview.get("available",false) or preview.get("scope","")!="AUTHORED_SHAPES_ONLY_NO_FRAME_NO_STAMP":return {"ok":false,"error":preview.get("error","PreviewUnavailable"),"required":preview.get("required",0)}
-		if preview.lines.size()>8192:return {"ok":false,"error":"Capacity"}
+		if preview.lines.size()>Box3DAuthoringData.MAX_LINES:return {"ok":false,"error":"Capacity"}
 		for line in preview.lines:
 			points.append(Vector3(line.a[0],line.a[1],line.a[2]));points.append(Vector3(line.b[0],line.b[1],line.b[2]));colors.append(Color(line.color[0],line.color[1],line.color[2],line.color[3]))
 	var pending: Array[Node]=[]

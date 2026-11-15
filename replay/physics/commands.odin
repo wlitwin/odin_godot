@@ -1,5 +1,7 @@
 package replay_physics
 
+import bcap "godot:box3d/limits"
+
 import b "godot:box3d"
 import r "godot:replay"
 
@@ -588,7 +590,7 @@ sensor_events :: proc(capability: r.Execution, out: []Sensor_Event) -> (u32, r.E
 
 @(private)
 read_sensor_events :: proc(world: b.World, out: []Sensor_Event) -> (u32, r.Error) {
-    events: [70]b.Sensor_Event
+    events: [bcap.MAX_SENSOR_EVENTS]b.Sensor_Event
     count, status := b.world_sensor_events(world, events[:])
 
     if status != .Ok {
@@ -620,7 +622,7 @@ overlap :: proc(capability: r.Execution, lower, upper: b.Vec3, out: []Shape_Key)
         return 0, error
     }
 
-    shapes: [35]b.Shape
+    shapes: [bcap.MAX_SHAPES]b.Shape
     count, status := b.query_overlap_aabb(work.stage.world, lower, upper, b.QUERY_FILTER_ALL, shapes[:])
 
     if status != .Ok {
@@ -657,7 +659,7 @@ ray :: proc(capability: r.Execution, origin, translation: b.Vec3, out: []Ray_Hit
         return 0, error
     }
 
-    hits: [35]b.Ray_Hit
+    hits: [bcap.MAX_SHAPES]b.Ray_Hit
     count, status := b.query_ray(work.stage.world, origin, translation, b.QUERY_FILTER_ALL, hits[:])
 
     if status != .Ok {

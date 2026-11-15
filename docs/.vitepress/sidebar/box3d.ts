@@ -40,6 +40,10 @@ const sidebar: DefaultTheme.SidebarItem[] = [
       {
         "text": "Build and export",
         "link": "/box3d/building"
+      },
+      {
+        "text": "Configure capacities",
+        "link": "/box3d/capacities"
       }
     ]
   },

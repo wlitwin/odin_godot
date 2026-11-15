@@ -38,6 +38,9 @@ jobs:
         working-directory: docs
         run: nix develop ../.#docs --command npm run test:api
 
+      - name: Check shared capacity definitions
+        run: nix develop .#docs --command python3 build/box3d_capacity.py --check
+
       - name: Build documentation
         working-directory: docs
         run: nix develop ../.#docs --command npm run build

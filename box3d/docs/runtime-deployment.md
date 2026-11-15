@@ -1,5 +1,10 @@
 # Optional Box3D SDK runtime
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 Current desktop deployment/export scope is recorded in
 [desktop-compatibility.md](../../docs/box3d/support.md) and the actual four-case
 [Gate C report](../../tests/box3d_gate_c/report.json). Native macOS ARM64 and

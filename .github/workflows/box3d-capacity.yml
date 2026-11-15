@@ -1,0 +1,36 @@
+name: Box3D capacity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: box3d-capacity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v31
+      - name: Verify larger worlds and rollback
+        run: nix develop .#capacity --command python3 tests/box3d_capacity/run.py --out "$RUNNER_TEMP/box3d-capacity"
+      - name: Verify a custom build profile
+        run: nix develop .#capacity --command python3 tests/box3d_capacity/run.py --profile tests/box3d_capacity/larger.json --out "$RUNNER_TEMP/box3d-capacity-custom"
+      - name: Preserve capacity logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: box3d-capacity
+          path: |
+            ${{ runner.temp }}/box3d-capacity/*.log
+            ${{ runner.temp }}/box3d-capacity/capacity-profile.json
+            ${{ runner.temp }}/box3d-capacity-custom/*.log
+            ${{ runner.temp }}/box3d-capacity-custom/capacity-profile.json

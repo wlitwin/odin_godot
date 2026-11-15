@@ -1,5 +1,10 @@
 # Production diagnostics
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 Kit and Replay share `box3d/diagnostics`; each framework retains its own Session,
 authority, confirmation and recovery contracts. Diagnostics inspect evidence and
 do not authorize a sender, advance simulation or replace a recovery mechanism.

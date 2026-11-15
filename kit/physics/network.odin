@@ -1,5 +1,7 @@
 package kit_physics
 
+import bcap "godot:box3d/limits"
+
 // Canonical schema utility only: this imports no Replay runtime or net runner.
 import "core:mem"
 import b3 "godot:box3d"
@@ -74,7 +76,9 @@ codec_init :: proc(
 
     c.owner = ownership.owner
     options := rs.DEFAULT_OPTIONS
-    options.max_wire_bytes = sim.WORLD_NETWORK_BYTES
+    // The complete envelope also carries native state. Individual logical
+    // codecs retain the schema library's independently bounded value format.
+    options.max_wire_bytes = min(sim.WORLD_NETWORK_BYTES, rs.DEFAULT_OPTIONS.max_wire_bytes)
     r := rs.init(&c.schema, T, options, allocator)
 
     if r.error != .None {
@@ -426,7 +430,7 @@ network_attach :: proc(
         return e
     }
 
-    if len(fields) > 35 ||
+    if len(fields) > bcap.MAX_BODIES ||
        len(inputs) > sim.MAX_INPUT_CLASSES_PER_SEAT ||
        len(drivers) > sim.WORLD_NETWORK_DRIVERS ||
        len(effects) > sim.WORLD_EFFECTS_PER_TICK {

@@ -29,9 +29,11 @@ order or geometry content; native catalog IDs bind geometry content. SHA256
 scene identity binds the baked semantic data. Arrays are sorted by
 stable keys before native construction. No native allocation identities are IDs.
 
-Limits preserve current 35 bodies/35 shapes/32 dynamic/8 catalog assets and
-64MiB envelope; Hull 4..256 points, Mesh 4096 vertices/24576 indices,
-64x64 heightfield and 2MiB input.
+World counts and byte budgets use the shared
+[capacity profile](../../docs/box3d/capacities.md). Defaults permit 1024 bodies,
+4096 shapes, 256 joints, 128 catalog assets, 32 MiB authoring input and a 1 GiB
+accounted-memory allowance. Per-geometry bounds remain Hull 4..256 points,
+Mesh 4096 vertices/24576 indices and 64x64 heightfield.
 Non-origin/rotated boxes become exact eight-vertex hulls. Mesh/heightfield require
 Static, non-sensor and enable_sensor_events=false (the mesh/heightfield default).
 Explicit unsupported flags fail validation; the builder never drops them.

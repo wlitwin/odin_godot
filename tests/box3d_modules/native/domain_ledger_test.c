@@ -1,6 +1,12 @@
 /* Native P4 support controls. This tests accounting, not an allocator hard cap.
  */
 #include "api.h"
+
+/* Exercise the selected profile's actual quota, including reduced profiles. */
+#define QUOTA_A_LIVE (OGB3_HOST_LIMIT_BYTES / 4)
+#define QUOTA_RESERVE (OGB3_HOST_LIMIT_BYTES / 8)
+#define QUOTA_B_LIVE (OGB3_HOST_LIMIT_BYTES - QUOTA_A_LIVE - 2 * QUOTA_RESERVE)
+#define QUOTA_A_TOTAL (QUOTA_A_LIVE + QUOTA_RESERVE)
 #include "owned_snapshot.h"
 #include "state_dump.h"
 #include <assert.h>
@@ -143,12 +149,12 @@ int main(void) {
   assert(required == 777);
   failure(ogb3_host_memory_check(cookie, a, 0, 0, 0, 0, NULL),
           OGB3_INVALID_ARGUMENT, before);
-  OK(ogb3_host_owner_set(cookie, a, 16 * 1024 * 1024, 8 * 1024 * 1024));
-  OK(ogb3_host_owner_set(cookie, b, 32 * 1024 * 1024, 8 * 1024 * 1024));
+  OK(ogb3_host_owner_set(cookie, a, QUOTA_A_LIVE, QUOTA_RESERVE));
+  OK(ogb3_host_owner_set(cookie, b, QUOTA_B_LIVE, QUOTA_RESERVE));
   before = stats();
   assert(before.admitted_bytes == LIMIT &&
-         before.host_live_bytes == 48 * 1024 * 1024 &&
-         before.host_reserved_bytes == 16 * 1024 * 1024);
+         before.host_live_bytes == (QUOTA_A_LIVE + QUOTA_B_LIVE) &&
+         before.host_reserved_bytes == 2 * QUOTA_RESERVE);
   OK(ogb3_host_memory_check(cookie, 0, 0, 0, 0, 0, &required));
   assert(required == LIMIT);
   unchanged(before);
@@ -160,18 +166,18 @@ int main(void) {
   failure(ogb3_host_memory_check(cookie, a, 0, 0, UINT64_MAX, 1, &required),
           OGB3_CAPACITY, before);
   assert(required == 777);
-  failure(ogb3_host_owner_set(cookie, a, 16 * 1024 * 1024 + 1, 8 * 1024 * 1024),
+  failure(ogb3_host_owner_set(cookie, a, QUOTA_A_LIVE + 1, QUOTA_RESERVE),
           OGB3_CAPACITY, before);
   failure(ogb3_host_owner_set(cookie, a, UINT64_MAX, 1), OGB3_CAPACITY, before);
   /* One atomic reservation->owned conversion; no double charging own token. */
-  OK(ogb3_host_memory_check(cookie, a, 24 * 1024 * 1024, 0, 0, 0, &required));
+  OK(ogb3_host_memory_check(cookie, a, QUOTA_A_TOTAL, 0, 0, 0, &required));
   assert(required == LIMIT);
   unchanged(before);
-  OK(ogb3_host_owner_set(cookie, a, 24 * 1024 * 1024, 0));
+  OK(ogb3_host_owner_set(cookie, a, QUOTA_A_TOTAL, 0));
   assert(stats().admitted_bytes == LIMIT);
   OK(ogb3_host_owner_get(cookie, a, &info));
   assert(info.producer == 11 && info.component == 1 &&
-         info.live_bytes == 24 * 1024 * 1024 && !info.reserved_bytes);
+         info.live_bytes == QUOTA_A_TOTAL && !info.reserved_bytes);
   OK(ogb3_host_owner_close(cookie, a));
   before = stats();
   failure(ogb3_host_owner_close(cookie, a), OGB3_INVALID_HANDLE, before);

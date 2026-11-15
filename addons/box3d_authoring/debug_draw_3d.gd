@@ -2,8 +2,9 @@
 class_name Box3DDebugDraw3D
 extends MeshInstance3D
 
-const MAX_LINES := 8192
-const MAX_JSON_BYTES := 2097152
+const CAPACITY = preload("res://addons/box3d_authoring/capacity_defaults.gd")
+const MAX_LINES: int = CAPACITY.PROFILE["debug_lines"]
+const MAX_JSON_BYTES: int = CAPACITY.PROFILE["network_bytes"]
 @export var enabled: bool=false:
 	set(value):
 		enabled=value

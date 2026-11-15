@@ -51,6 +51,14 @@ _Static_assert(b3_staticBody == OGB3_STATIC &&
                    b3_kinematicBody == OGB3_KINEMATIC &&
                    b3_dynamicBody == OGB3_DYNAMIC,
                "body enum");
+uint64_t ogb3_capacity_fingerprint(void) {
+  const uint64_t values[] = OGB3_CAPACITY_VALUES;
+  uint64_t hash = UINT64_C(0xcbf29ce484222325);
+  for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
+    for (unsigned byte = 0; byte < 8; ++byte)
+      hash = (hash ^ ((values[i] >> (byte * 8)) & 255)) * UINT64_C(0x100000001b3);
+  return hash;
+}
 static b3WorldId world_id(uint32_t x) {
   b3WorldId y;
   memcpy(&y, &x, sizeof y);

@@ -156,26 +156,18 @@ Generic local checkpoint reset/reconcile is refused while networking is active.
 
 ## Bounds, diagnostics and deployment
 
-The default complete envelope is at most 1 MiB including both native recovery
-and full diagnostic bytes. Chunks are at most 32 KiB; there is one transfer,
-at most 32 chunks, and at most 16 queued control messages / 64 KiB. Reassembly,
-DTO/import, output, schemas, ledgers, images and first-trace payloads are charged
-against the shared 64 MiB allowance with explicit operation reservation. Canonical
-write/query preflights include the native contract's 8 MiB transient allowance
-(including DTO); ordinary provider primitives retain their measured 2 MiB
-reservation. Both are headroom within the same 64 MiB limit, not extra budgets.
-Native read preflights DTO plus 4 MiB staging and receives all external charges. Caller
-transport backlogs and other application allocations must be separately bounded
-and charged as external ownership; a custom send callback is not an unlimited
-free queue. A partial transfer is discarded by an explicit recovery request.
-An incompatible/oversized profile rejects rather than broadening these limits.
+Complete envelope size, chunk staging, observation buffers, and the shared
+memory allowance follow [the selected capacity profile](../box3d/capacities.md).
+The default maximum envelope is 32 MiB; chunks remain 32 KiB. Reassembly masks
+and queued chunk storage scale with that maximum rather than stopping after
+32 chunks.
 
-H=128 and count/age/memory limits are deterministic admission rules. Clocks only
-record acceptance measurements; a scheduling spike never rejects valid gameplay.
-The earlier mesh-floor measurements do not describe this new primitive profile.
-P3's actual counts, timing and staged ownership must be measured independently.
-Native engine allocator exhaustion remains the documented fatal upstream
-boundary, not a claimed recoverable allocation guarantee.
+DTO/import, output, schemas, ledgers, images, and first-trace payloads participate
+in resource admission. Primitive reservations scale with the profile's snapshot
+and decode bounds. Transport backlogs outside the adapters need their own
+bounded accounting. Missing history and incompatible identity require explicit
+recovery. Clock measurements report work; they do not reject otherwise valid
+input. Profile capacities do not guarantee a frame-time budget.
 
 `lane_world_confirmed_signature` exposes only confirmed state on clients.
 `lane_world_network_trace` owns the first settled complete-state conflict with

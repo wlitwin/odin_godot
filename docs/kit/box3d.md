@@ -156,19 +156,19 @@ presentation. Already played cosmetic effects cannot be unplayed by arbitrary
 state restoration. Author stable keys must include logical identity/generation
 when native allocation numbers can recur.
 
-The runtime profile checks enforce initial dynamics<=32, total bodies<=35,
-shapes<=35, contacts<=147, joints<=1, H=128 and prediction/ordinary repair<=8.
-Asset identity is an immutable declaration of bounded predeclared content,
-not certification that arbitrary geometry with the same counts is affordable.
-Counts/resources are checked before/after staged work. The default explicit
-reservation is 2 MiB for the bounded open/capture operation; larger authored
-allocation batches need a measured reservation and revalidation. Total shared
-engine/snapshot live bytes plus tracked typed Side/image/execution, field and
-input history, detached checkpoint owners and declared external/reserved bytes
-must fit 64 MiB. Caller-owned allocations outside these domains must be included
-through configuration. Multiple active providers/frameworks need aggregate
-external accounting; this is not an allocator-level native hard cap or an RSS
-limit. Native allocator OOM/unexpected sealed-loader invariants remain fatal.
+World counts and byte budgets come from the shared [capacity profile](../box3d/capacities.md).
+The native build and Odin modules use matching settings. History remains 128
+frames and Kit prediction/ordinary repair remains bounded to eight ticks.
+Asset identity declares immutable content; it does not establish a frame-time
+budget for arbitrary geometry and joint topology.
+
+Counts and resources are checked around staged work. The default primitive
+reservation scales with the selected snapshot/decode capacities. Shared native,
+wrapper, typed Side, history, checkpoint, and declared external ownership must
+fit the selected memory allowance. Include caller-owned allocations and queues
+through configuration. These are requested-byte accounting rules rather than
+an allocator hard cap or process RSS limit. Native allocator exhaustion remains
+fatal.
 
 `physics.allocation_stats` records sampled total/staged live peaks, allocation
 requests between reserved primitive boundaries and reservation violations.

@@ -1,8 +1,10 @@
 // Detached value-only presentation. This package links no Native or Godot code.
 package box3d_presentation
 
+import bcap "godot:box3d/limits"
+
 VERSION :: u32(1)
-MAX_BODIES :: 35
+MAX_BODIES :: bcap.MAX_BODIES
 MAX_CHANGES :: 2 * MAX_BODIES
 
 Error :: enum {

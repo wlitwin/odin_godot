@@ -228,6 +228,33 @@ present :: proc "contextless" (
     required: u32,
     error: Error,
 ) {
+    // The first pass checks the complete transaction without touching output.
+    // The second repeats the pure plan after capacity is known, avoiding a
+    // capacity-sized Change array on the caller's stack.
+    required, error = present_plan(view, previous, current, alpha, nil, false)
+
+    if error != .None {
+        return
+    }
+
+    if u64(len(out)) < u64(required) {
+        return required, .Capacity
+    }
+
+    return present_plan(view, previous, current, alpha, out, true)
+}
+
+@(private)
+present_plan :: proc "contextless" (
+    view: ^View,
+    previous, current: ^Frame,
+    alpha: f32,
+    out: []Change,
+    commit: bool,
+) -> (
+    required: u32,
+    error: Error,
+) {
     if view == nil || !frame_valid(current) || (previous != nil && !frame_valid(previous)) || !finite(alpha) {
         return 0, .Invalid
     }
@@ -243,7 +270,6 @@ present :: proc "contextless" (
 
     a := clamp(alpha, 0, 1)
     next := view^
-    changes: [MAX_CHANGES]Change
     count := u32(0)
     epoch_cut := next.ready && next.epoch != current.epoch
     revision_cut := next.ready && next.revision != current.revision
@@ -267,13 +293,16 @@ present :: proc "contextless" (
         }
 
         if !found {
-            changes[count] = {
-                kind           = .Remove,
-                token          = {u32(i), slot.generation},
-                previous_token = {u32(i), slot.generation},
-                row            = slot.row,
-                previous       = slot.row,
+            if commit {
+                out[count] = {
+                    kind           = .Remove,
+                    token          = {u32(i), slot.generation},
+                    previous_token = {u32(i), slot.generation},
+                    row            = slot.row,
+                    previous       = slot.row,
+                }
             }
+
             count += 1
             slot.active = false
         }
@@ -341,19 +370,19 @@ present :: proc "contextless" (
 
         slot.active = true
         slot.row = value
-        changes[count] = {
-            kind           = kind,
-            token          = {u32(at), slot.generation},
-            previous_token = old_token,
-            row            = value,
-            previous       = old,
-            interpolated   = blend,
-        }
-        count += 1
-    }
 
-    if u64(len(out)) < u64(count) {
-        return count, .Capacity
+        if commit {
+            out[count] = {
+                kind           = kind,
+                token          = {u32(at), slot.generation},
+                previous_token = old_token,
+                row            = value,
+                previous       = old,
+                interpolated   = blend,
+            }
+        }
+
+        count += 1
     }
 
     if epoch_cut || revision_cut {
@@ -365,8 +394,11 @@ present :: proc "contextless" (
     next.tick = current.tick
     next.revision = current.revision
     next.frames += 1
-    copy(out, changes[:count])
-    view^ = next
+
+    if commit {
+        view^ = next
+    }
+
     return count, .None
 }
 
@@ -375,21 +407,11 @@ view_clear :: proc "contextless" (view: ^View, out: []Change) -> (u32, Error) {
         return 0, .Invalid
     }
 
-    changes: [MAX_BODIES]Change
     count := u32(0)
-    next := view^
 
-    for &slot, i in next.slots {
+    for slot in view.slots {
         if slot.active {
-            changes[count] = {
-                kind           = .Remove,
-                token          = {u32(i), slot.generation},
-                previous_token = {u32(i), slot.generation},
-                row            = slot.row,
-                previous       = slot.row,
-            }
             count += 1
-            slot.active = false
         }
     }
 
@@ -397,12 +419,28 @@ view_clear :: proc "contextless" (view: ^View, out: []Change) -> (u32, Error) {
         return count, .Capacity
     }
 
-    next.ready = false
-    next.epoch = 0
-    next.tick = 0
-    next.revision = 0
-    copy(out, changes[:count])
-    view^ = next
+    at := 0
+
+    for &slot, i in view.slots {
+        if !slot.active {
+            continue
+        }
+
+        out[at] = {
+            kind           = .Remove,
+            token          = {u32(i), slot.generation},
+            previous_token = {u32(i), slot.generation},
+            row            = slot.row,
+            previous       = slot.row,
+        }
+        at += 1
+        slot.active = false
+    }
+
+    view.ready = false
+    view.epoch = 0
+    view.tick = 0
+    view.revision = 0
     return count, .None
 }
 

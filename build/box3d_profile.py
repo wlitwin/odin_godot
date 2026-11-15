@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import box3d_capacity as capacity
 
 
 class ProfileError(Exception):
@@ -217,7 +218,16 @@ def native_input(source, repo, target):
     }
     if native_query:
         require(query_domain(source) == info, "actual shared native metadata differs from the recorded build")
+    profile = capacity.validate(manifest['capacity_profile'])
+    require(manifest.get('capacity_fingerprint') == capacity.fingerprint(profile),
+            'capacity profile differs from its recorded fingerprint')
+    if native_query:
+        library = ctypes.CDLL(str(source))
+        library.ogb3_capacity_fingerprint.restype = ctypes.c_uint64
+        require(library.ogb3_capacity_fingerprint() == capacity.fingerprint(profile),
+                'actual native capacity profile differs from its manifest')
     return {"source_library": str(source), "source_library_sha256": sha(source),
+            "capacity_profile": profile, "odin_capacity_flags": capacity.odin_flags(profile),
             "native_manifest": str(manifest_path), "native_manifest_sha256": sha(manifest_path),
             "native_archive_sha256": manifest["archive_sha256"], "native_sources": manifest["native_sources"],
             "identity_record_sha256": sha(identity_path), "domain": info,
@@ -276,7 +286,9 @@ def web_input(source, repo):
                 if expected is None:
                     expected = hashlib.sha256(tar.extractfile(member).read()).hexdigest()
                 require(expected == digest, 'web engine source differs from pin: ' + member)
+    profile = capacity.validate(manifest['capacity_profile'])
     return dict(result='VERIFIED_LINK_INPUT_RUNTIME_PENDING', target='web-wasm32',
+                capacity_profile=profile, odin_capacity_flags=capacity.odin_flags(profile),
                 source_archive=str(source), source_archive_sha256=sha(source),
                 native_manifest=str(manifest_path), native_manifest_sha256=sha(manifest_path),
                 build=expected_build, backend_target=expected_target, variant=manifest['variant'],

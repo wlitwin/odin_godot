@@ -1,5 +1,10 @@
 # Box3D dependency pins and reuse provenance
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 Current baseline: Box3D `336263320469e5e9febfe18697ab562488f7e97a`
 (October 28, 2026), promoted by the Web Showcase W0 refresh. The July desktop
 qualification remains historical and build-specific. See the

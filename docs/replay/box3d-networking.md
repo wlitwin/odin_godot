@@ -28,7 +28,7 @@ Ordinary prediction and correction are limited to the configured window, `Config
 
 Wire revision 2 (`PHYSICS_WIRE_VERSION`, carried in every fact header) keeps complete images out of a predicting driver's steady state. Each accepted fact carries the decisions and the signature's 32-byte complete digest, which commits to identity, epoch, tick and every part; the client confirms from facts alone and compares with `physics_signature_match`. The authority signs each tick once for all peers and sends every fact on the reliable channel plus an unreliable copy (when it fits), so one lost packet no longer holds every later fact behind a retransmission. At the `snapshot_every` cadence a driver receives a small reliable `Physics_Status` (authority head, newest received input, settled actions) for the lead controller. Complete images remain for Welcome, an explicit same-history mismatch request, and spectators, who do not predict. A periodic image was tens of KB on the ordered channel: about 3.4 Mbit/s that delayed every fact queued behind it.
 
-Complete Welcome/Snapshot envelopes are at most 1 MiB, transported in bounded 32 KiB parts on the existing reliable transport. They contain immutable identity, a 480-byte diagnostic signature, canonical full Game/events/completed observations, normalized solver dump3, and an independent native canonical recovery attachment. Normalized dump bytes are comparison data and are never an import format. Decode verifies all bounds, identity, checksums, canonical values and the decoded native solver against the signed logical solver before publication. Native future sensor/contact end queues are part of solver state; completed same-tick observations remain provider-owned.
+Complete Welcome/Snapshot envelopes use the selected capacity profile (32 MiB by default), transported in bounded 32 KiB parts on the existing reliable transport. Reassembly supports the full selected chunk count. They contain immutable identity, a 480-byte diagnostic signature, canonical full Game/events/completed observations, normalized solver dump3, and an independent native canonical recovery attachment. Normalized dump bytes are comparison data and are never an import format. Decode verifies all bounds, identity, checksums, canonical values and the decoded native solver against the signed logical solver before publication. Native future sensor/contact end queues are part of solver state; completed same-tick observations remain provider-owned.
 
 An ordinary checkpoint also carries the last eight accepted rows and their occurrences. This lets the client validate/replay the accepted prefix before publishing correction when complete checkpoints arrive ahead of individual facts. A hard Welcome establishes a new baseline and does not replay old effects.
 
@@ -42,9 +42,16 @@ Confirmed signatures use `box3d/diagnostics` over complete Solver, Game, Side, O
 
 Trace `from_tick..to_tick` and `depth` describe the full planned correction, including later prediction. The input-context payload records the known accepted/check prefix and the corresponding published prediction. `last_checked_prefix` and `last_executed_steps` report checked-prefix and actual execution separately. A prefix mismatch, or an unchanged accepted prefix, may execute fewer steps than the planned correction; it is not evidence of a full-window repair.
 
-The measured profile declares 32 initial dynamic bodies and admits at most 35 total bodies/shapes, 147 contacts and one hinge, H128, 60 Hz/four substeps, one caller. The primitive box-floor fixture observed 35/35/141/1; it does not inherit the historical mesh fixture's measurements. Native catalog geometries remain explicitly bounded to declared Box/Sphere/Capsule assets.
+World counts, captured source images, canonical recovery bytes, complete
+transfers, sensor observations, and accounted memory follow the shared
+[capacity profile](../box3d/capacities.md). Retained image storage is charged to
+the memory allowance; it is separate from canonical wire size. Include native,
+wrapper, provider, history, and caller-owned queues in the resource budget.
 
-The process resource cap remains 64 MiB over engine, wrapper and charged provider/runtime/payload ownership. Reserve before allocating and report requested live bytes, reservation bounds, actual temporary peaks, allocator overhead and RSS separately. Two full 32-body/H128 runtimes need separate process budgets; co-located correctness tests use a smaller declared scene. Transfer budget hooks account raw, compressed, reassembly, decode and workspace owners and keep catalog callback leases alive. Nil hooks preserve native-free transfer behavior. A failed replacement retains the old sender payload and frontiers. Native engine allocator fatal-OOM behavior is not a recovered-allocation guarantee.
+Transfer budget hooks retain their catalog and callback owners. A failed
+replacement preserves the prior sender payload and frontiers. Requested
+ownership, temporary reservations, allocator overhead, and RSS are different
+measurements. Native allocator exhaustion remains fatal.
 
 
 ## Build and support

@@ -1,5 +1,7 @@
 package replay_physics
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import "core:time"
 import "core:reflect"
@@ -11,12 +13,16 @@ import meter "godot:box3d/godot/meter"
 import "base:runtime"
 import intrinsics "base:intrinsics"
 
-// Private working/image ABI2 includes the extended producer command table.
-// Existing execution/image identity checks reject ABI1 before typed access.
-IDENTITY :: u64(0x5245504c42334432)
-MAX_ASSETS :: 8
-IMAGE_BYTES_LIMIT :: 512 * 1024
-RESERVATION_BYTES :: 2 * 1024 * 1024
+// Private working/image ABI3 has profile-sized Config/assets and sensor arrays.
+// Include their dimensions so execution/image checks reject older or differently
+// sized producer layouts before any typed access.
+IDENTITY :: u64(0x5245504c42334433) ~ u64(bcap.MAX_SENSOR_EVENTS) ~ (u64(bcap.MAX_ASSETS) << 32)
+MAX_ASSETS :: bcap.MAX_ASSETS
+// Retained solver storage and canonical wire bytes are different domains.
+// The shared memory budget accounts the complete image; SNAPSHOT_BYTES bounds
+// its opaque source image and RECOVERY_BYTES bounds canonical encoding.
+IMAGE_BYTES_LIMIT :: bcap.MEMORY_BYTES
+RESERVATION_BYTES :: bcap.OPERATION_RESERVE_BYTES
 
 Body_Key :: b.Body_Key
 Shape_Key :: b.Shape_Key
@@ -68,7 +74,7 @@ Image :: struct {
     contract, bytes:                      u64,
     allocator:                            mem.Allocator,
     sensor_count:                         u32,
-    sensors:                              [70]Sensor_Event,
+    sensors:                              [bcap.MAX_SENSOR_EVENTS]Sensor_Event,
     catalog:                              b.Recovery_Catalog,
     catalog_identity:                     b.Recovery_Identity,
     native_required, normalized_required: u64,
@@ -82,7 +88,7 @@ Working :: struct {
     allocator:                                    mem.Allocator,
     commands:                                     ^Command_Dispatch,
     sensor_count:                                 u32,
-    sensors:                                      [70]Sensor_Event,
+    sensors:                                      [bcap.MAX_SENSOR_EVENTS]Sensor_Event,
     catalog:                                      b.Recovery_Catalog,
     catalog_identity:                             b.Recovery_Identity,
     revision, admitted_revision, native_required: u64,
@@ -429,6 +435,7 @@ config_contract :: proc(config: Config) -> u64 {
 
     for value in ([?]u64 {
             IDENTITY,
+            bcap.fingerprint(),
             config.asset_id,
             config.build_id,
             b.build_fingerprint(),
@@ -474,7 +481,7 @@ valid_config :: proc(config: Config) -> bool {
 
     if config.asset_id == 0 ||
        config.build_id == 0 ||
-       config.initial_dynamic_bodies > 32 ||
+       config.initial_dynamic_bodies > bcap.MAX_BODIES ||
        config.asset_count > MAX_ASSETS {
         return false
     }
@@ -1041,7 +1048,7 @@ checkpoint_make :: proc(
         return {}, status_error(status)
     }
 
-    states: [35]b.Body_State
+    states: [bcap.MAX_BODIES]b.Body_State
     count, read_status := b.snapshot_body_states(&snapshot, states[:])
 
     if read_status != .Ok {
@@ -1062,7 +1069,7 @@ checkpoint_make :: proc(
         return {}, .Resource_Limit
     }
 
-    sensors: [70]Sensor_Event
+    sensors: [bcap.MAX_SENSOR_EVENTS]Sensor_Event
     sensor_count, sensor_error := read_sensor_events(world, sensors[:])
 
     if sensor_error != .None {

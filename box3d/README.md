@@ -137,8 +137,9 @@ surface needs explicit native support and
 evidence before use. `Motion_Joint_Def` supports Pin, Hinge, Slider, Spherical,
 Distance, Motor, Weld and Wheel. Pin maps to a spherical point constraint,
 Hinge to Revolute and Slider to Prismatic. Each definition uses world-independent
-body allocation keys, and creation returns a joint key. The current profile
-still permits one joint at a time.
+body allocation keys, and creation returns a joint key. Joint families share the
+configured capacity, which defaults to 256. See
+[Configure world capacities](../docs/box3d/capacities.md) for the shared build profile.
 
 ## Ownership and identity
 

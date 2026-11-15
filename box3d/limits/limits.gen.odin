@@ -1,0 +1,33 @@
+// Generated from box3d/capacity.json by build/box3d_capacity.py.
+package box3d_limits
+
+MAX_BODIES :: #config(BOX3D_MAX_BODIES, 1024)
+MAX_SHAPES :: #config(BOX3D_MAX_SHAPES, 4096)
+MAX_CONTACTS :: #config(BOX3D_MAX_CONTACTS, 16384)
+MAX_JOINTS :: #config(BOX3D_MAX_JOINTS, 256)
+MAX_ASSETS :: #config(BOX3D_MAX_ASSETS, 128)
+MAX_SENSOR_PAIRS :: #config(BOX3D_MAX_SENSOR_PAIRS, 4096)
+MEMORY_BYTES :: #config(BOX3D_MEMORY_BYTES, 1073741824)
+RECOVERY_BYTES :: #config(BOX3D_RECOVERY_BYTES, 8388608)
+DTO_BYTES :: #config(BOX3D_DTO_BYTES, 33554432)
+SNAPSHOT_BYTES :: #config(BOX3D_SNAPSHOT_BYTES, 16777216)
+NETWORK_BYTES :: #config(BOX3D_NETWORK_BYTES, 33554432)
+DEBUG_LINES :: #config(BOX3D_DEBUG_LINES, 32768)
+
+OPERATION_RESERVE_BYTES :: 2 * SNAPSHOT_BYTES + max(DTO_BYTES, 8 * 1024 * 1024)
+MAX_SENSOR_EVENTS :: 2 * MAX_SENSOR_PAIRS
+MAX_SPARSE_SLOTS :: max(512, 4 * max(MAX_BODIES, MAX_SHAPES, MAX_CONTACTS, MAX_JOINTS))
+MAX_TREE_NODES :: max(512, 4 * MAX_SHAPES)
+NETWORK_PARTS :: (NETWORK_BYTES + 32767) / 32768
+
+// Compared with the actual native macros before constructing a world.
+fingerprint :: proc() -> u64 {
+    values := [?]u64{MAX_BODIES, MAX_SHAPES, MAX_CONTACTS, MAX_JOINTS, MAX_ASSETS, MAX_SENSOR_PAIRS, MEMORY_BYTES, RECOVERY_BYTES, DTO_BYTES, SNAPSHOT_BYTES, NETWORK_BYTES, DEBUG_LINES}
+    value := u64(0xcbf29ce484222325)
+    for field in values {
+        for shift in 0 ..< 8 {
+            value = (value ~ ((field >> uint(shift * 8)) & 255)) * 0x100000001b3
+        }
+    }
+    return value
+}

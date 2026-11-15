@@ -1,5 +1,10 @@
 # Box3D prediction and presentation
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 P4.2 functional integration is DONE (stored report `r_03e61e9cd6ce4325`). Kit and
 Replay now consume the presentation bridges and startup impairment controls in
 their separate scenes; bounded actual checks are recorded below. Whole-call

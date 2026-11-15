@@ -1,5 +1,10 @@
 # Shared Box3D contract for Kit and Replay
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 P2.1 contract, 2026-10-30. The [Gate A decision](../../docs/box3d/support.md) admits a bounded,
 same-build/same-target alpha implementation and test slice. It does not admit
 mixed-target physics or arbitrary scenes with the same body count. Kit and

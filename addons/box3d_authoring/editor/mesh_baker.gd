@@ -29,9 +29,9 @@ static func bake_mesh(mesh: Mesh, stable_key: String, transform: Transform3D = T
 	var mirrored: bool = transform.basis.determinant() < 0.0
 	var triangles := PackedVector3Array()
 	var surfaces: int = mesh.get_surface_count()
-	if surfaces == 0 or surfaces > 35:
-		d.issue(errors, "mesh.surfaces", "Capacity", "Source needs1..35 surfaces.")
-	for surface in range(mini(surfaces, 35)):
+	if surfaces == 0 or surfaces > d.MAX_SHAPES:
+		d.issue(errors, "mesh.surfaces", "Capacity", "Source surface count exceeds the configured shape capacity.")
+	for surface in range(mini(surfaces, d.MAX_SHAPES)):
 		var path: String = "mesh.surfaces[%d]" % surface
 		# Primitive meshes always produce triangles; only ArrayMesh reports its type.
 		if mesh is ArrayMesh and (mesh as ArrayMesh).surface_get_primitive_type(surface) != Mesh.PRIMITIVE_TRIANGLES:

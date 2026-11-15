@@ -45,7 +45,7 @@ func box3d_body_definition(world: Node3D, path: String, errors: Array) -> Dictio
 	var shape_data: Array = []
 	var keys: Dictionary = {}
 	if shapes.size()>d.MAX_SHAPES:
-		d.issue(errors,path+".shapes","Capacity","Shape count exceeds35.")
+		d.issue(errors,path+".shapes","Capacity","Shape capacity (%d) exceeded." % d.MAX_SHAPES)
 	for i in range(mini(shapes.size(),d.MAX_SHAPES)):
 		var shape:=shapes[i]
 		var shape_path:=path+".shapes[%d]"%i

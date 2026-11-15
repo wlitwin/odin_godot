@@ -2,19 +2,23 @@
 class_name Box3DAuthoringData
 extends RefCounted
 
+const CAPACITY = preload("res://addons/box3d_authoring/capacity_defaults.gd")
+
 const SCHEMA_VERSION := 1
 const MOTION_SCHEMA_VERSION := 2
-const MAX_JOINTS := 1
-const MAX_CHARACTERS := 35
+const MAX_JOINTS: int = CAPACITY.PROFILE["max_joints"]
+const MAX_CHARACTERS: int = CAPACITY.PROFILE["max_bodies"]
 const MAX_KEY_BYTES := 128
-const MAX_BODIES := 35
-const MAX_SHAPES := 35
-const MAX_ASSETS := 8
+const MAX_BODIES: int = CAPACITY.PROFILE["max_bodies"]
+const MAX_SHAPES: int = CAPACITY.PROFILE["max_shapes"]
+const MAX_ASSETS: int = CAPACITY.PROFILE["max_assets"]
 const MAX_HULL_POINTS := 256
 const MAX_VERTICES := 4096
 const MAX_INDICES := 24576
 const MAX_GRID_SIDE := 64
-const MAX_BYTES := 2097152
+const MAX_BYTES: int = CAPACITY.PROFILE["dto_bytes"]
+const MAX_LINES: int = CAPACITY.PROFILE["debug_lines"]
+const MAX_JSON_BYTES: int = CAPACITY.PROFILE["network_bytes"]
 const MAX_ERRORS := 64
 const EPS := 0.00001
 

@@ -6,6 +6,10 @@ the compiler, CMake, and export tools.
 
 ## Build the backend
 
+To select body, joint, asset, and byte limits for the game, follow
+[Configure capacities](capacities.md). A build without an override uses the
+SDK's default capacity profile.
+
 From the repository root:
 
 ```sh

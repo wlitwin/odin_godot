@@ -1,5 +1,10 @@
 # Canonical solver recovery, format 1
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 The shared native codec encodes the complete admitted Box3D solver state as
 explicit little-endian fields. It does not export the opaque local snapshot
 image. Kit and Replay compose their own Game, Side, registered prediction

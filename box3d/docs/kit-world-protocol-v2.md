@@ -1,5 +1,10 @@
 # Kit World protocol v2
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 Status: the cleaned implementation passes eight focused World groups, four
 caller groups, a real32-body Core/SDK short pair and the primary impaired
 600-second Kit policy. Remaining Gate B matrix and CPU validation are open.

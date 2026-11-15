@@ -1,0 +1,6 @@
+{
+  "max_bodies": 2048,
+  "max_shapes": 8192,
+  "max_joints": 512,
+  "memory_bytes": 2147483648
+}

@@ -1,5 +1,10 @@
 # Pinned Box3D upgrade and release workflow
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 The October baseline refresh is recorded below. The backend maintainer owns
 the engine pin/private compatibility boundary and signs off with **both Kit and
 Replay owners**; deployment/export and authoring/editor owners review their

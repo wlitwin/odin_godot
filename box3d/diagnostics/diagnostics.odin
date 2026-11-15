@@ -1,6 +1,8 @@
 // Native-free confirmed-frame diagnostics. These hashes are not authentication.
 package box3d_diagnostics
 
+import bcap "godot:box3d/limits"
+
 import "core:crypto/sha2"
 
 Digest :: [32]u8
@@ -64,7 +66,7 @@ Limits :: struct {
     max_part_bytes, max_frame_bytes, max_input_bytes: int,
 }
 
-DEFAULT_LIMITS :: Limits{1024 * 1024, 2 * 1024 * 1024, 64 * 1024}
+DEFAULT_LIMITS :: Limits{bcap.NETWORK_BYTES, bcap.NETWORK_BYTES, 64 * 1024}
 
 hash_bytes :: proc(bytes: []u8) -> Digest {
     h: sha2.Context_256
@@ -79,9 +81,9 @@ hash_bytes :: proc(bytes: []u8) -> Digest {
 valid_limits :: proc(l: Limits) -> bool {
     return(
         l.max_part_bytes > 0 &&
-        l.max_part_bytes <= 2 * 1024 * 1024 &&
+        l.max_part_bytes <= bcap.NETWORK_BYTES &&
         l.max_frame_bytes >= l.max_part_bytes &&
-        l.max_frame_bytes <= 4 * 1024 * 1024 &&
+        l.max_frame_bytes <= bcap.NETWORK_BYTES &&
         l.max_input_bytes >= 0 &&
         l.max_input_bytes <= 256 * 1024 \
     )

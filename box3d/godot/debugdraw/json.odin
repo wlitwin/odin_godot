@@ -1,12 +1,14 @@
 // Copies detached debug lines into an owning JSON payload. No Godot/Native API.
 package box3d_godot_debugdraw
 
+import bcap "godot:box3d/limits"
+
 import "core:encoding/json"
 import "core:math"
 import "core:mem"
 import d "godot:box3d/debugdraw"
 
-MAX_JSON_BYTES :: 2 * 1024 * 1024
+MAX_JSON_BYTES :: bcap.NETWORK_BYTES
 
 Error :: enum {
     None,

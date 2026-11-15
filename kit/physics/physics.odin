@@ -1,5 +1,7 @@
 package kit_physics
 
+import bcap "godot:box3d/limits"
+
 // Optional Box3D participant for Kit. Importing kit/sim alone never imports this
 // package or a native library. Side is an owned value with world-independent keys.
 import "base:intrinsics"
@@ -304,7 +306,7 @@ attach :: proc(
     a.config = cfg
 
     if a.config.reservation_bytes == 0 {
-        a.config.reservation_bytes = 2 * 1024 * 1024
+        a.config.reservation_bytes = bcap.OPERATION_RESERVE_BYTES
     }
 
     a.allocator = l.allocator
@@ -1011,12 +1013,12 @@ Sensor_Observation :: struct {
 
 Sensor_Observations :: struct {
     count:  u32,
-    events: [128]Sensor_Observation,
+    events: [bcap.MAX_SENSOR_EVENTS]Sensor_Observation,
 }
 
 @(private)
 collect_observations :: proc(world: b3.World, out: ^Sensor_Observations) -> ksim.World_Error {
-    native: [128]b3.Sensor_Event
+    native: [bcap.MAX_SENSOR_EVENTS]b3.Sensor_Event
     count, status := b3.world_sensor_events(world, native[:])
 
     if status != .Ok {

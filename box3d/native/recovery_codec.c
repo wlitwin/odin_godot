@@ -42,7 +42,7 @@ _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24 &&
                "binary32 codec");
 #define WIRE_HEADER 192u
 #define SECTIONS 12u
-#define BUDGET (64ull * 1024 * 1024)
+#define BUDGET ((uint64_t)OGB3_MEMORY_BYTES)
 /* Recovery-only staging headroom; tracked requested bytes still checked per
  * DTO/native allocation and before returning an owned image. */
 #define RECOVERY_NATIVE_RESERVE (4ull * 1024 * 1024)
@@ -2494,17 +2494,17 @@ ogb3_status ogb3_recovery_config_default(ogb3_recovery_config *out) {
   *out = (ogb3_recovery_config){.profile = 1,
                                 .max_bytes = OGB3_RECOVERY_MAX_BYTES,
                                 .max_dto_bytes = OGB3_RECOVERY_MAX_DTO_BYTES,
-                                .max_bodies = 35,
-                                .max_shapes = 35,
-                                .max_contacts = 147,
-                                .max_joints = 1,
-                                .max_sensors = 1,
-                                .max_sparse_slots = 512,
-                                .max_tree_nodes = 512,
-                                .max_manifolds = 147,
-                                .max_visitors = 128,
-                                .max_pending_sensors = 35,
-                                .max_pending_contacts = 147};
+                                .max_bodies = OGB3_MAX_BODIES,
+                                .max_shapes = OGB3_MAX_SHAPES,
+                                .max_contacts = OGB3_MAX_CONTACTS,
+                                .max_joints = OGB3_MAX_JOINTS,
+                                .max_sensors = OGB3_MAX_SHAPES,
+                                .max_sparse_slots = OGB3_MAX_SPARSE_SLOTS,
+                                .max_tree_nodes = OGB3_MAX_TREE_NODES,
+                                .max_manifolds = OGB3_MAX_CONTACTS,
+                                .max_visitors = OGB3_MAX_SHAPES,
+                                .max_pending_sensors = OGB3_MAX_SENSOR_PAIRS,
+                                .max_pending_contacts = OGB3_MAX_CONTACTS};
   native_build_target(out->build_target);
   return OGB3_OK;
 }
@@ -2512,12 +2512,12 @@ static int profile_limits_valid(const ogb3_recovery_config *p) {
   return p->profile && p->max_bytes >= WIRE_HEADER + 16 * SECTIONS &&
          p->max_bytes <= OGB3_RECOVERY_MAX_BYTES && p->max_dto_bytes >= 4096 &&
          p->max_dto_bytes <= OGB3_RECOVERY_MAX_DTO_BYTES && p->max_bodies > 0 &&
-         p->max_bodies <= 35 && p->max_shapes > 0 && p->max_shapes <= 35 &&
-         p->max_contacts <= 147 && p->max_joints <= 1 && p->max_sensors <= 1 &&
-         p->max_sparse_slots >= 35 && p->max_sparse_slots <= 512 &&
-         p->max_tree_nodes >= 31 && p->max_tree_nodes <= 512 &&
-         p->max_manifolds <= 147 && p->max_visitors <= 128 &&
-         p->max_pending_sensors <= 35 && p->max_pending_contacts <= 147;
+         p->max_bodies <= OGB3_MAX_BODIES && p->max_shapes > 0 && p->max_shapes <= OGB3_MAX_SHAPES &&
+         p->max_contacts <= OGB3_MAX_CONTACTS && p->max_joints <= OGB3_MAX_JOINTS && p->max_sensors <= OGB3_MAX_SHAPES &&
+         p->max_sparse_slots >= p->max_bodies && p->max_sparse_slots <= OGB3_MAX_SPARSE_SLOTS &&
+         p->max_tree_nodes >= 31 && p->max_tree_nodes <= OGB3_MAX_TREE_NODES &&
+         p->max_manifolds <= OGB3_MAX_CONTACTS && p->max_visitors <= OGB3_MAX_SHAPES &&
+         p->max_pending_sensors <= OGB3_MAX_SENSOR_PAIRS && p->max_pending_contacts <= OGB3_MAX_CONTACTS;
 }
 static int asset_valid(const ogb3_recovery_asset *a) {
   if (!a->id || a->reserved || a->kind < OGB3_RECOVERY_BOX ||

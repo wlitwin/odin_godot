@@ -92,6 +92,10 @@ PY
         "-define:BOX3D_LIBRARY=${BOX3D_WEB_FIELDS[0]}"
         "-define:BOX3D_EXPECTED_BUILD=sha256:${BOX3D_WEB_FIELDS[1]}"
         "-define:BOX3D_EXPECTED_TARGET=sha256:${BOX3D_WEB_FIELDS[2]}")
+    while IFS= read -r value; do BOX3D_WEB_FLAGS+=("$value"); done < <(
+        python3 -c 'import json,sys; print("\n".join(json.load(open(sys.argv[1]))["odin_capacity_flags"]))' "$BOX3D_WEB_PROFILE_DIR/input.json"
+    )
+    python3 "$ROOT/build/box3d_capacity.py" --manifest "$BOX3D_WEB_PROFILE_DIR/input.json" --install-authoring "$PROJ"
 fi
 
 # Preflight: catch imports of core packages that do NOT exist on the wasm target BEFORE

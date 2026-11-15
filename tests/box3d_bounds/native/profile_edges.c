@@ -109,7 +109,8 @@ static void profile_edge(int shape_edge) {
   Live baseline = live();
   ogb3_recovery_config config;
   OK(ogb3_recovery_config_default(&config));
-  assert(config.max_bodies == 35 && config.max_shapes == 35);
+  assert(config.max_bodies >= 35 && config.max_shapes >= 35);
+  config.max_bodies = config.max_shapes = 35;
   ogb3_recovery_asset_v2 asset = {
     .version = OGB3_AUTHORING_ASSET_VERSION, .struct_bytes = sizeof(asset),
     .base = {.id = 1, .kind = OGB3_RECOVERY_BOX, .a = {.25f, .25f, .25f}}

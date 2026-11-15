@@ -1,5 +1,7 @@
 package replay_physics
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import b "godot:box3d"
 import bg "godot:box3d/godot"
@@ -206,7 +208,7 @@ network_codec_init :: proc(
                 codec_drop(cast(^Network_Codec(S, C, A, E, N))pointer)
             }},
         catalog = c,
-        max_attachment_bytes = b.RECOVERY_MAX_BYTES + 24 + 4 + 70 * 17,
+        max_attachment_bytes = b.RECOVERY_MAX_BYTES + 24 + 4 + bcap.MAX_SENSOR_EVENTS * 17,
         encode = proc(
             pointer: rawptr,
             checkpoint: ^r.Complete_Checkpoint(S, net.Net_Event(E)),
@@ -327,14 +329,14 @@ network_codec_init :: proc(
             observation_bytes, native_bytes := int(obs_get32(src[12:16])), int(obs_get32(src[16:20]))
 
             if observation_bytes < 4 ||
-               observation_bytes > 4 + 70 * 17 ||
+               observation_bytes > 4 + bcap.MAX_SENSOR_EVENTS * 17 ||
                native_bytes < 1 ||
                native_bytes > b.RECOVERY_MAX_BYTES ||
                len(src) != 24 + observation_bytes + native_bytes {
                 return {}, .Invalid_Frame
             }
 
-            observations: [70]Sensor_Event
+            observations: [bcap.MAX_SENSOR_EVENTS]Sensor_Event
             count, oe := observations_read(src[24:24 + observation_bytes], observations[:])
 
             if oe != .None {
@@ -523,7 +525,7 @@ observations_read :: proc(src: []u8, out: []Sensor_Event) -> (int, net.Error) {
 
     count := int(obs_get32(src[:4]))
 
-    if count > 70 || count > len(out) || len(src) != 4 + count * 17 {
+    if count > bcap.MAX_SENSOR_EVENTS || count > len(out) || len(src) != 4 + count * 17 {
         return 0, .Invalid_Frame
     }
 

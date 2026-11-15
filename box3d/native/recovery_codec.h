@@ -1,6 +1,7 @@
 #ifndef OGB3_RECOVERY_CODEC_H
 #define OGB3_RECOVERY_CODEC_H
 #include "owned_snapshot.h"
+#include "capacity.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -11,10 +12,10 @@ extern "C" {
 /* Current motion catalogs are constructed explicitly with create_v3 from
  * authoring_catalog.h; original catalog APIs/identity1/2 remain supported. */
 #define OGB3_RECOVERY_MOTION_FORMAT 3u
-#define OGB3_RECOVERY_MAX_ASSETS 8u
-#define OGB3_RECOVERY_MAX_BYTES (512u * 1024u)
-#define OGB3_RECOVERY_MAX_DTO_BYTES (2u * 1024u * 1024u)
-#define OGB3_RECOVERY_MAX_SOURCE_IMAGE_BYTES (2u * 1024u * 1024u)
+#define OGB3_RECOVERY_MAX_ASSETS OGB3_MAX_ASSETS
+#define OGB3_RECOVERY_MAX_BYTES OGB3_RECOVERY_BYTES
+#define OGB3_RECOVERY_MAX_DTO_BYTES OGB3_DTO_BYTES
+#define OGB3_RECOVERY_MAX_SOURCE_IMAGE_BYTES OGB3_SNAPSHOT_BYTES
 #define OGB3_RECOVERY_WRITE_RESERVE_BYTES (8u * 1024u * 1024u)
 typedef struct ogb3_recovery_catalog ogb3_recovery_catalog;
 enum {
@@ -32,7 +33,7 @@ typedef struct {
   float radius;
   uint32_t reserved;
 } ogb3_recovery_asset;
-/* Defaults are the bounded alpha; callers may lower limits only. Sparse slots
+/* Defaults come from the shared build capacity profile; callers may lower limits. Sparse slots
  * and tree nodes are separate from live counts. build_target is filled by
  * config_default from the embedded verified native
  * source/config/compiler/target/FP identity. Catalog creation rejects

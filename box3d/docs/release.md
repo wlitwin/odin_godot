@@ -1,5 +1,10 @@
 # Box3D release procedure
 
+The fixed-count measurements in this record describe the legacy qualification
+profile. Current world capacities are selected through
+[the shared capacity profile](../../docs/box3d/capacities.md); recorded timings and
+artifacts are not reclassified by changing those settings.
+
 Release a declared candidate with separate Kit and Replay evidence. A completed
 local phase, exported smoke test or diagnostic bundle does not certify every
 platform/workload or authorize distribution. Keep previous artifacts and FAILs.

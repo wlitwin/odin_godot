@@ -3,6 +3,7 @@ package box3d_authoring_frameworks_test
 // Actual Native + existing framework APIs; standalone nilOwner/static linkage.
 // The separate Godot authoring fixture covers SDK extraction/resource lifetimes.
 import "core:mem"
+import "core:fmt"
 import "core:testing"
 import b "godot:box3d"
 import bd "godot:box3d/diagnostics"
@@ -284,14 +285,20 @@ replay_authored_six_shapes_and_sensor_canonical_welcome_and_confirmation :: proc
     }
 
     defer ba.destroy(&scene)
-    cfg, ce := rp.authoring_config(&scene)
+    replay_network_scene(t, &scene)
+}
+
+// Shared test driver: exercise the existing runner/transport for either the
+// small authoring fixture or a larger scene, including multi-pump welcomes.
+replay_network_scene :: proc(t: ^testing.T, scene: ^ba.Baked_Scene, minimum_parts: int = 1) {
+    cfg, ce := rp.authoring_config(scene)
     testing.expect_value(t, ce, r.Error.None)
 
     if ce != .None {
         return
     }
 
-    built, build_error := ba.build(&scene, PROFILE)
+    built, build_error := ba.build(scene, PROFILE)
     testing.expect_value(t, build_error.error, ba.Error.None)
 
     if build_error.error != .None {
@@ -322,7 +329,7 @@ replay_authored_six_shapes_and_sensor_canonical_welcome_and_confirmation :: proc
         return
     }
 
-    ba.destroy(&scene)
+    ba.destroy(scene)
     memory := new(tr.Memory)
     defer free(memory)
 
@@ -380,11 +387,40 @@ replay_authored_six_shapes_and_sensor_canonical_welcome_and_confirmation :: proc
     testing.expect_value(t, rn.client_pump(client, 0), rn.Error.None)
     tr.memory_advance(memory, 0)
     testing.expect_value(t, rn.server_pump(server, 0), rn.Error.None)
-    testing.expect_value(t, rn.server_step(server), rn.Error.None)
-    tr.memory_advance(memory, 0)
-    testing.expect_value(t, rn.client_pump(client, 0), rn.Error.None)
-    tr.memory_advance(memory, 0)
-    _ = rn.server_pump(server, 0)
+    first_step_error := rn.server_step(server)
+    testing.expect(
+        t,
+        first_step_error == .None,
+        fmt.tprintf("net=%v frame=%v memory=%v", first_step_error, server.frame_error, rp.allocation_stats()),
+    )
+
+    if first_step_error != .None {
+        return
+    }
+
+    largest := 0
+
+    for tx in server.physics.tx {
+        largest = max(largest, (len(tx.data.bytes) + rn.COMPLETE_PART_BYTES - 1) / rn.COMPLETE_PART_BYTES)
+    }
+
+    testing.expect(t, largest >= minimum_parts)
+    welcome_now := u64(0)
+
+    for pump in 0 ..< 256 {
+        now := u64(pump * 17)
+        welcome_now = now
+        tr.memory_advance(memory, now)
+        testing.expect_value(t, rn.client_pump(client, now), rn.Error.None)
+        tr.memory_advance(memory, now)
+        testing.expect_value(t, rn.server_pump(server, now), rn.Error.None)
+
+        if client.phase == .Running {
+            break
+        }
+    }
+
+    testing.expect(t, client.phase == .Running)
 
     if !replay_same(t, server, client, codec, 1) {
         return
@@ -395,12 +431,12 @@ replay_authored_six_shapes_and_sensor_canonical_welcome_and_confirmation :: proc
         testing.expect_value(t, rn.server_step(server), rn.Error.None)
 
         for _ in 0 ..< 4 {
-            tr.memory_advance(memory, tick * 17)
-            testing.expect_value(t, rn.client_pump(client, tick * 17), rn.Error.None)
+            tr.memory_advance(memory, welcome_now + tick * 17)
+            testing.expect_value(t, rn.client_pump(client, welcome_now + tick * 17), rn.Error.None)
             changes: [512]view.Change(rn.Net_Event(u8))
             view.drain(&client.journal, changes[:])
-            tr.memory_advance(memory, tick * 17)
-            _ = rn.server_pump(server, tick * 17)
+            tr.memory_advance(memory, welcome_now + tick * 17)
+            _ = rn.server_pump(server, welcome_now + tick * 17)
 
             if client.timeline.confirmed >= tick {
                 break

@@ -1,6 +1,8 @@
 // Detached authoring definitions. No Godot/Owner/native handle is durable data.
 package box3d_authoring
 
+import bcap "godot:box3d/limits"
+
 import "core:mem"
 import b "godot:box3d"
 import bd "godot:box3d/diagnostics"
@@ -10,7 +12,7 @@ Native_Vec3 :: b.Vec3
 
 LEGACY_SCHEMA_VERSION :: 1
 SCHEMA_VERSION :: 2
-MAX_JOINTS :: 1
+MAX_JOINTS :: bcap.MAX_JOINTS
 MAX_CHARACTERS :: MAX_BODIES
 MAX_KEY_BYTES :: 128
 MAX_BODIES :: b.ALPHA_TOTAL_BODIES
@@ -20,7 +22,7 @@ MAX_VERTICES :: 4096
 MAX_HULL_POINTS :: 256
 MAX_INDICES :: 24576
 MAX_GRID_SIDE :: 64
-MAX_DEFINITION_BYTES :: 2 * 1024 * 1024
+MAX_DEFINITION_BYTES :: bcap.DTO_BYTES
 
 Pose_Input :: struct {
     position: [3]f32,

@@ -8,6 +8,7 @@
 #ifndef OGB3_API_H
 #define OGB3_API_H
 #include <stdint.h>
+#include "capacity.h"
 #if defined(__GNUC__)
 #define OGB3_API __attribute__((visibility("default")))
 #else
@@ -17,6 +18,7 @@
 extern "C" {
 #endif
 typedef int32_t ogb3_status;
+OGB3_API uint64_t ogb3_capacity_fingerprint(void);
 enum {
   OGB3_OK = 0,
   OGB3_INVALID_ARGUMENT = 1,
@@ -173,7 +175,7 @@ OGB3_API ogb3_status ogb3_engine_allocation_stats(ogb3_allocation_stats *);
  */
 #define OGB3_DOMAIN_CONTRACT_VERSION 1u
 #define OGB3_HOST_OWNER_CAPACITY 256u
-#define OGB3_HOST_LIMIT_BYTES UINT64_C(67108864)
+#define OGB3_HOST_LIMIT_BYTES ((uint64_t)OGB3_MEMORY_BYTES)
 typedef struct {
   uint64_t cookie;
   uint32_t size, version, abi_version, logical_version, resource_version,

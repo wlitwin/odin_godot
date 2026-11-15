@@ -21,15 +21,18 @@ manifest=json.loads(manifest_bytes)
 import sys
 sys.path.insert(0,str(repo/'build'))
 from box3d_source import prepare_source
+import box3d_capacity as capacity
+capacity.check_generated()
+capacity_profile=capacity.load(os.environ.get('BOX3D_CAPACITY_PROFILE'))
 source=prepare_source(repo,cache,manifest)
 def run(*args,**kw): return subprocess.run(args,check=True,**kw)
 def digest(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 def native_inputs():
     paths=[p for p in (repo/'box3d/native').rglob('*') if p.is_file()]
-    paths += [repo/'box3d/dependency.json',repo/'build/build_box3d.sh',repo/'build/box3d_source.py']
+    paths += [repo/'box3d/dependency.json',repo/'box3d/capacity.json',repo/'build/box3d_capacity.py',repo/'build/build_box3d.sh',repo/'build/box3d_source.py']
     for test in sorted((repo/'tests/box3d_soak/native_observe').rglob('*')):
         if test.is_file() and test.suffix in ('.c','.h'): paths.append(test)
-    for directory in ['tests/box3d_native','tests/box3d_recovery','tests/box3d_modules/native','tests/box3d_authoring/native','tests/box3d_motion/native','tests/box3d_upgrade']:
+    for directory in ['tests/box3d_capacity/native','tests/box3d_native','tests/box3d_recovery','tests/box3d_modules/native','tests/box3d_authoring/native','tests/box3d_motion/native','tests/box3d_upgrade']:
         for test in sorted((repo/directory).rglob('*')):
             if test.is_file() and (test.suffix in ('.c','.h','.py') or test.name=='fields.json'): paths.append(test)
     return {str(p.relative_to(repo)):digest(p) for p in sorted(paths)}
@@ -42,7 +45,7 @@ if any(arg in ['-S','-B','--build','--install'] or arg.startswith(('-S','-B')) f
     raise SystemExit('CMAKE_ARGS may not override driver source/output paths')
 # Required provenance/configuration options follow user options so accidental
 # duplicate -D values cannot select an unverified engine source tree.
-run('cmake','-S',str(repo/'box3d/native'),'-B',str(build),*extra,
+run('cmake','-S',str(repo/'box3d/native'),'-B',str(build),*extra,*capacity.cmake_flags(capacity_profile),
     '-DCMAKE_BUILD_TYPE='+config,'-DOGB3_ENGINE_SOURCE='+str(source),'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
 commands=json.loads((build/'compile_commands.json').read_text())
 # Verify effective commands retain FP and assertions; extra flags cannot silently
@@ -71,6 +74,7 @@ test_names=[t['name'] for t in json.loads(subprocess.check_output(['ctest','--te
 if test_names: run('ctest','--test-dir',str(build),'--output-on-failure')
 if native_inputs()!=inputs_before: raise SystemExit('native inputs changed during build; rerun for coherent evidence')
 metadata={'schema_version':1,'host':platform.platform(),'machine':platform.machine(),'configuration':config,
+    'capacity_profile':capacity_profile,'capacity_fingerprint':capacity.fingerprint(capacity_profile),
     'native_observation_enabled': 'OGB3_NATIVE_OBSERVATION:BOOL=ON' in (build/'CMakeCache.txt').read_text().splitlines(),
     'dependency_manifest':manifest,'resolved_simulation_macros':resolved,'dependency_manifest_sha256':digest(repo/'box3d/dependency.json'),
     'compiler_version':subprocess.check_output([shlex.split(commands[0]['command'])[0],'--version'],text=True).strip(),
