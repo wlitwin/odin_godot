@@ -33,6 +33,7 @@ receiver_init :: proc(
         r,
         nil,
         model.complete_codec.transfer_budget.user,
+        required = #config(BOX3D_REQUIRE_DOMAIN, false) && model.complete_state,
     ); error != .None {
         return error
     }
@@ -282,12 +283,25 @@ receiver_ownership_check :: proc(
     model_data, policy_data: rawptr,
     access: replay.Owner_Access = .Execute,
 ) -> Error {
-    managed := !replay.owner_is_nil(ownership.transfer.container.owner)
+    managed :=
+        !replay.owner_is_nil(ownership.transfer.container.owner) ||
+        !replay.owner_is_nil(ownership.model.owner) ||
+        !replay.owner_is_nil(ownership.policy.owner) ||
+        !replay.owner_is_nil(ownership.codec.allocator.owner) ||
+        !replay.owner_is_nil(ownership.codec.data_context.owner)
 
     when #config(BOX3D_REQUIRE_DOMAIN, false) {
-        if !managed {
+        if model.complete_state && !managed {
             return .Invalid_Config
         }
+    }
+
+    if managed &&
+       (replay.owner_is_nil(ownership.transfer.container.owner) ||
+               replay.owner_is_nil(ownership.transfer.allocator.owner) ||
+               replay.owner_is_nil(ownership.codec.allocator.owner) ||
+               replay.owner_is_nil(ownership.codec.data_context.owner)) {
+        return .Invalid_Config
     }
 
     if replay.owned_context_access(ownership.model, model_data, managed, access) != .None ||

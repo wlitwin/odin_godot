@@ -50,13 +50,8 @@ checkpoint_codec_init_owned :: proc(
         return .Invalid_Config
     }
 
-    if error := container_acquire(
-        &c.lifetime,
-        ownership,
-        allocator,
-        temporary ? nil : rawptr(c),
-        #config(BOX3D_REQUIRE_DOMAIN, false),
-    ); error != .None {
+    if error := container_acquire(&c.lifetime, ownership, allocator, temporary ? nil : rawptr(c), false);
+       error != .None {
         checkpoint_codec_destroy(c)
         return error
     }
@@ -121,6 +116,19 @@ checkpoint_codec_matches :: proc(c: ^Checkpoint_Codec, $S, $C, $A, $E: typeid, $
         c.types[1] == C &&
         c.types[2] == A &&
         c.types[3] == E \
+    )
+}
+
+// Complete recovery retains cached metadata independently of its producer.
+// Ordinary value-only schemas can instead have a caller-scoped lifetime.
+@(private)
+checkpoint_codec_managed :: proc(c: ^Checkpoint_Codec) -> bool {
+    return(
+        c != nil &&
+        !r.owner_is_nil(c.lifetime.ownership.allocator.owner) &&
+        !r.owner_is_nil(c.lifetime.ownership.data_context.owner) &&
+        container_access(&c.lifetime) == .None &&
+        owned_context_check(c.lifetime.ownership.data_context, c, true, .Read) == .None \
     )
 }
 
@@ -367,7 +375,7 @@ checkpoint_decode_protocol :: proc(
         ownership,
         allocator,
         ownership.data_context.data,
-        #config(BOX3D_REQUIRE_DOMAIN, false),
+        #config(BOX3D_REQUIRE_DOMAIN, false) && complete_identity != nil,
     ); error != .None {
         checkpoint_destroy(&tmp)
         return error

@@ -514,13 +514,19 @@ ownership_entry :: proc(
     allocator: mem.Allocator,
     container, wire, accept, schema, budget: rawptr,
     access: r.Owner_Access = .Execute,
+    required: bool = false,
 ) -> Error {
-    managed := !r.owner_is_nil(owned.allocator.owner) || !r.owner_is_nil(owned.container.owner)
+    managed := required
 
-    when #config(BOX3D_REQUIRE_DOMAIN, false) {
-        if !managed {
-            return .Invalid_Config
-        }
+    for binding in ([?]r.Owned_Context {
+            owned.allocator,
+            owned.container,
+            owned.wire,
+            owned.accept,
+            owned.schema,
+            owned.budget,
+        }) {
+        managed = managed || !r.owner_is_nil(binding.owner)
     }
 
     if managed {
@@ -575,6 +581,7 @@ ownership_validate :: proc(
     owned: Ownership,
     allocator: mem.Allocator,
     container, wire, accept, schema, budget: rawptr,
+    required: bool = false,
 ) -> Error {
-    return ownership_entry(owned, allocator, container, wire, accept, schema, budget)
+    return ownership_entry(owned, allocator, container, wire, accept, schema, budget, required = required)
 }

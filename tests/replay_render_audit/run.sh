@@ -7,7 +7,7 @@ pids=()
 render_audit_finish() {
     local result=$?
     trap - EXIT
-    for pid in "${pids[@]}"; do
+    for pid in ${pids[@]+"${pids[@]}"}; do
         kill "$pid" 2>/dev/null || true
         wait "$pid" 2>/dev/null || true
     done

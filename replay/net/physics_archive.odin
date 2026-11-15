@@ -23,6 +23,12 @@ checkpoint_encode_physics :: proc(
     []u8,
     Error,
 ) {
+    when #config(BOX3D_REQUIRE_DOMAIN, false) {
+        if codec != nil && !checkpoint_codec_managed(codec) {
+            return nil, .Invalid_Model
+        }
+    }
+
     if !checkpoint_valid(cp, model) {
         return nil, .Invalid_Checkpoint
     }
@@ -125,6 +131,12 @@ checkpoint_decode_physics :: proc(
     codec: ^Checkpoint_Codec,
     ownership: Container_Ownership,
 ) -> Error {
+    when #config(BOX3D_REQUIRE_DOMAIN, false) {
+        if codec != nil && !checkpoint_codec_managed(codec) {
+            return .Invalid_Model
+        }
+    }
+
     if !checkpoint_empty(cp) {
         return .Wrong_Phase
     }

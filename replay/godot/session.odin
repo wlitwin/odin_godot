@@ -362,7 +362,7 @@ session_backup_receipt :: proc(s: ^Session($State, $Control, $Action, $Event, $S
         return session_link(s).outgoing.acknowledged, session_link(s).outgoing.acknowledged.archive.sequence != 0
     }
 
-    return rec.receiver_latest(session_link(s).incoming)
+    return rec.receiver_latest(&session_link(s).incoming)
 }
 
 @(private)

@@ -598,6 +598,10 @@ container_acquire :: proc(
     context_data: rawptr = nil,
     required: bool = false,
 ) -> Error {
+    // Declaring either half opts this container into the full ownership contract.
+    // Value-only callers may use their ordinary scoped lifetime with no owners.
+    required := required || !r.owner_is_nil(ownership.allocator.owner) || !r.owner_is_nil(ownership.data_context.owner)
+
     if required && r.owner_is_nil(ownership.allocator.owner) {
         return .Invalid_Model
     }

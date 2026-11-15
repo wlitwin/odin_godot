@@ -47,6 +47,20 @@ sender_publish :: proc(
     }
 
     if model.complete_state {
+        if tf.ownership_validate(
+               s.ownership,
+               s.allocator,
+               s,
+               s.wire.user,
+               nil,
+               s.layout.schema,
+               s.budget.hooks.user,
+               required = #config(BOX3D_REQUIRE_DOMAIN, false),
+           ) !=
+           .None {
+            return .Invalid_Config
+        }
+
         if model.complete_codec.transfer_budget.reserve == nil {
             return .Invalid_Config
         }

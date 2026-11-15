@@ -359,6 +359,33 @@ link_target :: proc(
         return .Checkpoint_Policy
     }
 
+    owned := l.ownership.outgoing
+    owned.wire = l.background_owner
+
+    when #config(BOX3D_REQUIRE_DOMAIN, false) {
+        if server.model.complete_state {
+            if r.owner_is_nil(l.ownership.container.owner) ||
+               r.owner_is_nil(l.ownership.codec.allocator.owner) ||
+               r.owner_is_nil(l.ownership.codec.data_context.owner) {
+                return .Invalid_Model
+            }
+
+            if tf.ownership_validate(
+                   owned,
+                   l.allocator,
+                   &l.outgoing,
+                   l.background.user,
+                   nil,
+                   nil,
+                   nil,
+                   required = true,
+               ) !=
+               .None {
+                return .Invalid_Model
+            }
+        }
+    }
+
     if !l.publish_codec.ready {
         if err := net.checkpoint_codec_init(
             &l.publish_codec,
@@ -380,9 +407,6 @@ link_target :: proc(
         if sender_destroy(&l.outgoing) != .None {
             return .Wrong_Phase
         }
-
-        owned := l.ownership.outgoing
-        owned.wire = l.background_owner
 
         if sender_init(&l.outgoing, scope, peer, l.background, l.cfg.transfer, l.allocator, ownership = owned) !=
            .None {
