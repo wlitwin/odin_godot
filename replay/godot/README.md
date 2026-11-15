@@ -16,6 +16,7 @@ presentation.
 | [`godot:replay/godot/storage`](storage/README.md) | `storagegd` | Files, browser stores, persistent profiles, tokens and archive encoding |
 | [`godot:replay/godot/transport`](transport/README.md) | `transportgd` | Direct ENet, RTC, Steam and WebSocket adapters |
 | [`godot:replay/godot/debug`](debug/README.md) | `debuggd` | Optional overlays, history inspection, recording, playback and telemetry |
+| [`godot:replay/godot/physics`](physics/README.md) | `physicsgd` | Copied presentation frames from complete Box3D checkpoints; requires the backend |
 
 Start with the root import for a Session or Room. Its selected transport is
 managed internally; using Session does not require driving a transport adapter.
@@ -23,6 +24,11 @@ Add a feature import when the game directly creates or manages its types.
 Scene, input and debug packages extend the lifecycle package. Storage and
 transport are independent foundations. The internal wire helpers are implementation
 details shared by the lifecycle and transport packages.
+
+Root Session and ordinary scene/input/debug imports do not link a Box3D backend.
+Add the physics feature only when reading complete Box3D checkpoint body state.
+Its `physics_presentation_frame` procedure retains its arguments and ownership
+checks; change the qualifier from `replaygd` to `physicsgd` when importing it.
 
 ### Migrating the earlier single-package API
 

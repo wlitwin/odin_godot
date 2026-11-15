@@ -21,10 +21,9 @@ import "core:strings"
 // DWARF/compact-unwind tables (the same info lldb uses) and recovers the full chain even
 // with frame pointers omitted. (Verified: backtrace()=1 frame vs _Unwind_Backtrace=full.)
 //
-// `dladdr`'s `dli_sname` for an Odin proc built with `-debug` is already readable, e.g.
-// `showcase_scripts::coin_collect` (verified: `nm libodinscripts.dylib | grep coin_collect`
-// lists `_showcase_scripts::coin_collect`; dladdr strips the leading underscore). That IS
-// the "function" Godot wants. Source line numbers need DWARF resolution (out of scope) —
+// Darwin's dladdr can name local Odin symbols. On glibc, dladdr supplies the
+// owning image while the preloaded ELF function table supplies internalized
+// `pkg::proc` names. Source line numbers need DWARF resolution —
 // we report line 0 and use the dll path as "source". (See docs/debugging.md.)
 // ----------------------------------------------------------------------------
 
@@ -76,7 +75,7 @@ unwind_collect :: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32 {
 }
 
 // debug_capture_odin_stack walks the native stack and returns a Godot `Array` of
-// `Dictionary{ "function": String, "line": int(0), "source": String }`, one per frame
+// `Dictionary{ "function": String, "line": int(0), "file": String }`, one per frame
 // that belongs to the scripts dll, OUTERMOST script frame first (call order). This is the
 // exact shape Godot expects back from `_debug_get_current_stack_info`. The returned Array
 // is owned by the caller (the engine copies it out of the `ret` slot).
@@ -84,6 +83,8 @@ unwind_collect :: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32 {
 // `skip` drops the innermost N frames (this proc + the unwind callback + the virtual
 // trampoline) so the reported chain starts at real script code.
 debug_capture_odin_stack :: proc(skip := 0) -> godot.Array {
+    debug_symbol_read_begin()
+    defer debug_symbol_read_end()
     arr := godot.new_array_default()
 
     col: Stack_Collector
@@ -111,12 +112,26 @@ debug_capture_odin_stack :: proc(skip := 0) -> godot.Array {
             continue
         }
 
-        if info.dli_sname == nil || info.dli_fname == nil {
+        if info.dli_fname == nil {
+            continue
+        }
+
+        // glibc's dladdr sees dynamic exports only. The loader's immutable ELF
+        // cache also covers local Odin procedures internalized by LLVM.
+        symbol, _ := debug_symbol_lookup(col.addrs[i], &info)
+
+        when ODIN_OS == .Darwin {
+            if symbol == nil {
+                symbol = info.dli_sname
+            }
+        }
+
+        if symbol == nil {
             continue
         }
 
         fname := string(info.dli_fname)
-        sym := string(info.dli_sname)
+        sym := string(symbol)
         // Keep ONLY frames that live in the scripts dll. Odin script procs additionally
         // carry a `pkg::proc` symbol (the `::` check), so engine / libc / core frames —
         // different dll, no `::` — fall away and the engine sees just the Odin chain.
@@ -128,7 +143,7 @@ debug_capture_odin_stack :: proc(skip := 0) -> godot.Array {
         }
 
         frames[count] = Frame {
-            sym   = info.dli_sname,
+            sym   = symbol,
             fname = info.dli_fname,
         }
         count += 1
@@ -163,7 +178,8 @@ debug_capture_odin_stack :: proc(skip := 0) -> godot.Array {
     return arr
 }
 
-// Build one `{ "function", "line", "source" }` Dictionary for a stack frame.
+// Godot 4.7 reads `file`; keep `source` as an additional observation for clients
+// that already inspected that key on the returned dictionary.
 @(private = "file")
 debug_make_frame_dict :: proc(symbol: cstring, source: cstring) -> godot.Dictionary {
     d := godot.new_dictionary_default()
@@ -182,6 +198,7 @@ debug_make_frame_dict :: proc(symbol: cstring, source: cstring) -> godot.Diction
     set(&d, "line", godot.variant_from_int(&line))
 
     src_s := godot.new_string_cstring(source)
+    set(&d, "file", godot.variant_from_string(&src_s))
     set(&d, "source", godot.variant_from_string(&src_s))
 
     return d

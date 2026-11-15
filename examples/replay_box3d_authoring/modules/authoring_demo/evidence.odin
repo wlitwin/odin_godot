@@ -1,5 +1,6 @@
 package replay_authoring_demo
 
+import physicsgd "godot:replay/godot/physics"
 import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
@@ -206,7 +207,12 @@ publish_presentation :: proc(self: ^ReplayAuthoringDemo) {
     defer r.complete_checkpoint_destroy(&checkpoint)
     revision :=
         self.hosting ? u64(0) : self.state.session.client.view_reset + self.state.session.client.stats.corrections
-    frame, projection_error, owner_error := rgd.physics_presentation_frame(&checkpoint, project, revision, .Confirmed)
+    frame, projection_error, owner_error := physicsgd.physics_presentation_frame(
+        &checkpoint,
+        project,
+        revision,
+        .Confirmed,
+    )
 
     if owner_error != .None || projection_error != .None {
         error_set(self, "presentation.complete_frame")

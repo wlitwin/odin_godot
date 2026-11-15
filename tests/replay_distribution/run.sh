@@ -30,6 +30,25 @@ for pid in "${pids[@]}";do wait "$pid";done;pids=()
 for role in host client observer;do rg -q "REPLAY_PACKAGE_NETWORK_OK role=$role" "$work/$role.log";done
 if rg -q 'REPLAY_PACKAGE_FAIL|REPLAY_STARTER_ERROR|SCRIPT ERROR|ERROR:|instances were leaked|resources still in use' "$work"/solo.log "$work"/host.log "$work"/client.log "$work"/observer.log "$work"/import.log;then exit 1;fi
 odin check "$project/scripts" -collection:godot="$addon" -target:freestanding_wasm32 -no-entry-point -custom-attribute:gd_method
+python3 - "$ROOT" "$project" "$work" <<'PY'
+from pathlib import Path
+import hashlib,json,sys
+root,project,out=map(Path,sys.argv[1:]);addon=project/'addons/odin_godot'
+for name in ['core','godot','gdext','libgd','runtime','decl','flow','flowgd','events','kit','play','replay','box3d','scriptgen','template','build','docs']:
+ assert (addon/name/'.gdignore').exists(),name
+for p in (addon/'replay').rglob('*.odin'):
+ assert p.read_bytes()==(out/'source'/p.relative_to(addon)).read_bytes(),p
+source_refs=[]
+for p in project.rglob('*.odin'):
+ if str(root) in p.read_text(errors='replace'):source_refs.append(str(p.relative_to(project)))
+assert not source_refs,source_refs
+(out/'result.json').write_text(json.dumps({'addon':str(addon),'solo':True,'browser':False,'network_roles':['host','client','observer'],'original_checkout_references':source_refs,'replay_files':len(list((addon/'replay').rglob('*.odin')))},indent=2)+'\n')
+print('REPLAY_PACKAGE_ISOLATED_OK')
+PY
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 cp "$ROOT/tests/replay_distribution/browser_probe.gd" "$ROOT/tests/replay_distribution/browser_test.tscn" "$project/"
 python3 - "$project/project.godot" <<'PY'
 from pathlib import Path
@@ -44,19 +63,10 @@ port=$((21000+RANDOM%9000))
 bash "$addon/build/serve.sh" "$project/out" "$port" >"$work/http.log" 2>&1 &pids+=("$!")
 for _ in {1..100};do if curl -fsS -o /dev/null "http://127.0.0.1:$port/index.html" 2>/dev/null;then break;fi;sleep 0.1;done
 node "$ROOT/tests/replay_distribution/drive.mjs" "http://127.0.0.1:$port/index.html" "$work"
-python3 - "$ROOT" "$project" "$work" <<'PY'
+python3 - "$work/result.json" <<'PY'
 from pathlib import Path
-import hashlib,json,sys
-root,project,out=map(Path,sys.argv[1:]);addon=project/'addons/odin_godot'
-for name in ['core','godot','gdext','libgd','runtime','decl','flow','flowgd','events','kit','play','replay','scriptgen','template','build','docs']:
- assert (addon/name/'.gdignore').exists(),name
-for p in (addon/'replay').rglob('*.odin'):
- assert p.read_bytes()==(out/'source'/p.relative_to(addon)).read_bytes(),p
-source_refs=[]
-for p in project.rglob('*.odin'):
- if str(root) in p.read_text(errors='replace'):source_refs.append(str(p.relative_to(project)))
-assert not source_refs,source_refs
-(out/'result.json').write_text(json.dumps({'addon':str(addon),'solo':True,'browser':True,'network_roles':['host','client','observer'],'original_checkout_references':source_refs,'replay_files':len(list((addon/'replay').rglob('*.odin')))},indent=2)+'\n')
-print('REPLAY_PACKAGE_ISOLATED_OK')
+import json,sys
+p=Path(sys.argv[1]);result=json.loads(p.read_text());result['browser']=True
+p.write_text(json.dumps(result,indent=2)+'\n')
 PY
 echo REPLAY_DISTRIBUTION_OK

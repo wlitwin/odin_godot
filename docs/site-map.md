@@ -118,7 +118,7 @@ the whole map or use your browser's Find command to locate a subject.
 | --- | --- |
 | [Replay overview](replay/index.md) | World, frames, occurrences, runners, and runtime owners |
 | [Correct an inventory transfer](replay/quickstart.md) | Local history, input revision, entity lifetime, and replay |
-| [Connect a Godot session](replay/godot.md) | Starter setup, native dependencies, solo play, host, client, and observer |
+| [Connect a Godot session](replay/godot.md) | Value-only starter setup, solo play, host, client, and observer |
 | [World and history](replay/architecture.md) | Restorable values, transactions, pools, handles, RNG, and confirmation |
 | [Networking](replay/networking.md) | Authority, controls, actions, transports, prediction scope, and correction |
 | [Presentation](replay/presentation.md) | Copied frames, interpolation, and effect Begin, Update, Confirm, and Cancel changes |

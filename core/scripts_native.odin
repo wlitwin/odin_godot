@@ -177,6 +177,7 @@ Script_Generation :: struct {
     retired:       bool,
     desc_tokens:   [dynamic]uintptr,
     box3d_service: bg.Service,
+    debug_symbols: rawptr,
 }
 
 @(private)
@@ -233,6 +234,7 @@ script_generation_create :: proc(
         return nil
     }
 
+    script_debug_symbols_register(gen)
     append(&g_script_generations, gen)
     return gen
 }
@@ -377,6 +379,7 @@ script_generations_collect_at_gate :: proc() {
             }
         }
 
+        script_debug_symbols_retire(gen)
         delete(gen.desc_tokens)
         delete(gen.module_name)
         delete(gen.reload_path)

@@ -20,6 +20,7 @@
 set -uo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/examples/cavecrawl"
 
 # A failed build MUST kill the run here — this script has no `set -e` (the
@@ -29,7 +30,7 @@ if ! bash "$ROOT/build/build_scripts.sh" "$PROJ"; then
 	echo "CAVECRAWL_FAIL: script build failed"
 	exit 1
 fi
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 FSLP_PROJ="$PROJ"
 FSLP_DRIVER="cave_test.gd"

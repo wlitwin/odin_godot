@@ -15,6 +15,6 @@ SDK, and runs it against the prebuilt core in Godot. `--web-build` also links th
 packaged core and starter into a WebAssembly side module. It retains logs and a
 report; the web build is separate from browser runtime validation.
 
-Box3D backends and the current Replay Session starter require the source-checkout
-setup documented in the archive. This check does not substitute a backend or
-claim their native adapter is self-contained in the downloaded addon.
+Box3D games require the backend setup documented in the archive. The value-only
+Replay Session starter has no Box3D link dependency. This check does not
+substitute a native backend when testing the ordinary Hello starter.

@@ -3,9 +3,10 @@
 # Reuses the showcase project's built dlls. Prints SAVE_TEST_OK.
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/showcase"
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 # Assert the format-on-save path only where odinfmt exists (it ships with ols; the nix
 # dev shell has it). Elsewhere the save test still covers the raw write path.

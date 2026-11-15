@@ -26,6 +26,7 @@ import "core:fmt"
 import "core:os"
 import "core:strconv"
 import "core:strings"
+import symbols "godot:core/debug_symbols"
 
 when ODIN_OS == .Darwin {
     foreign import libsys "system:System"
@@ -73,6 +74,11 @@ collect_cb :: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32 {
 // is an Odin `pkg::proc`. Returns the list of kept symbol names.
 @(optimization_mode = "none")
 filter_odin_frames :: proc(allocator := context.allocator) -> [dynamic]string {
+    when ODIN_OS == .Linux {
+        symbols.read_begin()
+        defer symbols.read_end()
+    }
+
     out := make([dynamic]string, allocator)
     c: Collector
     _Unwind_Backtrace(collect_cb, &c)
@@ -80,11 +86,23 @@ filter_odin_frames :: proc(allocator := context.allocator) -> [dynamic]string {
     for i in 0 ..< c.n {
         info: Dl_info
 
-        if dladdr(c.addrs[i], &info) == 0 || info.dli_sname == nil {
+        if dladdr(c.addrs[i], &info) == 0 {
             continue
         }
 
-        sym := string(info.dli_sname)
+        name := info.dli_sname
+
+        when ODIN_OS == .Linux {
+            if local, _ := symbols.cached_lookup(uintptr(c.addrs[i]), uintptr(info.dli_fbase)); local != nil {
+                name = local
+            }
+        }
+
+        if name == nil {
+            continue
+        }
+
+        sym := string(name)
 
         if strings.contains(sym, "::") {
             append(&out, sym)
@@ -122,6 +140,20 @@ sim_game_iteration :: proc() {
 }
 
 main :: proc() {
+    when ODIN_OS == .Linux {
+        own: Dl_info
+
+        if dladdr(cast(rawptr)sim_game_iteration, &own) == 0 || own.dli_fname == nil {
+            fmt.println("BTPROBE_FAIL: own image not found")
+            os.exit(1)
+        }
+
+        if symbols.register(string(own.dli_fname), uintptr(own.dli_fbase)) == nil {
+            fmt.println("BTPROBE_FAIL: own ELF local symbols unavailable")
+            os.exit(1)
+        }
+    }
+
     // ---- Part 1: live backtrace of our own call chain ----
     sim_collect_fp = sim_coin_collect
     sim_step_fp = sim_player_step
@@ -183,17 +215,41 @@ main :: proc() {
         os.exit(1)
     }
 
+    when ODIN_OS == .Linux {
+        if base_info.dli_fname == nil ||
+           symbols.register(string(base_info.dli_fname), uintptr(base_info.dli_fbase)) == nil {
+            fmt.println("BTPROBE_FAIL: script ELF local symbols unavailable")
+            os.exit(1)
+        }
+
+        symbols.read_begin()
+        defer symbols.read_end()
+    }
+
     // +8: an address strictly INSIDE the proc (mirrors a faulting pc, and keeps a
     // boundary symbol's end address from resolving to whatever proc follows it).
     addr := rawptr(uintptr(base_info.dli_fbase) + uintptr(file_addr) + 8)
     info: Dl_info
 
-    if dladdr(addr, &info) == 0 || info.dli_sname == nil || info.dli_fname == nil {
+    if dladdr(addr, &info) == 0 || info.dli_fname == nil {
         fmt.println("BTPROBE_FAIL: dladdr failed on coin_collect address")
         os.exit(1)
     }
 
-    sname := string(info.dli_sname)
+    name := info.dli_sname
+
+    when ODIN_OS == .Linux {
+        if local, _ := symbols.cached_lookup(uintptr(addr), uintptr(info.dli_fbase)); local != nil {
+            name = local
+        }
+    }
+
+    if name == nil {
+        fmt.println("BTPROBE_FAIL: local function name unavailable")
+        os.exit(1)
+    }
+
+    sname := string(name)
     fname := string(info.dli_fname)
     fmt.printf("BTPROBE part2 dli_sname=%s dli_fname=%s\n", sname, fname)
 

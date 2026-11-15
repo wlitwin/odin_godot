@@ -5,6 +5,7 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/phase4"
 
 # The live test swaps this authored fixture to v2. Always start at v1, and restore both
@@ -26,7 +27,7 @@ trap restore_v1 EXIT
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 
 # Make the scripts dll path unambiguous for the core's dynlib load + reload.
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true

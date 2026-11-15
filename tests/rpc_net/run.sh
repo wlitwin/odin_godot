@@ -22,13 +22,14 @@
 set -uo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/rpc_net"
 LOGDIR="$PROJ/.runlogs"
 mkdir -p "$LOGDIR"
 
 # 1. Build the scripts dll (NetNode + boot) + the core dll, via the codegen pipeline.
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # 2. Write .godot/extension_list.cfg + import so the runtime loads the extension. (A SIGSEGV
 #    in Godot's headless editor doc-gen at import cleanup is a pre-existing engine issue.)

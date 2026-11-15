@@ -25,11 +25,11 @@ library beside Kit, and `template/replay/` as a separate starter project. See th
 and limitations.
 
 Box3D's source APIs, shared capacity profiles, and guides are included. Native
-Box3D and the current Replay Session starter use the
+Box3D games use the
 [source-checkout setup](https://wlitwin.github.io/odin_godot/box3d/building.html)
 to build and select a matching backend; this addon does not include prebuilt
-Box3D backends. The ordinary Hello starter and native-free Kit/Replay libraries
-use the bundled core directly.
+Box3D backends. The ordinary Hello and value-only Replay Session starters, along with
+native-free Kit/Replay libraries, use the bundled core directly.
 
 ---
 

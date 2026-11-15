@@ -8,3 +8,9 @@ macos.debug = "bin/hello.dylib"
 macos.release = "bin/hello.dylib"
 macos.debug.arm64 = "bin/hello.dylib"
 macos.release.arm64 = "bin/hello.dylib"
+
+linux.debug = "bin/hello.so"
+linux.release = "bin/hello.so"
+
+windows.debug = "bin/hello.dll"
+windows.release = "bin/hello.dll"

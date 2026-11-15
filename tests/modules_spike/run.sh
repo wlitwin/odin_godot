@@ -19,6 +19,7 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/modules_spike"
 # The export phase runs the headless EDITOR, whose OdinExportPlugin resolves the
 # collection root from the `odin_godot/root` setting -> ODIN_GODOT_ROOT env -> dladdr
@@ -37,14 +38,15 @@ LOG="$(mktemp)"
 TLOG="$(mktemp)"
 CLOG="$(mktemp)"
 ILOG="$(mktemp)"
-trap 'rm -f "$LOG" "$TLOG" "$CLOG" "$ILOG"; cleanup_generated' EXIT
+ELOG="$(mktemp)"
+trap 'rm -f "$LOG" "$TLOG" "$CLOG" "$ILOG" "$ELOG"; cleanup_generated' EXIT
 
 # Build core + the main module + the enemies module (v1).
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 
 # Make the MAIN scripts dll path unambiguous for the core's dynlib load; the module
 # dlls are discovered as its libodinscripts_<name> siblings.
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
@@ -164,23 +166,27 @@ echo "  ok  cross-module import rejected at build time with a clear message"
 # exit); it MUST be gone before exporting or the export build fails its isolation check.
 cleanup_generated
 
-APP="$PROJ/out/OdinGameModulesSpike.app"
-EXE="$APP/Contents/MacOS/OdinGodotModulesSpike"
+odin_godot_test_export_paths "$PROJ" OdinGameModulesSpike OdinGodotModulesSpike
+EXE="$ODIN_GODOT_TEST_EXPORTED_EXE"
 rm -rf "$PROJ/out" "$PROJ/.export_build"
 mkdir -p "$PROJ/out"
-"$GODOT" --headless --path "$PROJ" --export-release "macOS" "$APP" 2>&1 \
-    | grep -E "odin export:" || true
+if ! "$GODOT" --headless --path "$PROJ" --export-release "$ODIN_GODOT_TEST_EXPORT_PRESET" "$ODIN_GODOT_TEST_EXPORT_PATH" >"$ELOG" 2>&1; then
+    cat "$ELOG"
+    echo "MODULES_SPIKE_FAIL: native export failed"
+    exit 1
+fi
+grep -E "odin export:" "$ELOG" || true
 
 if [[ ! -x "$EXE" ]]; then
     echo "MODULES_SPIKE_FAIL: exported executable missing ($EXE)"
     exit 1
 fi
-if [[ ! -f "$APP/Contents/Frameworks/libodinscripts.dylib" ]]; then
-    echo "MODULES_SPIKE_FAIL: main scripts dll not bundled into Frameworks"
+if [[ ! -f "$ODIN_GODOT_TEST_EXPORTED_LIBDIR/libodinscripts.$ODIN_GODOT_TEST_LIB_EXT" ]]; then
+    echo "MODULES_SPIKE_FAIL: main scripts library not bundled into the native export"
     exit 1
 fi
-if [[ ! -f "$APP/Contents/Frameworks/libodinscripts_enemies.dylib" ]]; then
-    echo "MODULES_SPIKE_FAIL: enemies MODULE dll not bundled into Frameworks"
+if [[ ! -f "$ODIN_GODOT_TEST_EXPORTED_LIBDIR/libodinscripts_enemies.$ODIN_GODOT_TEST_LIB_EXT" ]]; then
+    echo "MODULES_SPIKE_FAIL: enemies module library not bundled into the native export"
     exit 1
 fi
 echo "  ok  export bundled BOTH dlls (libodinscripts + libodinscripts_enemies)"

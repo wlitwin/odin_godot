@@ -18,6 +18,10 @@ for script in mesh_probe_test glob_view_test area_view_test cast_path_test ordna
  RSY_PERSIST=0 ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext" "$GODOT" --headless --max-fps 60 --path "$project" --script "$script.gd" >"$work/$script.log" 2>&1
  if rg -q 'SCRIPT ERROR|ERROR:|WORKBENCH_FAIL|instances were leaked|resources still in use' "$work/$script.log";then cat "$work/$script.log";exit 1;fi
 done
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 ODIN_EXPORT_OPT=speed bash "$ROOT/build/build_web.sh" "$project" >"$work/web-build.log" 2>&1
 mkdir -p "$project/out";touch "$project/out/.gdignore"
 ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext" "$GODOT" --headless --path "$project" --export-release Web "$project/out/index.html" >"$work/export.log" 2>&1

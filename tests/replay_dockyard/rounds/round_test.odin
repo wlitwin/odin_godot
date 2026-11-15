@@ -1,5 +1,6 @@
 package dockyard_round_test
 
+import physicsgd "godot:replay/godot/physics"
 import "core:fmt"
 import "core:math"
 import "core:mem"
@@ -161,7 +162,7 @@ frame :: proc(t: ^testing.T, f: ^Fixture) -> (bp.Frame, bool) {
     }
 
     defer r.complete_checkpoint_destroy(&cp)
-    value, projection_error, owner_error := rgd.physics_presentation_frame(&cp, game.project, 0, .Confirmed)
+    value, projection_error, owner_error := physicsgd.physics_presentation_frame(&cp, game.project, 0, .Confirmed)
     return value, check(t, projection_error == .None && owner_error == .None, "actual copied Native poses")
 }
 

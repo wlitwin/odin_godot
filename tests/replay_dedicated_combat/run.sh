@@ -7,6 +7,10 @@ for mode in planned crash;do
  python3 "$ROOT/tests/replay_dedicated_combat/execute.py" "$work/native" "$work/native-$mode" "$mode"
  python3 "$ROOT/tests/replay_dedicated_combat/verify.py" "$work/native-$mode"
 done
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 bash "$ROOT/tests/replay_dedicated_combat/build_web.sh" "$work/web"
 for mode in planned crash;do
  python3 "$ROOT/tests/replay_dedicated_browser/execute.py" "$work/web" "$mode"

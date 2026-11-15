@@ -17,10 +17,10 @@ together, then measure that configuration with your World and workload.
 
 ## Platforms and transports
 
-The current `replay/godot` Session package imports the native Box3D presentation
-adapter. A fresh Session build requires a selected Box3D backend, including for
-games that do not simulate physics. The [Session tutorial](godot.md) includes
-this setup. The core local Timeline has no native physics dependency.
+The local Timeline and ordinary `replay/godot` Session/scene features have no
+native Box3D dependency. Complete native physics uses `replay/physics` and the
+optional `replay/godot/physics` checkpoint presentation reader, with the matching
+[backend setup](../box3d/building.md).
 
 The main Godot runtime coverage is macOS arm64 with Godot 4.7.1 and Chrome.
 Standalone WASM and translated x86 binaries have focused coverage; independent

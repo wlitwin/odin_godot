@@ -9,6 +9,7 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/codegen"
 
 # Build the scripts dll (Probe + boot) + the core dll via the codegen pipeline.
@@ -23,7 +24,7 @@ grep -q 'offset_of(BareProbe, health)' "$GEN" \
   || { echo "CODEGEN_FAIL: bare-import embed did not compose (no health descriptor in $GEN)"; exit 1; }
 
 # Make the scripts dll path unambiguous for the core's dynlib load.
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # Import and both assertion passes must finish without engine errors/leaks.
 work="${CODEGEN_LOGS:-$(mktemp -d)}"

@@ -23,11 +23,12 @@
 # ----------------------------------------------------------------------------
 set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/examples/quickdraw"
 LOGDIR="$PROJ/.qdlogs"
 
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null || { echo "QUICKDRAW_NATIVE_FAIL (build)"; exit 1; }
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # The launch/ready/reap plumbing is the kit harness; the phase structure and
 # every receipt below stay the acid's own.

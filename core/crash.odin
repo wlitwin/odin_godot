@@ -186,6 +186,7 @@ crash_reporter_install :: proc() {
     // Godot calls are legal HERE (not in the handler): fix the crash-report file path
     // now, into a static buffer the handler and the panic path can use allocation-free.
     crash_file_precompute_path()
+    debug_symbols_self_register()
 
     // Alternate signal stack: a STACK-OVERFLOW SIGSEGV leaves the faulting thread no
     // stack to run a handler on — without this the process just dies, report-less. A
@@ -245,21 +246,37 @@ cwrite_hex :: proc "c" (v: uintptr) {
     }
 }
 
-// One "  <addr>  <symbol> + <offset>  (<module>)" line via dladdr (Dl_info/dladdr are
-// declared package-wide in scripts_native.odin). dladdr is not formally on the
-// async-signal-safe list, but it takes no locks worth fearing and every production
-// crash handler (Godot's included) leans on it — and stderr step 1 already landed.
+// One address/name/module line. Linux local names come from metadata prepared
+// before script execution; this lookup performs no allocation or file I/O.
+// dladdr remains a best-effort platform call. Unknown/stripped images retain a
+// module offset or raw address for later symbolization.
 @(private = "file")
 cwrite_frame :: proc "c" (label: string, addr: rawptr) {
+    debug_symbol_read_begin()
+    defer debug_symbol_read_end()
     cwrite(label)
     cwrite_hex(uintptr(addr))
     info: Dl_info
 
-    if addr != nil && dladdr(addr, &info) != 0 && info.dli_sname != nil {
+    if addr != nil && dladdr(addr, &info) != 0 {
+        symbol, start := debug_symbol_lookup(addr, &info)
+
+        when ODIN_OS == .Darwin {
+            if symbol == nil {
+                symbol, start = info.dli_sname, uintptr(info.dli_saddr)
+            }
+        }
+
         cwrite("  ")
-        cwrite(string(info.dli_sname))
-        cwrite(" + ")
-        cwrite_hex(uintptr(addr) - uintptr(info.dli_saddr))
+
+        if symbol != nil {
+            cwrite(string(symbol))
+            cwrite(" + ")
+            cwrite_hex(uintptr(addr) - start)
+        } else {
+            cwrite("<no function symbol> module + ")
+            cwrite_hex(uintptr(addr) - uintptr(info.dli_fbase))
+        }
 
         if info.dli_fname != nil {
             cwrite("  (")
@@ -267,7 +284,7 @@ cwrite_frame :: proc "c" (label: string, addr: rawptr) {
             cwrite(")")
         }
     } else {
-        cwrite("  <no symbol — symbolize via dSYM, see docs/debugging.md>")
+        cwrite("  <unknown module; see docs/debugging.md>")
     }
 
     cwrite("\n")

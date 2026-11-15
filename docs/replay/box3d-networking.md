@@ -1,6 +1,6 @@
 # Complete Box3D state in Replay networking
 
-Replay uses its existing server/client, `Model`, `Timeline`, event journal and recovery transfer. The optional `replay/physics` codec adds complete native checkpoints. Core value-only models retain their protocol and need no native archive; the current Godot Session build dependency is documented in [setup](godot.md). This does not enable the separate P2P policy or portable physics.
+Replay uses its existing server/client, `Model`, `Timeline`, event journal and recovery transfer. The optional `replay/physics` codec adds complete native checkpoints. Value-only models and ordinary Godot Sessions need no native archive. Complete physics uses a matching [backend](../box3d/building.md); its checkpoint presentation reader lives in `godot:replay/godot/physics`. The separate P2P policy and cross-target physics compatibility have their own requirements.
 
 Exact physics requires the same build and target. `Recovery_Config` defaults contain the actual native compiler/configuration/target identity; do not replace it with an application label. Debug, Release, macOS and Linux identities differ. Linux validation through Podman/Rosetta establishes functional execution, not native Linux throughput.
 

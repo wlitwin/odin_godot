@@ -21,6 +21,7 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 SRC="$ROOT/tests/phase35"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -32,13 +33,20 @@ bash "$ROOT/build/build_scripts.sh" >/dev/null
 # Copy the project and rearrange into the split layout.
 cp -r "$SRC" "$PROJ"
 rm -rf "$PROJ/.godot"
-mkdir -p "$PROJ/addons/odin_godot/bin/macos"
-mv "$PROJ/bin/libodin_godot.dylib" "$PROJ/addons/odin_godot/bin/macos/"
-rm -rf "$PROJ/bin/libodin_godot.dylib.dSYM"
-# -i.bak (not -i '') so it works under both BSD sed (host) and GNU sed (dev shell).
-sed -i.bak 's|res://bin/libodin_godot.dylib|res://addons/odin_godot/bin/macos/libodin_godot.dylib|g' \
-    "$PROJ/odin_godot.gdextension"
-rm -f "$PROJ/odin_godot.gdextension.bak"
+mkdir -p "$PROJ/addons/odin_godot/bin/$ODIN_GODOT_TEST_PLATFORM"
+mv "$PROJ/bin/libodin_godot.$ODIN_GODOT_TEST_LIB_EXT" \
+    "$PROJ/addons/odin_godot/bin/$ODIN_GODOT_TEST_PLATFORM/"
+rm -rf "$PROJ/bin/libodin_godot.$ODIN_GODOT_TEST_LIB_EXT.dSYM"
+python3 - "$PROJ/odin_godot.gdextension" "$ODIN_GODOT_TEST_PLATFORM" "$ODIN_GODOT_TEST_LIB_EXT" <<'PY'
+from pathlib import Path
+import sys
+manifest, platform, extension = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+source = 'res://bin/libodin_godot.' + extension
+target = 'res://addons/odin_godot/bin/' + platform + '/libodin_godot.' + extension
+text = manifest.read_text()
+assert source in text, 'the active platform has no core manifest entry'
+manifest.write_text(text.replace(source, target))
+PY
 
 # Driver: load an .odin script by res:// path, attach it, let _ready run.
 cat > "$PROJ/test_splitaddon.gd" <<'EOF'

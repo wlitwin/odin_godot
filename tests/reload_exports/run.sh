@@ -17,6 +17,7 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/reload_exports"
 SCRIPTS="$PROJ/scripts"
 
@@ -26,7 +27,7 @@ git -C "$ROOT" checkout -- tests/reload_exports/scripts/widget.odin 2>/dev/null 
 
 # Build core + scripts dll.
 bash "$ROOT/build/build_scripts.sh" "$PROJ" "$SCRIPTS"
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 # The editor's reload-on-save coordinator resolves the collection root for the rebuild. In this
 # in-repo (non-installed) layout it can't be auto-derived from the core dll location, so declare
 # it explicitly (an installed addons/odin_godot/ install derives it automatically).
@@ -37,7 +38,7 @@ export ODIN_GODOT_ROOT="$ROOT"
 # is fingerprinted, so a scripts dll built against the copy carries a DIFFERENT ABI fingerprint
 # than this core — the exact "addon updated while the editor kept its startup core" skew.
 SKEWROOT="$(mktemp -d)"
-for d in build decl dist events flow flowgd gdext godot kit kititems libgd play runtime scriptgen; do
+for d in build core decl dist events flow flowgd gdext godot kit libgd play replay box3d runtime scriptgen; do
 	[ -d "$ROOT/$d" ] || continue
 	cp -c -R "$ROOT/$d" "$SKEWROOT/$d" 2>/dev/null || cp -R "$ROOT/$d" "$SKEWROOT/$d"
 done
@@ -49,7 +50,7 @@ export ODIN_GODOT_SKEW_ROOT="$SKEWROOT"
 # reporting a deliberately different Odin version. The loader must accept it based on the
 # complete ABI fingerprint instead of reinstating exact compiler-string lockstep.
 COMPATROOT="$(mktemp -d)"
-for d in build decl dist events flow flowgd gdext godot kit kititems libgd play runtime scriptgen; do
+for d in build core decl dist events flow flowgd gdext godot kit libgd play replay box3d runtime scriptgen; do
 	[ -d "$ROOT/$d" ] || continue
 	cp -c -R "$ROOT/$d" "$COMPATROOT/$d" 2>/dev/null || cp -R "$ROOT/$d" "$COMPATROOT/$d"
 done

@@ -27,11 +27,12 @@
 # ----------------------------------------------------------------------------
 set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/examples/speedball"
 LOGDIR="$PROJ/.spblogs"
 
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null || { echo "SPEEDBALL_NATIVE_FAIL (build)"; exit 1; }
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # The launch/ready/reap plumbing is the kit harness; every receipt below
 # stays the acid's own.

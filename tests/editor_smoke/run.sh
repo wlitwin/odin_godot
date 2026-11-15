@@ -21,11 +21,12 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/showcase"
 
 # Build the core dll + showcase scripts dll (same pipeline the showcase test uses).
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # Ensure the extension list / import cache exists so the editor loads the GDExtension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true

@@ -9,9 +9,9 @@ Learn [Odin scripting](../scripting/index.md) first. Kit is an alternative; you
 do not need to learn or install its session framework to use Replay. Replay is
 experimental. Read [support and compatibility](support.md) when selecting a mode.
 
-The local Timeline is engine-free. The current Godot Session package also links
-the Box3D presentation adapter; its [setup guide](godot.md) includes the required
-backend build even for a value-only game.
+The local Timeline is engine-free. The Godot Session and ordinary scene
+features also work without a Box3D backend. Games using complete native physics
+add the [Box3D adapter](../box3d/multiplayer.md) and its explicit backend setup.
 
 For the background behind the framework, start with
 [multiplayer concepts](../multiplayer/concepts/index.md), then use

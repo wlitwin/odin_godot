@@ -5,10 +5,10 @@ set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SRC="$ROOT/core"
-OUT="$ROOT/tests/phase1/bin/libodin_godot.dylib"
 
 # Shared helpers: $ODIN override + atomic_odin_dll (temp+mv publish, stale-.o scrub).
 source "$ROOT/build/common.sh"
+OUT="$ROOT/tests/phase1/bin/libodin_godot.$DLL_EXT"
 
 mkdir -p "$ROOT/tests/phase1/bin"
 

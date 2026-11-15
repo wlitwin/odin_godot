@@ -27,9 +27,11 @@
 set -uo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
+export ODIN_GODOT_ROOT="$ROOT"
 cd "$ROOT"
 PROJ="$ROOT/tests/showcase"
-SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 if [[ -z "${GODOT:-}" || ! -x "${GODOT:-/nonexistent}" ]]; then
     echo "debug: \$GODOT not set/executable — run inside the Nix dev shell." >&2
@@ -45,12 +47,27 @@ if [[ ! -f "$SCRIPTS_DLL" ]]; then
 fi
 export ODIN_SCRIPTS_DLL="$SCRIPTS_DLL"
 
+# Every native path needs Godot's extension inventory, including Linux where
+# the macOS-only LLDB segment below is unavailable.
+mkdir -p "$ROOT/tests/.logs"
+IMPORT_LOG="$ROOT/tests/.logs/debug-import.log"
+if ! "$GODOT" --editor --headless --path "$PROJ" --quit-after 120 >"$IMPORT_LOG" 2>&1; then
+    cat "$IMPORT_LOG"
+    echo "debug: FAIL — showcase import failed"
+    exit 1
+fi
+if grep -qE 'SCRIPT ERROR|ERROR:|instances were leaked|resources still in use' "$IMPORT_LOG"; then
+    cat "$IMPORT_LOG"
+    echo "debug: FAIL — showcase import reported errors"
+    exit 1
+fi
+
 # ---------------------------------------------------------------------------
 # (A) UNIT — backtrace + dladdr + filter mechanism.
 # ---------------------------------------------------------------------------
 echo
 echo "== (A) unit: native backtrace + dladdr + filter =="
-odin build "$ROOT/tests/debug/bt_probe.odin" -file -debug -out:"$ROOT/tests/debug/bt_probe" 2>&1 \
+odin build "$ROOT/tests/debug/bt_probe.odin" -file -collection:godot="$ROOT" -debug -out:"$ROOT/tests/debug/bt_probe" 2>&1 \
     | grep -iE "error" | grep -v "could not find symbol" || true
 # coin_collect's unslid file address for the probe's part 2: script procs are LOCAL
 # symbols since -use-single-module (dlsym can't see them; dladdr can — that's the point
@@ -74,15 +91,21 @@ echo
 echo "== (B) lldb: break on showcase_scripts::coin_collect, drive a real collect =="
 
 LLDB="${LLDB:-/usr/bin/lldb}"
+LLDB_GATED=0
+# This segment exercises macOS codesigning and the arm64 x0 register. The
+# portable native backtrace and script-loading checks still run on Linux.
+if [[ "$ODIN_GODOT_TEST_PLATFORM" != macos || "$(uname -m)" != arm64 ]]; then
+    echo "debug: macOS arm64 LLDB fixture unavailable on this host."
+    LLDB_GATED=1
+fi
 # nix sets DEVELOPER_DIR to an SDK without lldb, breaking the /usr/bin/lldb xcrun shim.
-if ! "$LLDB" --version >/dev/null 2>&1; then
+if [[ "$LLDB_GATED" == 0 ]] && ! "$LLDB" --version >/dev/null 2>&1; then
     for d in /Applications/Xcode.app/Contents/Developer /Library/Developer/CommandLineTools; do
         [[ -d "$d" ]] && export DEVELOPER_DIR="$d" && break
     done
 fi
 
-LLDB_GATED=0
-if ! "$LLDB" --version >/dev/null 2>&1; then
+if [[ "$LLDB_GATED" == 0 ]] && ! "$LLDB" --version >/dev/null 2>&1; then
     echo "debug: lldb unavailable — SKIPPING the lldb breakpoint check (gated)."
     LLDB_GATED=1
 fi
@@ -139,8 +162,18 @@ fi
 echo
 echo "== (C) integration: does Godot invoke _debug_get_current_stack_info in a normal run? =="
 DUMP_LOG="$ROOT/tests/.logs/debug-stackdump.log"
-ODIN_DEBUG_STACK_DUMP=1 "$GODOT" --headless --path "$PROJ" --script test_showcase.gd \
-    > "$DUMP_LOG" 2>&1 || true
+if ! ODIN_DEBUG_STACK_DUMP=1 "$GODOT" --headless --path "$PROJ" --script test_showcase.gd \
+    > "$DUMP_LOG" 2>&1; then
+    cat "$DUMP_LOG"
+    echo "debug: FAIL — showcase integration exited unsuccessfully"
+    exit 1
+fi
+if ! grep -q '^SHOWCASE_OK$' "$DUMP_LOG" || \
+   grep -qE 'SHOWCASE_FAIL|SCRIPT ERROR|ERROR:|instances were leaked|resources still in use' "$DUMP_LOG"; then
+    cat "$DUMP_LOG"
+    echo "debug: FAIL — showcase integration did not complete cleanly"
+    exit 1
+fi
 if grep -q "ODIN_STACK_BEGIN" "$DUMP_LOG"; then
     echo "  RESULT: Godot DID call _debug_get_current_stack_info (captured Odin frames):"
     grep "ODIN_STACK_FRAME" "$DUMP_LOG" | head -10 | sed 's/^/    /'

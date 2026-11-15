@@ -1,6 +1,7 @@
 // Value-only rendering consumer of the existing Replay presentation bridge.
 package replay_box3d
 
+import physicsgd "godot:replay/godot/physics"
 import "core:fmt"
 import gd "godot:godot"
 import b "godot:box3d"
@@ -298,7 +299,7 @@ slice_presentation_draw :: proc(self: ^ReplayBox3d, dt: f64) {
             return
         }
 
-        fresh, view_error, read_error := rgd.physics_presentation_frame(
+        fresh, view_error, read_error := physicsgd.physics_presentation_frame(
             &checkpoint,
             slice_bindings,
             p.revision,

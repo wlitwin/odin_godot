@@ -15,6 +15,10 @@ if rg -q 'SCRIPT ERROR|ERROR:' "$work/import.log";then cat "$work/import.log";ex
 "$GODOT" --headless --path "$PROJ" --quit-after 600 >"$work/native.log" 2>&1
 rg -q REPLAY_BROWSER_STORE_NATIVE_OK "$work/native.log"
 if rg -q 'SCRIPT ERROR|ERROR:|instances were leaked' "$work/import.log" "$work/native.log";then cat "$work/import.log" "$work/native.log";exit 1;fi
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 "$GODOT" --headless --path "$PROJ" --export-release Web "$PROJ/out/index.html" >"$work/export.log" 2>&1
 [[ -f "$PROJ/out/libodin_godot.wasm" ]]
 if [[ ! -e "$PROJ/node_modules" ]];then ln -s "$ROOT/tests/web/node_modules" "$PROJ/node_modules";fi

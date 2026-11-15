@@ -12,6 +12,10 @@ for game in cavecrawl speedball scrapyard;do
 done
 bash "$ROOT/tests/replay_restore_renewal/build.sh" "$work/live"
 python3 "$ROOT/tests/replay_restore_renewal/execute.py" "$work/live"
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 bash "$ROOT/tests/replay_claimball_online/build_web.sh" "$work/live/game" "$work/live/web"
 python3 "$ROOT/tests/replay_restore_renewal/execute_web.py" "$work/live"
 echo REPLAY_RESTORE_RENEWAL_OK

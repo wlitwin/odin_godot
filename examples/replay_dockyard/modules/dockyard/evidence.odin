@@ -1,5 +1,6 @@
 package dockyard_duo
 
+import physicsgd "godot:replay/godot/physics"
 import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
@@ -326,7 +327,12 @@ export_final :: proc(self: ^DockyardDuo) -> bool {
         game.lost,
         game.recovered,
     })
-    native_frame, frame_error, frame_owner_error := rgd.physics_presentation_frame(&checkpoint, project, 0, .Confirmed)
+    native_frame, frame_error, frame_owner_error := physicsgd.physics_presentation_frame(
+        &checkpoint,
+        project,
+        0,
+        .Confirmed,
+    )
 
     if frame_error == .None && frame_owner_error == .None {
         robots: [2][3]f32
@@ -438,7 +444,7 @@ publish_presentation :: proc(self: ^DockyardDuo) {
     defer r.complete_checkpoint_destroy(&checkpoint)
     revision :=
         self.hosting ? u64(0) : self.state.session.client.view_reset + self.state.session.client.stats.corrections
-    frame, projection_error, owner_error := rgd.physics_presentation_frame(
+    frame, projection_error, owner_error := physicsgd.physics_presentation_frame(
         &checkpoint,
         project,
         revision,

@@ -9,19 +9,9 @@ a repository checkout inside `nix develop`.
 
 ## 1. Copy the starter
 
-The current Godot Session package also imports the Box3D presentation adapter,
-so this build requires the native Box3D backend even when your World has no
-physics. The local Timeline tutorial has no such dependency. Build and select
-the backend before compiling this starter; on macOS:
-
-```sh
-bash build/build_box3d.sh Release "$PWD/.box3d-cache"
-export BOX3D_NATIVE_LIBRARY="$PWD/.box3d-cache/build/Release/libogb3.dylib"
-```
-
-Linux uses `libogb3.so`. Keep this environment when launching the editor so its
-save-time builds can link the same backend. See
-[Box3D build and export](../box3d/building.md) for target and replacement rules.
+The starter uses value-only gameplay and needs no Box3D backend. The optional
+[Box3D integration](../box3d/multiplayer.md) adds its own backend setup when a
+game uses complete native physics.
 
 ```sh
 mkdir ../first-replay-game
@@ -38,9 +28,9 @@ The coin disappears and the bag count changes.
 The copied extension manifest connects the checkout build's core to Godot. An
 installed addon already supplies its own manifest.
 
-These instructions use a checkout. The packaged Replay starter has its own
-layout instructions; check that package's backend availability before using it
-with this source revision.
+These instructions use a checkout. For an installed addon, copy its
+`template/replay/` project and use the packaged build helpers with that addon
+as `ODIN_GODOT_ROOT`. See [Distribution](../distribution.md).
 
 ## 2. Run two roles
 

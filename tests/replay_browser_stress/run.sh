@@ -14,6 +14,10 @@ for project in "$SERVER" "$PROJ";do
  python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/$label-wait.json"
  bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$label-final-build.log" 2>&1
 done
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 ODIN_EXPORT_OPT=speed bash "$ROOT/build/build_web.sh" "$PROJ" >"$work/web-build.log" 2>&1
 ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.$ext" "$GODOT" --headless --path "$PROJ" --export-release Web "$PROJ/out/index.html" >"$work/export.log" 2>&1
 if rg -q 'SCRIPT ERROR|ERROR:' "$work/export.log";then cat "$work/export.log";exit 1;fi

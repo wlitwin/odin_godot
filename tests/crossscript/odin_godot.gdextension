@@ -8,3 +8,9 @@ macos.debug = "res://bin/libodin_godot.dylib"
 macos.release = "res://bin/libodin_godot.dylib"
 macos.debug.arm64 = "res://bin/libodin_godot.dylib"
 macos.release.arm64 = "res://bin/libodin_godot.dylib"
+
+linux.debug = "res://bin/libodin_godot.so"
+linux.release = "res://bin/libodin_godot.so"
+
+windows.debug = "res://bin/libodin_godot.dll"
+windows.release = "res://bin/libodin_godot.dll"

@@ -8,11 +8,11 @@ guaranteed to remain stable. Kit and its authoring model remain available indepe
 ## Start with the included project
 
 Copy the contents of `template/replay/` into a new project that contains this addon.
-Use [the checkout Session tutorial](replay/godot.md) for this source revision.
-The current `replay/godot` package imports Box3D presentation code even for a
-value-only model, so its build also needs the matching native backend and setup.
-The template alone does not supply that dependency. Native adapter packaging
-requires separate validation from the local Timeline library.
+Build it with the installed addon's helpers and use this addon as
+`ODIN_GODOT_ROOT`; see [the install workflow](distribution.md). The value-only
+starter needs no Box3D backend. Complete native physics uses a separate
+[backend setup](box3d/building.md) and the optional
+`godot:replay/godot/physics` presentation reader.
 The starter moves two value-owned players and atomically transfers a shared coin
 into one bag. Its default mode is offline; host/client/observer native modes use
 the same simulation model.

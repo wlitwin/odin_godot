@@ -17,10 +17,11 @@
 # ----------------------------------------------------------------------------
 set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/examples/slopball"
 
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null || { echo "SLOPBALL_NATIVE_FAIL (build)"; exit 1; }
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 FSLP_PROJ="$PROJ"
 FSLP_LOGS="$PROJ/.sloplogs"

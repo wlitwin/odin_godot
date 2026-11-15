@@ -2,6 +2,7 @@ package box3d_editor_frameworks_test
 
 // Actual existing framework checkpoint readers feed one detached draw contract.
 // Explicit static Native/nilOwner scope; the separate SDK case covers Godot.
+import physicsgd "godot:replay/godot/physics"
 import "core:mem"
 import "core:testing"
 import "core:os"
@@ -14,7 +15,6 @@ import k "godot:kit/sim"
 import ks "godot:kit/session"
 import r "godot:replay"
 import rp "godot:replay/physics"
-import rg "godot:replay/godot"
 import wire "godot:box3d/godot/debugdraw"
 
 PROFILE :: u64(0x454449544f523031)
@@ -295,7 +295,7 @@ replay_copied_checkpoint_geometry_draws_without_live_solver_or_mutation :: proc(
 
     checkpoint, xe := r.capture_complete(&timeline, 3)
     testing.expect_value(t, xe, r.Error.None)
-    frame, pe, fe := rg.physics_presentation_frame(&checkpoint, project, 1, .Predicted)
+    frame, pe, fe := physicsgd.physics_presentation_frame(&checkpoint, project, 1, .Predicted)
     testing.expect(t, pe == .None && fe == .None)
     lines := make([]d.Line, d.MAX_LINES)
     defer delete(lines)

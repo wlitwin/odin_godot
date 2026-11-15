@@ -33,6 +33,7 @@
 set -uo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/kitacid"
 LOGDIR="$PROJ/.runlogs"
 mkdir -p "$LOGDIR"
@@ -42,7 +43,7 @@ LATENCY_MS="${LATENCY_MS:-100}"
 # A failed build MUST fail the test — without this the peers launch against a
 # stale dll and the whole acid silently proves yesterday's binary.
 bash "$ROOT/build/build_scripts.sh" "$PROJ" || { echo "KITACID_FAIL (scripts build)"; exit 1; }
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 

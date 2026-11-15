@@ -12,8 +12,12 @@ bash "$ROOT/tests/replay_cave_moderation/build.sh" "$work/native"
 MODERATION_RENDERED=1 python3 "$ROOT/tests/replay_cave_moderation/direct.py" "$work/native" "$work/direct"
 for mode in unsupported planned crash;do python3 "$ROOT/tests/replay_cave_moderation/room.py" "$work/native" "$work/$mode" "$mode";done
 MODERATION_DROP_REPLY=1 python3 "$ROOT/tests/replay_cave_moderation/room.py" "$work/native" "$work/lost-reply" planned
-bash "$ROOT/tests/replay_cave_moderation/browser_build.sh" "$work/browser-build"
-for mode in planned crash;do python3 "$ROOT/tests/replay_cave_moderation/browser_execute.py" "$work/browser-build" "$work/browser-$mode" "$mode";done
 python3 "$ROOT/tests/replay_cave_feedback/execute.py" "$work/native" "$work/campaign" campaign
 REPLAY_CAVE_OWNER_OUT="$work/owner-regression" bash "$ROOT/tests/replay_cave_owner/run.sh"
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
+bash "$ROOT/tests/replay_cave_moderation/browser_build.sh" "$work/browser-build"
+for mode in planned crash;do python3 "$ROOT/tests/replay_cave_moderation/browser_execute.py" "$work/browser-build" "$work/browser-$mode" "$mode";done
 echo REPLAY_CAVE_MODERATION_OK

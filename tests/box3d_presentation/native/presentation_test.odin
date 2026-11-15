@@ -1,5 +1,6 @@
 package presentation_native_test
 
+import physicsgd "godot:replay/godot/physics"
 import "core:mem"
 import "core:testing"
 import b "godot:box3d"
@@ -25,7 +26,7 @@ ok :: proc(t: ^testing.T, e: r.Error) {
 }
 
 read_replay :: proc(t: ^testing.T, cp: ^r.Complete_Checkpoint(Game, Event), revision: u64) -> p.Frame {
-    frame, ve, error := rg.physics_presentation_frame(cp, project, revision, .Predicted)
+    frame, ve, error := physicsgd.physics_presentation_frame(cp, project, revision, .Predicted)
     ok(t, error)
     testing.expect_value(t, ve, p.Error.None)
     return frame
@@ -270,14 +271,14 @@ counting_project :: proc(game: Game, out: []p.Binding) -> (u32, p.Error) {
 @(test)
 missing_and_invalid_owners_are_rejected_before_game_projection :: proc(t: ^testing.T) {
     missing: r.Complete_Checkpoint(Game, Event)
-    _, ve, error := rg.physics_presentation_frame(&missing, counting_project)
+    _, ve, error := physicsgd.physics_presentation_frame(&missing, counting_project)
     testing.expect(t, error == .Incomplete_State && ve == .None && project_calls == 0)
     // This malformed capability fails the existing public owner check before any
     // typed image/cache/Game access. No fake allocation/context is retained.
     invalid := r.Complete_Checkpoint(Game, Event) {
         owner = {realm = 9},
     }
-    _, ve, error = rg.physics_presentation_frame(&invalid, counting_project)
+    _, ve, error = physicsgd.physics_presentation_frame(&invalid, counting_project)
     testing.expect(t, error != .None && project_calls == 0)
     kit_missing: k.World_Checkpoint
     _, kve, ke := kp.presentation_frame(&kit_missing, 1, Game, counting_project)

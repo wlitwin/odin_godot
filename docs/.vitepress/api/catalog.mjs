@@ -35,6 +35,7 @@ export const descriptions = {
   replay: 'Frames, timelines, history, pools, RNG, and occurrences.',
   'replay/net': 'Authoritative models, controls, actions, and correction.',
   'replay/godot': 'Godot Session, Party, Room, and presentation integration.',
+  'replay/godot/physics': 'Optional copied presentation frames from complete Box3D checkpoints.',
   'replay/physics': 'Complete Box3D checkpoints and Replay codecs.',
   'replay/play': 'Value-based gameplay helpers for restorable Worlds.',
   box3d: 'Worlds, bodies, shapes, queries, characters, joints, and snapshots.',

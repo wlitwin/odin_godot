@@ -11,6 +11,10 @@ import sys
 with open(sys.argv[1],'wb') as file:file.truncate(16*1024*1024+1)
 PY
 python3 "$ROOT/tests/replay_recording/playback.py" "$work/native" "$work/files" "$work/native-playback"
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 bash "$ROOT/tests/replay_scrubber/web.sh" "$work/native" "$work/web"
 bash "$ROOT/tests/replay_recording/playback_web.sh" "$work/web" "$work/files" "$work/browser-playback"
 echo REPLAY_PLAYBACK_OK

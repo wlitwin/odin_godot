@@ -3,6 +3,7 @@ package presentation_strict_test
 // Test-only gate setup follows tests/box3d_modules/replay/provider/provider_test.
 // Native ledger, Host registry, Meter and owner checks are real. The code-image
 // validator is deliberately a fake; actual dladdr/reload proof belongs to P4.1.
+import physicsgd "godot:replay/godot/physics"
 import "core:testing"
 import b "godot:box3d"
 import bg "godot:box3d/godot"
@@ -11,7 +12,6 @@ import meter "godot:box3d/godot/meter"
 import p "godot:box3d/presentation"
 import r "godot:replay"
 import ph "godot:replay/physics"
-import rg "godot:replay/godot"
 import k "godot:kit/sim"
 import kp "godot:kit/physics"
 
@@ -149,18 +149,18 @@ managed_checkpoint_projection_requires_origin_realm_and_retained_allocator :: pr
     testing.expect_value(t, ph.owner_context_destroy(&owner), r.Error.None)
     // Source allocator owner can be released: the CP retains its exact lease.
     testing.expect_value(t, meter.destroy(&memory), bg.OK)
-    frame, ve, error := rg.physics_presentation_frame(&cp, project)
+    frame, ve, error := physicsgd.physics_presentation_frame(&cp, project)
     testing.expect(t, error == .None && ve == .None && frame.rows[0].id.lifetime == 3)
     calls := project_calls
     saved_owner := cp.owner
     cp.owner.realm += 1
-    _, _, error = rg.physics_presentation_frame(&cp, project)
+    _, _, error = physicsgd.physics_presentation_frame(&cp, project)
     testing.expect(t, error != .None && project_calls == calls)
     cp.owner = saved_owner
     bh.origin_leave(origin)
     leave(nil)
     // Rejected read cannot reach typed Game projection; owner remains intact.
-    _, _, error = rg.physics_presentation_frame(&cp, project)
+    _, _, error = physicsgd.physics_presentation_frame(&cp, project)
     testing.expect(t, error != .None && project_calls == calls && cp.owner == saved_owner)
     forged := k.World_Checkpoint {
         owner = saved_owner,
@@ -171,7 +171,7 @@ managed_checkpoint_projection_requires_origin_realm_and_retained_allocator :: pr
     testing.expect_value(t, enter(nil), bg.OK)
     origin, status = bh.origin_enter(service.user)
     testing.expect_value(t, status, bg.OK)
-    again, ave, ae := rg.physics_presentation_frame(&cp, project)
+    again, ave, ae := physicsgd.physics_presentation_frame(&cp, project)
     testing.expect(t, ae == .None && ave == .None && again == frame)
     testing.expect_value(t, r.complete_checkpoint_destroy(&cp), r.Error.None)
     testing.expect_value(t, bh.registry_stats().owners, u32(0))

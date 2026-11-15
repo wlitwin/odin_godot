@@ -7,12 +7,13 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/kitnav"
 LOG="$PROJ/.runlogs/nav.log"
 mkdir -p "$PROJ/.runlogs"
 
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 "$GODOT" --headless --path "$PROJ" --script nav_test.gd >"$LOG" 2>&1 || true

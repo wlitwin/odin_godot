@@ -18,3 +18,9 @@ macos.release.arm64 = "res://bin/libodin_godot.dylib"
 ; Emscripten SIDE_MODULE wasm. Built by build/build_web.sh.
 web.debug.wasm32 = "res://bin/libodin_godot.wasm"
 web.release.wasm32 = "res://bin/libodin_godot.wasm"
+
+linux.debug = "res://bin/libodin_godot.so"
+linux.release = "res://bin/libodin_godot.so"
+
+windows.debug = "res://bin/libodin_godot.dll"
+windows.release = "res://bin/libodin_godot.dll"

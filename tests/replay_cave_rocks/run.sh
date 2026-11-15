@@ -12,6 +12,10 @@ for profile in server owner;do
 done
 python3 "$ROOT/tests/replay_cave_feedback/execute.py" "$work/server" "$work/fault" fault
 CAVE_FEEDBACK_DRIVER="$ROOT/tests/replay_cave_rocks/visual.gd" python3 "$ROOT/tests/replay_cave_feedback/execute.py" "$work/server" "$work/rendered" rendered
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 bash "$ROOT/tests/replay_cave_feedback/browser_build.sh" "$work/server"
 python3 "$ROOT/tests/replay_cave_feedback/browser_execute.py" "$work/server" "$work/browser"
 echo REPLAY_CAVE_ROCKS_OK

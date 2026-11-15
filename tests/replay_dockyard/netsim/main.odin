@@ -19,6 +19,7 @@
 //   ./netsim rtt=100 jitter=10 loss=100 kbps=8000 seconds=60
 package dockyard_netsim
 
+import physicsgd "godot:replay/godot/physics"
 import "core:fmt"
 import "core:math"
 import "core:mem"
@@ -150,7 +151,7 @@ robot_positions :: proc(
     frame: bp.Frame,
     ok: bool,
 ) {
-    f, projection_error, owner_error := rgd.physics_presentation_frame(cp, game.project, 0, .Predicted)
+    f, projection_error, owner_error := physicsgd.physics_presentation_frame(cp, game.project, 0, .Predicted)
 
     if projection_error != .None || owner_error != .None {
         return

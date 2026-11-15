@@ -47,6 +47,21 @@ for target, flags in targets.items():
     require(checked.returncode == 0, f'Canonical package imports failed ({target})', log_name)
     positive.append(target)
 
+# Checking an object cannot detect an unwanted foreign archive dependency.
+# Link the value-only surface with a deliberately missing physics library;
+# importing Session, scene, input or debug must not ask the linker for it.
+missing_physics = out / 'deliberately-missing-libogb3.a'
+require(not missing_physics.exists(), 'Missing-library control unexpectedly exists')
+native_library = out / ('value-only.dylib' if sys.platform == 'darwin' else 'value-only.so')
+linked = run([
+    'build', str(root / 'tests/replay_packages/fixture'), collection,
+    '-build-mode:dll', '-no-entry-point',
+    '-define:BOX3D_LIBRARY=' + str(missing_physics),
+    '-define:BOX3D_REQUIRE_DOMAIN=true', '-out:' + str(native_library),
+], 'value-only-link.log')
+require(linked.returncode == 0 and native_library.is_file(),
+        'Value-only Replay feature imports require a native physics library', 'value-only-link.log')
+
 
 def public_names(package):
     log_name = package.replace('/', '_') + '.doc'
@@ -71,6 +86,8 @@ for feature in features:
     package = f'{core}/{feature}'
     inventories[package] = public_names(package)
 root_names = inventories[core]
+require('physics_presentation_frame' not in root_names,
+        'Core re-exports the native physics checkpoint reader')
 require({'Session', 'Room', 'Party', 'session_open', 'session_close'} <= root_names,
         'Core inventory lost required session owners')
 require(len(root_names) <= 160,
@@ -125,7 +142,7 @@ def imports(file):
 
 
 core_directory = root / core
-optional_directories = [core_directory / feature for feature in ['scene', 'input', 'debug']]
+optional_directories = [core_directory / feature for feature in ['scene', 'input', 'debug', 'physics']]
 edges = []
 for file in sorted(core_directory.glob('*.odin')):
     for destination in imports(file):
@@ -148,6 +165,8 @@ result = {
     'core_limit': 160,
     'import_files_checked': len(set(edges)),
     'feature_reexports': False,
+    'value_only_native_link': True,
+    'missing_physics_library': str(missing_physics),
 }
 (out / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
 print(f'REPLAY_PACKAGES_OK core={len(root_names)} limit=160 {out}')

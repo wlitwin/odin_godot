@@ -13,10 +13,13 @@ It verifies:
 
 - Canonical imports and representative owner operations compile natively and for
   freestanding WASM.
+- The value-only surface links a native shared library with `BOX3D_LIBRARY`
+  naming a deliberately nonexistent archive, so a native physics dependency
+  cannot be hidden by a successful object-only check or a local backend cache.
 - Moved root names fail with the expected missing-name diagnostic on both targets.
 - Compiler documentation exposes at most 160 root declarations, retains the core
   session owners, and contains no re-exports of child-package declarations.
-- Core does not import scene/input/debug. Foundational transport/storage/internal
+- Core does not import scene/input/debug/physics. Foundational transport/storage/internal
   wire packages do not import core. Collection and relative imports are checked.
 
 The compiler documentation command in the pinned toolchain returns status 1 even

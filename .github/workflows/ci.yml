@@ -1,7 +1,7 @@
 # CI: run the headless E2E suite on Linux.
 #
 # Web tests are skipped (SKIP_WEB=1): they need Chrome + puppeteer, which this runner
-# doesn't set up. The editor/GUI tests run headless like they do locally.
+# doesn't set up. Native rendered checks use Xvfb and Mesa software rendering.
 
 name: ci
 
@@ -15,18 +15,64 @@ jobs:
   test-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      SUITE_SHARD_INDEX: ${{ matrix.shard }}
+      SUITE_SHARD_COUNT: '4'
     steps:
       - uses: actions/checkout@v6
 
       - uses: cachix/install-nix-action@v31
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install native signaling-test dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install virtual display for native rendering checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xauth libgl1-mesa-dri
+
+      - name: Keep intentional crash checks from filling the runner disk
+        run: |
+          sudo mkdir -p /etc/systemd/coredump.conf.d
+          printf '[Coredump]\nStorage=none\nProcessSizeMax=0\n' | sudo tee /etc/systemd/coredump.conf.d/odin-ci.conf
+
       - name: Install Godot 4.7.1 (linux headless)
         run: |
-          curl -sSLo godot.zip \
+          curl -fsSLo godot.zip \
             https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
           unzip -q godot.zip
           chmod +x Godot_v4.7.1-stable_linux.x86_64
           echo "GODOT=$PWD/Godot_v4.7.1-stable_linux.x86_64" >> "$GITHUB_ENV"
+
+      - name: Cache native Linux export templates
+        id: templates
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/godot/export_templates/4.7.1.stable
+          key: godot-4.7.1-linux-x86_64-templates-v1
+
+      - name: Install native Linux export templates
+        if: steps.templates.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/godot-templates.tpz" \
+            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+          template_dir="$HOME/.local/share/godot/export_templates/4.7.1.stable"
+          mkdir -p "$template_dir"
+          unzip -jo "$RUNNER_TEMP/godot-templates.tpz" \
+            templates/linux_debug.x86_64 templates/linux_release.x86_64 templates/version.txt \
+            -d "$template_dir"
+          chmod +x "$template_dir"/linux_*.x86_64
+          rm "$RUNNER_TEMP/godot-templates.tpz"
 
       - name: Dump engine API (extension_api.json is gitignored)
         run: nix develop --command make api-dump
@@ -35,11 +81,11 @@ jobs:
         run: nix develop .#build-parity --command bash tests/build_helpers/run.sh
 
       - name: Run the suite
-        run: SKIP_WEB=1 nix develop --command bash tests/run_all.sh
+        run: xvfb-run -a -s '-screen 0 1280x720x24' env SKIP_WEB=1 LIBGL_ALWAYS_SOFTWARE=1 nix develop --command bash tests/run_all.sh
 
-      - name: Upload test logs on failure
-        if: failure()
+      - name: Preserve test results and logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-logs
+          name: test-logs-linux-${{ matrix.shard }}
           path: tests/.logs/

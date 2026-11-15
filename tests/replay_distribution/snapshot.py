@@ -12,7 +12,7 @@ import sys
 root=Path(sys.argv[1]).resolve()
 destination=Path(sys.argv[2]).resolve()
 destination.mkdir(parents=True,exist_ok=False)
-trees=['core','godot','gdext','libgd','runtime','decl','flow','flowgd','events','kit','play','replay','scriptgen','build','dist/addons/odin_godot']
+trees=['core','godot','gdext','libgd','runtime','decl','flow','flowgd','events','kit','play','replay','box3d','scriptgen','build','dist/addons/odin_godot']
 suffixes={'.odin','.sh','.ps1','.py','.nix','.md','.svg','.cfg','.gd','.tscn','.godot','.gdextension'}
 files=[]
 for tree in trees:
@@ -21,7 +21,8 @@ for tree in trees:
         relative=path.relative_to(root)
         if any(part in ['bin','.godot','node_modules','out','.git','__pycache__'] or part.endswith('.dSYM') for part in relative.parts):continue
         if path.name.startswith('odin_godot_') and path.name.endswith('.gen.odin'):continue
-        if path.suffix not in suffixes and path.name not in ['.gdignore','LICENSE','NOTICE']:continue
+        backend_input=tree=='box3d' and (path.suffix in ['.json','.c','.h','.patch'] or path.name in ['CMakeLists.txt','THIRD_PARTY_NOTICES.txt'])
+        if path.suffix not in suffixes and path.name not in ['.gdignore','LICENSE','NOTICE'] and not backend_input:continue
         files.append(path)
 for name in ['flake.nix','flake.lock','LICENSE','NOTICE']:
     files.append(root/name)

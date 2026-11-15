@@ -70,11 +70,10 @@ collections are hidden from Godot's scene scanner using `.gdignore`; the Odin
 compiler still resolves imports from them. The default Hello starter does not
 use Replay.
 
-For current Box3D and Replay Godot Session workflows, use the
-[checkout setup](replay/godot.md). The Session package currently links Box3D
-presentation code, including for a value-only game. Its native backend and
-adapter packaging need separate validation; a copied template alone does not
-provide that setup.
+The value-only Replay Session starter uses the bundled core and source
+collection without a Box3D backend. Complete Box3D games additionally use the
+[backend setup](box3d/building.md) and the optional
+`godot:replay/godot/physics` checkpoint presentation reader.
 
 The [Replay distribution gate](https://github.com/wlitwin/odin_godot/blob/main/tests/replay_distribution/README.md) builds an
 isolated source snapshot, installs the Nix-produced addon into an external project,

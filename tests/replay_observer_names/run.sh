@@ -28,6 +28,10 @@ done
 for pid in "${pids[@]}";do wait "$pid";done;pids=()
 node "$ROOT/examples/replay_scrapyard/chat_check.mjs" "$work/native" >"$work/native/report.log"
 if rg -q 'SCRIPT ERROR|ERROR:|COMBAT_FAIL|instances were leaked|resources still in use' "$work/native/"*.log;then exit 1;fi
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 ODIN_EXPORT_OPT=speed bash "$ROOT/build/build_web.sh" "$project" >"$work/web-build.log" 2>&1
 mkdir -p "$project/out";touch "$project/out/.gdignore"
 ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext" "$GODOT" --headless --path "$project" --export-release Web "$project/out/index.html" >"$work/export.log" 2>&1

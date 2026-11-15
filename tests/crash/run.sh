@@ -36,6 +36,7 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/crash"
 # The export phase (5) runs the headless EDITOR, whose OdinExportPlugin resolves the
 # odin_godot collection from this env (repo test projects have no addons/ dir).
@@ -45,7 +46,7 @@ export ODIN_GODOT_ROOT="$ROOT"
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 
 # Make the scripts dll path unambiguous for the core's dynlib load.
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
@@ -72,6 +73,11 @@ assert_grep() {
         fail "$3 (pattern not found: $2)"
     fi
 }
+
+case "$ODIN_GODOT_TEST_PLATFORM" in
+    linux) BACKTRACE_PATTERN='^[^[:space:]]+\([^)]*\) \[0x[[:xdigit:]]+\]' ;;
+    *) BACKTRACE_PATTERN='^[0-9]+ +[^ ]+ +0x[[:xdigit:]]+' ;;
+esac
 
 # ---------------------------------------------------------------------------
 # (1) PANIC path
@@ -125,8 +131,9 @@ assert_grep "$SEGV_LOG" "ODIN_GODOT_CRASH: fatal signal SIGSEGV" \
 # The SYMBOLIZED faulting frame (ucontext pc -> dladdr): the Odin proc by name.
 assert_grep "$SEGV_LOG" "ODIN_GODOT_CRASH at +pc .*crash_target_do_segv" \
     "faulting frame not symbolized to the Odin proc"
-# At least one backtrace frame line from backtrace_symbols_fd ("N  <module>  0x... sym").
-assert_grep "$SEGV_LOG" "^[0-9]+ +[^ ]+ +0x[0-9a-f]+" \
+# Require a real backtrace_symbols_fd frame in the host's libc format:
+# Darwin uses "N module 0x... symbol"; Linux uses "module(symbol+offset) [0x...]".
+assert_grep "$SEGV_LOG" "$BACKTRACE_PATTERN" \
     "no backtrace frame lines from backtrace_symbols_fd"
 # The best-effort editor-visible one-liner (headless: an ERROR: line).
 assert_grep "$SEGV_LOG" "ERROR: Odin: the game CRASHED in native code \(SIGSEGV" \
@@ -142,7 +149,7 @@ assert_grep "$CRASH_FILE" "ODIN_GODOT_CRASH: fatal signal SIGSEGV" \
     "crash-report file lacks the ODIN_GODOT_CRASH marker"
 assert_grep "$CRASH_FILE" "ODIN_GODOT_CRASH at +pc .*crash_target_do_segv" \
     "crash-report file lacks the symbolized faulting frame"
-assert_grep "$CRASH_FILE" "^[0-9]+ +[^ ]+ +0x[0-9a-f]+" \
+assert_grep "$CRASH_FILE" "$BACKTRACE_PATTERN" \
     "crash-report file lacks backtrace frame lines"
 if grep -q "ODIN_SCRIPT_PANIC" "$CRASH_FILE"; then
     fail "stale panic line survived in the crash file — handler did not truncate a fresh report"

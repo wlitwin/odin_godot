@@ -18,11 +18,11 @@ rm -f "$BIN"/libodinscripts-*.o "$BIN"/libodin_godot-*.o
 # The compiled scripts dll: the project's authored res://scripts sources
 # (Ping/Counter/ToolProbe + the runtime registry boot), as a dll. Those same
 # `res://scripts/*.odin` are the resources attached to nodes — single-file authoring.
-atomic_odin_dll "$ROOT/tests/phase3/scripts" "$BIN/libodinscripts.dylib" -debug
+atomic_odin_dll "$ROOT/tests/phase3/scripts" "$BIN/libodinscripts.$DLL_EXT" -debug
 
 # The core ScriptLanguageExtension dll.
-atomic_odin_dll "$ROOT/core" "$BIN/libodin_godot.dylib" -debug
+atomic_odin_dll "$ROOT/core" "$BIN/libodin_godot.$DLL_EXT" -debug
 
 echo "Built:"
-echo "  $BIN/libodin_godot.dylib"
-echo "  $BIN/libodinscripts.dylib"
+echo "  $BIN/libodin_godot.$DLL_EXT"
+echo "  $BIN/libodinscripts.$DLL_EXT"

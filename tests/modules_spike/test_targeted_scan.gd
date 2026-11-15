@@ -5,8 +5,8 @@ extends SceneTree
 # asserts that every job between this driver's request/completion markers targets enemies.
 
 const ENEMY_SRC := "res://modules/enemies/enemy.odin"
-const OLD := "\t//TARGET_SCAN_FIELD"
-const NEW := "\ttarget_scan_field: gd.Int `gd:\"export\"`,"
+const OLD := "//TARGET_SCAN_FIELD"
+const NEW := "target_scan_field: gd.Int `gd:\"export\"`,"
 
 var original := ""
 var done := false

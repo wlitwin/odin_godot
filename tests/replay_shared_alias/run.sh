@@ -6,4 +6,8 @@ odin build "$ROOT/scriptgen" -collection:godot="$ROOT" -out:"$work/scriptgen"
 python3 "$ROOT/tests/replay_shared_alias/cases.py" "$work/scriptgen" "$work/cases"
 SGEN_BIN="$work/scriptgen" bash "$ROOT/tests/scriptgen/run.sh"
 REPLAY_HELLO_INPUT_OUT="$work/hello" bash "$ROOT/tests/replay_hello_input/run.sh"
+if [[ "${SKIP_WEB:-0}" == 1 ]]; then
+    echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
+    exit 0
+fi
 echo REPLAY_SHARED_ALIAS_OK

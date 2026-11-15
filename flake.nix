@@ -66,6 +66,13 @@
           sqlite        # Replay authority service: durable, transactional decision ledger
           python3       # Replay content/baseline extraction tools; avoid macOS SDK shims
           nodejs        # web milestone: COOP/COEP serve.sh + headless-browser drive.mjs
+          ripgrep       # Source/render audits and gameplay log assertions invoke rg
+          coreutils     # Bound every suite child with GNU timeout
+          curl          # Local service readiness and deployment probes
+          unzip         # Export-template and addon archive fixtures
+          git           # Frozen source snapshots and build provenance
+          openssl       # Native authority-service fixtures generate local TLS certificates
+          file          # Inspect native and exported binary formats
         ];
 
         # GODOT is exported from shellHook (NOT a mkShell env attr): an env attr would

@@ -23,12 +23,13 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/editortools"
 SCRIPTS="$PROJ/addons/odinplugin"
 
 # Build the scripts dll (all Odin classes live in the addons/odinplugin package) + core dll.
 bash "$ROOT/build/build_scripts.sh" "$PROJ" "$SCRIPTS"
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # First pass: write .godot/extension_list.cfg + import so the editor loads the GDExtension
 # and scans the filesystem (registers global classes incl. the icon path).

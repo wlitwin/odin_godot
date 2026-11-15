@@ -6,6 +6,7 @@
 set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/phase2"
 
 # This fixture HAND-WRITES its @(init) registration (that is what phase2 pins), so a
@@ -17,7 +18,7 @@ bash "$ROOT/build/build_phase2.sh"
 
 # Make the scripts dll path unambiguous for the core's dynlib load (also works via
 # globalize_path(res://bin/...), but the env override avoids any cwd ambiguity).
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true

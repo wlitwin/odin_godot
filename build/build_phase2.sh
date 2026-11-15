@@ -18,11 +18,11 @@ rm -f "$BIN"/libodinscripts-*.o "$BIN"/libodin_godot-*.o
 # The compiled scripts dll: the project's authored res://scripts sources (Player +
 # the runtime registry boot), as a dll. The same `res://scripts/player.odin` is the
 # resource attached to the node — single-file authoring, no separate stub.
-atomic_odin_dll "$ROOT/tests/phase2/scripts" "$BIN/libodinscripts.dylib" -debug
+atomic_odin_dll "$ROOT/tests/phase2/scripts" "$BIN/libodinscripts.$DLL_EXT" -debug
 
 # The core ScriptLanguageExtension dll.
-atomic_odin_dll "$ROOT/core" "$BIN/libodin_godot.dylib" -debug
+atomic_odin_dll "$ROOT/core" "$BIN/libodin_godot.$DLL_EXT" -debug
 
 echo "Built:"
-echo "  $BIN/libodin_godot.dylib"
-echo "  $BIN/libodinscripts.dylib"
+echo "  $BIN/libodin_godot.$DLL_EXT"
+echo "  $BIN/libodinscripts.$DLL_EXT"

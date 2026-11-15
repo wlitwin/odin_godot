@@ -26,6 +26,7 @@
 set -uo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/shared_spike"
 ODIN="${ODIN:-odin}"
 # The build, the mid-test editor rebuild and the export plugin all resolve the collection
@@ -67,8 +68,8 @@ rm -rf "$PROJ/modules/sneak" "$PROJ/bin/libodinscripts_sneak".* 2>/dev/null || t
 # ---- phase 1: the build (isolation checks included) + the shared tree's layout ----
 bash "$ROOT/build/build_scripts.sh" "$PROJ" || fail "build_scripts.sh failed (shared imports must pass the isolation checks)"
 
-[[ -f "$PROJ/bin/libodinscripts.dylib" ]] || fail "the main scripts dll was not built"
-[[ -f "$PROJ/bin/libodinscripts_enemies.dylib" ]] || fail "the enemies module dll was not built"
+[[ -f "$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}" ]] || fail "the main scripts dll was not built"
+[[ -f "$PROJ/bin/libodinscripts_enemies.${ODIN_GODOT_TEST_LIB_EXT}" ]] || fail "the enemies module dll was not built"
 if [ -n "$(find "$PROJ/shared" -name '*.gen.odin' -print -quit)" ]; then
     fail "the shared tree was given generated code (it belongs to no module)"
 fi
@@ -78,7 +79,7 @@ fi
 echo "  ok  layout: both dlls built with shared imports, no artifacts under shared/, no shared guard entries"
 
 # ---- phase 2: headless main ----
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
 "$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
 

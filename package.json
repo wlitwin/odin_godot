@@ -1,0 +1,7 @@
+{
+  "name": "odin-godot-test-tools",
+  "private": true,
+  "dependencies": {
+    "ws": "8.23.0"
+  }
+}

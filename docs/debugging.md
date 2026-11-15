@@ -345,10 +345,11 @@ virtual by capturing a native backtrace
 ([`core/debug.odin`](https://github.com/wlitwin/odin_godot/blob/main/core/debug.odin)). When called, it:
 
 1. Walks the native stack with libunwind's **`_Unwind_Backtrace`**.
-2. Resolves each return address with **`dladdr`** → `dli_sname` (e.g.
-   `showcase_scripts::coin_collect`) + `dli_fname` (the dll path).
+2. Finds the owning library with `dladdr`. Darwin can resolve local names there;
+   Linux uses an ELF function-range cache prepared when each script generation
+   loads, including internalized `pkg::proc` names.
 3. Keeps frames from the scripts library and returns Godot's expected structure:
-   `Array[ Dictionary{ "function": String, "line": int, "source": String } ]`.
+   `Array[ Dictionary{ "function": String, "line": int, "file": String } ]`.
 
 ### Full backtraces with omitted frame pointers
 
@@ -363,8 +364,16 @@ verifies this difference
 
 Mapping an address to a source line needs DWARF line-table resolution at runtime (an
 `addr2line`/`libdwarf` step), which this implementation does not provide. It
-reports `"line": 0` and uses the library path as `"source"`. Function names
-are resolved; source lines are unavailable. Use lldb for source-line resolution.
+reports `"line": 0` and uses the library path as `"file"` (also retained under
+`"source"`). Function names are resolved when symbol metadata is available;
+source lines are unavailable. Use lldb for source-line resolution.
+
+The Linux cache checks exact executable function ranges and retains metadata
+while stack readers use it. Retiring a script generation removes its cache entry
+and releases image storage after readers finish. Metadata is bounded to 128 MiB
+and 4096 registrations per process; unavailable, stripped, or exhausted metadata
+keeps a module/offset crash record instead of inventing a function name. Crash
+lookups use preloaded data and perform no additional file I/O or allocation.
 
 <a id="when-this-surfaces"></a>
 

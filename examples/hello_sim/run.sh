@@ -10,13 +10,14 @@
 set -uo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/examples/hello_sim"
 
 if ! bash "$ROOT/build/build_scripts.sh" "$PROJ"; then
 	echo "HELLO_SIM_FAIL: script build failed"
 	exit 1
 fi
-export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
+export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 FSLP_PROJ="$PROJ"
 FSLP_DRIVER="hello_test.gd"
