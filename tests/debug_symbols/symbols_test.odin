@@ -162,6 +162,29 @@ retirement_keeps_borrowed_names_until_read_exit :: proc(t: ^testing.T) {
     testing.expect(t, string(name) == "fixture::local")
     missing, _ := symbols.cached_lookup(0x201008, 0x200000)
     testing.expect(t, missing == nil)
+
+    // Another image can occupy the same load base after loader release. Its
+    // gaps must not resolve through the retired generation's old ranges.
+    put(data, 544, 4160, 8)
+
+    for i in 641 ..< 672 {
+        data[i] = 0
+    }
+
+    copy(data[641:], "fixture::replacement")
+    testing.expect(t, os.write_entire_file(path, data) == nil)
+    replacement := symbols.register(path, 0x200000)
+    testing.expect(t, replacement != nil)
+
+    if replacement != nil {
+        old_address, _ := symbols.cached_lookup(0x201008, 0x200000)
+        new_name, new_start := symbols.cached_lookup(0x201048, 0x200000)
+        testing.expect(t, old_address == nil, "a reused image base must not inherit retired function ranges")
+        testing.expect(t, string(new_name) == "fixture::replacement" && new_start == 0x201040)
+        testing.expect(t, string(name) == "fixture::local", "an existing reader retains its original borrowed name")
+        symbols.retire(replacement)
+    }
+
     symbols.read_end()
     symbols.retire(registration) // collect retired storage; repeated retirement is safe
 }

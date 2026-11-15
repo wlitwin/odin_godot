@@ -79,6 +79,25 @@ case "$ODIN_GODOT_TEST_PLATFORM" in
     *) BACKTRACE_PATTERN='^[0-9]+ +[^ ]+ +0x[[:xdigit:]]+' ;;
 esac
 
+# A nonfatal script error must reach Godot with a valid native-stack dictionary,
+# then return to the caller. This catches engine contract errors that a fatal
+# crash can obscure while the process is already terminating.
+echo "== (0) nonfatal error: valid native stack dictionaries =="
+ERROR_LOG="$LOGDIR/crash-nonfatal-error.log"
+if ! ODIN_DEBUG_STACK_DUMP=1 "$GODOT" --headless --path "$PROJ" --script test_error.gd >"$ERROR_LOG" 2>&1; then
+    fail "nonfatal error driver exited unsuccessfully (see $ERROR_LOG)"
+fi
+assert_grep "$ERROR_LOG" 'ERROR: CRASH_TEST_NONFATAL_ERROR from Odin' "intended Odin error was not reported"
+assert_grep "$ERROR_LOG" '^NONFATAL_STACK_OK$' "nonfatal Odin error did not return normally"
+assert_grep "$ERROR_LOG" '^ODIN_STACK_BEGIN$' "Godot did not request the native stack for the error"
+if [[ "$ODIN_GODOT_TEST_PLATFORM" == linux ]]; then
+    assert_grep "$ERROR_LOG" 'ODIN_STACK_FRAME .*crash_target_report_error' "Linux native error stack lost its actual Odin caller"
+    assert_grep "$ERROR_LOG" '^[[:space:]]+\[[0-9]+\] crash_scripts::crash_target_report_error ' "Godot did not print the actual Odin error caller from its stack dictionaries"
+fi
+if grep -Eq 'SCRIPT ERROR|CRASH_DRIVER_FAIL|Condition.*d\.has|ODIN_GODOT_CRASH' "$ERROR_LOG"; then
+    fail "nonfatal error reporting produced a stack dictionary, driver, or crash error (see $ERROR_LOG)"
+fi
+
 # ---------------------------------------------------------------------------
 # (1) PANIC path
 # ---------------------------------------------------------------------------

@@ -517,7 +517,7 @@ lv_is_control_flow_keyword :: proc "c" (
 // this when it gathers a script's stack (during error reporting / an active remote-debug
 // session). Because Odin scripts are AOT native code, we capture the REAL native stack
 // (`backtrace` + `dladdr`, see core/debug.odin) and return the frames that belong to the
-// scripts dll, shaped as Godot expects: Array[ {function, line, source} ].
+// scripts dll, shaped as Godot expects: Array[ {func, line, file} ].
 //
 // `skip = 2` drops this trampoline + debug_capture_odin_stack itself so the chain starts
 // at script code. When ODIN_DEBUG_STACK_DUMP=1 the captured frames are also echoed to

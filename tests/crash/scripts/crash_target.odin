@@ -30,11 +30,19 @@ import "core:os"
 import gd "godot:godot"
 
 CrashTarget :: struct {
-    owner: gd.Node,
+    owner:           gd.Node,
+    reported_errors: u32,
 }
 
 // The known message run.sh greps for (alongside the file:line of the panic call).
 CRASH_TEST_PANIC_MESSAGE :: "CRASH_TEST_PANIC boom from odin script"
+
+@(gd_method)
+crash_target_report_error :: proc(self: ^CrashTarget) -> gd.Int {
+    gd.error("CRASH_TEST_NONFATAL_ERROR from Odin")
+    self.reported_errors += 1 // Keep the real Odin caller live across error reporting.
+    return gd.Int(self.reported_errors)
+}
 
 @(gd_method)
 crash_target_do_panic :: proc(self: ^CrashTarget) {

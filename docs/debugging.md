@@ -349,7 +349,7 @@ virtual by capturing a native backtrace
    Linux uses an ELF function-range cache prepared when each script generation
    loads, including internalized `pkg::proc` names.
 3. Keeps frames from the scripts library and returns Godot's expected structure:
-   `Array[ Dictionary{ "function": String, "line": int, "file": String } ]`.
+   `Array[ Dictionary{ "func": String, "line": int, "file": String } ]`.
 
 ### Full backtraces with omitted frame pointers
 
@@ -379,25 +379,25 @@ lookups use preloaded data and perform no additional file I/O or allocation.
 
 ### When Godot requests stack information
 
-When called mid-script, native capture returns Odin frames such as
-`showcase_scripts::coin_collect`, as tested under "Verification" below.
-Godot invokes `_debug_get_current_stack_info` during an active remote-debug
-session, when `EngineDebugger` reports an error or breakpoint to a connected
-debugger.
+Godot 4.7.1 can request native stack information while reporting a script
+error, including a headless `gd.error` call without an attached remote debugger.
+The error is nonfatal: after Godot gathers the language stacks, the Odin method
+can return normally. The returned dictionaries use the engine's `file`, `func`,
+and `line` keys. The additional `source` and `function` aliases remain available
+to callers that inspect the array directly.
 
-A plain `gd.error` does not automatically add the Odin stack to editor Output.
-In `tests/debug/run.sh` part C, the showcase runs headless with
-`ODIN_DEBUG_STACK_DUMP=1`; the engine does not call the virtual:
+Available frames depend on the native unwind path and symbol metadata. A Linux
+script error can include the actual Odin caller, while another platform or
+optimized path may expose fewer frames. A run that emits no script error is a
+different case: `tests/debug/run.sh` records whether the showcase caused Godot
+to request the virtual, without requiring either outcome. That observation does
+not predict the error-reporting path.
 
-```
-== (C) integration: does Godot invoke _debug_get_current_stack_info in a normal run? ==
-  RESULT: Godot did NOT call _debug_get_current_stack_info in this headless run.
-```
-
-The virtual returns a well-formed Array containing the Odin call chain when
-invoked. It does not provide an automatic script-line stack for plain
-errors or crashes in the editor. Use lldb `bt` (section 2/3) for routine stack
-inspection.
+The nonfatal case in `tests/crash/run.sh` checks that an Odin method reports its
+known error and returns, that Godot requests the stack, and that no dictionary
+contract errors occur. On Linux it also checks the actual Odin caller in that
+stack. Use lldb `bt` for native source-line inspection; the language callback
+continues to report line zero.
 
 `backtrace()`/`dladdr` are POSIX-ish and present on darwin/linux. Windows and the web/wasm
 build use a stub that returns an empty Array ([`core/debug_other.odin`](https://github.com/wlitwin/odin_godot/blob/main/core/debug_other.odin)).
@@ -424,7 +424,9 @@ checks native capture, lldb integration, and whether Godot requests stack info:
 - **(B) lldb**: launches Godot under lldb, breaks on `coin_collect`, triggers a
   physics collection, and asserts `stop reason = breakpoint` plus the
   function in `bt`. → `DEBUG_LLDB_OK`. (Gated: skipped if lldb is unavailable.)
-- **(C) integration**: runs the showcase with `ODIN_DEBUG_STACK_DUMP=1` and reports
-  whether Godot actually called the virtual (it does not, outside remote-debug).
+- **(C) integration**: runs the showcase with `ODIN_DEBUG_STACK_DUMP=1`, requires
+  successful gameplay, and records whether Godot requested the virtual. The
+  separate nonfatal error case in `tests/crash/run.sh` requires the stack route
+  and validates the engine dictionary contract.
 
 Run it: `nix develop --command bash -c 'bash tests/debug/run.sh'`.

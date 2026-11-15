@@ -65,8 +65,8 @@ if ! grep -q "ODIN_RELOAD_PROC_STATE_PINNED" "$LOG"; then
     echo "PHASE4_FAIL: callback-bearing state without a reload hook was not pinned safely"
     exit 1
 fi
-if [ "$(grep -c "ODIN_RELOAD_GENERATION_UNLOADED" "$LOG")" -lt 2 ]; then
-    echo "PHASE4_FAIL: retired DLL generations were not unloaded at the writer gate"
+if [ "$(grep -c "ODIN_RELOAD_GENERATION_LOADER_RELEASED" "$LOG")" -lt 2 ]; then
+    echo "PHASE4_FAIL: retired DLL generations did not release their loader references at the writer gate"
     exit 1
 fi
-echo "  ok  removed/callback-bearing instances pin exactly their owner; releasable generations unload"
+echo "  ok  removed/callback-bearing instances pin exactly their owner; releasable generations release loader references"

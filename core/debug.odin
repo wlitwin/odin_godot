@@ -75,7 +75,7 @@ unwind_collect :: proc "c" (ctx: ^Unwind_Context, arg: rawptr) -> i32 {
 }
 
 // debug_capture_odin_stack walks the native stack and returns a Godot `Array` of
-// `Dictionary{ "function": String, "line": int(0), "file": String }`, one per frame
+// `Dictionary{ "func": String, "line": int(0), "file": String }`, one per frame
 // that belongs to the scripts dll, OUTERMOST script frame first (call order). This is the
 // exact shape Godot expects back from `_debug_get_current_stack_info`. The returned Array
 // is owned by the caller (the engine copies it out of the `ret` slot).
@@ -178,8 +178,8 @@ debug_capture_odin_stack :: proc(skip := 0) -> godot.Array {
     return arr
 }
 
-// Godot 4.7 reads `file`; keep `source` as an additional observation for clients
-// that already inspected that key on the returned dictionary.
+// Godot 4.7 reads `file`, `func`, and `line`. Keep `source`/`function` as
+// compatibility observations for clients that already inspected those keys.
 @(private = "file")
 debug_make_frame_dict :: proc(symbol: cstring, source: cstring) -> godot.Dictionary {
     d := godot.new_dictionary_default()
@@ -192,6 +192,7 @@ debug_make_frame_dict :: proc(symbol: cstring, source: cstring) -> godot.Diction
     }
 
     fn_s := godot.new_string_cstring(symbol)
+    set(&d, "func", godot.variant_from_string(&fn_s))
     set(&d, "function", godot.variant_from_string(&fn_s))
 
     line := godot.Int(0)

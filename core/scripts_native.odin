@@ -350,6 +350,10 @@ script_generations_collect_at_gate :: proc() {
 
         // Keep the ownership lock from spanning platform loader/finalizer code. The
         // execution writer gate prevents a descriptor lookup while the lock is open.
+        // Deactivate cached names before the loader can reuse this image's base.
+        // If unload fails, this retired zero-ref generation stays eligible for a
+        // later collection retry, with truthful module/offset diagnostics meanwhile.
+        script_debug_symbols_retire(gen)
         dll := gen.dll
         sync.unlock(&g_script_generation_lock)
         unloaded := dll.__handle == nil || dynlib.unload_library(dll.__handle)
@@ -379,7 +383,6 @@ script_generations_collect_at_gate :: proc() {
             }
         }
 
-        script_debug_symbols_retire(gen)
         delete(gen.desc_tokens)
         delete(gen.module_name)
         delete(gen.reload_path)
