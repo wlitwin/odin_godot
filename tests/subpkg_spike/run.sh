@@ -270,12 +270,15 @@ import gd "godot:godot"
 
 Hud :: struct {
 	owner: gd.Control,
-	label: string \`gd:"export"\`,
+	label: gd.String \`gd:"export"\`,
 }
 EOF
 }
 fp() { # fp <name> -> the NET_FINGERPRINT literal
-    "$SGEN" "$work/$1/scripts" "-godot:$ROOT" >/dev/null 2>&1 || return 1
+    if ! "$SGEN" "$work/$1/scripts" "-godot:$ROOT" >"$work/$1/scriptgen.log" 2>&1; then
+        cat "$work/$1/scriptgen.log" >&2
+        return 1
+    fi
     sed -n 's/^NET_FINGERPRINT :: u64(\(0x[0-9a-f]*\)).*/\1/p' "$work/$1/scripts/odin_godot_guard.gen.odin"
 }
 

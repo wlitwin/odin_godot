@@ -2,6 +2,21 @@
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
 work="${REPLAY_CLAIMBALL_TRACE_OUT:-$(mktemp -d)}";mkdir -p "$work"
+claimball_trace_finish() {
+ local result=$?
+ trap - EXIT
+ if [[ "$result" != 0 ]]; then
+  echo "Claimball trace logs: $work"
+  for log in "$work/app/build.log" "$work/app/import.log" "$work/app/final-build.log" "$work/app/replayer-build.log" "$work/app/schema-tests.log" "$work/app/mutate-build.log" "$work/replay.log"; do
+   if [[ -f "$log" ]]; then
+    echo "----- $log -----"
+    tail -c 8192 "$log" | tail -n 60 || true
+   fi
+  done
+ fi
+ exit "$result"
+}
+trap claimball_trace_finish EXIT
 bash "$ROOT/tests/replay_claimball_trace/build.sh" "$work/app"
 live_status=0
 RCB_TRACE="$work/app/fault/logs/observer.trace" python3 "$ROOT/tests/replay_claimball_ui/regression.py" "$work/app" fault || live_status=$?

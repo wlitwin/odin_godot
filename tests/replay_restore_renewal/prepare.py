@@ -1,11 +1,16 @@
 from pathlib import Path
-import hashlib,json,subprocess,sys
+import hashlib,json,re,subprocess,sys
 root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve()
 subprocess.run([sys.executable,str(root/'tests/replay_claimball_ui/prepare.py'),str(out)],check=True)
-p=out/'project/scripts/claimball.odin';s=p.read_text().replace('import r "godot:replay"','import r "godot:replay"\nimport tr "godot:replay/transport"').replace('view_epoch:u64,','view_epoch:u64,\n restore_base:tr.Transport,\n restore_due,restore_deferred:u64,\n restore_wrapped,restore_delayed,restore_old_grant,restore_refreshed:bool,');p.write_text(s)
+p=out/'project/scripts/claimball.odin';s=p.read_text().replace('import r "godot:replay"','import r "godot:replay"\nimport tr "godot:replay/transport"')
+s,n=re.subn(r'(?m)^([ \t]*)view_epoch[ \t]*:[ \t]*u64[ \t]*,',r'\1view_epoch:u64,\n\1restore_base:tr.Transport,\n\1restore_due,restore_deferred:u64,\n\1restore_wrapped,restore_delayed,restore_old_grant,restore_refreshed:bool,',s)
+assert n==1,'expected one view_epoch field for the renewal fixture'
+p.write_text(s)
 p=out/'project/scripts/migration.odin';s=p.read_text().replace('import r "godot:replay"','import r "godot:replay"\nimport tr "godot:replay/transport"\nimport ck "godot:replay/provision/checkpoint"')
-needle=' return self.room.ready ? rgd.room_frame(&self.room,dt,c) : rgd.session_frame(self.session,dt,c)';assert needle in s
-s=s.replace(needle,''' if !self.room.ready {return rgd.session_frame(self.session,dt,c)}
+needle=(r'(?m)^[ \t]*return\s+self\.room\.ready\s*\?\s*'
+        r'rgd\.room_frame\(\s*&self\.room\s*,\s*dt\s*,\s*c\s*\)\s*:\s*'
+        r'rgd\.session_frame\(\s*self\.session\s*,\s*dt\s*,\s*c\s*\)\s*$')
+s,n=re.subn(needle,''' if !self.room.ready {return rgd.session_frame(self.session,dt,c)}
  if !self.restore_wrapped {
   self.restore_base=self.room.control_wire;self.restore_wrapped=true
   self.room.control_wire={user=self,send=restore_delay_send,
@@ -27,7 +32,8 @@ s=s.replace(needle,''' if !self.room.ready {return rgd.session_frame(self.sessio
   self.restore_refreshed=true
   gd.print_str(fmt.tprintf("RESTORE_RENEWED_INSTALL epoch=2 checkpoint=%d",self.room.recovery.checkpoint_tick))
  }
- return error''')
+ return error''',s)
+assert n==1,'expected one frame_session call for the renewal fixture'
 s+='''
 // Test-only backpressure on the Restore request itself. Other protocol messages
 // keep flowing, and neither clock nor lease timestamps are altered.

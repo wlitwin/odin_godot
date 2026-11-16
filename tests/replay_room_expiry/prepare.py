@@ -1,11 +1,15 @@
 from pathlib import Path
-import hashlib,json,shutil,subprocess,sys
+import hashlib,json,re,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve()
 subprocess.run([sys.executable,str(root/'tests/replay_claimball_ui/prepare.py'),str(out)],check=True)
-p=out/'project/scripts/claimball.odin';s=p.read_text().replace('view_epoch:u64,','view_epoch:u64,\n expiry_base:auth.Clock_Source,\n expiry_offset:u64,\n expiry_reads:int,\n expiry_installed,expiry_fired:bool,')
+p=out/'project/scripts/claimball.odin';s=p.read_text()
+s,n=re.subn(r'(?m)^([ \t]*)view_epoch[ \t]*:[ \t]*u64[ \t]*,',r'\1view_epoch:u64,\n\1expiry_base:auth.Clock_Source,\n\1expiry_offset:u64,\n\1expiry_reads:int,\n\1expiry_installed,expiry_fired:bool,',s)
+assert n==1,'expected one view_epoch field for the expiry fixture'
 s=s.replace('import r "godot:replay"','import r "godot:replay"\nimport auth "godot:replay/authority"');p.write_text(s)
-p=out/'project/scripts/migration.odin';s=p.read_text();needle=' return self.room.ready ? rgd.room_frame(&self.room,dt,c) : rgd.session_frame(self.session,dt,c)';assert needle in s
-s=s.replace(needle,''' if !self.room.ready {return rgd.session_frame(self.session,dt,c)}
+p=out/'project/scripts/migration.odin';s=p.read_text();needle=(r'(?m)^[ \t]*return\s+self\.room\.ready\s*\?\s*'
+        r'rgd\.room_frame\(\s*&self\.room\s*,\s*dt\s*,\s*c\s*\)\s*:\s*'
+        r'rgd\.session_frame\(\s*self\.session\s*,\s*dt\s*,\s*c\s*\)\s*$')
+s,n=re.subn(needle,''' if !self.room.ready {return rgd.session_frame(self.session,dt,c)}
  if !self.expiry_installed {
   self.expiry_base=self.room.clock;self.expiry_installed=true
   self.room.clock={user=self,read=expiry_room_clock}
@@ -22,7 +26,8 @@ s=s.replace(needle,''' if !self.room.ready {return rgd.session_frame(self.sessio
   assert(self.session.ready && old_epoch==new_epoch && old_head==new_head)
   gd.print_str(fmt.tprintf("ROOM_EXPIRY_PRESERVED member=%d epoch=%d head=%d phase=%v",self.room.options.identity.member,old_epoch,old_head,self.room.phase))
  }
- return err''')
+ return err''',s)
+assert n==1,'expected one frame_session call for the expiry fixture'
 s+='''
 // Test-only monotonic forward jump between the outer and inner lease checks.
 // The Room and Lease keep the same time domain afterward. No deadline is extended.

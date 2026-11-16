@@ -44,6 +44,7 @@ Owners :: struct {
 @(require) canonical_surface :: proc() {
     owners: Owners
     _ = replaygd.session_seat(&owners.session)
+    _, _ = replaygd.session_backup_receipt(&owners.session)
     _ = transportgd.enet_transport(&owners.transport)
     _ = storagegd.browser_store_key_valid("portable/profile")
     _ = storagegd.session_token("package-boundary-test")
