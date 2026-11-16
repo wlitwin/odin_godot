@@ -8,7 +8,7 @@ import view "godot:replay/view"
 
 @(private)
 client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expected: sc.Envelope_Meta) -> Error {
-    if c.phase != .Running {
+    if !client_current_facts_open(c) {
         return .None
     }
 
@@ -127,6 +127,10 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
     }
 
     if entry.tick - c.timeline.confirmed >= PHYSICS_HISTORY {
+        if c.phase == .Resyncing {
+            return .None
+        }
+
         client_resync(c, .Facts_Overflow, entry.tick)
         return .None
     }
@@ -154,6 +158,12 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
     }
 
     c.last_received = c.now
+
+    // Keep all existing accepted-input, signature, event and pair validation,
+    // but only stage this old stream while its matching Welcome is pending.
+    if c.phase == .Resyncing {
+        return .None
+    }
 
     // Coalesce partial prefixes at the existing pump presentation boundary.
     // Apply a complete predicted tail before farther facts exhaust history.

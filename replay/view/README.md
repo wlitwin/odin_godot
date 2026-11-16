@@ -78,6 +78,30 @@ check and commit. `Output_Full` requires draining and retrying. `Capacity` means
 the required notifications cannot fit even in an empty queue. A **new epoch**
 still uses `journal_reset`, with its separate old-scope cancellation contract.
 
+A runner may also have received complete authority batches after its last
+presented snapshot. `Journal_Authority(Event)` describes only that contiguous
+known tail: `through` is its last tick, and the borrowed `read(user, tick)`
+callback supplies each complete batch after the journal's confirmed frontier,
+including known empty batches. It must not fabricate batches for a missing gap.
+The tail is bounded by the journal's history and the accepted checkpoint tick.
+
+Use `journal_rebase_prepare(&journal, tick, &authority)` before installing that
+matching checkpoint, then `journal_rebase_commit(&plan)` after the simulation
+reset succeeds. Preparation allocates nothing, checks the entire output budget,
+and validates new event IDs and their policies. A new ID's policy is evaluated
+once, after output capacity is available; commit does not reclassify it after
+the world changes. Existing IDs retain their policy and reconcile normally.
+The journal and borrowed authority batches must remain unchanged until commit.
+The one-use plan owns no storage and can simply be dropped if the reset fails.
+
+The network runner uses this transaction only for an accepted same-epoch,
+same-generation Welcome and facts admitted for its previous serial. While
+awaiting Welcome it retains those bounded facts without publishing effects or
+advancing the old world. `Output_Full` leaves that world and journal intact:
+drain, prepare again, and retry the checkpoint. Unknown gaps retain the default
+rebase semantics above, and callers without an authority tail continue to use
+`journal_rebase` unchanged.
+
 `replay.confirm_through` separately protects the simulation frontier. A runner
 must establish that the ticks are settled under its authority or peer-commit
 protocol before calling it. Neither counter elects a host,

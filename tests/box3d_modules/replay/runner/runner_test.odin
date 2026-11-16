@@ -301,6 +301,33 @@ strict_sdk_existing_complete_runners_retain_exact_model_blocks_through_join_and_
     delete(z, alloc)
     r.complete_checkpoint_destroy(&left)
     r.complete_checkpoint_destroy(&right)
+    // A strict managed driver can retain a signed current-stream fact during
+    // refresh without executing its old world or publishing any new output.
+    client.phase, client.hello_sent = .Resyncing, true
+    client.last_hello = 187
+    old_head, old_confirmed, old_serial := client.timeline.head, client.timeline.confirmed, client.serial
+    old_queue := client.journal.queue_count
+    fact_tick := server.timeline.head + 1
+    testing.expect_value(t, net.server_step(server), net.Error.None)
+    testing.expect_value(t, net.server_pump(server, 187), net.Error.None)
+    tr.memory_advance(test_transport, 11)
+    testing.expect_value(t, net.client_pump(client, 187), net.Error.None)
+    accepted, retained := net.accepted_read(&client.physics.accepted, fact_tick)
+    testing.expect(t, retained && accepted.tick == fact_tick)
+    testing.expect(
+        t,
+        client.facts[fact_tick % 128].tick == fact_tick &&
+        client.physics.signatures[fact_tick % 128].tick == fact_tick,
+    )
+    testing.expect(t, client.facts_contiguous >= fact_tick)
+    testing.expect(
+        t,
+        client.timeline.head == old_head &&
+        client.timeline.confirmed == old_confirmed &&
+        client.serial == old_serial &&
+        client.phase == .Resyncing,
+    )
+    testing.expect_value(t, client.journal.queue_count, old_queue)
     // A changed callback context is rejected before any callback/publication.
     head := server.timeline.head
     server.model.user = server

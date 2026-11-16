@@ -1050,7 +1050,7 @@ client_receive :: proc(c: ^Client($State, $Control, $Action, $Event, $Seats), by
             return client_recent_facts(c, bytes, expected)
         }
     case .Facts:
-        if c.phase != .Running {
+        if !client_current_facts_open(c) {
             return
         }
 
@@ -1107,6 +1107,71 @@ client_welcome :: proc(
 }
 
 @(private)
+Welcome_Facts :: struct($Event: typeid) {
+    facts:                              []Facts_Packet(Event),
+    first, through, generation, serial: u64,
+}
+
+@(private)
+welcome_fact_batch :: proc(source: ^Welcome_Facts($Event), tick: u64) -> ([]r.Occurrence(Net_Event(Event)), bool) {
+    if source.first == 0 || tick < source.first || tick > source.through || len(source.facts) == 0 {
+        return nil, false
+    }
+
+    fact := &source.facts[tick % u64(len(source.facts))]
+
+    if fact.tick != tick ||
+       fact.generation != source.generation ||
+       fact.serial != source.serial ||
+       int(fact.count) > len(fact.events) {
+        return nil, false
+    }
+
+    return fact.events[:fact.count], true
+}
+
+@(private)
+welcome_tail_outcome :: proc(
+    source: ^Welcome_Facts($Event),
+    outcome: Action_Outcome,
+    seat: u16,
+) -> (
+    found, valid: bool,
+) {
+    if source.first == 0 {
+        return false, true
+    }
+
+    for offset in u64(0) ..< source.through - source.first + 1 {
+        tick := source.first + offset
+        events, ready := welcome_fact_batch(source, tick)
+
+        if !ready {
+            return false, false
+        }
+
+        for occurrence in events {
+            event := occurrence.value
+
+            if event.kind != .Action_Result || event.seat != seat || event.sequence != outcome.sequence {
+                continue
+            }
+
+            if found ||
+               occurrence.id.tick != outcome.tick ||
+               event.applied != outcome.applied ||
+               event.reason != outcome.reason {
+                return false, false
+            }
+
+            found = true
+        }
+    }
+
+    return found, true
+}
+
+@(private)
 client_welcome_core :: proc(
     c: ^Client($State, $Control, $Action, $Event, $Seats),
     packet: Welcome_Packet(State, Control, Seats),
@@ -1119,14 +1184,54 @@ client_welcome_core :: proc(
     packet := packet
     changing_epoch := c.recovering
     had_world := c.has_world
+    tail := Welcome_Facts(Event) {
+        facts      = c.facts,
+        generation = c.generation,
+        serial     = c.serial,
+    }
+    authority: view.Journal_Authority(Net_Event(Event))
+
+    // Only the accepted same-generation Welcome may reconcile facts from the
+    // old serial. Unknown or missing history is never filled with empty batches.
+    if had_world && !changing_epoch && packet.generation == c.generation && packet.serial > c.serial {
+        through := min(c.facts_contiguous, packet.frame.tick)
+
+        if through > c.journal.confirmed {
+            tail.first, tail.through = c.journal.confirmed + 1, through
+            authority = {
+                through = through,
+                user = &tail,
+                read = proc(user: rawptr, tick: u64) -> ([]r.Occurrence(Net_Event(Event)), bool) {
+                    return welcome_fact_batch(cast(^Welcome_Facts(Event))user, tick)
+                },
+            }
+        }
+    }
+
+    recovered: [ACTION_CAPACITY]bool
+
+    for outcome, i in packet.completed[:packet.completed_count] {
+        found, valid := welcome_tail_outcome(&tail, outcome, c.seat)
+
+        if !valid {
+            c.stats.rejected_packets += 1
+            return
+        }
+
+        recovered[i] = !found
+    }
 
     if changing_epoch && c.journal.queue_count != 0 {
         c.stats.rejected_packets += 1
         return
     }
 
+    rebase: view.Journal_Rebase(Net_Event(Event))
+
     if had_world && !changing_epoch {
-        if err := view.journal_rebase_check(&c.journal, packet.frame.tick); err != .None {
+        candidate, err := view.journal_rebase_prepare(&c.journal, packet.frame.tick, &authority)
+
+        if err != .None {
             // A full output queue needs a consumer drain, then the ordinary
             // correlated Resync retry. Do not install only half of the reset.
             if err != .Output_Full {
@@ -1135,6 +1240,8 @@ client_welcome_core :: proc(
 
             return
         }
+
+        rebase = candidate
     }
 
     if (c.phase == .Joining || c.phase == .Resyncing) && packet.echo_ms <= c.now {
@@ -1198,11 +1305,20 @@ client_welcome_core :: proc(
         return
     }
 
+    if had_world && !changing_epoch {
+        // Reset succeeded. Commit while old stream, seat and fact storage still
+        // match preflight; a tail-only verdict uses this journal route once.
+        if view.journal_rebase_commit(&rebase) != .None {
+            c.phase = .Failed
+            return
+        }
+    }
+
     if changing_epoch {
         client_reconcile_actions(c, packet)
     } else {
-        for outcome in packet.completed[:packet.completed_count] {
-            client_outcome(c, outcome, true)
+        for outcome, i in packet.completed[:packet.completed_count] {
+            client_outcome(c, outcome, recovered[i])
         }
 
         client_retire(c, packet.action_settled)
@@ -1255,13 +1371,6 @@ client_welcome_core :: proc(
             cfg = {c.cfg.history, WIRE_EVENTS, c.cfg.history * WIRE_EVENTS * 2},
             allocator = c.allocator,
         )
-    } else {
-        // Existing confirmed verdicts keep their journal route. Only newly
-        // recovered Welcome outcomes need Session's synthetic delivery route.
-        if view.journal_rebase(&c.journal, packet.frame.tick) != .None {
-            c.phase = .Failed
-            return
-        }
     }
 
     client_install_policy(c)
@@ -1898,12 +2007,17 @@ client_presentation_failure :: proc(
 }
 
 @(private)
+client_current_facts_open :: proc(c: ^Client($S, $C, $A, $E, $N)) -> bool {
+    return c.phase == .Running || (c.phase == .Resyncing && c.has_world && !c.recovering)
+}
+
+@(private)
 client_accept_facts :: proc(c: ^Client($S, $C, $A, $E, $N), packet: Facts_Packet(E)) -> (error: Error) {
     if error := client_access(c); error != .None {
         return error
     }
 
-    if c.phase != .Running {
+    if !client_current_facts_open(c) {
         return
     }
 
@@ -1928,6 +2042,12 @@ client_accept_facts :: proc(c: ^Client($S, $C, $A, $E, $N), packet: Facts_Packet
     }
 
     if packet.tick - c.journal.confirmed >= u64(c.cfg.history) {
+        // A refresh only borrows the old stream's bounded contiguous tail. Do
+        // not advance the old world or publish effects while awaiting Welcome.
+        if c.phase == .Resyncing {
+            return
+        }
+
         // A receive burst can contain more than one history window. Apply
         // any retained complete snapshot before discarding these facts. This
         // also handles unordered facts beyond a still-repairable earlier gap.

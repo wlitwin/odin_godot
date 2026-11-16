@@ -1,12 +1,16 @@
 from pathlib import Path
-import hashlib, json, shutil, subprocess, sys
+import hashlib, json, re, shutil, subprocess, sys
 
 root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve()
 subprocess.run([sys.executable,str(root/'tests/replay_claimball_trace/prepare.py'),str(out)],check=True)
 p=out/'project/scripts/observer_trace.odin';s=p.read_text()
-s=s.replace('ready,paused:bool','ready,paused,requested:bool')
-s=s.replace(' pause:=gd.env_int("RCB_TRACE_PAUSE_MS",0)',' trace_maybe_refresh(self)\n pause:=gd.env_int("RCB_TRACE_PAUSE_MS",0)')
-s=s.replace(' data,error:=tape.encode(&t.log);',' if gd.env_int("RCB_TRACE_REFRESH",0)==1 {assert(t.requested)}\n data,error:=tape.encode(&t.log);')
+def patch(pattern,replacement,label):
+ global s
+ s,count=re.subn(pattern,replacement,s,flags=re.M)
+ if count!=1:raise RuntimeError(f'{label}: expected one source anchor, found {count}')
+patch(r'^([ \t]*)ready\s*,\s*paused\s*:\s*bool\s*,[ \t]*$',r'\1ready, paused, requested: bool,','refresh storage')
+patch(r'^([ \t]*)(pause\s*:=\s*gd\.env_int\("RCB_TRACE_PAUSE_MS",\s*0\))\s*$',r'\1trace_maybe_refresh(self)\n\1\2','refresh call')
+patch(r'^([ \t]*)(data\s*,\s*error\s*:=\s*tape\.encode\(&t\.log\))\s*$',r'\1if gd.env_int("RCB_TRACE_REFRESH", 0) == 1 {assert(t.requested)}\n\1\2','refresh completion')
 s+='''
 trace_maybe_refresh :: proc(self:^ReplayClaimball) {
  t:=&self.observer_trace[0];c:=&self.session.client
