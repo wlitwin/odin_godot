@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 project="$ROOT/examples/replay_scrapyard";work="${REPLAY_DASH_INPUT_OUT:-$(mktemp -d)}";mkdir -p "$work"
 trap 'echo "Dash input logs: $work"' EXIT
 case "$(uname -s)" in Darwin) ext=dylib;;Linux) ext=so;;*) ext=dll;;esac
 export ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext"
 if [[ "${REPLAY_PREBUILT:-0}" != 1 ]];then
  bash "$ROOT/build/build_scripts.sh" "$project" >"$work/build.log" 2>&1
- "$GODOT" --headless --path "$project" --editor --quit-after 90 >"$work/import.log" 2>&1
+ odin_godot_test_import "$project" "$ODIN_SCRIPTS_DLL" "$work/import.log"
  if rg -q 'SCRIPT ERROR|ERROR:' "$work/import.log";then cat "$work/import.log";exit 1;fi
  python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/wait.json"
  bash "$ROOT/build/build_scripts.sh" "$project" >"$work/final-build.log" 2>&1

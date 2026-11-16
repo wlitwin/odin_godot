@@ -59,6 +59,7 @@ trap 'rm -rf "$work"' EXIT
 # directory; --full-name makes git print them relative to the repo root either way.
 # Frozen compatibility references are byte-for-byte historical fixtures. Their
 # manifests must continue identifying the captured code, including whitespace.
+# Evolution's generated revision types and scaffold goldens retain emitter bytes.
 if [[ ${#paths[@]} -eq 0 ]]; then
     (cd "$ROOT" && git ls-files -co --exclude-standard --full-name -- '*.odin')
 else
@@ -69,7 +70,9 @@ fi | grep '\.odin$' | grep -v -e '\.gen\.odin$' -e '^bindgen/upstream/' \
     -e '^tests/replay_authority_moderation_compat/reference/' \
     -e '^tests/replay_lz4_staging/reference/' \
     -e '^tests/replay_shuffle/reference/' \
-    -e '^tests/replay_schema_blocks/reference/' | sort -u |
+    -e '^tests/replay_schema_blocks/reference/' \
+    -e '^examples/replay_scrapyard/shared/revisions/' \
+    -e '^tests/replay_evolution/generated/' | sort -u |
     while IFS= read -r rel; do
         if [[ -f "$ROOT/$rel" ]]; then # -c also lists files deleted from the working tree
             echo "$rel"
