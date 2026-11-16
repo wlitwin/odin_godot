@@ -5,7 +5,7 @@ sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 subprocess.run([sys.executable,str(root/'tests/replay_claimball_native_restore/prepare_bridge.py'),str(out/'bridge.gd')],check=True)
 verifier=out/'verify-publication'
 subprocess.run(['odin','build',str(root/'tests/replay_claimball_party_restore/verify'),'-collection:godot='+str(root),'-out:'+str(verifier)],check=True)
-with (out/'certificate.log').open('w') as log:subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(out/'key.pem'),'-out',str(out/'cert.pem'),'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost'],stdout=log,stderr=subprocess.STDOUT,check=True)
+with (out/'certificate.log').open('w') as log:subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(out/'key.pem'),'-out',str(out/'cert.pem'),'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost,IP:127.0.0.1'],stdout=log,stderr=subprocess.STDOUT,check=True)
 os.chmod(out/'key.pem',0o600)
 def port(kind=socket.SOCK_STREAM):
  with socket.socket(socket.AF_INET,kind) as s:s.bind(('127.0.0.1',0));return s.getsockname()[1]
@@ -19,7 +19,7 @@ def service_start(create):
  assert 'tls=true' in (out/('service-'+str(create)+'.log')).read_text();return p
 
 def launch(role,phase):
- label=phase+'-'+role;env=os.environ.copy();env.update(RCB_NATIVE_RESTORE_DIR=str(out),RCB_NATIVE_RESTORE_ROLE=label,RCB_ROOM_SERVICE='wss://localhost:'+str(control),RCB_ROOM_CA=str(out/'cert.pem'),RCB_ROOM_LOCAL='0',RCB_ROOMS_DB=str(out/(role+'-rooms.sqlite3')),RCB_PROFILE=str(out/(role+'-profile')),RCB_ROLE='',RCB_TOKEN='',RCB_NAME='',RCB_PERSIST='1',RCB_BOT='',RCB_GOALS='9',RCB_PLAYERS='3',RCB_PORT=str(ports[role]),RCB_LATENCY='120',RCB_COORD_PORT='0',RCB_PROBE='1',ODIN_SCRIPTS_DLL=str(game/('bin/libodinscripts.'+ext)))
+ label=phase+'-'+role;env=os.environ.copy();env.update(RCB_NATIVE_RESTORE_DIR=str(out),RCB_NATIVE_RESTORE_ROLE=label,RCB_ROOM_SERVICE='wss://127.0.0.1:'+str(control),RCB_ROOM_CA=str(out/'cert.pem'),RCB_ROOM_LOCAL='0',RCB_ROOMS_DB=str(out/(role+'-rooms.sqlite3')),RCB_PROFILE=str(out/(role+'-profile')),RCB_ROLE='',RCB_TOKEN='',RCB_NAME='',RCB_PERSIST='1',RCB_BOT='',RCB_GOALS='9',RCB_PLAYERS='3',RCB_PORT=str(ports[role]),RCB_LATENCY='120',RCB_COORD_PORT='0',RCB_PROBE='1',ODIN_SCRIPTS_DLL=str(game/('bin/libodinscripts.'+ext)))
  log=(out/(label+'.log')).open('w');files.append(log);p=subprocess.Popen([env['GODOT'],'--headless','--max-fps','60','--path',str(game),'--script',str(out/'bridge.gd')],env=env,stdout=log,stderr=subprocess.STDOUT);children.append(p)
  a={'label':label,'process':p};until(a,lambda s:s['profile_ready']==1 and s['recent']==1,'menu');return a
 

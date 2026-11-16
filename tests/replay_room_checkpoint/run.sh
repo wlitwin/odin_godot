@@ -2,6 +2,7 @@
 set -euo pipefail
 umask 077
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"; export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 SERVICE="$ROOT/examples/replay_room_service"; PROJ="$ROOT/tests/replay_room_checkpoint"
 work="${REPLAY_CHECKPOINT_OUT:-$(mktemp -d)}"; mkdir -p "$work"
 server=""
@@ -11,21 +12,31 @@ case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) exit 1 ;; esac
 for project in "$SERVICE" "$PROJ"; do
     name="$(basename "$project")"; export ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext"
     bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$name-build.log" 2>&1
-    "$GODOT" --headless --path "$project" --editor --quit-after 90 >"$work/$name-import.log" 2>&1
-    if rg -q 'SCRIPT ERROR|ERROR:' "$work/$name-import.log"; then cat "$work/$name-import.log"; exit 1; fi
+    odin_godot_test_import "$project" "$ODIN_SCRIPTS_DLL" "$work/$name-import.log"
     python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/$name-wait.json"
     bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$name-final-build.log" 2>&1
 done
-openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/key.pem" -out "$work/cert.pem" -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost >"$work/certificate.log" 2>&1
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/key.pem" -out "$work/cert.pem" -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost,IP:127.0.0.1 >"$work/certificate.log" 2>&1
 export CHECKPOINT_CERT="$work/cert.pem"
 for game in ${CHECKPOINT_GAMES:-cavecrawl cavecrawl-owned speedball scrapyard}; do
     case "$game" in
-        cavecrawl) content=0x4341564552504c39 ;;
-        cavecrawl-owned) content=0x434156454f574e33 ;;
-        speedball) content=0x5253504545444234 ;;
-        scrapyard) content=0x5253435241503049 ;;
+        cavecrawl) content_source=examples/replay_cavecrawl/shared/cave/types.odin ;;
+        cavecrawl-owned) content_source=examples/replay_cavecrawl/shared/owner_cave/game.odin ;;
+        speedball) content_source=examples/replay_speedball/shared/pitch/types.odin ;;
+        scrapyard) content_source=examples/replay_scrapyard/shared/game/game.odin ;;
         *) echo "Unknown checkpoint fixture game: $game";exit 1 ;;
     esac
+    # Deploy the same current identity as the compiled checkpoint producer and
+    # validator. A copied literal can silently lag a game's versioned schema.
+    content="$(python3 - "$ROOT/$content_source" <<'PYCONTENT'
+from pathlib import Path
+import re, sys
+values = re.findall(r'^\s*CONTENT\s*::\s*u64\(0x([0-9a-fA-F]+)\)', Path(sys.argv[1]).read_text(), re.M)
+if len(values) != 1:
+    raise SystemExit('expected one explicit game CONTENT identity: ' + sys.argv[1])
+print('0x' + values[0])
+PYCONTENT
+)"
     mkdir -p "$work/$game"
     export CHECKPOINT_GAME="$game" CHECKPOINT_EXPECTED="$work/$game/archive.sha256"
     export CHECKPOINT_PORT=$((30000+RANDOM%10000))

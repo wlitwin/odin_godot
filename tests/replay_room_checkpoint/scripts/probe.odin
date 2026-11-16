@@ -89,7 +89,9 @@ room_checkpoint_probe_ready :: proc(self: ^RoomCheckpointProbe) {
 
     if rgd.provision_connect(
            &self.connection,
-           fmt.tprintf("wss://localhost:%d", gd.env_int("CHECKPOINT_PORT", 49740)),
+           // Match the service's explicit IPv4 loopback bind. The fixture
+           // certificate includes this IP; hostname verification stays enabled.
+           fmt.tprintf("wss://127.0.0.1:%d", gd.env_int("CHECKPOINT_PORT", 49740)),
            tls = self.tls,
        ) !=
        .None {
