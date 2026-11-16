@@ -87,7 +87,32 @@ func _process(_dt: float) -> bool:
 			if directory != "":
 				for role in ["host", "client", "observer"]:
 					if not FileAccess.file_exists(directory + "/measured-" + role): return false
-			print("REPLAY_SCRAPYARD_ARENA_PEER_OK")
-			quit(0)
-			return true
+			phase = "shutdown"
+			shutdown()
+			return false
 	return false
+
+func shutdown() -> void:
+	var streams: Array[WeakRef] = []
+	for player in game.find_children("*", "AudioStreamPlayer", true, false):
+		if player.stream != null:
+			streams.append(weakref(player.stream))
+	# Scene teardown stops music and releases its owned references. AudioServer
+	# retires the stopped playbacks during later mix/main-loop cleanup, so wait
+	# for actual release before stopping the engine that performs that cleanup.
+	game.queue_free()
+	await process_frame
+	var deadline := Time.get_ticks_msec() + 2000
+	while true:
+		var pending := false
+		for stream in streams:
+			if stream.get_ref() != null:
+				pending = true
+		if not pending:
+			break
+		if Time.get_ticks_msec() > deadline:
+			fail("music playback did not release after scene teardown")
+			return
+		await process_frame
+	print("REPLAY_SCRAPYARD_ARENA_PEER_OK")
+	quit(0)

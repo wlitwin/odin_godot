@@ -2,14 +2,23 @@
 set -euo pipefail
 umask 077
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 PROJ="$ROOT/examples/replay_scrapyard";SERVICE="$ROOT/examples/replay_room_service";work="${RSY_ONLINE_OUT:-$(mktemp -d)}";mkdir -p "$work/host" "$work/guest";pids=()
-trap 'for pid in "${pids[@]}";do kill "$pid" 2>/dev/null || true;wait "$pid" 2>/dev/null || true;done;echo "Scrapyard party logs: $work"' EXIT
+cleanup() {
+ local result=$?
+ trap - EXIT
+ for pid in ${pids[@]+"${pids[@]}"};do kill "$pid" 2>/dev/null || true;wait "$pid" 2>/dev/null || true;done
+ echo "Scrapyard party logs: $work"
+ if [[ "$result" != 0 ]];then python3 "$ROOT/tests/log_tail.py" "$work" || true;fi
+ exit "$result"
+}
+trap cleanup EXIT
+room_content="$(python3 "$ROOT/tests/replay_scrapyard/content_id.py" "$PROJ")"
 case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) exit 1 ;; esac
 for project in "$SERVICE" "$PROJ";do
  name="$(basename "$project")";export ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext"
  bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$name-build.log" 2>&1
- "$GODOT" --headless --path "$project" --editor --quit-after 90 >"$work/$name-import.log" 2>&1
- if rg -q 'SCRIPT ERROR|ERROR:' "$work/$name-import.log";then cat "$work/$name-import.log";exit 1;fi
+ odin_godot_test_import "$project" "$project/bin/libodinscripts.$ext" "$work/$name-import.log"
  python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/$name-wait.json"
  bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$name-final-build.log" 2>&1
 done
@@ -17,7 +26,7 @@ odin build "$ROOT/tests/replay_scrapyard/online_seed" -collection:godot="$ROOT" 
 for role in host guest;do "$work/seed" "$work/$role" "$role";done
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$work/key.pem" -out "$work/cert.pem" -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost >"$work/cert.log" 2>&1
 control=$((30000+RANDOM%9000));gameport=$((41000+RANDOM%8000))
-REPLAY_ROOM_CONTENT=0x5253435241503048 REPLAY_ROOM_PORT="$control" REPLAY_ROOM_DB="$work/service.sqlite3" REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_CERT="$work/cert.pem" REPLAY_ROOM_KEY="$work/key.pem" ODIN_SCRIPTS_DLL="$SERVICE/bin/libodinscripts.$ext" "$GODOT" --headless --max-fps 120 --path "$SERVICE" >"$work/service.log" 2>&1 &pids+=("$!")
+REPLAY_ROOM_CONTENT="$room_content" REPLAY_ROOM_PORT="$control" REPLAY_ROOM_DB="$work/service.sqlite3" REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_CERT="$work/cert.pem" REPLAY_ROOM_KEY="$work/key.pem" ODIN_SCRIPTS_DLL="$SERVICE/bin/libodinscripts.$ext" "$GODOT" --headless --max-fps 120 --path "$SERVICE" >"$work/service.log" 2>&1 &pids+=("$!")
 for _ in {1..100};do if rg -q REPLAY_ROOM_SERVICE_READY "$work/service.log";then break;fi;sleep 0.1;done
 rg -q REPLAY_ROOM_SERVICE_READY "$work/service.log"
 export RSY_ROLE='' RSY_ROOM_SERVICE="wss://localhost:$control" RSY_ROOM_CA="$work/cert.pem" RSY_PERSIST=1 RSY_ONLINE_WORK="$work" RSY_RUN=0 RSY_ENCOUNTER=migration RSY_AUDIO=0 RSY_SETTINGS_PATH="$work/settings" RSY_MODS_DIR="$work/no-mods"

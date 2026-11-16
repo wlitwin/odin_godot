@@ -3,7 +3,7 @@ import hashlib,json,os,re,socket,subprocess,sys,time
 root=Path(__file__).resolve().parents[2];game=Path(sys.argv[1]).resolve()/'project';service=Path(sys.argv[2]).resolve()/'project';out=Path(sys.argv[3]).resolve();out.mkdir(exist_ok=False);os.chmod(out,0o700);ext='dylib' if sys.platform=='darwin' else 'so'
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 subprocess.run([sys.executable,str(root/'tests/replay_quickdraw_native_restore/prepare_bridge.py'),str(out/'bridge.gd')],check=True)
-with (out/'certificate.log').open('w') as log:subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(out/'key.pem'),'-out',str(out/'cert.pem'),'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost'],stdout=log,stderr=subprocess.STDOUT,check=True)
+with (out/'certificate.log').open('w') as log:subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-keyout',str(out/'key.pem'),'-out',str(out/'cert.pem'),'-days','1','-subj','/CN=localhost','-addext','subjectAltName=DNS:localhost,IP:127.0.0.1'],stdout=log,stderr=subprocess.STDOUT,check=True)
 os.chmod(out/'key.pem',0o600)
 def port():
  with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as s:s.bind(('127.0.0.1',0));return s.getsockname()[1]
@@ -17,7 +17,7 @@ def service_start(create):
  assert 'tls=true' in (out/('service-'+str(create)+'.log')).read_text();return p
 
 def launch(role,phase):
- label=phase+'-'+role;env=os.environ.copy();env.update(RQ_NATIVE_RESTORE_DIR=str(out),RQ_NATIVE_RESTORE_ROLE=label,RQ_ROOM_SERVICE='wss://localhost:'+str(control),RQ_ROOM_CA=str(out/'cert.pem'),RQ_ROOM_LOCAL='0',RQ_ROOMS_DB=str(out/(role+'-rooms.sqlite3')),RQ_PROFILE=str(out/(role+'-profile')),RQ_ROLE='',RQ_TOKEN='',RQ_NAME='',RQ_PERSIST='1',RQ_BOT='',RQ_GOLD='1',RQ_PORT=str(ports[role]),RQ_LATENCY='120',RQ_COORD_PORT='0',RQ_PROBE='1',ODIN_SCRIPTS_DLL=str(game/('bin/libodinscripts.'+ext)))
+ label=phase+'-'+role;env=os.environ.copy();env.update(RQ_NATIVE_RESTORE_DIR=str(out),RQ_NATIVE_RESTORE_ROLE=label,RQ_ROOM_SERVICE='wss://127.0.0.1:'+str(control),RQ_ROOM_CA=str(out/'cert.pem'),RQ_ROOM_LOCAL='0',RQ_ROOMS_DB=str(out/(role+'-rooms.sqlite3')),RQ_PROFILE=str(out/(role+'-profile')),RQ_ROLE='',RQ_TOKEN='',RQ_NAME='',RQ_PERSIST='1',RQ_BOT='',RQ_GOLD='1',RQ_PORT=str(ports[role]),RQ_LATENCY='120',RQ_COORD_PORT='0',RQ_PROBE='1',ODIN_SCRIPTS_DLL=str(game/('bin/libodinscripts.'+ext)))
  log=(out/(label+'.log')).open('w');files.append(log);p=subprocess.Popen([env['GODOT'],'--headless','--max-fps','60','--path',str(game),'--script',str(out/'bridge.gd')],env=env,stdout=log,stderr=subprocess.STDOUT);children.append(p)
  a={'label':label,'process':p};until(a,lambda s:s['profile_ready']==1 and s['recent']==1,'menu');return a
 
@@ -71,7 +71,8 @@ try:
  watch=launch('watch','returned');send(watch,'watch',True);send(watch,'press',paths['rejoin']);until(watch,lambda s:s['member']==4 and s['incarnation']>1,'observer registered');assert status(watch)['authority']==0
  host=launch('host','returned');assert status(host)['name']=='Marshal';send(host,'press',paths['rejoin']);restored=until(host,lambda s:s['ready'] and s['steady']==1 and s['epoch']==2 and s['party_restore_publication']==1,'restored',60)
  assert restored['profile_hash']==identity,'connected native identity changed'
- assert restored['party_restore_tick']==saved['party_save_tick'] and restored['incarnation']>saved['incarnation'];assert send(host,'hash',saved['party_save_tick'])['hash']==saved_hash;assert 'Saved party restored' in restored['recovery_notice']
+ assert restored['party_restore_tick']==saved['party_save_tick'] and restored['incarnation']>saved['incarnation'];assert send(host,'hash',saved['party_save_tick'])['hash']==saved_hash;assert re.search(r'(?:Saved party|Party) restored',restored['recovery_notice']),{'notice':restored['recovery_notice'],'lost':restored['lost'],'tick':restored['party_restore_tick']}
+ if restored['lost']>0:assert 'recent progress lost' in restored['recovery_notice']
  until(watch,lambda s:s['ready'] and s['epoch']==2 and s['observer']==1 and s['seat']==0 and s['backup']==0,'observer follows')
  deputy=launch('deputy','returned');send(deputy,'press',paths['rejoin']);until(deputy,lambda s:s['ready'] and s['epoch']==2 and s['seat']==2,'deputy returns')
  rider=launch('rider','returned');send(rider,'press',paths['rejoin']);until(rider,lambda s:s['ready'] and s['epoch']==2 and s['seat']==3 and s['boots3']==1,'rider returns')

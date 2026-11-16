@@ -6,7 +6,8 @@ func _initialize():
  game=load("res://cave.tscn").instantiate();root.add_child(game);call_deferred("run")
 func run():
  var deadline:=Time.get_ticks_msec()+15000
- while int(game.feedback_probe("ready"))!=1:
+ # Cue-pool readiness can precede the first joined-player render.
+ while int(game.feedback_probe("ready"))!=1 or not game.has_node("Stage/Spelunker"):
   if Time.get_ticks_msec()>deadline:check(false,"startup");return
   await process_frame
  game.set_process(false)

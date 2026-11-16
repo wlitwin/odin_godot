@@ -24,6 +24,7 @@
 set -uo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 source "$ROOT/tests/platform.sh"
+source "$ROOT/tests/import_project.sh"
 PROJ="$ROOT/examples/quickdraw"
 LOGDIR="$PROJ/.qdlogs"
 
@@ -36,7 +37,7 @@ FSLP_PROJ="$PROJ"
 FSLP_LOGS="$LOGDIR"
 source "$ROOT/build/template/test/harness.sh"
 
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+odin_godot_test_import "$PROJ" "$ODIN_SCRIPTS_DLL" "$LOGDIR/import.log" || exit 1
 
 launch() { # launch <role> <bot> <name> <token> <log> <port> <norewind>
     local role="$1" bot="$2" name="$3" token="$4" log="$5" port="$6" norewind="$7"

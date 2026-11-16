@@ -2,6 +2,7 @@
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 export RSY_RUN=0
 PROJ="$ROOT/examples/replay_scrapyard"; work="$(mktemp -d)"; pids=()
 cleanup() { for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; done; if [[ "${REPLAY_KEEP_LOGS:-0}" == 1 ]]; then echo "Replay Scrapyard logs: $work"; else rm -rf "$work"; fi; }
@@ -9,7 +10,7 @@ trap cleanup EXIT
 if [[ "${REPLAY_PREBUILT:-0}" != 1 ]]; then bash "$ROOT/build/build_scripts.sh" "$PROJ"; fi
 case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.$ext"
-if ! "$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$work/import.log" 2>&1; then cat "$work/import.log"; exit 1; fi
+odin_godot_test_import "$PROJ" "$ODIN_SCRIPTS_DLL" "$work/import.log"
 if rg -q 'SCRIPT ERROR|ERROR:' "$work/import.log"; then cat "$work/import.log"; exit 1; fi
 export RSY_MOBS=0 RSY_REQUIRE_STOCK=1
 export RSY_SEED=1337 RSY_PORT=$((40000 + RANDOM % 12000)) RSY_LATENCY="${RSY_LATENCY:-120}"
