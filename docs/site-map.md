@@ -185,6 +185,8 @@ the whole map or use your browser's Find command to locate a subject.
 | Page | Topics |
 | --- | --- |
 | [Contributor overview](contributing/index.md) | Source layout, focused checks, and documentation development |
+| [Testing components](contributing/testing.md) | Small core, independent component commands, and broader acceptance checks |
+| [CI review](contributing/ci-review.md) | Real usage defects, brittle fixtures, evidence, and test boundaries |
 | [SDK architecture](contributing/architecture.md) | Build, load, reload, desktop export, and browser composition |
 | [Core and scripts boundary](contributing/native-boundary.md) | ABI compatibility, callbacks, allocation ownership, and lifetimes |
 | [Kit conventions](kit/conventions.md) | Contributor rules for Kit APIs and implementation |

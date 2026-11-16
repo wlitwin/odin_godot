@@ -23,8 +23,16 @@ framework guides instead.
 
 ## Validate a change
 
-Enter `nix develop` and run the focused test or example for the behavior you
-changed. The full headless suite is:
+Enter `nix develop` and run the [component core](testing.md) for the behavior you
+changed. For example:
+
+```sh
+nix develop --command bash tests/run_core.sh kit
+nix develop --command bash tests/run_core.sh replay --unit
+```
+
+The [CI review](ci-review.md) explains which failures warranted framework fixes
+and which came from brittle fixtures. The full acceptance suite remains explicit:
 
 ```sh
 nix develop --command bash tests/run_all.sh

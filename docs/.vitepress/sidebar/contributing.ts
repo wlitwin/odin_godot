@@ -6,6 +6,14 @@ const sidebar: DefaultTheme.SidebarItem[] = [
     "link": "/contributing/"
   },
   {
+    "text": "Testing components",
+    "link": "/contributing/testing"
+  },
+  {
+    "text": "CI review",
+    "link": "/contributing/ci-review"
+  },
+  {
     "text": "SDK architecture",
     "link": "/contributing/architecture"
   },
