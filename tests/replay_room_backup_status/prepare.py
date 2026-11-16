@@ -1,12 +1,18 @@
 from pathlib import Path
-import hashlib,json,shutil,subprocess,sys
+import hashlib,json,re,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve()
 subprocess.run([sys.executable,str(root/'tests/replay_slopball_ui/prepare.py'),str(out)],check=True)
-p=out/'project/scripts/slopball.odin';s=p.read_text().replace('owner: gd.Node2d,','owner: gd.Node2d,\n test_prepare_allowed:bool,',1);p.write_text(s)
-p=out/'project/scripts/migration.odin';s=p.read_text();needle='opts.session.discover_epoch=false';s=s.replace(needle,needle+'''
+p=out/'project/scripts/slopball.odin';s=p.read_text()
+s,count=re.subn(r'^([ \t]*owner:[ \t]*gd\.Node2d,)[ \t]*$',r'\1\n    test_prepare_allowed: bool,',s,flags=re.M)
+if count!=1:raise RuntimeError(f'backup storage: expected one source anchor, found {count}')
+p.write_text(s)
+p=out/'project/scripts/migration.odin';s=p.read_text()
+s,count=re.subn(r'^([ \t]*opts\.session\.discover_epoch\s*=\s*false)[ \t]*$',r'\1'+'''
   opts.preparation_user=self
   opts.preparation_ready=proc(user:rawptr,point:auth.Point,bytes:[]u8)->bool {return (cast(^ReplaySlopball)user).test_prepare_allowed}
-''',1);s+='''
+''',s,flags=re.M)
+if count!=1:raise RuntimeError(f'backup preparation callback: expected one source anchor, found {count}')
+s+='''
 @(gd_method)
 replay_slopball_allow_backup :: proc(self:^ReplaySlopball,allow:bool) {self.test_prepare_allowed=allow}
 @(gd_method)
