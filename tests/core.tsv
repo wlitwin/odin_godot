@@ -1,0 +1,21 @@
+# component	check	needs_godot
+bridge	scriptgen	0
+bridge	wireabi	0
+bridge	phase35	1
+bridge	godotlifetimes	1
+bridge	phase4	1
+kit	kitnet	0
+kit	kitsim	0
+kit	kitsession	0
+kit	kitwasm	0
+replay	replay	0
+replay	replaypackages	0
+replay	replaynet	0
+replay	replayview	0
+replay	replayrecovery	0
+replay	replayauthority	0
+replay	replayauthoritysqlite	0
+replay	replaydeterministic	0
+replay	replayreplica	1
+utilities	flow	0
+utilities	events	0

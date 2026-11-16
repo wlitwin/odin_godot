@@ -1,8 +1,5 @@
-# CI: run the headless E2E suite on Linux.
-#
-# Web tests are skipped (SKIP_WEB=1): they need Chrome + puppeteer, which this runner
-# doesn't set up. Native rendered checks use Xvfb and Mesa software rendering.
-
+# Small component contracts run once on each change. The full application matrix
+# remains explicitly available in ci-extended.yml and tests/run_all.sh.
 name: ci
 
 on:
@@ -14,94 +11,50 @@ on:
 jobs:
   test-linux:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
-    env:
-      SUITE_SHARD_INDEX: ${{ matrix.shard }}
-      SUITE_SHARD_COUNT: '8'
+        component: [bridge, kit, replay, utilities]
     steps:
       - uses: actions/checkout@v6
-
       - uses: cachix/install-nix-action@v31
-
       - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
-
-      - name: Install native signaling-test dependencies
+      - name: Install signaling-test dependency
         run: npm ci --ignore-scripts
-
-      - name: Install virtual display and audio for native rendering checks
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb xauth libgl1 libegl1 libgl1-mesa-dri libxkbcommon0 pulseaudio
-
-      - name: Start silent audio output for native rendering checks
-        run: |
-          pulseaudio --start --exit-idle-time=-1
-          pactl load-module module-null-sink sink_name=odin_ci
-          pactl set-default-sink odin_ci
-
-      - name: Keep intentional crash checks from filling the runner disk
-        run: |
-          sudo mkdir -p /etc/systemd/coredump.conf.d
-          printf '[Coredump]\nStorage=none\nProcessSizeMax=0\n' | sudo tee /etc/systemd/coredump.conf.d/odin-ci.conf
-
-      - name: Install Godot 4.7.1 (linux headless)
+      - name: Install Godot for engine contracts
+        if: matrix.component == 'bridge' || matrix.component == 'replay'
         run: |
           curl -fsSLo godot.zip \
             https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
           unzip -q godot.zip
           chmod +x Godot_v4.7.1-stable_linux.x86_64
           echo "GODOT=$PWD/Godot_v4.7.1-stable_linux.x86_64" >> "$GITHUB_ENV"
-
-      - name: Cache native Linux export templates
-        id: templates
-        uses: actions/cache@v4
-        with:
-          path: ~/.local/share/godot/export_templates/4.7.1.stable
-          key: godot-4.7.1-linux-x86_64-templates-v1
-
-      - name: Install native Linux export templates
-        if: steps.templates.outputs.cache-hit != 'true'
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/godot-templates.tpz" \
-            https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
-          template_dir="$HOME/.local/share/godot/export_templates/4.7.1.stable"
-          mkdir -p "$template_dir"
-          unzip -jo "$RUNNER_TEMP/godot-templates.tpz" \
-            templates/linux_debug.x86_64 templates/linux_release.x86_64 templates/version.txt \
-            -d "$template_dir"
-          chmod +x "$template_dir"/linux_*.x86_64
-          rm "$RUNNER_TEMP/godot-templates.tpz"
-
-      - name: Dump engine API (extension_api.json is gitignored)
+      - name: Dump engine API
+        if: matrix.component == 'bridge' || matrix.component == 'replay'
         run: nix develop --command make api-dump
-
-      - name: Verify Bash and PowerShell build-helper parity
+      - name: Verify build-helper parity
+        if: matrix.component == 'bridge'
         run: nix develop .#build-parity --command bash tests/build_helpers/run.sh
-
-      - name: Verify suite reporting and native fixture helpers
+      - name: Verify runner and fixture helpers
+        if: matrix.component == 'utilities'
         run: |
           set -euo pipefail
           mkdir -p tests/.logs
-          nix develop --command python3 -m unittest discover -s tests/suite_runner -v 2>&1 | tee tests/.logs/suite-runner-unit.log
+          nix develop --command python3 -m unittest discover -s tests/suite_runner -v 2>&1 | tee tests/.logs/runner-unit.log
           nix develop --command python3 -m unittest discover -s tests -p platform_test.py -v 2>&1 | tee tests/.logs/platform-unit.log
           nix develop --command python3 -m unittest discover -s tests -p import_project_test.py -v 2>&1 | tee tests/.logs/import-unit.log
-
-      - name: Run the suite
-        timeout-minutes: 50
-        run: xvfb-run -a -s '-screen 0 1280x720x24' env SKIP_WEB=1 LIBGL_ALWAYS_SOFTWARE=1 nix develop --command bash tests/run_all.sh
-
-      - name: Preserve test results and logs
+      - name: Run component contracts
+        timeout-minutes: 20
+        run: nix develop --command bash tests/run_core.sh '${{ matrix.component }}'
+      - name: Preserve results and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-logs-linux-${{ matrix.shard }}
+          name: core-linux-${{ matrix.component }}
           path: tests/.logs/
           include-hidden-files: true

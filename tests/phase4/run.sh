@@ -6,6 +6,7 @@ set -euo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 source "$ROOT/tests/platform.sh"
+source "$ROOT/tests/import_project.sh"
 PROJ="$ROOT/tests/phase4"
 
 # The live test swaps this authored fixture to v2. Always start at v1, and restore both
@@ -30,7 +31,8 @@ bash "$ROOT/build/build_scripts.sh" "$PROJ"
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+mkdir -p "$ROOT/tests/.logs"
+odin_godot_test_import "$PROJ" "$ODIN_SCRIPTS_DLL" "$ROOT/tests/.logs/phase4-import.log"
 
 # Run the milestone test. The test rebuilds the scripts dll as v2 mid-run (OS.execute)
 # then triggers the reload, so `odin` must be on PATH — it is, inside the nix shell.

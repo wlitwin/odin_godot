@@ -662,7 +662,25 @@ done
 if [[ ${#missing[@]} -gt 0 ]]; then
     echo "run_all: required tools missing: ${missing[*]}; enter nix develop" >&2; exit 2
 fi
-if [[ -z "${GODOT:-}" || ! -x "${GODOT:-/nonexistent}" ]]; then
+# Only explicitly engine-free core entries can bypass the engine preflight.
+# Unknown/non-core selections retain the full suite's conservative requirement.
+core_engine_free() {
+    local wanted="$1" group name needs_godot extra matches=0
+    [[ -f "$ROOT/tests/core.tsv" ]] || return 1
+    while IFS=$'\t' read -r group name needs_godot extra; do
+        [[ "$name" == "$wanted" && "$group" != \#* ]] || continue
+        case "$group" in bridge|kit|replay|utilities) ;; *) return 1 ;; esac
+        [[ "$needs_godot" == 0 && -z "${extra:-}" ]] || return 1
+        matches=$((matches + 1))
+    done < "$ROOT/tests/core.tsv"
+    [[ "$matches" == 1 ]]
+}
+needs_engine=0
+for position in "${!TESTS[@]}"; do
+    IFS='|' read -r name sentinel script skip capability <<<"${TESTS[$position]}"
+    if selected "$name" "$position" && ! core_engine_free "$name"; then needs_engine=1; break; fi
+done
+if [[ "$needs_engine" == 1 && ( -z "${GODOT:-}" || ! -x "${GODOT:-/nonexistent}" ) ]]; then
     echo 'run_all: GODOT must name an executable; enter nix develop and set it on Linux' >&2; exit 2
 fi
 TIMEOUT_SECS="${TIMEOUT_SECS:-600}"
@@ -676,13 +694,16 @@ if ! ulimit -S -c 0; then
     exit 2
 fi
 export ODIN_GODOT_ROOT="$ROOT"
-# Cache this suite's preprocessor separately from nested test output directories.
-SGEN_BIN="$LOGDIR/suite-scriptgen"
-if "${ODIN:-odin}" build "$ROOT/scriptgen" -collection:godot="$ROOT" -out:"$SGEN_BIN" -debug >"$LOGDIR/scriptgen_build.log" 2>&1; then
-    export SGEN_BIN
-else
-    echo "run_all: scriptgen pre-build failed; see $LOGDIR/scriptgen_build.log" >&2
-    exit 2
+# Engine suites share a preprocessor cache. Engine-free checks build codegen
+# through their own wrappers when needed; utilities must not depend on scriptgen.
+if [[ "$needs_engine" == 1 ]]; then
+    SGEN_BIN="$LOGDIR/suite-scriptgen"
+    if "${ODIN:-odin}" build "$ROOT/scriptgen" -collection:godot="$ROOT" -out:"$SGEN_BIN" -debug >"$LOGDIR/scriptgen_build.log" 2>&1; then
+        export SGEN_BIN
+    else
+        echo "run_all: scriptgen pre-build failed; see $LOGDIR/scriptgen_build.log" >&2
+        exit 2
+    fi
 fi
 
 run_one() {

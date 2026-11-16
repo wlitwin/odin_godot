@@ -1,13 +1,41 @@
 # Suite selection and results
 
-Run the suite from the repository root inside `nix develop`. `GODOT` must name
-the matching executable on Linux. With no arguments, every manifest entry is
+Run the suite from the repository root inside `nix develop`. Engine checks need
+`GODOT` to name the matching executable on Linux. With no arguments, every manifest entry is
 selected. Exact names select focused checks:
 
 ```sh
 bash tests/run_all.sh --list
 SKIP_WEB=1 bash tests/run_all.sh flow replaybrowsercheckpoint replayslop3
 ```
+
+The small core in `tests/core.tsv` has 20 entry points, grouped by component:
+
+```sh
+bash tests/run_core.sh bridge
+env -u GODOT bash tests/run_core.sh kit
+bash tests/run_core.sh replay
+env -u GODOT bash tests/run_core.sh utilities
+bash tests/run_core.sh all --list
+env -u GODOT bash tests/run_core.sh replay --unit
+```
+
+`--unit` selects only the component's explicitly engine-free entries. Kit and
+utilities are entirely engine-free; Replay has eight engine-free entries plus
+one real ENet recovery test. Bridge includes three Godot integration checks.
+Native/WASM simulation equality is executed by `replaydeterministic`; the actual
+network recovery test remains independently selectable as `replayreplica`.
+
+`run_core.sh` only selects names and delegates to `run_all.sh`. It clears inherited
+shard settings so a focused component cannot silently omit checks. Reports and
+per-check logs default to `tests/.logs/core/<component>` (with `-unit` when used);
+`SUITE_LOGDIR` still overrides that location. The existing result schema, limits,
+failure handling and omitted-entry counts are shared with the full catalog.
+
+Only a selection consisting entirely of entries explicitly marked engine-free
+in `core.tsv` may run without `GODOT`. Other or mixed selections retain the engine
+preflight. This is an execution boundary, not a claim that omitted example,
+browser, physics or integration tests passed. Box3D workflows remain separate.
 
 Each entry in `tests/run_all.sh` declares its execution capability:
 
