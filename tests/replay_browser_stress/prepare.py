@@ -1,7 +1,8 @@
 from pathlib import Path
-import hashlib,json,shutil,subprocess,sys
+import hashlib,json,os,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2];here=Path(__file__).parent;out=Path(sys.argv[1]).resolve()
-subprocess.run([sys.executable,str(root/'tests/replay_jam_comparison/prepare.py'),str(out)],check=True)
+env=os.environ|{'REPLAY_COMPARISON_IMPLEMENTATIONS':'replay'}
+subprocess.run([sys.executable,str(root/'tests/replay_jam_comparison/prepare.py'),str(out)],env=env,check=True)
 project=out/'replay/project'
 s=(root/'tests/replay_jam_comparison/driver.gd').read_text().replace('extends SceneTree','extends Node',1)
 a=s.index('func write(');b=s.index('func fail(',a)

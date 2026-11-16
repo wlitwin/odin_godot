@@ -1,11 +1,18 @@
 """Verify data-only authoring, absence of the cold client's row, and all peer results."""
 from pathlib import Path
-import difflib,hashlib,itertools,json,re,sys
+import itertools,json,re,sys
+from fixture import CATALOG_FILES,digest,snapshot,verify_catalog
 
-def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def report(root,partial=False):
  root=Path(root);contract=json.loads((root/'contract.json').read_text());plan=json.loads((root/'run-plan.json').read_text())
  assert contract==json.loads((Path(__file__).parent/'contract.json').read_text())
+ implementations=plan['implementations'];environment=json.loads((root/'environment.json').read_text())
+ assert implementations==environment['implementations']
+ assert implementations in (['replay'],['kit','replay']) and set(contract['required_implementations'])<=set(implementations)
+ assert ('kit' in implementations)==(environment['original_revision'] is not None)
+ for variant,count in [('new',8),('cold',7)]:
+  assert 'REPLAY_WEAPON_STOCK_OK guns='+str(count) in (root/('native-stock-'+variant+'.log')).read_text()
+
  full=plan['cases']==contract['cases'] and plan['conditions']==contract['conditions'] and plan['repetitions']==contract['repetitions']
  assert full or partial
  assert plan['receive_delay_ms']=={'local':0,'delayed':120} and plan['loss_permyriad']==plan['duplicate_permyriad']==0
@@ -13,34 +20,45 @@ def report(root,partial=False):
  assert plan['conditions'] and set(plan['conditions'])<=set(contract['conditions']) and len(set(plan['conditions']))==len(plan['conditions'])
  assert type(plan['repetitions'])==int and 1<=plan['repetitions']<=contract['repetitions']
  build=json.loads((root/'build.json').read_text())
+ actual_binaries={str(p.relative_to(root)) for impl,variant in itertools.product(implementations,('new','cold')) for p in (root/impl/variant/'project/bin').iterdir() if p.is_file() and p.suffix in ('.so','.dylib','.dll')}
+ assert set(build['binaries'])==actual_binaries
+ for impl,variant in itertools.product(implementations,('new','cold')):
+  folder=root/impl/variant/'project/bin'
+  assert any(all((folder/(name+ext)).is_file() for name in ('libodin_godot','libodinscripts')) for ext in ('.so','.dylib','.dll')),('missing native libraries',impl,variant)
  for name,expected in build['binaries'].items():assert digest(root/name)==expected,('binary',name)
  feature_summary={}
- for impl,variant in itertools.product(('kit','replay'),('new','cold')):
-  base=root/impl/variant;project=base/'project';before=json.loads((base/'before.json').read_text());source=json.loads((base/'source.json').read_text());feature=json.loads((base/'feature/changes.json').read_text());fixture=json.loads((base/'fixture-changes.json').read_text())
-  expected={'data/guns/stapler.tres'}|({'shared/content/stock.odin'} if impl=='replay' else set()) if variant=='new' else set()
-  assert set(feature['changes'])==expected and feature['implementation']==impl and feature['variant']==variant
+ for impl,variant in itertools.product(implementations,('new','cold')):
+  base=root/impl/variant;project=base/'project';before=json.loads((base/'before.json').read_text());source=json.loads((base/'source.json').read_text());feature=json.loads((base/'feature/changes.json').read_text());fixture=json.loads((base/'fixture-changes.json').read_text());inputs=json.loads((base/'inputs.json').read_text())
+  assert set(feature['changes'])==({'data/guns/stapler.tres'} if variant=='new' else set())
+  assert feature['implementation']==impl and feature['variant']==variant
   assert feature['handwritten_gameplay_files']==feature['handwritten_network_files']==0 and feature['authored_resource_files']==int(variant=='new')
   expected_after=dict(before)
   for name,row in feature['changes'].items():assert row['before']==before.get(name);expected_after[name]=row['after']
   for name,row in fixture.items():assert row['before']==expected_after[name];expected_after[name]=row['after']
-  assert set(fixture)==({'data/mobs/hulk.tres','shared/content/stock.odin'} if impl=='replay' else {'data/mobs/hulk.tres'})
-  assert set(source)==set(expected_after)|{'weapon_authoring.gd','scripts/weapon_authoring.odin'}
-  for name,expected_hash in expected_after.items():assert source[name]==expected_hash,('unrecorded edit',impl,variant,name)
-  for name,expected_hash in source.items():assert digest(project/name)==expected_hash,('source',impl,variant,name)
+  assert set(fixture)=={'data/mobs/hulk.tres'}
+  assert set(inputs)==set(expected_after)|{'weapon_authoring.gd','scripts/weapon_authoring.odin'}
+  for name,expected_hash in expected_after.items():assert inputs[name]==expected_hash,('unrecorded input edit',impl,variant,name)
+  here=Path(__file__).parent
+  if impl=='replay':assert before['tools/stock.py']==digest(here.parents[1]/'examples/replay_scrapyard/tools/stock.py')
+  assert inputs['weapon_authoring.gd']==digest(here/'driver.gd')
+  assert inputs['scripts/weapon_authoring.odin']==digest(here/(impl+'_adapter.odin'))
+  catalog=json.loads((base/'catalog/changes.json').read_text())
+  assert set(catalog)==(set(CATALOG_FILES) if impl=='replay' else set())
+  expected_source=dict(inputs)
+  for name,row in catalog.items():
+   assert row['before']==inputs[name]
+   assert digest(base/'catalog'/('before-'+Path(name).name))==row['before']
+   assert digest(base/'catalog'/('after-'+Path(name).name))==row['after']
+   expected_source[name]=row['after']
+  assert source==expected_source and snapshot(project)==source
+  if impl=='replay':verify_catalog(project)
   if variant=='cold':
    assert not (project/'data/guns/stapler.tres').exists()
-   if impl=='replay':assert 'c.guns[7]' not in (project/'shared/content/stock.odin').read_text()
   else:
-   resource=base/'feature/stapler.tres';assert digest(resource)==digest(Path(__file__).parent/'stapler.tres')==digest(project/'data/guns/stapler.tres')
-   row={'authored_files':1,'resource_physical_lines':len(resource.read_text().splitlines()),'resource_nonblank_lines':sum(bool(x.strip()) for x in resource.read_text().splitlines()),'handwritten_gameplay_files':0,'handwritten_network_files':0,'derived_added_lines':0,'derived_removed_lines':0}
-   if impl=='replay':
-    a=base/'feature/stock-before.odin';b=base/'feature/stock-after.odin';delta=''.join(difflib.unified_diff(a.read_text().splitlines(True),b.read_text().splitlines(True),fromfile='stock-before.odin',tofile='stock-after.odin'))
-    assert digest(a)==before['shared/content/stock.odin'] and digest(b)==feature['changes']['shared/content/stock.odin']['after']
-    assert delta==(base/'feature/generated.patch').read_text()
-    row['derived_added_lines']=sum(x.startswith('+') and not x.startswith('+++') for x in delta.splitlines());row['derived_removed_lines']=sum(x.startswith('-') and not x.startswith('---') for x in delta.splitlines())
-   feature_summary[impl]=row
+   resource=base/'feature/stapler.tres';assert digest(resource)==digest(here/'stapler.tres')==digest(project/'data/guns/stapler.tres')
+   feature_summary[impl]={'authored_files':1,'resource_physical_lines':len(resource.read_text().splitlines()),'resource_nonblank_lines':sum(bool(x.strip()) for x in resource.read_text().splitlines()),'handwritten_gameplay_files':0,'handwritten_network_files':0,'derived_catalog_files':list(catalog),'derived_artifact_bytes':(project/CATALOG_FILES[0]).stat().st_size if impl=='replay' else 0}
  expected_paths=set();runs=[]
- for pair,condition,case,impl in itertools.product(range(1,plan['repetitions']+1),plan['conditions'],plan['cases'],('kit','replay')):
+ for pair,condition,case,impl in itertools.product(range(1,plan['repetitions']+1),plan['conditions'],plan['cases'],implementations):
   folder=root/'runs'/str(pair)/condition/case/impl
   for seat,role in enumerate(('host','client'),1):
    path=folder/('success-'+role+'.json');expected_paths.add(path);v=json.loads(path.read_text())
@@ -64,7 +82,7 @@ def report(root,partial=False):
   assert not list(folder.glob('failure-*.json'))
   runs.append({'pair':pair,'condition':condition,'case':case,'implementation':impl})
  assert set((root/'runs').glob('*/*/*/*/success-*.json'))==expected_paths
- value={'feature':contract['feature'],'full_plan':full,'feature_changes':feature_summary,'runs':runs,'peer_receipts':len(expected_paths),'interpretation':'Data-resource addition in an existing family. Generated stock output is separate. Not human authoring time, new-family work, save/migration coverage, or a performance comparison.'}
+ value={'feature':contract['feature'],'implementations':implementations,'kit_comparison_exercised':'kit' in implementations,'full_plan':full,'feature_changes':feature_summary,'runs':runs,'peer_receipts':len(expected_paths),'interpretation':'Data-resource addition in an existing family. Typed catalog artifacts and fixture edits are recorded separately. Kit comparison is exercised only when listed. No human authoring time, save/migration or performance claim.'}
  temporary=root/'summary.json.pending';temporary.write_text(json.dumps(value,indent=2)+'\n');temporary.replace(root/'summary.json');return value
 if __name__=='__main__':
  v=report(sys.argv[1],sys.argv[2:]==['--allow-partial']);print('REPLAY_WEAPON_AUTHORING_REPORT_OK full_plan='+str(v['full_plan']).lower()+' peer_receipts='+str(v['peer_receipts']))

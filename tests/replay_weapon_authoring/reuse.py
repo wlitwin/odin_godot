@@ -9,10 +9,12 @@ framework=json.loads((source/'framework-source.json').read_text())
 for name,expected in framework.items():assert digest(root/name)==expected,('framework changed',name)
 build=json.loads((source/'build.json').read_text())
 for name,expected in build['binaries'].items():assert digest(source/name)==expected,('binary changed',name)
-for impl in ['kit','replay']:
+implementations=json.loads((source/'environment.json').read_text())['implementations']
+for impl in implementations:
  for variant in ['new','cold']:
   base=source/impl/variant;manifest=json.loads((base/'source.json').read_text())
   for name,expected in manifest.items():assert digest(base/'project'/name)==expected,('prepared source changed',impl,variant,name)
+  if impl=='replay':assert manifest['tools/stock.py']==digest(root/'examples/replay_scrapyard/tools/stock.py'),'baker changed; rebuild required'
   assert digest(base/'project/scripts/weapon_authoring.odin')==digest(here/(impl+'_adapter.odin')),'Odin adapter changed; rebuild required'
   dest=out/impl/variant;shutil.copytree(base,dest)
   shutil.copy2(here/'driver.gd',dest/'project/weapon_authoring.gd')
@@ -22,7 +24,8 @@ for impl in ['kit','replay']:
   manifest['weapon_authoring.gd']=digest(dest/'project/weapon_authoring.gd');manifest['project.godot']=digest(p)
   (dest/'source.json').write_text(json.dumps(manifest,indent=2)+'\n')
   before=json.loads((dest/'before.json').read_text());before['project.godot']=digest(p);(dest/'before.json').write_text(json.dumps(before,indent=2)+'\n')
-for name in ['contract.json','environment.json','framework-source.json','framework-status.txt','framework-diff.patch','original-status.txt','original-diff.patch']:shutil.copy2(source/name,out/name)
+  inputs=json.loads((dest/'inputs.json').read_text());inputs['project.godot']=digest(p);inputs['weapon_authoring.gd']=digest(dest/'project/weapon_authoring.gd');(dest/'inputs.json').write_text(json.dumps(inputs,indent=2)+'\n')
+for name in ['contract.json','environment.json','framework-source.json','framework-status.txt','framework-diff.patch']+(['original-status.txt','original-diff.patch'] if 'kit' in implementations else []):shutil.copy2(source/name,out/name)
 build['reused_from']=str(source);(out/'build.json').write_text(json.dumps(build,indent=2)+'\n')
 (out/'reuse.json').write_text(json.dumps({'source':str(source),'compiled_sources_verified':True,'binaries_verified':True,'uncompiled_changes':['weapon_authoring.gd','project.godot (isolated user namespace)']},indent=2)+'\n')
 print('REPLAY_WEAPON_AUTHORING_REUSED')

@@ -12,6 +12,11 @@ uses the same extracted gameplay/observation checks and the strict delay policy;
 actual RTC message faults are recorded separately. This is not a Kit comparison
 or a raw UDP/SCTP packet-loss test.
 
+Preparation uses only the Replay example and its in-repository assets. It shares
+the comparison workload overlays without copying or inspecting the optional Kit
+companion project. With `SKIP_WEB=1`, native builds, resource import and the
+JavaScript fault-interceptor checks run; browser execution is reported as omitted.
+
 The data-channel interceptor owns copies of outgoing RPC buffers. It delays
 messages by 40±10 ms, preserves reliable order through one FIFO drain per channel,
 and applies 5% loss/duplication only to unreliable data. It never erases reliable

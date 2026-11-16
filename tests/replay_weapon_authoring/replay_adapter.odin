@@ -115,8 +115,8 @@ replay_scrapyard_weapon_probe :: proc(self: ^ReplayScrapyard, key: string, seat:
         return gd.Int(player.profile.ready)
     }
 
-    if self.rigs[seat - 1].gun != nil {
-        rect := gd.sprite2d_get_region_rect(self.rigs[seat - 1].gun)
+    if self.rigs[seat - 1] != nil && self.rigs[seat - 1].weapon != nil && self.rigs[seat - 1].weapon.owner != nil {
+        rect := gd.sprite2d_get_region_rect(self.rigs[seat - 1].weapon.owner)
 
         switch key {
         case "region_x":

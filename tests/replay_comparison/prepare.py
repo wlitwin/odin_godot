@@ -1,25 +1,28 @@
 """Prepare instrumented, isolated projects for a shared workload driver."""
 from pathlib import Path
 import hashlib,json,shutil,subprocess,sys,os,re,platform
+from preparation import implementations
 root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve();out.mkdir(parents=True,exist_ok=True)
 scenario=os.environ.get('REPLAY_COMPARISON_SCENARIO','idle')
 assert scenario in ('idle','firing','combat'),scenario
 old=out/'kit'/'project';new=out/'replay'/'project'
-subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/prepare_baseline.py'),str(root.parent/'scrapyard'),str(old),str(root)],check=True)
-p=old/'project.godot';s=p.read_text().replace('config/name="replay_baseline_stress_kit"','config/name="replay_baseline_stress_'+out.name+'_kit"');p.write_text(s)
-subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/baseline_cleanup.py'),str(old)],check=True)
+if 'kit' in implementations():
+ subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/prepare_baseline.py'),str(root.parent/'scrapyard'),str(old),str(root)],check=True)
+ p=old/'project.godot';s=p.read_text().replace('config/name="replay_baseline_stress_kit"','config/name="replay_baseline_stress_'+out.name+'_kit"');p.write_text(s)
+ subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/baseline_cleanup.py'),str(old)],check=True)
 shutil.copytree(root/'examples/replay_scrapyard',new,ignore=shutil.ignore_patterns('.godot','bin','out','node_modules','*.gen.odin','*.uid','*.import','__pycache__'))
 p=new/'project.godot';s=p.read_text().replace('config/custom_user_dir_name="replay_scrapyard"','config/custom_user_dir_name="replay_compare_'+out.name+'"');p.write_text(s)
 if scenario in ('firing','combat'):
  # A small magazine forces repeat reloads; disable random jams so both real
  # weapon mechanisms receive the same deterministic workload. No sim is stubbed.
- for project in (old,new):
+ for project in [out/impl/'project' for impl in implementations()]:
   p=project/'data/guns/bolter.tres';s=p.read_text()
   for key,value in [('mag',3),('jam_per_mille',0)]:
    s,n=re.subn(r'^'+key+r' = \d+$',key+' = '+str(value),s,flags=re.M);assert n==1
   p.write_text(s)
-for project in [old,new]:shutil.copy2(root/'tests/replay_comparison/driver.gd',project/'comparison.gd')
+for impl in implementations():shutil.copy2(root/'tests/replay_comparison/driver.gd',out/impl/'project/comparison.gd')
 for project,package,typ,prefix in [(old,'scrapyard_scripts','Scrapyard','scrapyard'),(new,'replay_scrapyard','ReplayScrapyard','replay_scrapyard')]:
+ if project==old and 'kit' not in implementations():continue
  baseline=project==old
  start_extra='' if baseline else 'if gd.env_int("COMPARE_PHASES",0)==1 {replay_scrapyard_bench_start(self)}'
  stop_extra='' if baseline else 'if gd.env_int("COMPARE_PHASES",0)==1 {_ = replay_scrapyard_bench_finish(self)}'
@@ -115,7 +118,8 @@ compare_note :: proc(start:u64) {{
   p=project/'scripts/bench.odin';s=p.read_text();marker='self.bytes_win += len(bytes)';assert s.count(marker)==1;p.write_text(s.replace(marker,marker+'\n\tcompare_packets+=1'))
 if scenario=='combat':
  from combat_overlay import install
- install(old,True);install(new,False)
+ if 'kit' in implementations():install(old,True)
+ install(new,False)
 files=[p for p in out.rglob('*') if p.is_file() and p.suffix in ['.odin','.gd','.tscn','.tres','.png','.wav','.mp3'] and not p.name.endswith('.gen.odin')]
 (out/'source-sha256.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+str(p.relative_to(out))+'\n' for p in sorted(files)))
 contract={'scenario':'firing_range' if scenario=='firing' else 'idle_arena','seed':1337,'players':2,'hz':60,'frame_cap':60,'warmup_ms':500,'steady_receive_warmup':{'duration_ms':500,'prediction_depth_limit':'measured lead + 4 ticks','facts_ahead_limit_ticks':4},'sample_ms':6000 if scenario=='firing' else 3000,'intents':'stationary, hold eastward fire until nine local observed rounds are spent, then release; no casts' if scenario=='firing' else 'zero movement/fire/casts','expected_positions':[[840,544],[880,544]],'expected_hp':10,'expected_look':0,'expected_iron':0,'population':0,'stage':'cleared empty single-wave floor','application_tx_scope':'all accepted Replay router lanes; Kit protocol bytes plus one-byte transport tag; excludes ENet framing/retransmission','frame_metric':'inclusive game process callback, not CPU-only; UI implementations differ','parity_limits':['authority models differ','UI/audio/presentation differs','no AI, damage or movement performance conclusion']}
@@ -147,14 +151,15 @@ directories=[name for name in ['core','godot','gdext','runtime','kit','play','re
 paths=subprocess.check_output(['rg','--files',*directories],cwd=root,text=True).splitlines()
 framework={name:hashlib.sha256((root/name).read_bytes()).hexdigest() for name in sorted(paths) if Path(name).suffix in ['.odin','.sh','.py','.nix']}
 (out/'framework-source.json').write_text(json.dumps({'root':str(root),'sha256':framework},indent=2)+'\n')
-for name,repo in [('framework',root),('original',root.parent/'scrapyard')]:
+for name,repo in [('framework',root)]+([('original',root.parent/'scrapyard')] if 'kit' in implementations() else []):
  (out/(name+'-diff.patch')).write_bytes(subprocess.check_output(['git','diff','--binary','--no-ext-diff'],cwd=repo))
  (out/(name+'-status.txt')).write_bytes(subprocess.check_output(['git','status','--short'],cwd=repo))
 info={'platform':platform.platform(),'machine':platform.machine(),'processor':platform.processor(),'gameplay_godot':os.environ.get('GODOT','godot'),
       'framework_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),
-      'original_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root.parent/'scrapyard',text=True).strip(),
+      'original_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root.parent/'scrapyard',text=True).strip() if 'kit' in implementations() else None,
       'godot_version':subprocess.check_output([os.environ.get('GODOT','godot'),'--version'],text=True).strip(),
-      'measurement_order':[['kit','replay'] if pair%2 else ['replay','kit'] for pair in range(1,contract['repetitions']+1)]}
+      'implementations':list(implementations()),
+      'measurement_order':[['kit','replay'] if pair%2 else ['replay','kit'] for pair in range(1,contract['repetitions']+1)] if 'kit' in implementations() else [['replay'] for _ in range(contract['repetitions'])]}
 if sys.platform=='darwin':
  for key,syskey in [('cpu','machdep.cpu.brand_string'),('memory_bytes','hw.memsize')]:
   result=subprocess.run(['sysctl','-n',syskey],capture_output=True,text=True)

@@ -1,10 +1,12 @@
 from pathlib import Path
 import hashlib,json,os,re,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2];here=Path(__file__).resolve().parent;out=Path(sys.argv[1]).resolve()
+sys.path.insert(0,str(root/"tests/replay_comparison"))
+from preparation import implementations
 env=os.environ.copy();env['REPLAY_COMPARISON_SCENARIO']='combat';env['REPLAY_COMPARISON_REPETITIONS']='3'
 subprocess.run([sys.executable,str(root/'tests/replay_comparison/prepare.py'),str(out)],env=env,check=True)
 shutil.copy2(out/'contract.json',out/'preparation-contract.json')
-for impl in ('kit','replay'):
+for impl in implementations():
  project=out/impl/'project';fixture={}
  for name,key,value in [('data/guns/bolter.tres','mag','255'),('data/mobs/scrapbot.tres','bite','0')]:
   p=project/name;before=p.read_text();after,n=re.subn(r'^'+key+r' = \d+$',key+' = '+value,before,flags=re.M);assert n==1;p.write_text(after);fixture[name]={'before_sha256':hashlib.sha256(before.encode()).hexdigest(),'after_sha256':hashlib.sha256(after.encode()).hexdigest(),'setting':{key:int(value)}}

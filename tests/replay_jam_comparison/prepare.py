@@ -1,9 +1,11 @@
 from pathlib import Path
 import hashlib,json,re,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2];here=Path(__file__).resolve().parent;out=Path(sys.argv[1]).resolve()
+sys.path.insert(0,str(root/"tests/replay_comparison"))
+from preparation import implementations
 subprocess.run([sys.executable,str(root/'tests/replay_endurance_comparison/prepare.py'),str(out)],check=True)
 shutil.copy2(out/'contract.json',out/'endurance-preparation-contract.json')
-for impl in ('kit','replay'):
+for impl in implementations():
  project=out/impl/'project';baseline=impl=='kit';prefix='scrapyard' if baseline else 'replay_scrapyard';typ='Scrapyard' if baseline else 'ReplayScrapyard'
  resource=project/'data/guns/bolter.tres';before=resource.read_text();after,n=re.subn(r'^jam_per_mille = \d+$','jam_per_mille = 200',before,flags=re.M);assert n==1;resource.write_text(after)
  fixture=json.loads((out/impl/'endurance-fixture.json').read_text());fixture['data/guns/bolter.tres']['after_sha256']=hashlib.sha256(after.encode()).hexdigest();fixture['data/guns/bolter.tres']['setting']['jam_per_mille']=200

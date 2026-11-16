@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 work="${REPLAY_BROWSER_STRESS_OUT:-$(mktemp -d)}";mkdir -p "$work";SERVER="$ROOT/tests/replay_web_authority/server"
+echo "Browser stress logs: $work"
 python3 "$ROOT/tests/replay_browser_stress/prepare.py" "$work" >"$work/prepare.log"
 PROJ="$work/replay/project";mkdir -p "$PROJ/out";touch "$PROJ/out/.gdignore"
 node "$ROOT/tests/replay_browser_stress/faults_test.mjs" >"$work/fault-test.log"
 case "$(uname -s)" in Darwin) ext=dylib;;Linux) ext=so;;*) exit 1;;esac
 for project in "$SERVER" "$PROJ";do
  label="$(basename "$project")"
- bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$label-build.log" 2>&1
- ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext" "$GODOT" --headless --path "$project" --editor --quit-after 120 >"$work/$label-import.log" 2>&1
- if rg -q 'SCRIPT ERROR|ERROR:' "$work/$label-import.log";then cat "$work/$label-import.log";exit 1;fi
+ bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$label-build.log" 2>&1 || { tail -n 60 "$work/$label-build.log";exit 1; }
+ odin_godot_test_import "$project" "$project/bin/libodinscripts.$ext" "$work/$label-import.log"
  python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/$label-wait.json"
- bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$label-final-build.log" 2>&1
+ bash "$ROOT/build/build_scripts.sh" "$project" >"$work/$label-final-build.log" 2>&1 || { tail -n 60 "$work/$label-final-build.log";exit 1; }
 done
 if [[ "${SKIP_WEB:-0}" == 1 ]]; then
     echo 'SUITE_NATIVE_ONLY_OK: native checks completed; browser checks omitted'
@@ -29,7 +30,7 @@ w=Path(sys.argv[1]);files=[*w.glob('replay/project/bin/*.wasm'),*w.glob('replay/
 PY
 [[ -e "$ROOT/tests/replay_browser_stress/node_modules" ]] || ln -s "$ROOT/tests/web/node_modules" "$ROOT/tests/replay_browser_stress/node_modules"
 port=$((21000+RANDOM%8000));control=$((31000+RANDOM%8000));pids=()
-trap 'for pid in "${pids[@]}";do kill "$pid" 2>/dev/null || true;wait "$pid" 2>/dev/null || true;done;echo "Browser stress logs: $work"' EXIT
+trap 'for pid in ${pids[@]+"${pids[@]}"};do kill "$pid" 2>/dev/null || true;wait "$pid" 2>/dev/null || true;done;echo "Browser stress logs: $work"' EXIT
 bash "$ROOT/tests/web/serve.sh" "$PROJ/out" "$port" >"$work/http.log" 2>&1 &pids+=("$!")
 RWA_SIGNAL=1 RWA_SIGNAL_ONLY=1 RWA_SIGNAL_MEMBERS=2 RWA_GAME=scrapyard RWA_PORT="$control" RWA_DB="$work/authority.sqlite" RWA_DONE="$work/done" ODIN_SCRIPTS_DLL="$SERVER/bin/libodinscripts.$ext" "$GODOT" --headless --path "$SERVER" >"$work/server.log" 2>&1 &pids+=("$!")
 for _ in {1..100};do if rg -q WEB_AUTHORITY_SERVER_READY "$work/server.log";then break;fi;sleep .1;done

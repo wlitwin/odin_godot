@@ -1,9 +1,11 @@
 from pathlib import Path
 import hashlib,json,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2];here=Path(__file__).resolve().parent;out=Path(sys.argv[1]).resolve()
+sys.path.insert(0,str(root/"tests/replay_comparison"))
+from preparation import implementations
 subprocess.run([sys.executable,str(root/'tests/replay_swarm_comparison/prepare.py'),str(out)],check=True)
 shutil.copy2(out/'contract.json',out/'swarm-preparation-contract.json')
-for impl in ('kit','replay'):
+for impl in implementations():
  project=out/impl/'project';baseline=impl=='kit'
  package,typ,prefix=('scrapyard_scripts','Scrapyard','scrapyard') if baseline else ('replay_scrapyard','ReplayScrapyard','replay_scrapyard')
  imports='import kn "godot:kit/net"' if baseline else 'import rgd "godot:replay/godot"'

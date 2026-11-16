@@ -1,43 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
-work="${REPLAY_WEAPON_AUTHORING_OUT:-$(mktemp -d)}";mkdir -p "$work";export SCRIPT_BUILD_FLAGS=-o:speed
+source "$ROOT/tests/import_project.sh"
+work="${REPLAY_WEAPON_AUTHORING_OUT:-$(mktemp -d)}";mkdir -p "$work";export SCRIPT_BUILD_FLAGS="${SCRIPT_BUILD_FLAGS:-}"
+echo "Weapon authoring logs: $work"
+selected_implementations() { python3 -c 'import json,sys;print(" ".join(json.load(open(sys.argv[1]))["implementations"]))' "$work/environment.json"; }
 case "$(uname -s)" in Darwin) ext=dylib;;Linux) ext=so;;*) ext=dll;;esac
 if [[ -n "${REPLAY_WEAPON_AUTHORING_REUSE:-}" ]];then
  python3 "$ROOT/tests/replay_weapon_authoring/reuse.py" "$REPLAY_WEAPON_AUTHORING_REUSE" "$work" >"$work/prepare.log"
 else
 python3 "$ROOT/tests/replay_weapon_authoring/prepare.py" "$work" >"$work/prepare.log"
-for impl in kit replay;do for variant in new cold;do
+for impl in $(selected_implementations);do for variant in new cold;do
  base="$work/$impl/$variant";project="$base/project"
- bash "$ROOT/build/build_scripts.sh" "$project" >"$base/build.log" 2>&1
- ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext" "$GODOT" --headless --path "$project" --editor --quit-after 120 >"$base/import.log" 2>&1
- if rg -q 'SCRIPT ERROR|ERROR:' "$base/import.log";then cat "$base/import.log";exit 1;fi
+ bash "$ROOT/build/build_scripts.sh" "$project" >"$base/build.log" 2>&1 || { tail -n 60 "$base/build.log";exit 1; }
+ odin_godot_test_import "$project" "$project/bin/libodinscripts.$ext" "$base/import.log"
  python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$base/build-wait.json"
- bash "$ROOT/build/build_scripts.sh" "$project" >"$base/final-build.log" 2>&1
+ if [[ "$impl" == replay ]];then
+  python3 "$project/tools/stock.py" --project "$project" >"$base/bake.log" 2>&1 || { tail -n 60 "$base/bake.log";exit 1; }
+ fi
+ bash "$ROOT/build/build_scripts.sh" "$project" >"$base/final-build.log" 2>&1 || { tail -n 60 "$base/final-build.log";exit 1; }
+ python3 "$ROOT/tests/replay_weapon_authoring/finalize.py" "$base" "$impl"
 done;done
 python3 - "$work" "$ext" <<'PY'
 from pathlib import Path
-import hashlib,json,subprocess,sys
-root=Path(sys.argv[1]);ext=sys.argv[2]
-(root/'build.json').write_text(json.dumps({'odin':subprocess.check_output(['odin','version'],text=True).strip(),'flags':['-debug','-o:speed'],'binaries':{str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for impl in ['kit','replay'] for variant in ['new','cold'] for p in (root/impl/variant/'project/bin').glob('*.'+ext)}},indent=2)+'\n')
+import hashlib,json,os,subprocess,sys
+root=Path(sys.argv[1]);ext=sys.argv[2];implementations=json.loads((root/'environment.json').read_text())['implementations']
+(root/'build.json').write_text(json.dumps({'odin':subprocess.check_output(['odin','version'],text=True).strip(),'flags':['-debug'],'script_build_flags':os.environ.get('SCRIPT_BUILD_FLAGS',''),'binaries':{str(p.relative_to(root)):hashlib.sha256(p.read_bytes()).hexdigest() for impl in implementations for variant in ['new','cold'] for p in (root/impl/variant/'project/bin').glob('*.'+ext)}},indent=2)+'\n')
 PY
 fi
 # Execute both generated catalogs independently of the Godot runtime.
 for variant in new cold;do
  expected=8;if [[ "$variant" == cold ]];then expected=7;fi
  odin build "$ROOT/tests/replay_weapon_authoring/native_stock" -collection:godot="$ROOT" -collection:subject="$work/replay/$variant/project" -define:EXPECTED_GUNS="$expected" -out:"$work/stock-$variant"
- "$work/stock-$variant"
+ "$work/stock-$variant" | tee "$work/native-stock-$variant.log"
 done
 cases='shared_resource host_only_resource';conditions='local delayed';repetitions=2
 if [[ "${REPLAY_WEAPON_AUTHORING_SMOKE:-0}" == 1 ]];then cases='shared_resource';conditions='local';repetitions=1;fi
 python3 - "$work" "$cases" "$conditions" "$repetitions" <<'PY'
 from pathlib import Path
 import json,sys
-(Path(sys.argv[1])/'run-plan.json').write_text(json.dumps({'cases':sys.argv[2].split(),'conditions':sys.argv[3].split(),'repetitions':int(sys.argv[4]),'receive_delay_ms':{'local':0,'delayed':120},'loss_permyriad':0,'duplicate_permyriad':0},indent=2)+'\n')
+root=Path(sys.argv[1]);implementations=json.loads((root/'environment.json').read_text())['implementations']
+(root/'run-plan.json').write_text(json.dumps({'implementations':implementations,'cases':sys.argv[2].split(),'conditions':sys.argv[3].split(),'repetitions':int(sys.argv[4]),'receive_delay_ms':{'local':0,'delayed':120},'loss_permyriad':0,'duplicate_permyriad':0},indent=2)+'\n')
 PY
-pids=();trap 'for pid in "${pids[@]}";do kill "$pid" 2>/dev/null || true;wait "$pid" 2>/dev/null || true;done;echo "Weapon authoring logs: $work"' EXIT
+implementations="$(selected_implementations)"
+pids=();trap 'for pid in ${pids[@]+"${pids[@]}"};do kill "$pid" 2>/dev/null || true;wait "$pid" 2>/dev/null || true;done;echo "Weapon authoring logs: $work"' EXIT
 for ((pair=1;pair<=repetitions;pair++));do
- order='kit replay';if ((pair%2==0));then order='replay kit';fi
+ order="$implementations";if ((pair%2==0)) && [[ "$implementations" == 'kit replay' ]];then order='replay kit';fi
  for condition in $conditions;do
   delay=0;if [[ "$condition" == delayed ]];then delay=120;fi
   for scenario in $cases;do for impl in $order;do

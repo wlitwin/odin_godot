@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
-if [[ ! -f "$ROOT/../scrapyard/project.godot" ]];then echo "Missing original sibling Scrapyard" >&2;exit 1;fi
+if [[ ! -f "$ROOT/../scrapyard/project.godot" ]];then echo "REPLAY_COMPARISON_BASELINE_MISSING: requires the original sibling Scrapyard project";exit 0;fi
 work="${REPLAY_ENDURANCE_OUT:-$(mktemp -d)}";mkdir -p "$work";export SCRIPT_BUILD_FLAGS=-o:speed
 if [[ -e "$work/kit" || -e "$work/replay" || -e "$work/contract.json" ]];then echo "Comparison requires a fresh output directory: $work";exit 2;fi
 export COMPARE_PHASES=0

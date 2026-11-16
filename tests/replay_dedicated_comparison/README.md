@@ -4,6 +4,10 @@
 Scrapyard checkout. `execute.py OUTPUT LABEL` runs a dedicated authority and two
 clients in each build; `report.py OUTPUT LABEL` validates the paired receipts.
 
+The optional comparison needs the original sibling `../scrapyard` checkout.
+Without it, `run.sh` emits `REPLAY_COMPARISON_BASELINE_MISSING` and the repository
+suite records a skip. That result supplies no comparison acceptance evidence.
+
 The scenario follows the original `server` act: clients join and Ready, clear a
 six-enemy wave, receive their core, and regroup to advance to floor two without
 an authority avatar or a player-host Start command. Both implementations use the

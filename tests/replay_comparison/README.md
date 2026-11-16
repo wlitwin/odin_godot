@@ -13,6 +13,11 @@ directory; `REPLAY_COMPARISON_REPETITIONS` controls the number of pairs.
 The original sibling project is required. If it is absent, the ordinary repository
 suite reports this gate as skipped; that is not comparison acceptance evidence.
 
+The shared preparation layers can also select only the Replay implementation.
+Browser stress uses that path to retain the same workload overlays without a
+dependency on the companion game. Its receipts describe a Replay workload, with
+no Kit measurements or original-game revision.
+
 Both games use seed 1337, two players, 60 Hz, a 60 FPS process cap and 120 ms receive
 delay per participant. The default idle controller waits for authoritative skin/weapon choices,
 enters an empty single-wave floor, and checks stage, population, health, loadouts
