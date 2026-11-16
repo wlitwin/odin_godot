@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 PROJ="$ROOT/examples/replay_duel";work="${RDP_REJOIN_OUT:-$(mktemp -d)}";mkdir -p "$work";pids=()
 [[ -z "$(ls -A "$work")" ]] || { echo 'Rejoin requires an empty output directory' >&2;exit 2; }
 trap 'for pid in "${pids[@]}";do [[ -z "$pid" ]] || { kill "$pid" 2>/dev/null || true;wait "$pid" 2>/dev/null || true; };done;echo "P2P rejoin logs: $work"' EXIT
@@ -8,7 +9,7 @@ case "$(uname -s)" in Darwin) ext=dylib;;Linux) ext=so;;*) ext=dll;;esac
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.$ext"
 if [[ "${REPLAY_PREBUILT:-0}" != 1 ]];then
  bash "$ROOT/build/build_scripts.sh" "$PROJ" >"$work/build.log" 2>&1
- "$GODOT" --headless --path "$PROJ" --editor --quit-after 90 >"$work/import.log" 2>&1
+ odin_godot_test_import "$PROJ" "$ODIN_SCRIPTS_DLL" "$work/import.log"
  python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$PROJ" "$work/wait.json"
  bash "$ROOT/build/build_scripts.sh" "$PROJ" >"$work/final-build.log" 2>&1
  if rg -q 'SCRIPT ERROR|ERROR:' "$work/import.log";then cat "$work/import.log";exit 1;fi

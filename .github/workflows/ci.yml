@@ -95,6 +95,7 @@ jobs:
           nix develop --command python3 -m unittest discover -s tests -p import_project_test.py -v 2>&1 | tee tests/.logs/import-unit.log
 
       - name: Run the suite
+        timeout-minutes: 50
         run: xvfb-run -a -s '-screen 0 1280x720x24' env SKIP_WEB=1 LIBGL_ALWAYS_SOFTWARE=1 nix develop --command bash tests/run_all.sh
 
       - name: Preserve test results and logs
