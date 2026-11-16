@@ -161,6 +161,11 @@ host_backup_status_checks_the_actual_nominee_connection_and_local_progress :: pr
         token_hash  = hash,
     }
     testing.expect_value(t, rgd.room_backup_status(room, 1100).phase, rgd.Room_Backup_Phase.Ready)
+    room.options.successor.incarnation = 21 // selector predates the member's authenticated rebind
+    testing.expect_value(t, rgd.room_backup_status(room, 1100).phase, rgd.Room_Backup_Phase.Ready)
+    room.backup_observation.nominee.incarnation = 23
+    testing.expect_value(t, rgd.room_backup_status(room, 1100).phase, rgd.Room_Backup_Phase.Waiting_Peer)
+    room.backup_observation.nominee.incarnation = 22
     room.session.server.timeline.head = 221
     testing.expect_value(t, rgd.room_backup_status(room, 1100).phase, rgd.Room_Backup_Phase.Stale)
     room.session.server.timeline.head = 200
@@ -195,6 +200,8 @@ recovery_disclosure_does_not_substitute_for_backup_readiness :: proc(t: ^testing
         rgd.room_recovery_message(room, status),
         "Party restored; recent progress lost · backup pending",
     )
+    room.recovery.known_lost_ticks = 0
+    testing.expect_value(t, rgd.room_recovery_message(room, status), "Saved party restored · backup pending")
     room.handoff_requested = true
     status = rgd.room_backup_status(room, 1100)
     testing.expect_value(t, status.phase, rgd.Room_Backup_Phase.Recovering)

@@ -142,7 +142,7 @@ room_backup_status_at :: proc(room: ^Room($S, $C, $A, $E, $N), now: u64) -> Room
         connection, live := room_successor_connection(room)
 
         if !live ||
-           room.options.successor != o.nominee ||
+           room.options.successor.member != o.nominee.member ||
            connection.incarnation != o.nominee.incarnation ||
            connection.generation != o.binding {
             return result
