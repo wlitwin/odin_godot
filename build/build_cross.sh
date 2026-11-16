@@ -40,7 +40,15 @@ case "$TARGET" in
     linux)
         ODIN_TARGET="linux_amd64"
         EXT=".so"
-        CC="${ODIN_CROSS_LINUX_CC:-$(command -v x86_64-unknown-linux-gnu-cc x86_64-unknown-linux-gnu-gcc x86_64-linux-gnu-gcc 2>/dev/null | head -1 || true)}"
+        if [[ -n "${ODIN_CROSS_LINUX_CC:-}" ]]; then
+            CC="$ODIN_CROSS_LINUX_CC"
+        elif [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]]; then
+            # Use the native compiler wrapper for a same-host target. Nix also
+            # exposes a raw triple-prefixed GCC whose link lacks the CRT paths.
+            CC="${CC:-$(command -v cc gcc clang 2>/dev/null | head -1 || true)}"
+        else
+            CC="$(command -v x86_64-unknown-linux-gnu-cc x86_64-unknown-linux-gnu-gcc x86_64-linux-gnu-gcc 2>/dev/null | head -1 || true)"
+        fi
         # glibc >=2.34 folds libdl/libpthread/libm into libc, but naming them is harmless
         # on older sysroots and documents the dependency.
         LINK_LIBS=(-ldl -lm -lpthread)

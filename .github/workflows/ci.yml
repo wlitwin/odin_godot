@@ -36,10 +36,16 @@ jobs:
       - name: Install native signaling-test dependencies
         run: npm ci --ignore-scripts
 
-      - name: Install virtual display for native rendering checks
+      - name: Install virtual display and audio for native rendering checks
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb xauth libgl1-mesa-dri
+          sudo apt-get install -y xvfb xauth libgl1 libegl1 libgl1-mesa-dri libxkbcommon0 pulseaudio
+
+      - name: Start silent audio output for native rendering checks
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=odin_ci
+          pactl set-default-sink odin_ci
 
       - name: Keep intentional crash checks from filling the runner disk
         run: |
@@ -82,9 +88,11 @@ jobs:
 
       - name: Verify suite reporting and native fixture helpers
         run: |
-          nix develop --command python3 -m unittest discover -s tests/suite_runner -v
-          nix develop --command python3 -m unittest discover -s tests -p platform_test.py -v
-          nix develop --command python3 -m unittest discover -s tests -p import_project_test.py -v
+          set -euo pipefail
+          mkdir -p tests/.logs
+          nix develop --command python3 -m unittest discover -s tests/suite_runner -v 2>&1 | tee tests/.logs/suite-runner-unit.log
+          nix develop --command python3 -m unittest discover -s tests -p platform_test.py -v 2>&1 | tee tests/.logs/platform-unit.log
+          nix develop --command python3 -m unittest discover -s tests -p import_project_test.py -v 2>&1 | tee tests/.logs/import-unit.log
 
       - name: Run the suite
         run: xvfb-run -a -s '-screen 0 1280x720x24' env SKIP_WEB=1 LIBGL_ALWAYS_SOFTWARE=1 nix develop --command bash tests/run_all.sh
