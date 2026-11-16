@@ -14,13 +14,23 @@ class ImportBarrierTests(unittest.TestCase):
             godot = root / 'godot'
             godot.write_text('#!/usr/bin/env bash\n' + program + '\n')
             godot.chmod(0o755)
+            project = root / 'project with spaces'
+            project.mkdir()
+            (project / 'project.godot').write_text('config_version=5\n')
+            (project / 'fixture.gdextension').write_text(
+                '[configuration]\nentry_symbol="fixture_init"\n'
+                'compatibility_minimum="4.7"\n\n[libraries]\n'
+                'linux.debug.x86_64="res://libfixture.so"\n')
             log = root / 'import.log'
             environment = os.environ.copy()
             environment['GODOT'] = str(godot)
+            environment['ODIN_GODOT_ROOT'] = str(HELPER.parent.parent)
             result = subprocess.run(['bash', '-c', 'source "$1"; '
-                'odin_godot_test_import "/project with spaces" "/native library.so" "$2"',
-                'import-test', str(HELPER), str(log)], env=environment,
+                'odin_godot_test_import "$2" "/native library.so" "$3"',
+                'import-test', str(HELPER), str(project), str(log)], env=environment,
                 capture_output=True, text=True)
+            self.assertEqual((project / '.godot/extension_list.cfg').read_text(),
+                             'res://fixture.gdextension\n')
             return result, log.read_text()
 
     def test_failed_import_retains_the_actual_error_log(self):

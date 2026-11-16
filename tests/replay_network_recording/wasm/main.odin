@@ -2,6 +2,7 @@ package network_recording_wasm
 
 import "base:runtime"
 import "core:mem"
+import tlsf "core:mem/tlsf"
 import d "godot:replay/diagnostic"
 import r "godot:replay"
 import net "godot:replay/net"
@@ -12,18 +13,20 @@ LEGACY_48 :: #config(REPLAY_RECORDING_CONTENT48, false)
 
 when LEGACY_48 {
     World :: upgrade.World_48
+    Action :: upgrade.Action_50
     IDENTITY :: upgrade.RECORDING_48
     source_model :: upgrade.model_48
 } else {
     World :: game.World
+    Action :: game.Action
     IDENTITY :: recording.CONTEXT
     source_model :: game.model
 }
 
-Archive :: d.Recording(World, net.Batch(game.Control, game.Action, game.SEATS), net.Net_Event(game.Event))
+Archive :: d.Recording(World, net.Batch(game.Control, Action, game.SEATS), net.Net_Event(game.Event))
 
 input: [d.MAX_RECORDING_BYTES]u8
-backing: [128 * 1024 * 1024]u8
+backing: [128 * 1024 * 1024 / size_of(u64)]u64
 report: [13]u64
 failure: [8192]u8
 failure_count: u32
@@ -51,9 +54,17 @@ field :: proc "c" (index: u32) -> u64 {
 @(export)
 verify :: proc "c" (count: u32) -> u32 {
     context = runtime.default_context()
-    arena: mem.Arena
-    mem.arena_init(&arena, backing[:])
-    context.allocator = mem.arena_allocator(&arena)
+    // Historical adapters create and destroy temporary schemas for each state.
+    // Reclaim those allocations inside the same fixed backing, as native does;
+    // a bump arena would retain every destroyed schema for the whole recording.
+    heap: tlsf.Allocator
+
+    if tlsf.init(&heap, mem.slice_to_bytes(backing[:])) != .None {
+        return u32(d.Recording_Error.Capacity)
+    }
+
+    defer tlsf.destroy(&heap)
+    context.allocator = tlsf.allocator(&heap)
     context.temp_allocator = context.allocator
     report = {}
     failure_count = 0
@@ -70,7 +81,7 @@ verify :: proc "c" (count: u32) -> u32 {
     }
 
     model := source_model()
-    capture: r.Audit_Capture(World, net.Batch(game.Control, game.Action, game.SEATS), net.Net_Event(game.Event))
+    capture: r.Audit_Capture(World, net.Batch(game.Control, Action, game.SEATS), net.Net_Event(game.Event))
     defer r.audit_capture_destroy(&capture)
     result := d.recording_verify(&archive, IDENTITY, net.recording_model(&model), &capture)
     report[0], report[1], report[2], report[3], report[12] =

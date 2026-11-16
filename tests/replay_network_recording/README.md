@@ -25,6 +25,13 @@ The full game simulation and math routines execute inside WASM; the module has n
 imports. Mutated test files/logs are retained per input. Odin object compilation
 plus Emscripten linking supplies the math library and normal WASM optimization.
 
+`upgrade.sh` uses the compressed historical recordings under
+[`fixtures/authority-before-observation`](fixtures/authority-before-observation/README.md).
+It verifies their original hashes, requires explicit conversion from the old
+input schema, and checks source/destination preservation before running the same
+native and WASM verification and corruption checks. It has no dependency on
+documentation build output or archived investigation directories.
+
 `tests/replay_net/recording_test.odin` independently checks replay after transport
 destruction, decision preservation without admission callbacks, and preflight of
 seat/group/control/action metadata. Existing diagnostic tests cover ownership and

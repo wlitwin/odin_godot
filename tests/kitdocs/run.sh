@@ -19,6 +19,13 @@ while IFS= read -r doc; do
 		target="${target%>}"
 		file_part="${target%%#*}"
 		[[ -z "$file_part" ]] && continue
+		# The package index is a build artifact, absent from a clean checkout.
+		# The Documentation workflow generates it and checks its published route
+		# and anchors with docs/.vitepress/check-links.mjs. Keep this exception
+		# exact so other missing authored or generated links still fail here.
+		if [[ "$file_part" == ../api/generated/index.md ]]; then
+			continue
+		fi
 		[[ -e "$(dirname "$doc")/$file_part" ]] \
 			|| fail "broken relative link in ${doc#$ROOT/}: $target"
 	done < <(perl -ne 'while (/\[[^]]*\]\(([^)]+)\)/g) { print "$1\n" }' "$doc")

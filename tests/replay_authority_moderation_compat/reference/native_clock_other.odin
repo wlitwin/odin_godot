@@ -4,6 +4,4 @@
 package authority_reference
 
 @(private)
-native_milliseconds :: proc(user: rawptr) -> (u64, bool) {
-    return 0, false
-}
+native_milliseconds :: proc(user: rawptr) -> (u64, bool) {return 0, false}

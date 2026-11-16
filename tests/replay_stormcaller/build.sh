@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
+source "$ROOT/tests/import_project.sh"
 work="${REPLAY_STORM_OUT:?Choose a fresh absolute output directory}"
 python3 - "$ROOT" "$work" <<'PY'
 from pathlib import Path
@@ -13,7 +14,7 @@ PY
 project="$work/project";case "$(uname -s)" in Darwin) ext=dylib;;*) ext=so;;esac
 export ODIN_SCRIPTS_DLL="$project/bin/libodinscripts.$ext"
 bash "$ROOT/build/build_scripts.sh" "$project" >"$work/build.log" 2>&1
-"$GODOT" --headless --path "$project" --editor --import >"$work/import.log" 2>&1
+odin_godot_test_import "$project" "$ODIN_SCRIPTS_DLL" "$work/import.log"
 python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/wait.json"
 bash "$ROOT/build/build_scripts.sh" "$project" >"$work/final-build.log" 2>&1
 odin check "$project/scripts" -collection:godot="$ROOT" -target:freestanding_wasm32 -no-entry-point -custom-attribute:gd_method -custom-attribute:gd_connect >"$work/wasm.log" 2>&1

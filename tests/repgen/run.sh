@@ -225,7 +225,7 @@ for needle in \
 	'CHEST_CMD_OPEN :: knet.Cmd_Id(0x' \
 	'CHEST_POLICY_OPEN :: knet.ACTION_ANY_SEAT_PREDICTED' \
 	'action = {name = "open", id = CHEST_CMD_OPEN, model = .Immediate, policy = CHEST_POLICY_OPEN' \
-	'CHEST_POLICY_CLAIM :: knet.Action_Policy {' \
+	'CHEST_POLICY_CLAIM :: knet.Action_Policy' \
 	'max_args_bytes = 32' \
 	'_ok := chest_claim(self, env.by)' \
 	'chest_claim_then(self, env.by)' \
@@ -238,6 +238,8 @@ for needle in \
 		exit 1
 	fi
 done
+perl -0777 -ne 'exit(! /CHEST_POLICY_CLAIM\s*::\s*knet\.Action_Policy\s*\{\s*access\s*=\s*\.Any_Seat,\s*prediction\s*=\s*\.Optimistic,\s*max_args_bytes\s*=\s*32\s*,?\s*\}/)' "$CGEN" \
+	|| { echo 'REPGEN_FAIL: claim command lost its explicit access, prediction, or argument bound'; exit 1; }
 echo "  ok  coop @(gd_command) wrapper returns knet.Action_Outcome; issuer param framework-filled (env.by in the thunk, ctx.me on the host's own issue, absent from the wrapper signature)"
 
 # @(gd_tick) artifacts: the ksim import, the input POD assert, the rawptr

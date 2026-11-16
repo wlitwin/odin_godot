@@ -1,0 +1,20 @@
+{
+  "host.rplrec.gz": {
+    "sha256": "b6828b3d73952ae9b37ecbef041a017c51e87ae0c156a70e814009e57eea5d07",
+    "bytes": 6465867,
+    "capture": "2026-09-14",
+    "origin": "native/run/host.rplrec"
+  },
+  "client.rplrec.gz": {
+    "sha256": "ef1a8cf605da1ead2fbf31640eec369d74592b3eea6055502a230bfb24ef526a",
+    "bytes": 1281792,
+    "capture": "2026-09-14",
+    "origin": "native/run/client.rplrec"
+  },
+  "browser.rplrec.gz": {
+    "sha256": "92fc79b4a054440c9c9b9f0c731174210dca6a74ef497ce33ea5d9aa99cbf750",
+    "bytes": 5076362,
+    "capture": "2026-09-14",
+    "origin": "browser/run/downloads/scrapyard.rplrec"
+  }
+}

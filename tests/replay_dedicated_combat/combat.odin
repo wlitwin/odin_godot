@@ -16,6 +16,29 @@ combat_initial :: proc() -> game.World {
     // Original stress-harness gun overrides; damage, health and enemies are stock.
     w.catalog.guns[1].mechanism.mag = 255
     w.catalog.guns[1].mechanism.jam_per_mille = 0
+    // Author a populated first wave across the yard from the player spawns.
+    // Waiting for a surrounding wave to spawn around idle players made survival
+    // before the next stock cooldown depend on admission/checkpoint timing.
+    w.stage = .Yard
+    w.wave_count = 1
+    w.waves[0] = {40, w.rules.rest}
+    w.director = {
+        wave  = 1,
+        alive = 40,
+    }
+    w.spawn_index = 40
+    w.spawn_placed = true
+
+    for &point, i in w.spawn_positions {
+        point = {400 + f32(i % 2) * 48, 490 + f32(i / 2) * 80}
+    }
+
+    for i in 0 ..< 40 {
+        point := [2]f32{1300 + f32(i % 5) * 55, 300 + f32(i / 5) * 65}
+        assert(game.spawn_mob(&w, game.wave_kind(u32(i), 1, 1), point, true))
+    }
+
+    assert(game.state_valid(w))
     return w
 }
 

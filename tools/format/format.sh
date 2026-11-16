@@ -57,11 +57,19 @@ trap 'rm -rf "$work"' EXIT
 
 # Repo-relative paths of the files to format. Explicit PATHs resolve against the caller's
 # directory; --full-name makes git print them relative to the repo root either way.
+# Frozen compatibility references are byte-for-byte historical fixtures. Their
+# manifests must continue identifying the captured code, including whitespace.
 if [[ ${#paths[@]} -eq 0 ]]; then
     (cd "$ROOT" && git ls-files -co --exclude-standard --full-name -- '*.odin')
 else
     git ls-files -co --exclude-standard --full-name -- "${paths[@]}"
-fi | grep '\.odin$' | grep -v -e '\.gen\.odin$' -e '^bindgen/upstream/' | sort -u |
+fi | grep '\.odin$' | grep -v -e '\.gen\.odin$' -e '^bindgen/upstream/' \
+    -e '^tests/replay_snapshot_compat/reference/' \
+    -e '^tests/replay_snapshot_compat/parts_reference/' \
+    -e '^tests/replay_authority_moderation_compat/reference/' \
+    -e '^tests/replay_lz4_staging/reference/' \
+    -e '^tests/replay_shuffle/reference/' \
+    -e '^tests/replay_schema_blocks/reference/' | sort -u |
     while IFS= read -r rel; do
         if [[ -f "$ROOT/$rel" ]]; then # -c also lists files deleted from the working tree
             echo "$rel"

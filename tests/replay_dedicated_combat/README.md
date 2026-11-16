@@ -13,6 +13,15 @@ They aim from their predicted body at the authority-observed enemy census, move
 through ordinary controls, and submit fire/revive/cast inputs. No live world value
 is edited by the driver.
 
+The initial state authors the fully populated first wave on the right side of
+the yard and places player entry points on the left. The ordinary model validates
+its wave/director/pool state. Both players enter with ten health and zero combat
+counters; stock enemy damage, health, speed, ability cooldowns, and generated cover
+remain active. This separation gives the recovery workload time to exercise the
+next cooldowns without spending the players' survival distance while admission
+and the forty individual director spawns complete. No damage immunity or live
+state reset is installed, and normal death/wipe transitions remain enabled.
+
 The authority waits for at least thirty simultaneously living enemies before
 clients engage. Planned/crash takeover must use an approved checkpoint containing
 living enemies, a live projectile/lob/zone, at least eight shots, two casts and an
