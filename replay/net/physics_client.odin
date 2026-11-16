@@ -175,10 +175,11 @@ client_physics_fact :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
 }
 
 @(private)
-client_physics_merge_window :: proc(
+client_physics_check_window :: proc(
     c: ^Client($S, $C, $A, $E, $N),
     window: ^Physics_Window(C, A, E, N),
     authority_head: u64,
+    admission: bool,
 ) -> Error {
     for i in 0 ..< window.count {
         entry := window.entries[i]
@@ -193,18 +194,16 @@ client_physics_merge_window :: proc(
             return .Invalid_Input
         }
 
-        if entry.tick <= c.timeline.confirmed || entry.tick <= c.physics.accepted.baseline {
-            continue
-        }
-
-        if error := accepted_can_note(
-            &c.physics.accepted,
-            entry,
-            c.timeline.confirmed,
-            c.timeline.head,
-            authority_head,
-        ); error != .None {
-            return error
+        if admission && entry.tick > c.timeline.confirmed && entry.tick > c.physics.accepted.baseline {
+            if error := accepted_can_note(
+                &c.physics.accepted,
+                entry,
+                c.timeline.confirmed,
+                c.timeline.head,
+                authority_head,
+            ); error != .None {
+                return error
+            }
         }
 
         fact := &c.facts[entry.tick % PHYSICS_HISTORY]
@@ -214,6 +213,19 @@ client_physics_merge_window :: proc(
                    !reflect.equal(fact.events[:fact.count], window.events[i][:window.event_counts[i]], true)) {
             return .Invalid_Input
         }
+    }
+
+    return .None
+}
+
+@(private)
+client_physics_merge_window :: proc(
+    c: ^Client($S, $C, $A, $E, $N),
+    window: ^Physics_Window(C, A, E, N),
+    authority_head: u64,
+) -> Error {
+    if error := client_physics_check_window(c, window, authority_head, true); error != .None {
+        return error
     }
 
     for i in 0 ..< window.count {

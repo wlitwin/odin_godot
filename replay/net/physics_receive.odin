@@ -173,7 +173,7 @@ client_physics_part :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
             return .None
         }
 
-        _, window_error := physics_window_decode(
+        window, window_error := physics_window_decode(
             c,
             inspection.metadata,
             c.codecs.welcome.wire_size,
@@ -184,6 +184,22 @@ client_physics_part :: proc(c: ^Client($S, $C, $A, $E, $N), bytes: []u8, expecte
         if window_error != .None {
             c.stats.rejected_packets += 1
             return .None
+        }
+
+        // A same-stream refresh cannot contradict facts already admitted under
+        // the previous serial, including confirmed effects still awaiting view.
+        // This is read-only: no accepted/fact cache or world changes before the
+        // complete image and journal transaction have both been admitted.
+        if c.has_world && !c.recovering && packet.generation == c.generation {
+            known := c.physics.signatures[meta.tick % PHYSICS_HISTORY]
+
+            if (known.epoch == c.cfg.epoch &&
+                   known.tick == meta.tick &&
+                   !physics_signature_match(known, inspection.signature)) ||
+               client_physics_check_window(c, &window, meta.tick, false) != .None {
+                c.stats.rejected_packets += 1
+                return .None
+            }
         }
 
         decode_started, decode_timed := profile_start(c.profile_clock)

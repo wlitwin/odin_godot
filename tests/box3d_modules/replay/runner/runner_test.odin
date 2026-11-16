@@ -3,6 +3,7 @@ package replay_runner_host_test
 import "core:testing"
 import "base:runtime"
 import "core:mem"
+import "core:fmt"
 import bg "godot:box3d/godot"
 import meter "godot:box3d/godot/meter"
 import bh "godot:box3d/godot/host"
@@ -328,6 +329,173 @@ strict_sdk_existing_complete_runners_retain_exact_model_blocks_through_join_and_
         client.phase == .Resyncing,
     )
     testing.expect_value(t, client.journal.queue_count, old_queue)
+    // The actual same-generation complete Welcome must agree with all retained
+    // signed state and accepted/event batches before it can publish the tail.
+    signature := client.physics.signatures[fact_tick % 128]
+    prior_input, prior_found := net.accepted_read(&client.physics.accepted, old_confirmed)
+    testing.expect(t, prior_found)
+    prior_fact := client.facts[old_confirmed % 128]
+    client.hello_sent = false
+    client.request_sequence += 1
+    tr.memory_advance(test_transport, 12)
+    testing.expect_value(t, net.client_pump(client, 204), net.Error.None)
+    testing.expect_value(t, net.server_pump(server, 204), net.Error.None)
+    peer_index := -1
+
+    for peer, index in server.peers {
+        if !peer.local && peer.connection == 2 {
+            peer_index = index
+            break
+        }
+    }
+
+    testing.expect(t, peer_index >= 0)
+    refresh_ms := u64(204)
+    transport_tick := u64(12)
+    client.profile_clock.read = proc(_: rawptr) -> (u64, bool) {
+        return 1, true
+    }
+
+    for variant in 0 ..< 4 {
+        client.physics.signatures[fact_tick % 128] = signature
+        client.physics.accepted.entries[old_confirmed % 128] = prior_input
+        client.facts[old_confirmed % 128] = prior_fact
+
+        switch variant {
+        case 0:
+            client.physics.signatures[fact_tick % 128].complete[0] ~= 1
+        case 1:
+            client.physics.accepted.entries[old_confirmed % 128].batch.controls[0] += 1
+        case 2:
+            client.facts[old_confirmed % 128].count = 1
+            client.facts[old_confirmed % 128].events[0] = {
+                id = {epoch = cfg.epoch, tick = old_confirmed, source = 77, key = 1},
+                value = {kind = .Gameplay, value = 777},
+            }
+        }
+
+        if variant > 0 {
+            // Re-send the exact same owned Welcome through the ordinary chunk
+            // sender; the prior rejection intentionally produced no ACK.
+            server.physics.tx[peer_index].part, server.physics.tx[peer_index].waiting_ack = 0, false
+        }
+
+        rejected := client.stats.rejected_packets
+        inspected := client.profile_metrics[.Physics_Inspect].samples
+        decoded := client.profile_metrics[.Physics_Decode].samples
+
+        for _ in 0 ..< 128 {
+            transport_tick += 1
+            refresh_ms += 17
+            tr.memory_advance(test_transport, transport_tick)
+            testing.expect_value(t, net.server_pump(server, refresh_ms), net.Error.None)
+            client.last_hello = refresh_ms
+            testing.expect_value(t, net.client_pump(client, refresh_ms), net.Error.None)
+
+            if client.profile_metrics[.Physics_Inspect].samples > inspected {
+                break
+            }
+        }
+
+        testing.expect(t, client.profile_metrics[.Physics_Inspect].samples > inspected)
+        fmt.printf(
+            "PHYSICS_WELCOME_PAIR variant=%d inspected=%d rejected=%d serial=%d confirmed=%d\n",
+            variant,
+            client.profile_metrics[.Physics_Inspect].samples - inspected,
+            client.stats.rejected_packets - rejected,
+            client.serial,
+            client.timeline.confirmed,
+        )
+
+        if variant < 3 {
+            testing.expect(t, client.stats.rejected_packets > rejected)
+            testing.expect_value(t, client.profile_metrics[.Physics_Decode].samples, decoded)
+            testing.expect(
+                t,
+                client.timeline.head == old_head &&
+                client.timeline.confirmed == old_confirmed &&
+                client.serial == old_serial &&
+                client.phase == .Resyncing,
+            )
+            testing.expect_value(t, client.journal.queue_count, old_queue)
+            testing.expect_value(t, client.facts_contiguous, fact_tick)
+
+            if variant == 0 {
+                testing.expect(t, client.physics.signatures[fact_tick % 128].complete != signature.complete)
+            }
+
+            if variant == 1 {
+                testing.expect(
+                    t,
+                    client.physics.accepted.entries[old_confirmed % 128].batch.controls[0] !=
+                    prior_input.batch.controls[0],
+                )
+            }
+
+            if variant == 2 {
+                testing.expect_value(t, client.facts[old_confirmed % 128].count, u16(1))
+            }
+        } else {
+            testing.expect(
+                t,
+                client.phase == .Running && client.serial > old_serial && client.timeline.confirmed == fact_tick,
+            )
+            truth, truth_error := r.capture_complete(&server.timeline, fact_tick, alloc)
+            installed, installed_error := r.capture_complete(&client.timeline, fact_tick, alloc)
+            testing.expect(t, truth_error == .None && installed_error == .None && truth.frame == installed.frame)
+            r.complete_checkpoint_destroy(&truth)
+            r.complete_checkpoint_destroy(&installed)
+        }
+    }
+
+    // A genuine history-gap refresh has no overlapping old facts. Consistency
+    // validation must not impose the old ledger's admission window on it.
+    refresh_ms += 17
+    transport_tick += 1
+    tr.memory_advance(test_transport, transport_tick)
+    testing.expect_value(t, net.server_pump(server, refresh_ms), net.Error.None) // consume the accepted Welcome ACK
+    client.phase, client.hello_sent = .Resyncing, true
+
+    for _ in 0 ..< 130 {
+        refresh_ms += 17
+        transport_tick += 1
+        tr.memory_advance(test_transport, transport_tick)
+        testing.expect_value(t, net.server_pump(server, refresh_ms), net.Error.None)
+        testing.expect_value(t, net.server_step(server), net.Error.None)
+
+        for &packet in test_transport.packets {
+            packet.active = false
+        }
+    }
+
+    gap_tick := server.timeline.head
+    testing.expect(t, gap_tick - client.timeline.confirmed > 128)
+    client.hello_sent = false
+    client.request_sequence += 1
+    refresh_ms += 17
+    transport_tick += 1
+    tr.memory_advance(test_transport, transport_tick)
+    testing.expect_value(t, net.client_pump(client, refresh_ms), net.Error.None)
+    gap_inspected := client.profile_metrics[.Physics_Inspect].samples
+
+    for _ in 0 ..< 128 {
+        refresh_ms += 17
+        transport_tick += 1
+        tr.memory_advance(test_transport, transport_tick)
+        testing.expect_value(t, net.server_pump(server, refresh_ms), net.Error.None)
+        client.last_hello = refresh_ms
+        testing.expect_value(t, net.client_pump(client, refresh_ms), net.Error.None)
+
+        if client.profile_metrics[.Physics_Inspect].samples > gap_inspected {
+            break
+        }
+    }
+
+    testing.expect(t, client.profile_metrics[.Physics_Inspect].samples > gap_inspected)
+    testing.expect(
+        t,
+        client.phase == .Running && client.timeline.confirmed == gap_tick && client.serial > old_serial + 1,
+    )
     // A changed callback context is rejected before any callback/publication.
     head := server.timeline.head
     server.model.user = server
