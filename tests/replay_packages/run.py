@@ -90,8 +90,16 @@ require('physics_presentation_frame' not in root_names,
         'Core re-exports the native physics checkpoint reader')
 require({'Session', 'Room', 'Party', 'session_open', 'session_close'} <= root_names,
         'Core inventory lost required session owners')
-require(len(root_names) <= 160,
-        f'Core Replay Godot surface grew to {len(root_names)} declarations (limit 160)')
+session_additions = {
+    'session_options_check', 'session_setup_message', 'session_setup_report',
+    'Presentation_Context', 'session_presentation', 'presentation_same_scope', 'session_correction',
+}
+require(session_additions <= root_names,
+        f'Missing public Session declarations: {sorted(session_additions - root_names)}')
+require('session_setup_fail' not in root_names, 'Internal setup error writer is public')
+core_limit = 160 + len(session_additions)
+require(len(root_names) <= core_limit,
+        f'Core Replay Godot surface grew to {len(root_names)} declarations (limit {core_limit})')
 for package, names in inventories.items():
     if package != core:
         duplicated = sorted(root_names & names)
@@ -162,11 +170,11 @@ result = {
     'canonical_targets': positive,
     'negative_probes': negative,
     'public_declarations': {package: len(names) for package, names in inventories.items()},
-    'core_limit': 160,
+    'core_limit': core_limit,
     'import_files_checked': len(set(edges)),
     'feature_reexports': False,
     'value_only_native_link': True,
     'missing_physics_library': str(missing_physics),
 }
 (out / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
-print(f'REPLAY_PACKAGES_OK core={len(root_names)} limit=160 {out}')
+print(f'REPLAY_PACKAGES_OK core={len(root_names)} limit={core_limit} {out}')

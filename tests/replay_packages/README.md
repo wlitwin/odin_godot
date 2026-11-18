@@ -17,8 +17,9 @@ It verifies:
   naming a deliberately nonexistent archive, so a native physics dependency
   cannot be hidden by a successful object-only check or a local backend cache.
 - Moved root names fail with the expected missing-name diagnostic on both targets.
-- Compiler documentation exposes at most 160 root declarations, retains the core
-  session owners, and contains no re-exports of child-package declarations.
+- Compiler documentation exposes at most 167 root declarations. The gate checks
+  the seven Session setup and presentation additions by name, retains the core
+  session owners, and rejects child-package re-exports and the private error writer.
 - Core does not import scene/input/debug/physics. Foundational transport/storage/internal
   wire packages do not import core. Collection and relative imports are checked.
 
