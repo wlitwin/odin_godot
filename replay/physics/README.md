@@ -84,8 +84,9 @@ table bounds speculative geometry. New geometry definitions are authored before
 capture, not allocated from arbitrary replay-time scene input. Changed assets,
 topology or workload need new measurements even within the numerical count cap.
 
-Sensor observations are copied after the fixed step into a bounded keyed cache.
-Images/savepoints retain that cache, so later actions see the same completed
+The working world collects sensor observations in a bounded buffer after the
+fixed step. A checkpoint or savepoint copies only the events that occurred
+into its own allocation. Restoring it gives later actions the same completed
 observations after an earlier action rejects. Future pending native sensor and
 contact end queues are a distinct dependency retained by the shared native
 snapshot; the next fixed step exposes them exactly once. The provider does not
@@ -204,7 +205,7 @@ execution; it does not alter or truncate simulation. Debug and emulated-target
 tests report their observations without asserting native Release throughput.
 # Private provider ABI
 
-Working objects and owned images derive their identity from `REPLB3D3` and the
+Working objects and owned images derive their identity from `REPLB3D4` and the
 profile's asset/sensor array dimensions. Configuration contracts also include the
 complete capacity fingerprint. Execution/image checks refuse older or differently
 sized producer layouts before casting or accessing a command table. This is

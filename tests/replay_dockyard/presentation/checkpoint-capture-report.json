@@ -1,0 +1,172 @@
+{
+  "baseline_commit": "f717930a",
+  "change": "Replay private provider ABI4 with event-sized checkpoint storage. The Box3D native and Web backends were reused.",
+  "fixture": "Two scripted Dockyard players, Apple M3, 60 Hz, 100 ms added RTT, 5 ms jitter per receiver and 1% loss on unreliable packets. Wall-time quantiles use nearest rank. Per-tick capture times divide each correction by its actual executed ticks.",
+  "chrome_157_webrtc": [
+    {
+      "storage": "event_sized",
+      "corrections": 867,
+      "replayed_ticks": 13735,
+      "ticks_per_correction": {
+        "median": 15,
+        "p95": 22
+      },
+      "capture_us_per_replayed_tick": {
+        "median": 47.733,
+        "p95": 60.2
+      },
+      "whole_room_update_ms": {
+        "median": 3.145,
+        "p95": 4.025
+      }
+    },
+    {
+      "storage": "fixed_capacity",
+      "corrections": 866,
+      "replayed_ticks": 13621,
+      "ticks_per_correction": {
+        "median": 15,
+        "p95": 20
+      },
+      "capture_us_per_replayed_tick": {
+        "median": 52.471,
+        "p95": 64.733
+      },
+      "whole_room_update_ms": {
+        "median": 3.346,
+        "p95": 3.939
+      }
+    },
+    {
+      "storage": "fixed_capacity",
+      "corrections": 859,
+      "replayed_ticks": 13578,
+      "ticks_per_correction": {
+        "median": 15,
+        "p95": 21
+      },
+      "capture_us_per_replayed_tick": {
+        "median": 52.4,
+        "p95": 64.933
+      },
+      "whole_room_update_ms": {
+        "median": 3.296,
+        "p95": 3.98
+      }
+    },
+    {
+      "storage": "event_sized",
+      "corrections": 931,
+      "replayed_ticks": 14610,
+      "ticks_per_correction": {
+        "median": 15,
+        "p95": 21
+      },
+      "capture_us_per_replayed_tick": {
+        "median": 49.0,
+        "p95": 60.214
+      },
+      "whole_room_update_ms": {
+        "median": 3.206,
+        "p95": 3.88
+      }
+    }
+  ],
+  "deterministic_native": [
+    {
+      "storage": "fixed_capacity",
+      "corrections": 984,
+      "initial_image_bytes": 331424,
+      "final_history_image_bytes": 43048034,
+      "capture_us_per_replayed_tick": {
+        "median": 24.783,
+        "p95": 32.792
+      }
+    },
+    {
+      "storage": "event_sized",
+      "corrections": 984,
+      "initial_image_bytes": 134824,
+      "final_history_image_bytes": 17883306,
+      "capture_us_per_replayed_tick": {
+        "median": 20.312,
+        "p95": 24.432
+      }
+    },
+    {
+      "storage": "event_sized",
+      "corrections": 984,
+      "initial_image_bytes": 134824,
+      "final_history_image_bytes": 17883306,
+      "capture_us_per_replayed_tick": {
+        "median": 20.767,
+        "p95": 23.996
+      }
+    },
+    {
+      "storage": "fixed_capacity",
+      "corrections": 984,
+      "initial_image_bytes": 331424,
+      "final_history_image_bytes": 43048034,
+      "capture_us_per_replayed_tick": {
+        "median": 23.201,
+        "p95": 31.825
+      }
+    }
+  ],
+  "native_client_observer": {
+    "scope": "Separate diagnostic across all simulated client frames. The capture row includes serialize, normalize and finalize. Recovery admission usually runs just before the measured capture callback.",
+    "capture": {
+      "calls": 12389,
+      "mean_us": 19.283
+    },
+    "serialize": {
+      "calls": 12389,
+      "mean_us": 4.684
+    },
+    "normalize": {
+      "calls": 12389,
+      "mean_us": 10.442
+    },
+    "finalize": {
+      "calls": 12389,
+      "mean_us": 3.798
+    },
+    "recovery_admission": {
+      "calls": 12388,
+      "mean_us": 20.229
+    }
+  },
+  "normalized_read_experiment": {
+    "scope": "Host and client combined, one count per shared native snapshot resource. A read means copying normalized contents or computing a digest. Size-only queries are served by the capture-time count. First reads in a private native diagnostic also reconstructed into a temporary world to check the historical bytes. Reconstruction timings exclude comparison to the eager result. Both paths ran in the same process.",
+    "captures": 14189,
+    "released": 14189,
+    "read": 3378,
+    "cumulative_normalized_bytes": 401437876,
+    "cumulative_unread_bytes": 306495360,
+    "repetitions": [
+      {
+        "eager_count_and_fill_ms": 145.673,
+        "count_only_ms": 60.914,
+        "first_read_restore_and_fill_ms": 71.213,
+        "projected_saved_us_per_capture": 0.955,
+        "byte_mismatches": 0
+      },
+      {
+        "eager_count_and_fill_ms": 153.668,
+        "count_only_ms": 68.021,
+        "first_read_restore_and_fill_ms": 71.643,
+        "projected_saved_us_per_capture": 0.987,
+        "byte_mismatches": 0
+      },
+      {
+        "eager_count_and_fill_ms": 158.242,
+        "count_only_ms": 66.065,
+        "first_read_restore_and_fill_ms": 76.862,
+        "projected_saved_us_per_capture": 1.079,
+        "byte_mismatches": 0
+      }
+    ]
+  },
+  "correctness": "All four browser pairs passed five-part final byte equality and checked teardown. The native deterministic pairs matched old and new canonical bytes at the same 15 checkpoints on both peers. Sensor begin/end, failed-action restore, history wrap, memory admission, stale provider rejection and detached SDK ownership checks passed."
+}

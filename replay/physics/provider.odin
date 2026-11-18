@@ -13,10 +13,11 @@ import meter "godot:box3d/godot/meter"
 import "base:runtime"
 import intrinsics "base:intrinsics"
 
-// Private working/image ABI3 has profile-sized Config/assets and sensor arrays.
+// Private ABI4 stores an image's sensor events inline after its header.
+// Working worlds and Config still have profile-sized arrays.
 // Include their dimensions so execution/image checks reject older or differently
 // sized producer layouts before any typed access.
-IDENTITY :: u64(0x5245504c42334433) ~ u64(bcap.MAX_SENSOR_EVENTS) ~ (u64(bcap.MAX_ASSETS) << 32)
+IDENTITY :: u64(0x5245504c42334434) ~ u64(bcap.MAX_SENSOR_EVENTS) ~ (u64(bcap.MAX_ASSETS) << 32)
 MAX_ASSETS :: bcap.MAX_ASSETS
 // Retained solver storage and canonical wire bytes are different domains.
 // The shared memory budget accounts the complete image; SNAPSHOT_BYTES bounds
@@ -73,11 +74,18 @@ Image :: struct {
     config_hash:                          u64, // config_contract(config), derived once per image
     contract, bytes:                      u64,
     allocator:                            mem.Allocator,
-    sensor_count:                         u32,
-    sensors:                              [bcap.MAX_SENSOR_EVENTS]Sensor_Event,
+    sensors:                              []Sensor_Event, // owned by the same allocation as Image
     catalog:                              b.Recovery_Catalog,
     catalog_identity:                     b.Recovery_Identity,
     native_required, normalized_required: u64,
+}
+
+#assert(align_of(Image) >= align_of(Sensor_Event))
+#assert(bcap.MAX_SENSOR_EVENTS <= (max(int) - size_of(Image)) / size_of(Sensor_Event))
+
+@(private)
+image_allocation_bytes :: proc(event_count: int) -> int {
+    return size_of(Image) + event_count * size_of(Sensor_Event)
 }
 
 @(private)
@@ -560,10 +568,16 @@ image_make :: proc(
         info = constructor_info^
     }
 
+    if len(sensors) > bcap.MAX_SENSOR_EVENTS {
+        return nil, 0, .Resource_Limit
+    }
+
+    allocation_bytes := image_allocation_bytes(len(sensors))
     storage := info.storage
 
-    if storage.native_requested_bytes > max(u64) - storage.wrapper_malloc_bytes ||
-       storage.native_requested_bytes + storage.wrapper_malloc_bytes > IMAGE_BYTES_LIMIT - size_of(Image) {
+    if u64(allocation_bytes) > IMAGE_BYTES_LIMIT ||
+       storage.native_requested_bytes > max(u64) - storage.wrapper_malloc_bytes ||
+       storage.native_requested_bytes + storage.wrapper_malloc_bytes > IMAGE_BYTES_LIMIT - u64(allocation_bytes) {
         return nil, 0, .Resource_Limit
     }
 
@@ -589,8 +603,8 @@ image_make :: proc(
         }
     }
 
-    bytes := storage.native_requested_bytes + storage.wrapper_malloc_bytes + size_of(Image)
-    pointer, alloc_error := mem.alloc(size_of(Image), align_of(Image), allocator)
+    bytes := storage.native_requested_bytes + storage.wrapper_malloc_bytes + u64(allocation_bytes)
+    pointer, alloc_error := mem.alloc(allocation_bytes, align_of(Image), allocator)
 
     if alloc_error != .None || pointer == nil {
         b.recovery_catalog_destroy(&catalog_owner)
@@ -607,15 +621,15 @@ image_make :: proc(
         contract            = contract != 0 ? contract : catalog_contract_from(config_hash, catalog_identity),
         bytes               = bytes,
         allocator           = allocator,
-        sensor_count        = u32(len(sensors)),
+        sensors             = mem.slice_ptr(cast(^Sensor_Event)mem.ptr_offset(image, 1), len(sensors)),
         catalog             = catalog_owner,
         catalog_identity    = catalog_identity,
         native_required     = native_required,
         normalized_required = storage.normalized_bytes,
     }
-    copy(image.sensors[:], sensors)
+    copy(image.sensors, sensors)
 
-    if error := charge(size_of(Image)); error != .None {
+    if error := charge(u64(allocation_bytes)); error != .None {
         b.recovery_catalog_destroy(&image.catalog)
         mem.free(image, allocator)
         return nil, 0, error
@@ -644,7 +658,7 @@ release :: proc(pointer: rawptr) {
         return
     }
 
-    uncharge(size_of(Image))
+    uncharge(u64(image_allocation_bytes(len(image.sensors))))
     mem.free(image, allocator)
     r.owner_drop(&owner)
 }
@@ -674,7 +688,7 @@ clone :: proc(pointer: rawptr) -> (rawptr, r.Error) {
         snapshot,
         image.config,
         image.allocator,
-        image.sensors[:image.sensor_count],
+        image.sensors,
         &image.catalog,
         image.native_required,
         &info,
@@ -742,13 +756,14 @@ open :: proc(pointer: rawptr) -> (rawptr, r.Error) {
         config           = image.config,
         allocator        = image.allocator,
         commands         = &command_dispatch,
-        sensor_count     = image.sensor_count,
-        sensors          = image.sensors,
+        sensor_count     = u32(len(image.sensors)),
         catalog_identity = image.catalog_identity,
         native_required  = image.native_required,
         contract         = image.contract,
         config_hash      = image.config_hash,
     }
+
+    copy(work.sensors[:], image.sensors)
 
     if error := charge(size_of(Working)); error != .None {
         b.stage_discard(&stage)
@@ -861,11 +876,11 @@ equal :: proc(left, right: rawptr) -> (bool, r.Error) {
         return false, .External_State
     }
 
-    if a.sensor_count != z.sensor_count {
+    if len(a.sensors) != len(z.sensors) {
         return false, .None
     }
 
-    for event, index in a.sensors[:a.sensor_count] {
+    for event, index in a.sensors {
         other := z.sensors[index]
 
         if event.sensor != other.sensor || event.visitor != other.visitor || event.began != other.began {

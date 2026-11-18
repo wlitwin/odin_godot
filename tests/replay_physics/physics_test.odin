@@ -269,6 +269,37 @@ network_action :: proc(game: ^f.Game, seat: u16, action: Action, ctx: ^r.Step(f.
 }
 
 @(test)
+checkpoint_sensor_storage_tracks_observations_across_capture_and_clone :: proc(t: ^testing.T) {
+    world, game, config := f.world()
+    defer b.world_destroy(&world)
+    frame := r.Frame(f.Game){state = game}
+    before := ph.allocation_stats().live_bytes
+    empty, empty_error := ph.checkpoint_make(frame, f.Event, world, config)
+    ok(t, empty_error)
+    defer r.complete_checkpoint_destroy(&empty)
+    empty_charge := ph.allocation_stats().live_bytes - before
+
+    testing.expect_value(t, b.world_step_fixed(world), b.Status.Ok)
+    events: [70]b.Sensor_Event
+    count, status := b.world_sensor_events(world, events[:])
+    testing.expect_value(t, status, b.Status.Ok)
+    testing.expect(t, count > 0)
+
+    before = ph.allocation_stats().live_bytes
+    active, active_error := ph.checkpoint_make(frame, f.Event, world, config)
+    ok(t, active_error)
+    defer r.complete_checkpoint_destroy(&active)
+    expected := empty_charge + u64(count) * size_of(ph.Sensor_Event)
+    testing.expect_value(t, ph.allocation_stats().live_bytes - before, expected)
+
+    before = ph.allocation_stats().live_bytes
+    clone, clone_error := r.complete_checkpoint_clone(&active)
+    ok(t, clone_error)
+    defer r.complete_checkpoint_destroy(&clone)
+    testing.expect_value(t, ph.allocation_stats().live_bytes - before, expected)
+}
+
+@(test)
 accepted_sensor_destruction_keeps_pending_next_tick_ends_exactly_once :: proc(t: ^testing.T) {
     world, game, config := f.world()
     defer b.world_destroy(&world)

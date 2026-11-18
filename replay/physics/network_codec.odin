@@ -247,7 +247,7 @@ network_codec_init :: proc(
                 }
             }
 
-            observations := 4 + int(image.sensor_count) * 17
+            observations := 4 + len(image.sensors) * 17
             total := 24 + observations + int(native_bytes)
 
             if total > int(ctx.value.max_attachment_bytes) {
@@ -503,7 +503,7 @@ network_codec_destroy :: proc(c: ^Network_Codec($S, $C, $A, $E, $N)) -> net.Erro
 
 @(private)
 observations_write :: proc(image: ^Image, dst: []u8) -> (int, net.Error) {
-    n := 4 + int(image.sensor_count) * 17
+    n := 4 + len(image.sensors) * 17
 
     if len(dst) == 0 {
         return n, .None
@@ -513,10 +513,10 @@ observations_write :: proc(image: ^Image, dst: []u8) -> (int, net.Error) {
         return n, .Capacity
     }
 
-    obs_put32(dst[:4], image.sensor_count)
+    obs_put32(dst[:4], u32(len(image.sensors)))
     at := 4
 
-    for event in image.sensors[:image.sensor_count] {
+    for event in image.sensors {
         obs_put64(dst[at:at + 8], u64(event.sensor))
         obs_put64(dst[at + 8:at + 16], u64(event.visitor))
         dst[at + 16] = u8(event.began)
@@ -679,7 +679,7 @@ network_attach_checkpoint :: proc(
         snapshot,
         c.config,
         c.allocator,
-        original.sensors[:original.sensor_count],
+        original.sensors,
         &c.catalog,
         ownership = c.ownership,
     )

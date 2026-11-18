@@ -18,7 +18,7 @@ refused: r.Error
 
 @(test)
 legacy_native_producer_rejects_current_commands_before_private_table_access :: proc(t: ^testing.T) {
-    expected := u64(0x5245504c42334433) ~ u64(limits.MAX_SENSOR_EVENTS) ~ (u64(limits.MAX_ASSETS) << 32)
+    expected := u64(0x5245504c42334434) ~ u64(limits.MAX_SENSOR_EVENTS) ~ (u64(limits.MAX_ASSETS) << 32)
     if !check(
         t,
         legacy.IDENTITY != ph.IDENTITY && ph.IDENTITY == expected,
@@ -180,7 +180,7 @@ current_native_execution_refuses_legacy_identity_and_current_commands_continue :
         check(
             t,
             refused == .External_State && f.timeline.head == 1,
-            "ABI2 accepts current commands after refusing the old identity",
+            "current provider accepts commands after refusing the old identity",
         )
     }
 }

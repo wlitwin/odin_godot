@@ -183,6 +183,34 @@ and replayed tick reported by the client. All three pairs finished at tick
 1,800 with identical bytes for all five canonical parts, zero resyncs and
 clean teardown. The per-correction timings are in [the compressed CSV](repair-cost.csv.gz).
 
+### Checkpoint capture and retained memory
+
+Replay previously reserved the profile maximum of 8,192 sensor events in
+every captured and cloned image. Each image now owns exactly the completed
+events from its tick, in the same allocation as its header. In a seeded
+30-second native run with 128 history slots, the client replayed the same
+10,586 ticks in both versions. Its final charged history fell from 41.05 to
+17.05 MiB. An empty-event initial image fell from 331,424 to 134,824 bytes.
+All five canonical parts matched across versions and peers at 15 checkpoints.
+
+Four 1,800-tick Chrome runs used the same repair probes and network conditions
+as above, in new/old/old/new order. Median capture time per replayed tick went
+from 52.4–52.5 µs to 47.7–49.0 µs. P95 went from 64.7–64.9 µs to 60.2 µs.
+Whole-update p95 ranged from 3.94–3.98 ms before and 3.88–4.03 ms after.
+Every peer pair reached byte-identical final state and released its resources.
+
+We also measured the cost of the two native representations. Across 12,389
+client captures, writing the restorable solver image averaged 4.7 µs and
+building its normalized comparison bytes averaged 10.4 µs. In a separate
+two-player run, 3,378 of 14,189 distinct images had their normalized bytes read.
+A first-read experiment retained the required size at capture time, restored
+the historical state into a temporary world, and filled the comparison buffer.
+Every read matched the eager bytes. Across three repetitions the projected
+saving averaged about 1 µs per capture, and reading required spare world
+slots. Replay keeps the eager comparison data so detached reads work when
+those slots are occupied. The [measurement report](checkpoint-capture-report.json)
+includes the per-run timings and exact byte totals.
+
 `run.py` reuses the bounded online runner and actual production menu inputs. It
 opens two headed Chrome processes with rendering enabled and without software-GL
 fallback flags, records the actual WebGL renderer/viewport/DPR, captures play and
