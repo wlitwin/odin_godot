@@ -85,7 +85,7 @@ TESTS=(
     "replaystormcaller|REPLAY_STORMCALLER_OK|tests/replay_stormcaller/run.sh||native"
     "replayeditor|REPLAY_EDITOR_OK|tests/replay_editor/run.sh||native"
     "replaysaveinputs|REPLAY_SAVE_INPUTS_OK|tests/replay_editor_workflow/save_inputs.sh||native"
-    "replayauthoring|REPLAY_AUTHORING_OK|tests/replay_editor_workflow/generic.sh||native"
+    "replayauthoringeditor|REPLAY_AUTHORING_EDITOR_OK|tests/replay_editor_workflow/generic.sh||native"
     "replayscrapbridge|REPLAY_SCRAP_BRIDGE_OK|tests/replay_scrapyard_bridge/run.sh||native"
     "replaybridge|REPLAY_BRIDGE_OK|tests/replay_bridge/run.sh||native"
     "replaydefinitions|REPLAY_DEFINITIONS_OK|tests/replay_definitions/run.sh||native"
