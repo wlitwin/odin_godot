@@ -138,6 +138,51 @@ The online service and players need the matching Web cohort when rolling this
 out. The [timing and alignment data](smoothing-cost-report.json) retain the
 individual run distributions, benchmark scopes and cohort IDs.
 
+### How much of a correction is physics?
+
+The 3.79–3.94 ms p95 above times the joining client's `Room.frame` on calls
+that replayed at least one tick. It includes receiving inputs, repairing history
+and advancing the current simulation when due. The two runs replayed a median
+of 15 ticks per correction, and 1,594 of 1,635 such calls also advanced one
+new tick. Browser presentation was measured separately. Across those same
+two runs, the median interval between animation callbacks was 16.67 ms and
+the p95 was 17.57–18.26 ms, from startup through the end-of-play marker.
+These intervals include waiting for the display.
+
+Three 1,800-tick pairs on the Apple M3 measured the cost inside the repair.
+Both players used the carry controller. The 100 ms cases added 50 ms receive
+delay at each peer, 5 ms jitter and 1% unreliable loss. Each cell with two
+values gives the median and p95 across corrections on the joining client.
+
+| Client and transport | Corrections | Ticks replayed | Whole update | Checked revision | Managed physics inside revision | Checkpoint capture inside revision |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Chrome 157, WebRTC, 100 ms added RTT | 845 | 15 / 21 | 3.29 / 3.89 ms | 2.89 / 3.42 ms | 0.75 / 0.99 ms | 0.83 / 1.04 ms |
+| Chrome 157, WebRTC, local with no added impairment | 1,076 | 7 / 11 | 2.37 / 2.87 ms | 1.96 / 2.45 ms | 0.47 / 0.69 ms | 0.49 / 0.66 ms |
+| Headless native Godot 4.7.1, ENet, 100 ms added RTT | 837 | 12 / 16 | 5.47 / 7.65 ms | 4.58 / 6.57 ms | 0.83 / 1.23 ms | 1.63 / 2.47 ms |
+
+In the 100 ms Chrome run, dividing each revision by its actual tick count
+gave a median **0.184 ms per replayed tick**, including the cost of opening,
+checking and publishing the revision. The corresponding averages for managed
+physics and checkpoint capture were 0.048 and 0.053 ms per tick at the
+median. Across all 13,321 replayed ticks those phases accounted for 26% and
+29% of checked revision time. Checkpoint capture is a candidate for further
+optimization as the world grows. On every replayed tick it serializes a
+restorable solver image and writes a separate normalized representation for
+comparison. At exactly 15 replayed ticks, median revision
+time was 2.80 ms in Chrome (477 corrections) and 4.91 ms in native Godot
+(75 corrections). The runs used different transports and builds.
+
+The probe ran in isolated copies of the game at `df5f5f7f`. It read Replay's
+`Physics_Repair` duration immediately after `revise_inputs_checked` returned,
+while that transaction's world-open, model and capture counters were still
+available. It also bracketed every `ph.step`, matching tick IDs to the repaired
+suffix. This includes all four solver substeps, the sensor read and command
+bookkeeping. Each sampled revision had one open and one model and capture
+sample per replayed tick. Sample counts and depths covered every correction
+and replayed tick reported by the client. All three pairs finished at tick
+1,800 with identical bytes for all five canonical parts, zero resyncs and
+clean teardown. The per-correction timings are in [the compressed CSV](repair-cost.csv.gz).
+
 `run.py` reuses the bounded online runner and actual production menu inputs. It
 opens two headed Chrome processes with rendering enabled and without software-GL
 fallback flags, records the actual WebGL renderer/viewport/DPR, captures play and
