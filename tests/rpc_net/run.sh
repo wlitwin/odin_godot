@@ -33,7 +33,7 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # 2. Write .godot/extension_list.cfg + import so the runtime loads the extension. (A SIGSEGV
 #    in Godot's headless editor doc-gen at import cleanup is a pre-existing engine issue.)
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 # Launch one peer (ROLE/PORT via env), backgrounded, stdout -> $2.
 launch_peer() {

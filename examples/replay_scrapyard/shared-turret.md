@@ -52,18 +52,16 @@ is operating the turret, checks the restored operator/ammo, then hands it to a
 third player and empties it. If the departed host was the operator, ordinary
 disconnect cleanup releases the turret instead.
 
-Content advances from **50/J to 51/K** (`0x525343524150304b`), protocol 7 unchanged.
-The offline converter accepts content 50 as well as prior supported revisions.
-Frozen old catalog/action contracts map explicitly to the new representation; old runs
-receive an empty turret pool and zero turret definitions/targets. Conversion
-preserves their original catalog rather than adding this ability to an existing
-run. The historical recording verifier accepts `--content50`. See [saves](saves.md).
+The retained pre-turret save was migrated to the current contract with its
+catalog preserved, an empty turret pool and zero turret definitions. Loading it
+does not add the ability to an existing run. [Current saved fixtures](saves.md#current-saved-fixtures)
+exercise this behavior without retaining old schema readers.
 
 The authoring exercise fit the existing framework without adding transport,
 rollback, recovery or code-generation primitives. The main extra work was schema
 evolution: adding a targeted action and a new ability family required freezing the
 old action type and explicitly mapping the extended enum. Gameplay remains a
-small value-state feature plus a scene adapter; compatibility code is separate.
+small value-state feature plus a scene adapter.
 
 Run the focused suite from the repository root:
 

@@ -26,8 +26,20 @@ Destroy them before their parent nodes or compiled script module disappear.
 The framework owns pooled root transforms; scene-local scripts own their child
 animation. A detached display value can be copied; a live pool or binding cannot.
 
+For definition tables, `godot:authoring` provides `Catalog(Script)` with checked
+IDs, duplicate diagnostics and retained Resources. `bake_fields` uses that
+package's explicit copy, rename and bounded conversion declarations inside a
+`Bake_Context`. Strings, Resource references and semantic rules remain explicit
+game code. The shared package also works with Kit; it does not require Replay.
+See [Resource mapping](../../../docs/authoring-guide.md#baking-resources-into-game-values).
+
 Use `replaygd "godot:replay/godot"` for Session/Room/Party. Scene adapters import
 that lifecycle package when they need it, keeping presentation optional for a
 game that only uses networking. See [typed adapters](adapter-bindings.md),
 [view pools](view-pools.md), [body contracts](body-bindings.md) and the
 [checked recipes](../../../examples/replay_recipes/README.md).
+
+For a complete pickup flash and confirmed sound, start with
+[`template/replay/scripts/effects.odin`](https://github.com/wlitwin/odin_godot/blob/main/build/template/replay/scripts/effects.odin)
+in the installed SDK, or the
+[pickup recipe](https://wlitwin.github.io/odin_godot/replay/presentation.html).

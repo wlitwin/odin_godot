@@ -25,6 +25,7 @@ import "core:sync"
 // ----------------------------------------------------------------------------
 
 // Godot Node notification constants.
+NOTIFICATION_PREDELETE :: 1
 NOTIFICATION_ENTER_TREE :: 10
 NOTIFICATION_EXIT_TREE :: 11
 NOTIFICATION_READY :: 13
@@ -33,20 +34,39 @@ NOTIFICATION_READY :: 13
 // engine hands back to every vtable callback.
 @(private)
 Odin_Instance :: struct {
-    owner:           gdext.ObjectPtr,
-    script:          gdext.ObjectPtr, // the OdinScript object
-    desc:            rt.Class_Desc,
-    user:            rawptr, // the allocated script struct (owner ptr at offset 0)
-    cache:           ^Class_Cache, // interned names + cached Variant constructors (per class)
-    script_identity: string, // OWNED desc_identity copy (normally res:// path); survives dll swaps
-    generation:      rawptr, // native ^Script_Generation lease; nil on web
-    box3d_context:   u64, // stable Core weak liveness token, never a game identity
+    owner:             gdext.ObjectPtr,
+    script:            gdext.ObjectPtr, // the OdinScript object
+    desc:              rt.Class_Desc,
+    user:              rawptr, // the allocated script struct (owner ptr at offset 0)
+    cache:             ^Class_Cache, // interned names + cached Variant constructors (per class)
+    script_identity:   string, // OWNED desc_identity copy (normally res:// path); survives dll swaps
+    generation:        rawptr, // native ^Script_Generation lease; nil on web
+    box3d_liveness:    ^u32, // stable cell held by the source lease
+    quarantined:       bool,
+    box3d_context:     u64, // stable Core weak liveness token, never a game identity
     // Reload snapshots pin the bookkeeping object so a synchronous Godot re-entry can
     // free an instance during lifecycle.reload without invalidating the walk. The retired
     // flag means Godot called free and the instance is no longer discoverable; destruction
     // waits for the last snapshot pin.
-    reload_pins:     int,
-    retired:         bool,
+    pins:              int, // active callbacks, finalization and reload snapshots
+    final_phase:       Final_Phase,
+    owned_connections: [dynamic]Instance_Connection,
+    retired:           bool,
+}
+
+@(private)
+Final_Phase :: enum u8 {
+    Live,
+    Detaching,
+    Finalizing,
+    Finalized,
+}
+
+@(private)
+Instance_Connection :: struct {
+    emitter:  u64,
+    signal:   godot.String_Name,
+    callback: godot.Callable,
 }
 
 // ----------------------------------------------------------------------------
@@ -59,6 +79,25 @@ Odin_Instance :: struct {
 // ----------------------------------------------------------------------------
 @(private)
 live_instances: [dynamic]^Odin_Instance
+
+// Unavoidable invalid-thread script retirement retains all owned storage and
+// code leases. These records never execute or get finalized later against a
+// potentially dead owner. Restart is the recovery for this unsupported misuse.
+@(private)
+quarantined_instances: [dynamic]^Odin_Instance
+@(private)
+script_lifecycle_thread: int
+@(private)
+script_lifecycle_engine_thread: u64
+
+@(private)
+instance_lifecycle_on_thread :: proc "contextless" () -> bool {
+    when WEB {
+        return godot.os_get_thread_caller_id(godot.singleton_os()) == script_lifecycle_engine_thread
+    } else {
+        return sync.current_thread_id() == script_lifecycle_thread
+    }
+}
 
 // owner -> its live instance, the O(1) lookup behind odin_script_struct. Maintained in
 // lockstep with live_instances, under live_lock.
@@ -108,7 +147,7 @@ retire_live_instance :: proc(oi: ^Odin_Instance) -> (destroy_now: bool) {
     }
 
     oi.retired = true
-    return oi.reload_pins == 0
+    return oi.pins == 0 && !oi.quarantined
 }
 
 // Stable reload walk: pin every entry while holding the registry lock. The execution
@@ -123,7 +162,7 @@ pin_live_instance_snapshot :: proc(allocator := context.temp_allocator) -> []^Od
 
     for oi in snapshot {
         if oi != nil {
-            oi.reload_pins += 1
+            oi.pins += 1
         }
     }
 
@@ -150,14 +189,36 @@ release_live_instance_snapshot :: proc(snapshot: []^Odin_Instance) {
         }
 
         sync.lock(&live_lock)
-        assert(oi.reload_pins > 0)
-        oi.reload_pins -= 1
-        destroy_now := oi.retired && oi.reload_pins == 0
+        assert(oi.pins > 0)
+        oi.pins -= 1
+        destroy_now := oi.retired && oi.pins == 0 && !oi.quarantined
         sync.unlock(&live_lock)
 
         if destroy_now {
             destroy_odin_instance(oi)
         }
+    }
+}
+
+// Callback pins also protect user storage when cleanup triggers synchronous
+// script retirement. No Godot/user callback runs while live_lock is held.
+@(private)
+instance_pin :: proc(oi: ^Odin_Instance) {
+    sync.lock(&live_lock)
+    oi.pins += 1
+    sync.unlock(&live_lock)
+}
+
+@(private)
+instance_unpin :: proc(oi: ^Odin_Instance) {
+    sync.lock(&live_lock)
+    assert(oi.pins > 0)
+    oi.pins -= 1
+    destroy := oi.retired && oi.pins == 0 && !oi.quarantined
+    sync.unlock(&live_lock)
+
+    if destroy {
+        destroy_odin_instance(oi)
     }
 }
 
@@ -834,6 +895,7 @@ odin_make_script_instance :: proc(
     oi.generation = script_generation_for_desc(desc)
     script_generation_retain(oi.generation)
     oi.box3d_context = box3d_context_create(oi.generation)
+    oi.box3d_liveness = box3d_context_liveness(oi.box3d_context)
     host_scope := script_box3d_enter(oi)
     defer script_box3d_leave(host_scope)
 
@@ -1099,7 +1161,7 @@ wire_indexed_connection :: proc "contextless" (oi: ^Odin_Instance, c: rt.Connect
             break
         }
 
-        godot.connect_to_bound(cast(godot.Object)node, c.signal, cast(godot.Object)oi.owner, c.method, i64(i))
+        connect_instance_signal(oi, cast(godot.Object)node, c.signal, c.method, true, i64(i))
         wired += 1
     }
 
@@ -1151,10 +1213,33 @@ resolve_onready_slot :: proc "contextless" (oi: ^Odin_Instance, o: rt.Onready, p
 
 @(private)
 inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, what: i32, reversed: bool) {
+    context = gdext.godot_context()
     script_access_enter()
     defer script_box3d_collect_pending()
     defer script_access_leave()
     oi := cast(^Odin_Instance)instance
+
+    if oi == nil || oi.user == nil || oi.quarantined {
+        return
+    }
+
+    if int(what) == NOTIFICATION_PREDELETE {
+        if oi.desc.lifecycle.finalize != nil ||
+           oi.desc.owns_state ||
+           oi.box3d_context != 0 ||
+           len(oi.owned_connections) > 0 {
+            _ = finalize_odin_instance(oi, true)
+        }
+
+        return
+    }
+
+    if oi.final_phase == .Finalizing || oi.final_phase == .Finalized || oi.retired {
+        return
+    }
+
+    instance_pin(oi)
+    defer instance_unpin(oi)
     host_scope := script_box3d_enter(oi)
     defer script_box3d_leave(host_scope)
 
@@ -1187,7 +1272,7 @@ inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, w
         // (and its declared signals) exists by now.
         for c in rt.desc_connections(oi.desc) {
             if c.path == nil {
-                godot.connect(cast(godot.Object)oi.owner, c.signal, c.method)
+                connect_instance_signal(oi, cast(godot.Object)oi.owner, c.signal, c.method)
                 continue
             }
 
@@ -1216,7 +1301,7 @@ inst_notification :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, w
                 continue
             }
 
-            godot.connect_to(cast(godot.Object)emitter, c.signal, cast(godot.Object)oi.owner, c.method)
+            connect_instance_signal(oi, cast(godot.Object)emitter, c.signal, c.method)
         }
 
         if oi.desc.lifecycle.ready != nil {
@@ -1242,10 +1327,28 @@ inst_call :: proc "c" (
     ret: gdext.VariantPtr,
     error: ^gdext.CallError,
 ) {
+    context = gdext.godot_context()
     script_access_enter()
     defer script_box3d_collect_pending()
     defer script_access_leave()
     oi := cast(^Odin_Instance)self
+
+    if oi == nil || oi.retired || oi.final_phase == .Finalizing || oi.final_phase == .Finalized {
+        if error != nil {
+            error^ = {
+                error = .Invalid_Method,
+            }
+        }
+
+        if ret != nil {
+            gdext.variant_new_nil(ret)
+        }
+
+        return
+    }
+
+    instance_pin(oi)
+    defer instance_unpin(oi)
     host_scope := script_box3d_enter(oi)
     defer script_box3d_leave(host_scope)
 
@@ -1344,7 +1447,7 @@ inst_has_method :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr, nam
     host_scope := script_box3d_enter(oi)
     defer script_box3d_leave(host_scope)
 
-    if oi == nil {
+    if oi == nil || oi.quarantined || oi.retired {
         return false
     }
 
@@ -1384,10 +1487,217 @@ inst_get_language :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) -
     return cast(gdext.ExtensionScriptLanguagePtr)odin_language_object
 }
 
+// PREDELETE is sent to scripts before Node's own child destruction. Let the
+// real tree-exit path run first, while stack state is intact; then finalize.
+// Native Node vetoes must remain effective (edited root/off-main in-tree free).
+@(private)
+finalize_odin_instance :: proc(oi: ^Odin_Instance, predelete: bool) -> bool {
+    if oi == nil || oi.user == nil {
+        return true
+    }
+
+    if oi.quarantined {
+        return false
+    }
+
+    if oi.final_phase != .Live {
+        return oi.final_phase == .Finalized
+    }
+
+    if predelete && godot.object_is_class(cast(godot.Object)oi.owner, godot.sname("Node")) {
+        node := cast(godot.Node)oi.owner
+
+        if godot.node_is_inside_tree(node) {
+            os := godot.singleton_os()
+
+            if godot.os_get_thread_caller_id(os) != godot.os_get_main_thread_id(os) {
+                return false
+            }
+
+            tree := godot.node_get_tree(node)
+
+            if godot.engine_is_editor_hint(godot.singleton_engine()) &&
+               godot.scene_tree_get_edited_scene_root(tree) == node {
+                return false
+            }
+        }
+    }
+
+    needs_main :=
+        oi.desc.owns_state ||
+        oi.desc.lifecycle.finalize != nil ||
+        len(oi.owned_connections) > 0 ||
+        oi.box3d_context != 0
+
+    if needs_main && !instance_lifecycle_on_thread() {
+        if predelete {
+            quarantine_odin_instance(oi)
+        }
+
+        return false
+    }
+
+    instance_pin(oi)
+    defer instance_unpin(oi)
+    scope := script_box3d_enter(oi)
+    defer script_box3d_leave(scope)
+
+    if scope.required && !scope.entered {
+        if predelete {
+            quarantine_odin_instance(oi)
+        }
+
+        return false
+    }
+
+    // A no-hook class keeps its native EXIT_TREE ordering. We only preflight
+    // the destruction boundary here; retirement disconnects its owned links.
+    if predelete && oi.desc.lifecycle.finalize == nil {
+        return true
+    }
+
+    // Classes without user/owned final cleanup still retire declarative links,
+    // but should not change their ordinary Node exit ordering.
+    if predelete &&
+       oi.desc.lifecycle.finalize != nil &&
+       godot.object_is_class(cast(godot.Object)oi.owner, godot.sname("Node")) {
+        node := cast(godot.Node)oi.owner
+
+        if godot.node_is_inside_tree(node) {
+            if parent := godot.node_get_parent(node); parent != nil {
+                oi.final_phase = .Detaching
+                godot.node_remove_child(parent, node)
+
+                if godot.node_is_inside_tree(node) {
+                    oi.final_phase = .Live
+                    quarantine_odin_instance(oi)
+                    return false
+                }
+            }
+        }
+    }
+
+    oi.final_phase = .Finalizing
+    disconnect_instance_connections(oi)
+
+    if oi.desc.lifecycle.finalize != nil {
+        oi.desc.lifecycle.finalize(oi.user)
+    }
+
+    oi.final_phase = .Finalized
+    return true
+}
+
+@(private)
+disconnect_instance_connections :: proc(oi: ^Odin_Instance) {
+    for connection in oi.owned_connections {
+        emitter := gdext.object_get_instance_from_id(connection.emitter)
+
+        if emitter != nil &&
+           godot.object_is_connected(cast(godot.Object)emitter, connection.signal, connection.callback) {
+            godot.object_disconnect(cast(godot.Object)emitter, connection.signal, connection.callback)
+        }
+
+        godot.free_callable(connection.callback)
+        godot.free_string_name(connection.signal)
+    }
+
+    delete(oi.owned_connections)
+    oi.owned_connections = {}
+}
+
+@(private)
+connect_instance_signal :: proc(
+    oi: ^Odin_Instance,
+    emitter: godot.Object,
+    signal, method: cstring,
+    indexed := false,
+    index: i64 = 0,
+) {
+    name := godot.new_string_name_cstring(method, false)
+    callback := godot.new_callable_object_string_name(cast(godot.Object)oi.owner, name)
+    godot.free_string_name(name)
+
+    if indexed {
+        value := index
+        variant := godot.variant_from_int(&value)
+        array := godot.new_array_default()
+        godot.array_push_back(&array, variant)
+        bound := godot.callable_bindv(&callback, array)
+        godot.free_array(array)
+        godot.variant_destroy(&variant)
+        godot.free_callable(callback)
+        callback = bound
+    }
+
+    signal_name := godot.new_string_name_cstring(signal, false)
+
+    if godot.object_is_connected(emitter, signal_name, callback) {
+        godot.free_callable(callback)
+        godot.free_string_name(signal_name)
+        return
+    }
+
+    if godot.object_connect(emitter, signal_name, callback, 0) != .Ok {
+        godot.free_callable(callback)
+        godot.free_string_name(signal_name)
+        return
+    }
+
+    context.allocator = core_allocator()
+    append(
+        &oi.owned_connections,
+        Instance_Connection{u64(godot.object_get_instance_id(emitter)), signal_name, callback},
+    )
+}
+
+@(private)
+quarantine_odin_instance :: proc(oi: ^Odin_Instance) {
+    if oi.box3d_liveness != nil {
+        sync.atomic_store_explicit(oi.box3d_liveness, 0, .Release)
+    }
+
+    context.allocator = core_allocator()
+    sync.lock(&live_lock)
+    fresh := !oi.quarantined
+
+    if fresh {
+        oi.quarantined = true
+        append(&quarantined_instances, oi)
+    }
+
+    sync.unlock(&live_lock)
+    _ = retire_live_instance(oi)
+
+    if fresh {
+        godot.error_str(
+            fmt.tprintf(
+                "ODIN_FINALIZE_QUARANTINED: %s was removed outside its cleanup context; weak execution is revoked and instance storage/code are retained. Remove/replace owning scripts on the main thread and restart this run.",
+                oi.script_identity,
+            ),
+        )
+    }
+}
+
 @(private)
 destroy_odin_instance :: proc(oi: ^Odin_Instance) {
+    if oi.quarantined {
+        return
+    }
+
+    if (oi.desc.owns_state || oi.desc.lifecycle.finalize != nil) && oi.final_phase != .Finalized {
+        quarantine_odin_instance(oi)
+        return
+    }
+
     host_scope := script_box3d_enter(oi, false)
     defer script_box3d_leave(host_scope)
+
+    if host_scope.required && !host_scope.entered {
+        quarantine_odin_instance(oi)
+        return
+    }
+
     box3d_context_invalidate(oi.box3d_context)
     context = gdext.godot_context()
     refcounted_release(oi.script) // release the ref taken in odin_make_script_instance
@@ -1415,6 +1725,7 @@ destroy_odin_instance :: proc(oi: ^Odin_Instance) {
 
     box3d_context_release(oi.box3d_context)
     oi.box3d_context = 0
+    oi.box3d_liveness = nil
     class_cache_release_instance(oi.cache)
     script_generation_release(oi.generation)
     free(oi)
@@ -1429,18 +1740,20 @@ inst_free :: proc "c" (instance: gdext.ExtensionScriptInstanceDataPtr) {
     defer script_box3d_collect_pending()
     defer script_access_leave()
     oi := cast(^Odin_Instance)instance
-    host_scope := script_box3d_enter(oi)
-    defer script_box3d_leave(host_scope)
 
-    if oi == nil {
+    if oi == nil || oi.quarantined {
         return
     }
 
-    box3d_context_invalidate(oi.box3d_context)
+    instance_pin(oi)
+    defer instance_unpin(oi)
 
-    if retire_live_instance(oi) {
-        destroy_odin_instance(oi)
+    if oi.final_phase == .Live && !finalize_odin_instance(oi, false) {
+        quarantine_odin_instance(oi)
+        return
     }
+
+    _ = retire_live_instance(oi)
 }
 
 // ---- vtable: Phase-3 @export property surfaces ----
@@ -1476,10 +1789,18 @@ inst_set :: proc "c" (
     name: gdext.StringNamePtr,
     value: gdext.VariantPtr,
 ) -> bool {
+    context = gdext.godot_context()
     script_access_enter()
     defer script_box3d_collect_pending()
     defer script_access_leave()
     oi := cast(^Odin_Instance)instance
+
+    if oi == nil || oi.quarantined || oi.retired {
+        return false
+    }
+
+    instance_pin(oi)
+    defer instance_unpin(oi)
     host_scope := script_box3d_enter(oi)
     defer script_box3d_leave(host_scope)
 
@@ -1587,10 +1908,18 @@ inst_get :: proc "c" (
     name: gdext.StringNamePtr,
     ret: gdext.VariantPtr,
 ) -> bool {
+    context = gdext.godot_context()
     script_access_enter()
     defer script_box3d_collect_pending()
     defer script_access_leave()
     oi := cast(^Odin_Instance)instance
+
+    if oi == nil || oi.quarantined || oi.retired {
+        return false
+    }
+
+    instance_pin(oi)
+    defer instance_unpin(oi)
     host_scope := script_box3d_enter(oi)
     defer script_box3d_leave(host_scope)
 
@@ -1918,6 +2247,7 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
     defer release_live_instance_snapshot(snapshot)
     warned_removed := make(map[string]bool, context.temp_allocator)
     warned_proc_state := make(map[string]bool, context.temp_allocator)
+    warned_owned_state := make(map[string]bool, context.temp_allocator)
 
     for oi in snapshot {
         if !snapshot_instance_is_live(oi) {
@@ -1941,6 +2271,24 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
                 )
                 msg := godot.new_string_odin(message)
                 godot.gd_push_warning(godot.variant_from_string(&msg))
+            }
+
+            continue
+        }
+
+        if !layout_compatible(oi.desc, new_desc) &&
+           (oi.desc.owns_state ||
+                   new_desc.owns_state ||
+                   oi.desc.lifecycle.finalize != nil ||
+                   new_desc.lifecycle.finalize != nil) {
+            if !(oi.script_identity in warned_owned_state) {
+                warned_owned_state[oi.script_identity] = true
+                godot.print_str(
+                    fmt.tprintf(
+                        "ODIN_RELOAD_OWNED_LAYOUT_PINNED: %s changed private layout while an instance owns state; recreate the instance to use the new layout. Its old code and state remain live.",
+                        oi.script_identity,
+                    ),
+                )
             }
 
             continue
@@ -1986,6 +2334,7 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
             box3d_context_release(oi.box3d_context)
             oi.generation = new_generation
             oi.box3d_context = box3d_context_create(oi.generation)
+            oi.box3d_liveness = box3d_context_liveness(oi.box3d_context)
             box3d_context_bind(oi.box3d_context, oi.user, u64(oi.desc.size))
         }
 
@@ -2062,7 +2411,7 @@ rebind_all_instances :: proc(only: map[string]bool = nil) {
 // proc bodies, not the struct".
 @(private)
 layout_compatible :: proc(a, b: rt.Class_Desc) -> bool {
-    if a.size != b.size || a.align != b.align {
+    if a.size != b.size || a.align != b.align || a.instance_layout == 0 || a.instance_layout != b.instance_layout {
         return false
     }
 
@@ -2196,6 +2545,7 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
     mem.free(oi.user, user_struct_allocator(int(oi.desc.align)))
     box3d_context_release(oi.box3d_context)
     oi.box3d_context = 0
+    oi.box3d_liveness = nil
     user, _ := mem.alloc(int(new_desc.size), int(new_desc.align), user_struct_allocator(int(new_desc.align)))
 
     if user != nil {
@@ -2207,6 +2557,7 @@ migrate_instance :: proc(oi: ^Odin_Instance, new_desc: rt.Class_Desc, new_cache:
     oi.cache = new_cache
     oi.generation = script_generation_for_desc(new_desc)
     oi.box3d_context = box3d_context_create(oi.generation)
+    oi.box3d_liveness = box3d_context_liveness(oi.box3d_context)
     box3d_context_bind(oi.box3d_context, oi.user, u64(oi.desc.size))
     migration_scope := Script_Box3D_Scope{}
 

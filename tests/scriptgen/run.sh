@@ -822,11 +822,11 @@ ODIN
 rc=$?
 [[ $rc -ne 0 ]] || fail "the profile-misuse fixture must fail the build"
 grep -q "belongs on the ksess.Session field" "$pe/out.log" || fail "a profile tag off the Session field must say where it goes"
-grep -q 'no struct "Nope"' "$pe/out.log" || fail "an unresolvable row type must be named"
+grep -q 'profile row Nope does not resolve' "$pe/out.log" || fail "an unresolvable row type must be named"
 grep -q "needs a \`pe_game_ready\`" "$pe/out.log" || fail "a profile without a ready must ask for one"
 
 # ---- fixture: the @(gd_message) typed app-message form ----------------------
-# One annotated handler becomes the game-owned Typed_Route storage, a
+# One annotated handler becomes an instance-bound Session route, a
 # `<class>_messages` registration proc, and two send doors (peer- and
 # seat-addressed) over the runtime typed-route API. The payload's field-by-field
 # shape folds into NET_FINGERPRINT — a drifted payload must MOVE the hash, like a
@@ -853,13 +853,13 @@ mg_game_ping :: proc(self: ^MgGame, from: knet.Player_Id, msg: Ping) {}
 ODIN
 "$SGEN" "$mg" -godot:"$ROOT" >"$mg/out.log" 2>&1 || { cat "$mg/out.log"; fail "the @(gd_message) fixture must generate"; }
 gen="$mg/odin_godot_scripts.gen.odin"
-grep -q "_mg_game_ping_route: ksess.Typed_Route(Ping)" "$gen" || fail "the game-owned Typed_Route storage is missing"
+grep -q "ksess.Typed_Route" "$gen" && fail "a generated route must not share mutable storage across game instances"
 grep -q "mg_game_messages :: proc(self: ^MgGame, s: ^ksess.Session)" "$gen" || fail "the <class>_messages registration proc is missing"
-grep -q "session_app_listen(s, TAG_PING, &_mg_game_ping_route, self" "$gen" || fail "the route must register under the declared tag"
+grep -q "session_app_route(s, u8(5), self" "$gen" || fail "the route must register under the declared tag"
 grep -q "mg_game_ping_send :: proc(s: ^ksess.Session, msg: Ping, to_peer: ksess.Peer_Id" "$gen" || fail "the peer-addressed send door is missing"
-grep -q "session_app_send_typed(s, TAG_PING, msg, to_peer, channel)" "$gen" || fail "the send door must frame under the declared tag"
+grep -q "session_app_send_typed(s, u8(5), msg, to_peer, channel)" "$gen" || fail "the send door must frame under the declared tag"
 grep -q "mg_game_ping_send_to :: proc(s: ^ksess.Session, player: knet.Player_Id, msg: Ping)" "$gen" || fail "the seat-addressed send door is missing"
-grep -q "session_app_send_typed_to(s, player, TAG_PING, msg)" "$gen" || fail "the seat-addressed door must resolve on the authority"
+grep -q "session_app_send_typed_to(s, player, u8(5), msg)" "$gen" || fail "the seat-addressed door must resolve on the authority"
 grep -q "_register_net_fingerprint" "$mg/odin_godot_guard.gen.odin" || fail "a @(gd_message) alone is a wire surface (the fingerprint default must register)"
 fp1=$(grep -oE "NET_FINGERPRINT :: u64\(0x[0-9a-f]+\)" "$mg/odin_godot_guard.gen.odin")
 # Reorder the payload's two same-size fields: SIZE unchanged, only the layout —
@@ -2177,7 +2177,7 @@ block_title :: proc(self:^Block)->gd.String {return gd.new_string_odin("block")}
 Values :: struct {owner:gd.Node,part:Block}
 @(gd_method)
 values_echo :: proc(self:^Values,value:string)->string {return value}
-@(gd_method="borrowed_args,owned_return")
+@(gd_method="owned_return")
 values_clone :: proc(self:^Values,value:gd.Array)->gd.Array {return gd.new_array_array(value)}
 ODIN
 "$SGEN" "$mv" -godot:"$ROOT" >"$work/method-values.log" 2>&1 || fail "method value fixture generation"
@@ -2185,7 +2185,7 @@ ODIN
 grep -q 'defer _destroy_r' "$mv/odin_godot_scripts.gen.odin" || fail "owned return destructor missing"
 grep -q 'defer _destroy_a0' "$mv/odin_godot_scripts.gen.odin" || fail "borrowed argument destructor missing"
 grep -q 'block_title(&self.part)' "$mv/odin_godot_scripts.gen.odin" || fail "composed return route missing"
-for invalid in typo scalar node native dynamic variant; do
+for invalid in typo scalar node native dynamic variant borrowed; do
  cat >"$mv/value.odin" <<'ODIN'
 //gd:extends Node
 //gd:class Values
@@ -2195,6 +2195,7 @@ Values :: struct {owner:gd.Node}
 ODIN
  case "$invalid" in
   typo) echo '@(gd_method="typo") values_bad :: proc(self:^Values) {}' >>"$mv/value.odin" ;;
+  borrowed) echo '@(gd_method="borrowed_args") values_bad :: proc(self:^Values) {}' >>"$mv/value.odin" ;;
   scalar) echo '@(gd_method="owned_return") values_bad :: proc(self:^Values)->i64 {return 1}' >>"$mv/value.odin" ;;
   node) echo '@(gd_method="owned_return") values_bad :: proc(self:^Values)->gd.Node {return self.owner}' >>"$mv/value.odin" ;;
   native) echo '@(gd_method="owned_return") values_bad :: proc(self:^Values)->string {return "text"}' >>"$mv/value.odin" ;;

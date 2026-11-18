@@ -35,6 +35,7 @@ Instance :: struct($Side: typeid) {
     allocator:              mem.Allocator,
     reservation_mark:       u64,
     reservation_active:     bool,
+    detach_pending:         ksim.World_Owner,
 }
 
 @(private)
@@ -247,7 +248,7 @@ attach :: proc(
     cfg: Config,
     settle: ksim.Step_Proc = nil,
 ) -> ksim.World_Error {
-    if a.lane != nil || l == nil || world == nil || world^ == 0 || cfg.asset_id == 0 {
+    if a.lane != nil || !ksim.world_owner_is_empty(a.detach_pending) || l == nil || world == nil || world^ == 0 || cfg.asset_id == 0 {
         return .Invalid
     }
 
@@ -408,28 +409,32 @@ attach :: proc(
 }
 
 detach :: proc(a: ^Instance($Side)) -> ksim.World_Error {
-    if a.lane == nil {
-        return .Ok
+    if a == nil { return .Invalid }
+    if !ksim.world_owner_is_empty(a.detach_pending) {
+        // Release the retained temporary before attempting another detach. Do
+        // not touch a after success: this can be the last backing-block owner.
+        pending := a.detach_pending
+        more := a.lane != nil
+        a.detach_pending = {}
+        if error := ksim.world_owner_drop(pending); error != .Ok {
+            a.detach_pending = pending
+            return error
+        }
+        return more ? .Busy : .Ok
     }
-
+    if a.lane == nil { return .Ok }
     owner := a.config.provider_owner
-
-    if e := ksim.world_owner_retain(owner); e != .Ok {
-        return e
-    }
-
-    defer {
-        _ = ksim.world_owner_drop(owner)
-    }
-
+    if error := ksim.world_owner_retain(owner); error != .Ok { return error }
     error := ksim.lane_world_detach(a.lane)
-
     if error == .Ok {
         a.lane = nil
         a.active = nil
         a.published = nil
     }
-
+    if released := ksim.world_owner_drop(owner); released != .Ok {
+        a.detach_pending = owner
+        return error == .Ok ? released : error
+    }
     return error
 }
 

@@ -28,6 +28,8 @@ and live transport objects remain outside the archive.
 
 `checkpoint_bundle_encode` returns owned bundle bytes without performing I/O.
 `checkpoint_bundle_decode` validates supplied bytes and returns a borrowed view.
+Bundle readers require this envelope. Use the explicit checkpoint APIs when
+deliberately managing raw checkpoint storage and its dependencies.
 Both share the same checkpoint/metadata validation with the file helpers. This
 lets an asynchronous backend store one complete bundle and report its own commit
 receipt. Scrapyard uses these helpers with IndexedDB for browser solo saves.
@@ -50,7 +52,7 @@ digest. The source is unchanged. The replacement root must be 1 byte–1 MiB and
 the complete output must remain within 16 MiB. This generic operation does not
 validate the replacement root's semantics, metadata or dependency completeness;
 the application must do that before publication. See the
-[protocol-6 checkpoint bridge](../net/checkpoint_upgrade.md).
+[explicit checkpoint conversion](../net/checkpoint_upgrade.md).
 
 The optional `target_content` argument explicitly updates the outer content ID for
 an application-schema conversion. Zero (the default) preserves the source content.

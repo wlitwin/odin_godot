@@ -16,6 +16,8 @@
 // mistake as it is actually made.
 package scriptgen
 
+import decl "godot:decl"
+
 import "core:odin/ast"
 import "core:odin/parser"
 import "core:odin/tokenizer"
@@ -494,7 +496,7 @@ lint_method_claims :: proc(claims: []Method_Claim, by_struct: map[string]^Script
                     "boot_attach defaults Options.methods to the standard eight, and %q names no @(gd_method) of %s — declare `@(gd_method) %s_%s :: proc(self: ^%s, ...)`, or pass Options.methods yourself (\"\" skips a slot on purpose)",
                     c.method,
                     c.struct_name,
-                    to_snake(c.struct_name),
+                    decl.snake_name(c.struct_name),
                     c.method,
                     c.struct_name,
                 )
@@ -505,7 +507,7 @@ lint_method_claims :: proc(claims: []Method_Claim, by_struct: map[string]^Script
                     c.call,
                     c.method,
                     c.struct_name,
-                    to_snake(c.struct_name),
+                    decl.snake_name(c.struct_name),
                     c.method,
                     c.struct_name,
                 )
@@ -601,7 +603,7 @@ lint_command_calls :: proc(calls: []Cmd_Call, scripts: []^Script) {
                 }
 
                 wrapper :=
-                    len(cmd.path) > 0 ? strings.concatenate({to_snake(s.struct_name), "_", cmd.name}) : cmd.proc_name
+                    len(cmd.path) > 0 ? strings.concatenate({decl.snake_name(s.struct_name), "_", cmd.name}) : cmd.proc_name
                 error_at(
                     Loc{path = c.path, line = c.line},
                     "%s is a @(gd_command) verb — a direct call skips the framework (no `_then`, no dedup or validation on the host; a silent local-only write on a client). Issue it through the generated wrapper: `%s_cmd(&boot, self, ...)`",

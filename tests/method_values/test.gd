@@ -21,10 +21,21 @@ func property_value_id(subject: Node) -> int:
 	var value = subject.get("payload")
 	assert(value is Array and value.size() == 1)
 	return int(subject.call("last_id"))
-func input_property_id(subject: Node) -> int:
+func input_property_id(subject: Node, property: String = "incoming") -> int:
 	var resource := Resource.new()
-	subject.set("incoming", [resource])
+	subject.set(property, [resource])
 	return resource.get_instance_id()
+func input_method_id(subject: Node) -> int:
+	var resource := Resource.new()
+	subject.call("set_incoming", [resource])
+	return resource.get_instance_id()
+func echo_input_id(subject: Node) -> int:
+	var resource := Resource.new()
+	var id := resource.get_instance_id()
+	var echoed: Array = subject.call("echo_array", [resource])
+	resource = null
+	assert(is_instance_id_valid(id) and echoed[0].get_instance_id() == id, "borrowed input survives return marshaling")
+	return id
 func _ready() -> void:
 	var subject := Node.new()
 	subject.set_script(load("res://scripts/values.odin"))
@@ -35,7 +46,10 @@ func _ready() -> void:
 	assert(is_instance_id_valid(borrowed_id), "borrowed return must not release its backing owner")
 	subject.call("clear")
 	assert(not is_instance_id_valid(borrowed_id))
-	assert(not is_instance_id_valid(temporary_input(subject, "legacy_owned_input")))
+	assert(not is_instance_id_valid(echo_input_id(subject)), "default argument copy leaked after returning it")
+	assert(not is_instance_id_valid(temporary_input(subject, "variant_input")), "Variant argument copy leaked its Resource")
+	for value in [null, 42, true, "text", Vector2(1, 2), {"key": 1}]:
+		assert(int(subject.call("variant_input", value)) == typeof(value))
 	for text in ["", "héllo 🌏", "a".repeat(8192)]:
 		assert(subject.call("echo", text) == text, "Odin UTF-8 string must round-trip")
 		assert(subject.call("clone_text", text) == text)
@@ -47,6 +61,15 @@ func _ready() -> void:
 	assert(is_instance_id_valid(incoming_id), "setter must retain its explicit copy")
 	subject.set("incoming", [])
 	assert(not is_instance_id_valid(incoming_id), "setter/trampoline must release both copies")
+	incoming_id = input_method_id(subject)
+	assert(is_instance_id_valid(incoming_id), "method must retain its explicit copy")
+	subject.call("set_incoming", [])
+	assert(not is_instance_id_valid(incoming_id))
+	assert(not subject.has_method("set_plain_incoming"), "fixture must exercise an unannotated setter")
+	var plain_id := input_property_id(subject, "plain_incoming")
+	assert(is_instance_id_valid(plain_id))
+	subject.set("plain_incoming", [])
+	assert(not is_instance_id_valid(plain_id), "unannotated setter/trampoline must release both copies")
 	var array_leaked := is_instance_id_valid(temporary_array(subject))
 	var input_leaked := is_instance_id_valid(temporary_input(subject, "borrowed_input"))
 	return_text(subject, 32)

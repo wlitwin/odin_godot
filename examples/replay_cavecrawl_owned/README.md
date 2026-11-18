@@ -90,7 +90,7 @@ This is a new profile, not full original-game parity. Broader browsers and publi
 network deployment, richer fault/recovery cases, remote presentation, and paired
 gameplay/performance/ergonomics comparisons remain acceptance work.
 
-## Action-time context and O1 saves
+## Action-time context and retained saves
 
 O2 attaches the local producer's pose and ownership scope to range interactions
 and throws. The reliable action can be judged before its movement observation, or
@@ -104,27 +104,17 @@ unsubmitted intents. Respawn, ownership changes
 and authority epochs retire old contexts. This is a scoped owner claim, not a
 verified historical simulation pose or competitive anti-cheat.
 
-The lower-level action also supports `Accepted_Pose` for server-authored commands
-and O1 compatibility. Ordinary UI actions use `Owner_Pose`. Action IDs retain the
+The lower-level action also supports `Accepted_Pose` for server-authored commands. Ordinary UI actions use `Owner_Pose`. Action IDs retain the
 runner's existing ordering and deduplication; contexts do not consume or rewind
 pose-stream sequences. A preserved pending context from a previous authority epoch
 is refused normally; a fresh command needs the newly observed scope.
 
-Convert an O1 or O2 native save explicitly to a new destination:
+Current owner content is O3. Retained O1/O2 checkpoints were migrated before
+retiring old readers. Saved accepted-pose commands keep that meaning; migration
+does not invent an issue-time origin. [Originals and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain
+separate evidence. The current fixture gate checks exact frame installation,
+pending refusal/settlement and continued movement/looting.
 
-```sh
-nix develop --command odin build examples/replay_cavecrawl_owned/tools/upgrade_save \
-  -collection:godot=. -out:/tmp/upgrade-owned-cave
-/tmp/upgrade-owned-cave /path/to/owner1.replay /path/to/owner3.replay
-```
-
-World, ownership, controls, membership and action frontiers remain unchanged.
-Pending O1 commands retain accepted-pose semantics; the converter does not invent
-an issue-time origin. Existing destinations/corrupt files are preserved, and
-coordinated archives require an application-owned upgrade. The converter does not
-rewrite browser IndexedDB records. Older browser archives remain protected by strict
-content checks; interactive cross-version browser import is still pending.
-
-O3 adds the common [generation-bound dweller impacts](../replay_cavecrawl/impacts.md).
-O2 saves convert with exact world/action preservation; explicit O2 recording
-verification retains the old event sequence.
+O3 includes the shared [dweller impacts](../replay_cavecrawl/impacts.md). Current
+recordings are newly captured under those event rules. Historical recordings
+remain evidence and are not relabelled as current traces.

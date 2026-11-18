@@ -8,6 +8,7 @@ import "core:strings"
 import gd "godot:godot"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import ga "godot:box3d/godot/authoring"
 import bg "godot:box3d/godot"
 import meter "godot:box3d/godot/meter"
@@ -207,7 +208,7 @@ startup :: proc(self: ^DockyardDuo) -> bool {
     }
 
     build_problem: a.Diagnostic
-    state.built, build_problem = a.build(&state.baked, PROFILE)
+    state.built, build_problem = ar.build(&state.baked, PROFILE)
 
     if build_problem.error != .None {
         error_set(self, fmt.tprintf("authoring.build:%v:%s", build_problem.error, build_problem.field))
@@ -266,7 +267,7 @@ startup :: proc(self: ^DockyardDuo) -> bool {
 
     state.initial = checkpoint
 
-    if a.built_destroy(&state.built) != .Ok {
+    if ar.built_destroy(&state.built) != .Ok {
         error_set(self, "authoring.built_destroy retained owner")
         return false
     }

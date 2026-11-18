@@ -8,6 +8,7 @@ func _ready() -> void:
 		if parts.size() == 2: query[parts[0]] = parts[1].uri_decode()
 	probe = Node.new()
 	probe.set_script(load("res://scripts/game.odin" if query.get("mode", "wire") == "game" else "res://scripts/probe.odin"))
+	if query.get("mode", "wire").begins_with("no_control_"):probe.expect_rejection = true
 	add_child(probe)
 	probe.call("start", query.get("role", "host"), query.get("url", ""), query.get("room", ""))
 

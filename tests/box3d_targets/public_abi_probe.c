@@ -10,10 +10,10 @@
 const uint32_t ogb3_target_public_abi[] = {
     sizeof(void *) * 8, sizeof(float), FLT_RADIX, FLT_MANT_DIG,
     sizeof(ogb3_world), sizeof(ogb3_body), sizeof(ogb3_shape), sizeof(ogb3_joint),
-    sizeof(ogb3_vec3), sizeof(ogb3_pose), sizeof(ogb3_recovery_asset_v2),
-    _Alignof(ogb3_recovery_asset_v2),
-    offsetof(ogb3_recovery_asset_v2, vertices),
-    offsetof(ogb3_recovery_asset_v2, indices),
-    offsetof(ogb3_recovery_asset_v2, vertex_count),
-    offsetof(ogb3_recovery_asset_v2, triangle_count), sizeof(ogb3_motion_joint_def)
+    sizeof(ogb3_vec3), sizeof(ogb3_pose), sizeof(ogb3_recovery_authored_asset),
+    _Alignof(ogb3_recovery_authored_asset),
+    offsetof(ogb3_recovery_authored_asset, vertices),
+    offsetof(ogb3_recovery_authored_asset, indices),
+    offsetof(ogb3_recovery_authored_asset, vertex_count),
+    offsetof(ogb3_recovery_authored_asset, triangle_count), sizeof(ogb3_motion_joint_def)
 };

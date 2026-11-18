@@ -1,5 +1,134 @@
 {
+  "version": 1,
   "worker": "res://tools/authoring.py",
-  "ability": "res://data/abilities/salvefield.tres",
-  "workbench": "res://dev/ability_workbench.tscn"
+  "status_action": "status",
+  "inputs": [
+    {
+      "id": "definition",
+      "label": "Definition",
+      "kind": "resource",
+      "default": "res://data/abilities/salvefield.tres",
+      "filters": [
+        "*.tres; Definition Resources"
+      ]
+    },
+    {
+      "id": "latency",
+      "label": "Network latency",
+      "kind": "choice",
+      "choices": [
+        {
+          "label": "Local \u2014 0 ms",
+          "value": 0
+        },
+        {
+          "label": "Typical \u2014 80 ms",
+          "value": 80
+        },
+        {
+          "label": "Adverse \u2014 150 ms",
+          "value": 150
+        }
+      ]
+    },
+    {
+      "id": "recording",
+      "label": "Recording",
+      "kind": "file",
+      "filters": [
+        "*.rplrec; Replay recording"
+      ]
+    },
+    {
+      "id": "draft_kind",
+      "label": "Draft type",
+      "kind": "choice",
+      "choices": [
+        {
+          "label": "Ability",
+          "value": "ability"
+        },
+        {
+          "label": "Actor",
+          "value": "actor"
+        }
+      ]
+    },
+    {
+      "id": "name",
+      "label": "New feature name",
+      "kind": "text",
+      "required": true
+    }
+  ],
+  "actions": [
+    {
+      "id": "validate",
+      "label": "Save & Validate Content",
+      "kind": "worker",
+      "inputs": [
+        "definition"
+      ]
+    },
+    {
+      "id": "bake",
+      "label": "Save & Bake Content",
+      "kind": "worker"
+    },
+    {
+      "id": "status",
+      "label": "Refresh Content Status",
+      "kind": "worker",
+      "save": false
+    },
+    {
+      "id": "workbench",
+      "label": "Open Ability Workbench",
+      "kind": "open_scene",
+      "scene": "res://dev/ability_workbench.tscn"
+    },
+    {
+      "id": "network",
+      "label": "Run Network Encounter",
+      "kind": "worker",
+      "inputs": [
+        "definition",
+        "latency"
+      ]
+    },
+    {
+      "id": "correction",
+      "label": "Replay Late Correction",
+      "kind": "worker",
+      "inputs": [
+        "definition"
+      ]
+    },
+    {
+      "id": "takeover",
+      "label": "Test Checkpoint Takeover",
+      "kind": "worker",
+      "inputs": [
+        "definition"
+      ]
+    },
+    {
+      "id": "verify",
+      "label": "Verify Recording",
+      "kind": "worker",
+      "inputs": [
+        "recording"
+      ]
+    },
+    {
+      "id": "scaffold",
+      "label": "Create Feature Draft",
+      "kind": "worker",
+      "inputs": [
+        "definition",
+        "draft_kind",
+        "name"
+      ]
+    }
+  ]
 }

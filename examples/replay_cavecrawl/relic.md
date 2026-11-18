@@ -26,16 +26,12 @@ implementation and comparison evidence.
 
 ## Existing saves
 
-Current content is `0x4341564552504c39`. Normal loads reject C1–C8 archives; use
-`tools/upgrade_save` with a new destination. C8 adds authority observation fields
-to the world; the network protocol is unchanged. C5 conversion retains every saved frame and peer field,
-including the old relic position and ownership, before applying current rules on
-advancement. A relic already reset by an old descent stays as recorded; the
-converter cannot recover its former carrier or position. Keep the original file
-and use its owning profile/token to resume. Conversion grants no authority.
+Current content is C9. Retained relic fixtures were migrated before removing old
+readers. Resting position, carrier and version remain saved values; current rules
+apply only as simulation advances. A previously lost carrier cannot be inferred.
+[Originals and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain historical evidence.
 
-The [acceptance runner](../../tests/replay_cave_relic/README.md) checks original
-placement, floor/restart behavior, complete rollback state/events and real C5
-archive conversion. Isolated Godot processes inspect retained transition frames,
-and the full multiplayer campaign exercises carry/move/set-down under normal and
-faulted network delivery.
+The [acceptance runner](../../tests/replay_cave_relic/README.md) checks placement,
+version 7 through descent, carried attachment, and release in place with version 8
+on restart. Isolated Godot processes inspect those transition frames. Multiplayer
+campaigns separately exercise carry/move/set-down under normal and faulted delivery.

@@ -21,7 +21,16 @@ FSLP_PROJ="$PROJ"
 FSLP_DRIVER="hello_test.gd"
 source "$ROOT/build/template/test/harness.sh"
 
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+# Use ordinary editor startup. Fast --import shutdown currently races Godot's
+# deferred extension documentation; never hide an importer failure here.
+if ! "$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$FSLP_LOGS/editor.log" 2>&1; then
+	cat "$FSLP_LOGS/editor.log"
+	exit 1
+fi
+if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$FSLP_LOGS/editor.log"; then
+	cat "$FSLP_LOGS/editor.log"
+	exit 1
+fi
 
 two_windows() {
 	local port="$1"
@@ -38,10 +47,16 @@ two_windows() {
 	expect "$glog" "HELLO_SEATED me=2" "the guest was never seated"
 	expect "$hlog" "HELLO_TWO_UP me=1" "the host never saw both squares"
 	expect "$glog" "HELLO_TWO_UP" "the guest never saw both squares"
+	expect "$hlog" "HELLO_BORN_PRESENTATION_OK" "host birth presentation was incomplete"
+	expect "$glog" "HELLO_BORN_PRESENTATION_OK" "guest birth presentation was incomplete"
 	expect "$hlog" "HELLO_WALKED" "the host never walked"
 	expect "$glog" "HELLO_SAW_WALK d=([6-9][0-9]|[0-9]{3,})" "the walk never crossed the wire"
 	expect "$hlog" "HOST_DONE" "host did not finish"
 	expect "$glog" "GUEST_DONE" "guest did not finish"
+	if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$hlog" "$glog"; then
+		echo "  FAIL: runtime errors or retained resources"
+		FSLP_OK=0
+	fi
 
 	if ((!FSLP_OK)); then
 		echo "  --- host ---"; tail -n 10 "$hlog" | sed 's/^/    /'
@@ -78,9 +93,14 @@ join_by_code() {
 	# resolved the code to the host's real endpoint.)
 	expect "$glog" "HELLO_CODE_JOIN code=$code" "the guest never opened the code door"
 	expect "$glog" "HELLO_SEATED me=2" "the code-joiner was never seated"
+	expect "$glog" "HELLO_BORN_PRESENTATION_OK" "code-joiner birth presentation was incomplete"
 	expect "$glog" "HELLO_SAW_WALK d=([6-9][0-9]|[0-9]{3,})" "the walk never crossed the code-brokered wire"
 	expect "$hlog" "HOST_DONE" "coded host did not finish"
 	expect "$glog" "GUEST_DONE" "code-joiner did not finish"
+	if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$hlog" "$glog"; then
+		echo "  FAIL: runtime errors or retained resources"
+		FSLP_OK=0
+	fi
 
 	if ((!FSLP_OK)); then
 		echo "  --- signal ---"; tail -n 6 "$FSLP_LOGS/signal.log" | sed 's/^/    /'
@@ -98,10 +118,10 @@ scene_lifecycle() {
 	fi
 }
 
-fslp_act "scene lifecycle" 1 scene_lifecycle
-fslp_act "two windows" 3 two_windows
+fslp_act "scene lifecycle" 1 scene_lifecycle || exit 1
+fslp_act "two windows" 1 two_windows || exit 1
 if command -v node >/dev/null 2>&1; then
-	fslp_act "join by code" 2 join_by_code
+	fslp_act "join by code" 1 join_by_code || exit 1
 else
 	echo "  (join-by-code act skipped: no node for the relay)"
 fi

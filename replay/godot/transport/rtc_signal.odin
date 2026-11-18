@@ -430,10 +430,6 @@ rtc_peer_open :: proc(r: ^Rtc, id: tr.Peer_Id) -> bool {
     }
 
     for i in 0 ..< len(peer.channels) {
-        if i == 2 && r.config.legacy_control {
-            continue
-        }
-
         options := gd.new_dictionary_default()
         defer gd.free_dictionary(options)
         wiregd.set_bool(&options, "negotiated", true)
@@ -478,12 +474,11 @@ rtc_apply_signal :: proc(peer: ^Rtc_Peer, data: ^gd.Dictionary) {
         defer delete(sdp)
         expected := peer.owner.id < peer.id ? "answer" : "offer"
 
-        if peer.remote_set || typ != expected || len(sdp) == 0 {
+        if peer.remote_set || typ != expected || len(sdp) == 0 || wiregd.get_int(data, "control_stream") != 1 {
             peer.failed = true
             return
         }
 
-        peer.control_separate = !peer.owner.config.legacy_control && wiregd.get_int(data, "control_stream") == 1
         t := gd.new_string_odin(typ)
         defer gd.free_string(t)
         s := gd.new_string_odin(sdp)
@@ -600,9 +595,7 @@ rtc_description_effect :: proc(
     wiregd.set(&d, "sdp_type", gd.variant_from_string(&typ))
     wiregd.set(&d, "sdp", gd.variant_from_string(&sdp))
 
-    if !peer.owner.config.legacy_control {
-        wiregd.set_int(&d, "control_stream", 1)
-    }
+    wiregd.set_int(&d, "control_stream", 1)
 
     if !rtc_relay(peer, &d) {
         peer.failed = true

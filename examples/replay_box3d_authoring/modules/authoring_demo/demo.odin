@@ -3,31 +3,18 @@
 package replay_authoring_demo
 
 import "base:runtime"
-import "core:mem"
 import gd "godot:godot"
-import b "godot:box3d"
-import a "godot:box3d/authoring"
 import bd "godot:box3d/diagnostics"
 import bp "godot:box3d/presentation"
-import bg "godot:box3d/godot"
-import meter "godot:box3d/godot/meter"
-import ph "godot:replay/physics"
-import rgd "godot:replay/godot"
+import physicsgd "godot:replay/godot/physics"
 import tr "godot:replay/transport"
 
-Runtime :: struct {
-    session:                                 rgd.Session(Game, Control, Action, Event, 2),
-    codec:                                   Codec,
-    catalog:                                 b.Recovery_Catalog,
-    baked:                                   a.Baked_Scene,
-    built:                                   a.Built_Scene,
-    image_owner, codec_owner, session_owner: ph.Owner_Context,
-    output:                                  string,
-}
+Runtime :: physicsgd.Authored_Data(Game,Control,Action,Event,2)
 
 ReplayAuthoringDemo :: struct {
     owner:                                                                                                            gd.Node3d,
-    scope:                                                                                                            ^meter.Context,
+    physics: physicsgd.Authored_Session(Game,Control,Action,Event,2),
+    output: string,
     state:                                                                                                            ^Runtime,
     hosting,
     scripted,
@@ -115,68 +102,20 @@ replay_authoring_demo_close :: proc(self: ^ReplayAuthoringDemo) -> bool {
     return close_runtime(self)
 }
 
-replay_authoring_demo_exit_tree :: proc(self: ^ReplayAuthoringDemo) {
+replay_authoring_demo_finalize :: proc(self: ^ReplayAuthoringDemo) {
     temp := runtime.default_temp_allocator_temp_begin()
     defer runtime.default_temp_allocator_temp_end(temp)
 
-    if self.state != nil {
-        if !close_runtime(self) {
-            gd.print_str("SAMPLE_CLOSE_ERROR Replay owner remains retained")
-        }
+    if !close_runtime(self) {
+        gd.print_str("SAMPLE_CLOSE_ERROR Replay owner remains retained")
     }
 }
 
 close_runtime :: proc(self: ^ReplayAuthoringDemo) -> bool {
-    if self.state != nil {
-        state := self.state
-        allocator := meter.allocator(self.scope)
-
-        if rgd.session_close(&state.session) != .None {
-            return false
-        }
-
-        if state.codec.ready || state.codec.catalog._handle != nil {
-            if ph.network_codec_destroy(&state.codec) != .None {
-                return false
-            }
-        }
-
-        if a.built_destroy(&state.built) != .Ok {
-            return false
-        }
-
-        a.destroy(&state.baked)
-
-        if b.recovery_catalog_destroy(&state.catalog) != .Ok {
-            return false
-        }
-
-        if ph.owner_context_destroy(&state.session_owner) != .None {
-            return false
-        }
-
-        if ph.owner_context_destroy(&state.codec_owner) != .None {
-            return false
-        }
-
-        if ph.owner_context_destroy(&state.image_owner) != .None {
-            return false
-        }
-
-        if len(state.output) > 0 {
-            delete(state.output, allocator)
-        }
-
-        mem.free(state, allocator)
-        self.state = nil
-    }
-
-    if self.scope != nil {
-        if meter.destroy(&self.scope) != bg.OK {
-            return false
-        }
-    }
-
     self.ready = false
+    if physicsgd.authored_close(&self.physics) != .None { return false }
+    self.state = nil
+    delete(self.output, runtime.heap_allocator())
+    self.output = ""
     return true
 }

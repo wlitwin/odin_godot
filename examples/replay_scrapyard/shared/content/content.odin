@@ -6,6 +6,11 @@ import "core:reflect"
 import p "godot:replay/play"
 import sc "godot:replay/schema"
 
+// Catalog interpretation is independent of gameplay/control schema revisions.
+// Change this when the meaning of catalog values changes; exporters and readers
+// share it so an unrelated game version bump cannot invalidate a fresh bake.
+SEMANTIC :: u64(0x525343524150304b)
+
 MAX_GUNS :: 16
 
 MAX_MOBS :: 8

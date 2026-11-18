@@ -442,6 +442,7 @@ Entity_Spec :: struct {
 }
 
 ENTITY_SPECS :: []Entity_Spec {
+    {"variant", false, true, "`variant=Name` — a stable named scene choice for this gameplay entity type"},
     {
         "stream_hz",
         false,
@@ -610,4 +611,31 @@ fnv1a32 :: proc(s: string) -> u32 {
 wire_id16 :: proc(name: string) -> u16 {
     h := fnv1a32(name)
     return u16(h >> 16) ~ u16(h & 0xFFFF)
+}
+
+// Convert Ada_Case and PascalCase identifiers to snake_case. Existing word
+// separators stay single; acronym runs form one word (HUD_View -> hud_view).
+snake_name :: proc(s: string, allocator := context.allocator) -> string {
+    b := strings.builder_make(allocator)
+
+    for r, i in s {
+        if r >= 'A' && r <= 'Z' {
+            if i > 0 && s[i - 1] != '_' {
+                previous_lower := s[i - 1] >= 'a' && s[i - 1] <= 'z'
+                previous_digit := s[i - 1] >= '0' && s[i - 1] <= '9'
+                next_lower := i + 1 < len(s) && s[i + 1] >= 'a' && s[i + 1] <= 'z'
+                previous_upper := s[i - 1] >= 'A' && s[i - 1] <= 'Z'
+
+                if previous_lower || ((previous_upper || previous_digit) && next_lower) {
+                    strings.write_rune(&b, '_')
+                }
+            }
+
+            strings.write_rune(&b, r + ('a' - 'A'))
+        } else {
+            strings.write_rune(&b, r)
+        }
+    }
+
+    return strings.to_string(b)
 }

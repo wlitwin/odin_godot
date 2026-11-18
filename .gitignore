@@ -97,3 +97,10 @@ examples/claimball/.clblogs/
 /box3d/native/libogb3.a
 /box3d/native/libogb3.dylib
 /box3d/native/libogb3.so
+
+# Installed SDK and local exports for the offline starter.
+/examples/box3d_starter/addons/
+/examples/box3d_starter/exports/
+
+# Per-machine paths written by the Replay editor installer.
+/examples/replay_scrapyard/addons/replay_authoring/toolchain.json

@@ -6,7 +6,6 @@ import "core:fmt"
 import gd "godot:godot"
 import d "godot:replay/definitions"
 import content "../shared/content"
-import game "../shared/game"
 import "defs"
 import scenegd "godot:replay/godot/scene"
 import storagegd "godot:replay/godot/storage"
@@ -36,7 +35,7 @@ scrap_content_export_ready :: proc(self: ^ScrapContentExport) {
     }
 
     ref: d.Ref
-    ref, report = scenegd.bake(&store, u8(0), game.CONTENT, content_extract)
+    ref, report = scenegd.bake(&store, u8(0), content.SEMANTIC, content_extract)
 
     if report.error == .None && scrap_param("RSY_AUTHORING_ABILITY", "") != "" {
         catalog, _ := d.get(&store, ref)
@@ -57,7 +56,7 @@ scrap_content_export_ready :: proc(self: ^ScrapContentExport) {
 
         gd.print_str(fmt.tprintf("RSY_AUTHORING_SELECTED id=%d", id))
         d.remove(&store, ref)
-        ref, report = d.publish(&store, candidate, game.CONTENT)
+        ref, report = d.publish(&store, candidate, content.SEMANTIC)
     }
 
     if report.error != .None {

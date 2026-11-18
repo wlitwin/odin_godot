@@ -6,6 +6,7 @@ import "core:encoding/json"
 import "core:fmt"
 import b "godot:box3d"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import ga "godot:box3d/godot/authoring"
 import bg "godot:box3d/godot"
 import meter "godot:box3d/godot/meter"
@@ -15,7 +16,7 @@ AuthoringProbe :: struct {
     owner: gd.Node,
     scope: ^meter.Context,
     baked: ba.Baked_Scene,
-    built: ba.Built_Scene,
+    built: ar.Built_Scene,
 }
 
 Extract_Report :: struct {
@@ -47,7 +48,7 @@ json_string :: proc(value: $T) -> gd.String {
 
 probe_close :: proc(self: ^AuthoringProbe) -> bool {
     if self.built.world != 0 {
-        if ba.built_destroy(&self.built) != .Ok {
+        if ar.built_destroy(&self.built) != .Ok {
             return false
         }
     }
@@ -151,7 +152,7 @@ authoring_probe_build :: proc(self: ^AuthoringProbe) -> gd.String {
         return gd.new_string_odin("{\"ok\":false}")
     }
 
-    built, error := ba.build(&self.baked, 0x415554484f523031)
+    built, error := ar.build(&self.baked, 0x415554484f523031)
 
     if error.error != .None {
         return json_string(

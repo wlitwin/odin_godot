@@ -3,6 +3,7 @@ package core
 
 import rt "godot:runtime"
 import gd "godot:godot"
+import knet "godot:kit/net"
 import "base:runtime"
 import "core:fmt"
 
@@ -58,6 +59,9 @@ web_temporary_shutdown :: proc "contextless" () {
     if web_script_access_depth != 0 {
         runtime.trap()
     }
+
+    context = runtime.default_context()
+    knet.subset_cache_destroy()
 
     if web_temp_ready {
         runtime.arena_destroy(&web_temp_arena)
@@ -192,6 +196,10 @@ web_startup :: proc "contextless" () {
     // first script context reseeds it from the engine (see web_script_context above).
     // reset_u64 drives the generator's .Reset mode, marking the state `_seeded`.
     runtime.random_generator_reset_u64(runtime.default_random_generator(&web_random_state), WEB_RANDOM_FALLBACK_SEED)
+    // Kit's descriptor views must outlive any session or callback arena. The
+    // freestanding Odin heap is unavailable; own them with the engine heap.
+    // Install before authored @(init) procedures can query a descriptor.
+    if !knet.subset_cache_init(web_aligned_allocator()) {runtime.trap()}
     runtime._startup_runtime()
 }
 

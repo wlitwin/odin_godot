@@ -600,7 +600,7 @@ actor_destroy :: proc(pointer: ^^Actor($S, $C, $A, $E)) -> bool {
         tr.memory_destroy(&a.memory)
     }
 
-    if a.codec.ready || a.codec.catalog._handle != nil {
+    if a.codec.ready || a.codec.closing || a.codec.catalog._handle != nil {
         if ph.network_codec_destroy(&a.codec) != .None {
             return false
         }

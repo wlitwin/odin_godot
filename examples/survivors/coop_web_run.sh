@@ -22,7 +22,7 @@ set -e
 bash "$ROOT/build/build_web.sh" "$PROJ" >/dev/null
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null
 rm -rf "$PROJ/out"; mkdir -p "$PROJ/out"
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 "$GODOT" --headless --path "$PROJ" --export-release "Web" "$PROJ/out/index.html" >/dev/null 2>&1 || true
 if [[ ! -f "$PROJ/out/libodin_godot.wasm" || ! -f "$PROJ/out/index.side.wasm" ]]; then
     echo "COOP_WEB_FAIL: export did not bundle the SIDE_MODULE + dlink runtime"

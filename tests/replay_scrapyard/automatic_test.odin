@@ -1,6 +1,7 @@
 package replay_scrapyard_test
 
 import "core:testing"
+import "core:encoding/json"
 import "core:reflect"
 import sc "godot:replay/schema"
 import game "../../examples/replay_scrapyard/shared/game"
@@ -94,28 +95,33 @@ profile_v2_keeps_automatic_flags_and_rejects_undefined_bits :: proc(t: ^testing.
 }
 
 @(test)
-frozen_profile_v1_import_keeps_its_explicit_choices_and_identity :: proc(t: ^testing.T) {
-    bytes := transmute([]u8)#load("fixtures/profile1/profile.bin")
-    codec: sc.Schema
-    defer sc.destroy(&codec)
-    testing.expect_value(t, sc.init(&codec, profile.Legacy_Record).error, sc.Error.None)
-    old: profile.Legacy_Record
-    _, unpacked := sc.unpack(&codec, &old, bytes, {kind = profile.KIND, epoch = 1, content = profile.LEGACY_CONTENT})
-    testing.expect_value(t, unpacked.error, sc.Error.None)
+saved_explicit_profile_keeps_choices_identity_and_metadata :: proc(t: ^testing.T) {
+    expected: profile.Record
+    testing.expect(t, json.unmarshal(#load("fixtures/current/profile.json", []u8), &expected) == nil)
+    bytes := #load("fixtures/current/profile.bin", []u8)
     before := sc.digest(bytes)
-    record, err := profile.decode(bytes, old.identity)
+    record, err := profile.decode(bytes, expected.identity)
     testing.expect_value(t, err, profile.Error.None)
+    testing.expect(t, reflect.equal(record, expected))
     testing.expect_value(t, record.automatic, u8(0))
-    testing.expect(t, reflect.equal(record.profile, old.profile))
-    testing.expect_value(t, record.epoch, old.epoch)
-    testing.expect_value(t, record.tick, old.tick)
-    converted, written := profile.encode(record)
-    defer delete(converted)
+    testing.expect(
+        t,
+        record.profile.look == 2 && record.profile.iron == 1 && record.profile.abilities == ([2]u8{5, 1}),
+    )
+    testing.expect(t, record.profile.meta.cores == 7 && record.profile.meta.parts == 2)
+    encoded, written := profile.encode(record)
+    defer delete(encoded)
     testing.expect_value(t, written, profile.Error.None)
-    restored, read := profile.decode(converted, old.identity)
+    restored, read := profile.decode(encoded, expected.identity)
     testing.expect_value(t, read, profile.Error.None)
     testing.expect(t, reflect.equal(restored, record))
     testing.expect_value(t, sc.digest(bytes), before)
     _, wrong := profile.decode(bytes, [32]u8{0 = 99})
     testing.expect_value(t, wrong, profile.Error.Identity)
+    old_bytes := #load(
+        "../../docs/replay/results/usability-legacy-2026-11-16/scrapyard/originals/scrapyard/profile1/profile.bin",
+        []u8,
+    )
+    _, obsolete := profile.decode(old_bytes, expected.identity)
+    testing.expect_value(t, obsolete, profile.Error.Codec)
 }

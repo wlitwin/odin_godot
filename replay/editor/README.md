@@ -12,30 +12,88 @@ A project opts in with `replay_authoring.json`:
 
 ```json
 {
-  "worker": "res://tools/authoring.py",
-  "ability": "res://data/abilities/salvefield.tres",
-  "workbench": "res://dev/ability_workbench.tscn"
+  "version": 1,
+  "actions": [
+    {"id": "validate", "label": "Save & Validate Pickup", "kind": "run_scene", "scene": "res://dev/validate.tscn"},
+    {"id": "preview", "label": "Open Pickup Preview", "kind": "open_scene", "scene": "res://dev/pickup_preview.tscn"}
+  ]
 }
 ```
 
 The normal `build/build_scripts.sh PROJECT` installs the addon when this file is
 present. Enable `res://addons/replay_authoring/plugin.cfg` in project settings
-(Scrapyard already does). Installation writes local framework/Python toolchain
+(the Replay starter and Scrapyard already do). Installation writes local framework/Python toolchain
 paths; re-run it when relocating the project/toolchain. It does not install tools
 or send anything to external services. Current process/job helpers target native
-macOS/Linux authoring with Python and an Odin build environment. If Odin is not
-on PATH, the example worker can enter the framework's Nix environment.
+macOS/Linux authoring with Python and an Odin compiler. The shared worker uses
+the normal saved toolchain selection, so an editor launched outside the development
+shell needs no separate compiler configuration or Nix fallback.
 
-The panel supplies Validate/Bake tools, current/stale content status, clickable
-issues, Resource selection, workbench/scenario actions and feature drafts. The
-project worker accepts project/framework/Godot/result paths, an action and optional
-selection/name/kind/latency arguments. It publishes an atomic JSON result with
-`ok`, `running`, `message`, `issues`, optional `stale` and retained log paths.
-Issues contain `source`, `path`, `message` and optionally a source line. Source
-links open Resources, scenes or scripts through the editor's normal interfaces.
+The panel shows only declared actions and their inputs. `open_scene` opens a
+scene in the editor; `run_scene` builds current Odin code and runs a bounded
+headless validation scene. Neither needs a project Python worker. The scene
+writes JSON to `REPLAY_AUTHORING_REPORT`, with an `ok` boolean and an `issues`
+array. Each issue contains `source`, `path` and `message`, with optional `line`.
+The starter's `dev/validate.gd` is a small working example. A missing report,
+failed process or engine error cannot report validation success.
 
-Save & Validate/Bake saves open scenes and the selected saved Resource. Save
-other edited Resources before running a project-wide action. The worker builds
+For custom operations, declare `worker: "res://tools/authoring.py"` and actions
+with `kind: "worker"`. That module implements `run(ctx, action, inputs)` and
+returns the same report. `ctx` supplies `project`, `framework`, `godot`, `env`,
+`job`, `build()` and `run_scene()`. Keep gameplay policy and artifact publication
+there; `jobs.py` owns process bounds, cancellation and retained logs.
+
+Optional `inputs` declare an `id`, `label` and `kind` (`resource`, `file`, `text`
+or `choice`). Actions reference the input IDs they use. Defaults, file filters
+and choice labels/values belong in the manifest; a choice defaults to its first
+value when no default is specified. See Scrapyard's `replay_authoring.json` for
+an example with Resource selection, drafts, recordings and network profiles.
+Queued actions retain the input values captured when clicked.
+
+Only projects declaring `status_action` receive background status polling. It
+must name a worker action with `save:false`. Reports may provide `stale` when
+the project has a baked artifact; ordinary validation does not imply one.
+Reports may also include `message`, `details`, `outputs` (label/path pairs), and
+an explicit `navigate_to` project path. The dock has no game-specific result
+formatting. Use **Reload Authoring Actions** after editing the manifest.
+
+For CI, run the shared entry point from the project directory:
+
+```sh
+python3 addons/odin_godot/replay/editor/worker.py --action validate --godot "$GODOT"
+```
+
+It prints the retained report path and returns a nonzero exit status on failure.
+Use `--result` to choose the output, or `--request request.json` for an action
+with inputs: `{"action":"validate","inputs":{"definition":"res://data/item.tres"}}`.
+`REPLAY_AUTHORING_REQUEST` gives validation scenes the resolved request file.
+`--describe` validates and returns the manifest without building or loading the
+project's worker. The old Scrapyard-specific manifest and command-line options
+are not supported.
+
+Actions save by default (`open_scene` defaults to `save:false`). Saving includes
+edited project Resources, their embedded data, open
+scenes and script buffers before starting the worker. This includes Resources
+you edited earlier and no longer have selected. It waits for a running filesystem
+import so discovery can include all loaded project files. Unsaved drafts without
+an owner, imported data that cannot be written back, and failed writes block the
+action with clickable issues. Save an unnamed draft as a project Resource or
+assign it to a saved Resource/open scene, then retry. A failed save preserves
+edited state and never starts a validator or publishes an artifact.
+
+The panel uses Godot's native edited flags and follows stored Resource references,
+including arrays and dictionaries. Custom editor tools should use the normal
+UndoRedo property actions or `EditorInterface.set_object_edited(resource, true)`
+when changing Resources programmatically. A script assignment alone does not
+mark an editor edit. Unattached drafts are tracked when inspected. Embedded data
+is saved with every owner that actually serializes it. An instanced scene's
+parent need not embed its inherited resources; their source scene remains the
+owner. A built-in script buffer whose
+owning scene is closed is identified so you can reopen that scene before saving.
+
+Results describe the saved inputs read by the worker. New editor edits during a
+job remain unsaved and are labelled separately; save and rerun to validate them.
+The worker builds
 current Odin code and runs typed checks in a separate bounded process. View
 validation instantiates authored scenes there, outside the live game's World.
 Their scripts can still run construction/ready code, so use view scenes whose

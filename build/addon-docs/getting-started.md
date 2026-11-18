@@ -13,12 +13,12 @@ and moves every frame.
 You need three things on your machine (the addon already provides the prebuilt engine core):
 
 1. **Godot 4.7+** — <https://godotengine.org> (the addon's `.gdextension` minimum)
-2. **The Odin compiler — release `@ODIN_VERSION@` tested/recommended** —
-   <https://github.com/odin-lang/Odin/releases>. The bundled prebuilt core validates a
-   scripts library's complete native ABI fingerprint before boot. Another compiler release
-   is accepted when it can compile the bundled sources and produces the same boundary layout;
-   a real ABI mismatch fails safely before user code runs. The tested release remains the
-   lowest-risk choice, especially before Odin 1.0.
+2. **The Odin compiler — build `@ODIN_VERSION@` tested** — see the acquisition
+   instructions below. This is the repository's patched development build, not
+   an upstream release with that name. The bundled core validates the scripts
+   library's complete native ABI fingerprint before boot. Another compiler must
+   compile the bundled sources and match that boundary; it is not automatically
+   qualified by sharing a version label.
 3. **A C linker Odin can drive:**
    - **macOS:** Xcode Command Line Tools — `xcode-select --install`
    - **Linux:** `gcc` or `clang` from your package manager
@@ -27,6 +27,35 @@ You need three things on your machine (the addon already provides the prebuilt e
 
 You only need Odin **while developing**. An exported game compiles your scripts at export
 time and ships no compiler.
+
+### Obtain the tested compiler
+
+On macOS/Linux, the reproducible path is the framework checkout's locked Nix
+toolchain. It includes the compiler and its checker fix:
+
+```sh
+git clone https://github.com/wlitwin/odin_godot
+cd odin_godot
+nix develop
+odin version
+# From this shell, change to your game and run its installed build helper.
+```
+
+For a non-Nix source build, start with Odin's `dev-2026-04` tag and apply the
+included `build/patches/odin-polymorphic-probes.patch` before building. It
+backports upstream commit `ca878a1de7e90ba62d146fd091ff918b8d65e334`, which fixes
+parallel generic-overload checks used by the framework:
+
+```sh
+git clone --branch dev-2026-04 --depth 1 https://github.com/odin-lang/Odin
+git -C Odin apply /absolute/path/to/game/addons/odin_godot/build/patches/odin-polymorphic-probes.patch
+```
+
+Then follow that checkout's compiler build instructions and
+[Odin's platform setup guide](https://odin-lang.org/docs/install/#from-source).
+The Nix build adds the `-checker-fix` version label; a manual build may report the
+base tag. The code fix and native boundary are what matter. Other official Odin
+releases can be tried, but this SDK's recorded qualification uses the pinned build.
 
 ## 2. How a project is wired
 
@@ -65,11 +94,13 @@ the generator then omits its default implementation.
 
 ### 2b. (Optional) editor settings
 
-If you launch Godot from Finder/Steam/the Project Manager, the editor process often can't see
-`odin` on its `PATH` — so rebuild-on-save and validation are disabled with a one-time
-warning. Point the editor at your compiler with the **`odin_godot/odin_bin`** project setting
-(absolute path to the `odin` binary). For autocomplete, **`odin_godot/ols_bin`** similarly
-points at an `ols` binary if you have one.
+Build once from a shell where the tools are available. Successful builds remember
+their absolute paths in ignored `.godot/odin_godot/toolchain/` entries, so reopening
+from Finder/Steam/the Project Manager needs no repeated shell setup. If the compiler
+is missing, the editor keeps an actionable build status visible and refuses stale
+Play after a failed build. To override discovery explicitly, use
+**`odin_godot/odin_bin`**; **`odin_godot/ols_bin`** similarly selects autocomplete.
+Those project settings are optional overrides, not required project configuration.
 
 ## 3. Write your first script
 
@@ -128,8 +159,7 @@ script.)
 
 - **macOS / Linux:**
   ```sh
-  ODIN_GODOT_ROOT="$PWD/addons/odin_godot" SKIP_CORE=1 \
-    bash addons/odin_godot/build/build_scripts.sh .
+  SKIP_CORE=1 bash addons/odin_godot/build/build_scripts.sh .
   ```
 - **Windows** (from a *"x64 Native Tools Command Prompt for VS"*):
   ```powershell

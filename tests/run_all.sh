@@ -37,13 +37,19 @@ fi
 # Every entry declares native, browser, or mixed. Mixed scripts honor SKIP_WEB
 # after their required native checks and emit SUITE_NATIVE_ONLY_OK.
 TESTS=(
+    "compilerprobes|COMPILER_PROBES_OK|tests/compiler_probes/run.sh||native"
     # Pure-Odin unit tests for the `flow` sequencer — no Godot process, the fastest entry.
     "flow|FLOW_OK|tests/flow/run.sh||native"
+    "replaysetup|REPLAY_SETUP_OK|tests/replay_setup/run.sh||native"
+    "replaysetupgodot|REPLAY_SETUP_GODOT_OK|tests/replay_setup/godot_run.sh||native"
     # Pure-Odin unit tests for the `events` observer (Event(T) subscribe/emit semantics).
     "events|EVENTS_OK|tests/events/run.sh||native"
     # Golden test for scriptgen's nested replicated/tagged-field discovery (same-package,
     # imported bundles, and the loud plain-nesting guardrail) — drives the binary, no Godot.
 	"scriptgen|SCRIPTGEN_OK|tests/scriptgen/run.sh||native"
+	"kitbindings|KIT_COMMAND_BINDINGS_OK|tests/kit_subpackages/bindings.sh||native"
+	"kitentities|KIT_SUBPACKAGE_ENTITIES_OK|tests/kit_subpackages/entities.sh||native"
+	"kitvariants|KIT_SCENE_VARIANTS_OK|tests/kit_variants/run.sh||native"
 	# Breaking API guard: retired event attributes, quoted command policies,
 	# redundant owner interpolation, ID-only census views, and boolean action
 	# aliases must all stay rejected/absent.
@@ -55,6 +61,8 @@ TESTS=(
 	# failure + stale cleanup, and concurrent builds. Bash always runs; PowerShell runs
 	# when available (the dedicated .#build-parity shell supplies it).
 	"buildhelpers|BUILD_HELPERS_OK|tests/build_helpers/run.sh||native"
+	"toolchaineditor|TOOLCHAIN_EDITOR_OK|tests/build_helpers/editor_run.sh||native"
+	"editorauthoring|EDITOR_AUTHORING_OK|tests/editor_authoring/run.sh||native"
 	# Recursive canonical wire ABI: one generated schema/fingerprint plus a raw
 	# byte vector accepted identically by native, wasm32, Linux, and Windows.
 	"wireabi|WIREABI_OK|tests/wireabi/run.sh||native"
@@ -76,6 +84,8 @@ TESTS=(
     "replaypackages|REPLAY_PACKAGES_OK|tests/replay_packages/run.sh||native"
     "replaystormcaller|REPLAY_STORMCALLER_OK|tests/replay_stormcaller/run.sh||native"
     "replayeditor|REPLAY_EDITOR_OK|tests/replay_editor/run.sh||native"
+    "replaysaveinputs|REPLAY_SAVE_INPUTS_OK|tests/replay_editor_workflow/save_inputs.sh||native"
+    "replayauthoring|REPLAY_AUTHORING_OK|tests/replay_editor_workflow/generic.sh||native"
     "replayscrapbridge|REPLAY_SCRAP_BRIDGE_OK|tests/replay_scrapyard_bridge/run.sh||native"
     "replaybridge|REPLAY_BRIDGE_OK|tests/replay_bridge/run.sh||native"
     "replaydefinitions|REPLAY_DEFINITIONS_OK|tests/replay_definitions/run.sh||native"
@@ -143,6 +153,11 @@ TESTS=(
     "replaycorrectionreuse|REPLAY_CORRECTION_REUSE_OK|tests/replay_correction_reuse/run.sh||native"
     "replaycomparisonmixed|REPLAY_MIXED_COMPARISON_OK|tests/replay_mixed_comparison/run.sh|REPLAY_COMPARISON_BASELINE_MISSING|native"
     "replaynetworkfaults|REPLAY_NETWORK_FAULTS_OK|tests/replay_network_faults/run.sh|REPLAY_COMPARISON_BASELINE_MISSING|native"
+    "authoringmapping|AUTHORING_MAPPING_OK|tests/authoring/run.sh||native"
+    "replaylargevalues|REPLAY_LARGE_VALUES_OK|tests/replay_large_values/run.sh||native"
+    "webmemory|WEB_MEMORY_OK|tests/web_memory/run.sh||browser"
+    "authoringcatalog|AUTHORING_CATALOG_OK|tests/authoring_catalog/run.sh||native"
+    "kitcatalog|KIT_CATALOG_ADMISSION_OK|tests/authoring_catalog/kit_run.sh|KIT_CATALOG_GAME_MISSING|native"
     "replayauthoring|REPLAY_AUTHORING_OK|tests/replay_authoring/run.sh||native"
     "replayweaponauthoring|REPLAY_WEAPON_AUTHORING_OK|tests/replay_weapon_authoring/run.sh||native"
     "replaycomparisonfire|REPLAY_COMPARISON_FIRING_OK|tests/replay_comparison/firing_run.sh|REPLAY_COMPARISON_BASELINE_MISSING|native"
@@ -153,7 +168,7 @@ TESTS=(
     "replayscrapassetsave|REPLAY_SCRAPYARD_ASSET_SAVE_OK|examples/replay_scrapyard/save_assets_run.sh||native"
     "replayscrapcoopsave|REPLAY_SCRAPYARD_COOP_SAVE_OK|examples/replay_scrapyard/save_coop_run.sh||native"
     "replayscrapsave|REPLAY_SCRAPYARD_SAVE_OK|examples/replay_scrapyard/save_run.sh||native"
-    "replayscrapupgrade|REPLAY_SCRAPYARD_UPGRADE_OK|tests/replay_scrapyard/upgrade_run.sh||native"
+    "replayscrapsavedfixtures|REPLAY_SCRAPYARD_SAVED_FIXTURES_OK|tests/replay_scrapyard/saved_fixtures_run.sh||native"
     "replayscrapworkbench|REPLAY_WORKBENCH_OK|examples/replay_scrapyard/workbench_run.sh||native"
     "replayscrapshop|REPLAY_SHOP_UI_OK|examples/replay_scrapyard/shop_run.sh||native"
     "replayscraphud|REPLAY_SCRAPYARD_HUD_OK|examples/replay_scrapyard/hud_run.sh||native"
@@ -210,7 +225,7 @@ TESTS=(
     "replaycavesocialcontract|REPLAY_CAVE_SOCIAL_COMPLETE_OK|tests/replay_cave_social/run.sh|SUITE_NATIVE_ONLY_OK|mixed"
     "replaycavedirector|REPLAY_CAVE_DIRECTOR_OK|tests/replay_cave_director/run.sh||native"
     "replaycavecarrierbrowser|REPLAY_CAVE_CARRIER_WEB_OK|tests/replay_cave_carrier/web_run.sh||browser"
-    "replayrecordingauthorityupgrade|REPLAY_RECORDING_AUTHORITY_UPGRADE_OK|tests/replay_network_recording/upgrade.sh||native"
+    "replayrecordingfixtures|REPLAY_RECORDING_CURRENT_FIXTURES_OK|tests/replay_network_recording/fixtures.sh||native"
     "replaydedicatedcombat|REPLAY_DEDICATED_COMBAT_COMPLETE_OK|tests/replay_dedicated_combat/run.sh|SUITE_NATIVE_ONLY_OK|mixed"
     "replaydedicatedbrowser|REPLAY_DEDICATED_BROWSER_COMPLETE_OK|tests/replay_dedicated_browser/run.sh||browser"
     "replaydedicatedroom|REPLAY_DEDICATED_ROOM_COMPLETE_OK|tests/replay_dedicated_room/run.sh||native"
@@ -346,13 +361,13 @@ TESTS=(
     "replaycavesolo|REPLAY_CAVE_SOLO_OK|examples/replay_cavecrawl/run.sh||native"
     "replaycavedefinitions|REPLAY_CAVE_DEFINITION_GATE_OK|examples/replay_cavecrawl/definitions_run.sh||native"
     "replaycavedefinitionsnetwork|REPLAY_CAVE_DEFINITION_NETWORK_ALL_OK|examples/replay_cavecrawl/definitions_network_run.sh||native"
-    "replaycaveupgrade|REPLAY_CAVE_UPGRADE_GATE_OK|tests/replay_cave/upgrade/run.sh||native"
+    "replaycavesaved|REPLAY_CAVE_SAVED_FIXTURE_OK|tests/replay_cave/saved_fixtures/run.sh||native"
     "replaycavelobbymigration|REPLAY_CAVE_LOBBY_MIGRATION_OK|tests/replay_migration/lobby_run.sh||native"
     "replaycavelobby|REPLAY_CAVE_LOBBY_ALL_OK|examples/replay_cavecrawl/lobby_run.sh||native"
     "replaycaveonline|REPLAY_CAVE_ONLINE_OK|examples/replay_cavecrawl/online_run.sh||native"
     "replaycaveonlineweb|REPLAY_CAVE_ONLINE_WEB_OK|examples/replay_cavecrawl/online_web_run.sh||browser"
     "replaycaverestart|REPLAY_CAVE_RESTART_ALL_OK|examples/replay_cavecrawl/restart_run.sh||native"
-    "replaycavecontent2|REPLAY_CAVE_CONTENT2_UPGRADE_OK|tests/replay_cave/upgrade/content2_run.sh||native"
+    "replaycavelobbysave|REPLAY_CAVE_LOBBY_SAVE_OK|tests/replay_cave/saved_fixtures/lobby_run.sh||native"
     "replaycavesocialmigration|REPLAY_CAVE_SOCIAL_MIGRATION_ALL_OK|tests/replay_migration/social_run.sh||native"
     "replaycavesocial|REPLAY_CAVE_SOCIAL_ALL_OK|examples/replay_cavecrawl/social_run.sh||native"
     "replaycavemoderation|REPLAY_CAVE_MODERATION_OK|tests/replay_cave_moderation/run.sh|SUITE_NATIVE_ONLY_OK|mixed"
@@ -376,6 +391,17 @@ TESTS=(
     "kitsession|KITSESSION_OK|tests/kitsession/run.sh||native"
     # Entity-census cardinality in both dev and release guard modes: singular
     # ownership returns exactly one and ambiguity can never become first-match.
+    "kituibindings|KIT_UI_BINDINGS_OK|tests/kit_ui_bindings/run.sh||native"
+    "kituiweb|KIT_UI_WEB_OK|tests/kit_ui_bindings/web.sh||browser"
+    "instancelifecycle|INSTANCE_LIFECYCLE_OK|tests/instance_lifecycle/run.sh||native"
+    "instancereload|INSTANCE_RELOAD_OK|tests/instance_lifecycle/reload.sh||native"
+    "kitgamelifecycle|KIT_GAME_LIFECYCLE_OK|tests/instance_lifecycle/games.sh||native"
+    "box3didentity|BOX3D_IDENTITY_OK|tests/box3d_editor/identity/run.sh||native"
+    "completephysicsowner|COMPLETE_PHYSICS_OWNER_OK|tests/complete_physics_owner/run.sh||native"
+    "box3dstarter|BOX3D_STARTER_OK|tests/box3d_starter/run.sh||native"
+    "box3dsetup|BOX3D_SETUP_OK|tests/box3d_editor/setup/run.sh||native"
+    "box3djoints|BOX3D_JOINTS_OK|tests/box3d_editor/joints/run.sh||native"
+    "box3dpreviewpure|BOX3D_PREVIEW_PURE_OK|tests/box3d_editor/preview/pure.sh||native"
     "kitboot|KITBOOT_OK|tests/kitboot/run.sh||native"
     # The kit's SCALE benchmark — delta/join/save CPU+bytes+memory at
     # 100/500/2000 entities, per-recipient fanout at 2/4/8 players, and forced

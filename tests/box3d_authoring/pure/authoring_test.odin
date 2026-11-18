@@ -3,7 +3,7 @@ package box3d_authoring_pure_test
 import "core:encoding/json"
 import "core:testing"
 import a "godot:box3d/authoring"
-import b "godot:box3d"
+import b "godot:box3d/types"
 
 // One borrowed input fixture; bake must copy it before this storage disappears.
 Fixture :: struct {

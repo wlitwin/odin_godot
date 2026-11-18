@@ -197,8 +197,10 @@ format_sync_editor_buffer :: proc(path: godot.String, formatted: string) {
     if script == nil {
         return
     }
+    defer godot.release_ref(cast(godot.Ref_Counted)script)
 
     cur := godot.resource_get_path(cast(godot.Resource)script)
+    defer godot.free_string(cur)
     cur_odin := string_to_odin(cur, context.temp_allocator)
     path_odin := string_to_odin(path, context.temp_allocator)
 
@@ -227,6 +229,7 @@ format_sync_editor_buffer :: proc(path: godot.String, formatted: string) {
     godot.text_edit_begin_complex_operation(te)
     godot.text_edit_select_all(te)
     s := godot.new_string_odin(formatted)
+    defer godot.free_string(s)
     godot.text_edit_insert_text_at_caret(te, s, -1)
     godot.text_edit_end_complex_operation(te)
 
@@ -272,6 +275,7 @@ format_for_save :: proc(
     // Keep the resource's in-memory source consistent with the bytes hitting disk —
     // get_source_code callers (validation overlays, future saves) must see the same text.
     fs := godot.new_string_odin(formatted)
+    defer godot.free_string(fs)
     godot.script_set_source_code(resource, fs)
     format_sync_editor_buffer(path, formatted)
     return formatted

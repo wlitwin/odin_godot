@@ -19,7 +19,7 @@ stock :: proc() -> Catalog {
         &schema,
         &value,
         #load("stock.rpldef", []u8),
-        {kind = d.ARTIFACT_KIND, epoch = 1, content = 0x525343524150304b},
+        {kind = d.ARTIFACT_KIND, epoch = 1, content = SEMANTIC},
     )
 
     if report.error != .None || !valid(value) {

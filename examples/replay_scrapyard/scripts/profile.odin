@@ -173,7 +173,9 @@ profile_sync :: proc(self: ^ReplayScrapyard, truth: ^r.Frame(game.World)) {
     record.profile = fresh
     record.tick = truth.tick
     record.automatic = local.automatic
-    record.epoch = self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    record.epoch = scope_info.epoch
     bytes, err := profile.encode(record)
     defer delete(bytes)
 

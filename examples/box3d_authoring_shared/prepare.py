@@ -27,7 +27,7 @@ def main():
  (project/'shared').mkdir(exist_ok=True)
  for name in ['view.gd','visuals.tscn']:shutil.copyfile(SHARED/name,project/'shared'/name)
  # Optional editor tooling uses the one standard module location, never Core bypass.
- shutil.copytree(addon/'tool_module',project/'modules/box3d_authoring_tools')
+ shutil.copytree(addon/'tool_module',project/'modules/box3d_authoring_tools', ignore=shutil.ignore_patterns(".gdignore"))
  copied={str(p.relative_to(project/'content')):sha(p) for p in files(project/'content')}
  if copied!=content:raise SystemExit('actual copied content differs')
  command=['bash',str(ROOT/'build/build_scripts.sh'),str(project)]

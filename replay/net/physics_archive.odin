@@ -226,12 +226,11 @@ checkpoint_decode_physics :: proc(
     temporary: Checkpoint(S, C, A, N)
     identity := model.complete_codec.identity
 
-    if error := checkpoint_decode_protocol(
+    if error := checkpoint_decode_values(
         &temporary,
         metadata,
         value_model,
         content,
-        PROTOCOL_VERSION,
         allocator,
         codec,
         &identity,

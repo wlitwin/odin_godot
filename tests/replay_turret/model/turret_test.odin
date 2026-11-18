@@ -5,7 +5,6 @@ import "core:os"
 import r "godot:replay"
 import net "godot:replay/net"
 import game "../../../examples/replay_scrapyard/shared/game"
-import upgrade "../../../examples/replay_scrapyard/shared/upgrade"
 import scenario "godot:replay/testing"
 
 TURRET :: u8(7)
@@ -221,30 +220,22 @@ late_claim_correction_removes_predicted_shots_and_ammo_spend :: proc(t: ^testing
 }
 
 @(test)
-content50_checkpoint_upgrades_with_no_turret_or_occupation :: proc(t: ^testing.T) {
-    bytes, error := os.read_entire_file("tests/replay_turret/fixtures/content50.checkpoint", context.allocator)
+saved_catalog_and_world_do_not_invent_turrets_or_occupation :: proc(t: ^testing.T) {
+    bytes, error := os.read_entire_file("tests/replay_turret/fixtures/without-turrets.checkpoint", context.allocator)
     assert(error == nil)
     defer delete(bytes)
-    source: net.Checkpoint(upgrade.World_50, game.Control, upgrade.Action_50, game.SEATS)
-    defer net.checkpoint_destroy(&source)
-    assert(net.checkpoint_decode(&source, bytes, upgrade.model_50(), upgrade.CONTENT_50) == .None)
-    converted, result := upgrade.root_50(bytes)
-    testing.expect_value(t, result, net.Error.None)
-    defer delete(converted)
-
-    if result != .None {
-        return
-    }
-
     target: net.Checkpoint(game.World, game.Control, game.Action, game.SEATS)
     defer net.checkpoint_destroy(&target)
-    assert(net.checkpoint_decode(&target, converted, game.model(), game.CONTENT) == .None)
-    expected, ok := upgrade.map_world_50(source.frame.state)
-    testing.expect(t, ok && reflect.equal(target.frame.state, expected) && target.frame.state.turrets.count == 0)
-
+    assert(net.checkpoint_decode(&target, bytes, game.model(), game.CONTENT) == .None)
+    testing.expect(t, target.frame.tick == 12 && target.frame.state.turrets.count == 0)
     for ability in target.frame.state.catalog.abilities {
         testing.expect_value(t, ability.turret, game.World{}.catalog.abilities[0].turret)
     }
+    for seat in u16(1) ..= game.SEATS {testing.expect(t, !game.turret_operator(&target.frame.state, seat))}
+    again, encoded := net.checkpoint_encode(&target, game.model())
+    defer delete(again)
+    testing.expect_value(t, encoded, net.Error.None)
+    testing.expect(t, reflect.equal(bytes, again, true))
 }
 
 @(test)

@@ -2,7 +2,7 @@ package box3d
 
 import bcap "godot:box3d/limits"
 
-RECOVERY_FORMAT :: 1
+RECOVERY_FORMAT :: 3
 RECOVERY_MAX_ASSETS :: bcap.MAX_ASSETS
 RECOVERY_MAX_BYTES :: bcap.RECOVERY_BYTES
 RECOVERY_MAX_SOURCE_IMAGE_BYTES :: bcap.SNAPSHOT_BYTES
@@ -50,10 +50,9 @@ Recovery_Catalog :: struct {
 }
 
 AUTHORING_ASSET_VERSION :: 2
-AUTHORING_RECOVERY_FORMAT :: 2
 
 // Narrow borrowed C input only. Catalog creation copies all pointed-to arrays.
-Recovery_Asset_V2 :: struct {
+Recovery_Authored_Asset :: struct {
     version, struct_bytes:        u32,
     base:                         Recovery_Asset,
     vertices:                     [^]Vec3,
@@ -62,11 +61,11 @@ Recovery_Asset_V2 :: struct {
 }
 
 when size_of(rawptr) == 8 {
-    #assert(size_of(Recovery_Asset_V2) == 72 && align_of(Recovery_Asset_V2) == 8)
+    #assert(size_of(Recovery_Authored_Asset) == 72 && align_of(Recovery_Authored_Asset) == 8)
     #assert(
-        offset_of(Recovery_Asset_V2, base) == 8 &&
-        offset_of(Recovery_Asset_V2, vertices) == 48 &&
-        offset_of(Recovery_Asset_V2, indices) == 56,
+        offset_of(Recovery_Authored_Asset, base) == 8 &&
+        offset_of(Recovery_Authored_Asset, vertices) == 48 &&
+        offset_of(Recovery_Authored_Asset, indices) == 56,
     )
 }
 
@@ -76,13 +75,13 @@ authoring_asset_abi_check :: proc() -> Status {
     }
 
     offsets := [7]uintptr {
-        offset_of(Recovery_Asset_V2, version),
-        offset_of(Recovery_Asset_V2, struct_bytes),
-        offset_of(Recovery_Asset_V2, base),
-        offset_of(Recovery_Asset_V2, vertices),
-        offset_of(Recovery_Asset_V2, indices),
-        offset_of(Recovery_Asset_V2, vertex_count),
-        offset_of(Recovery_Asset_V2, triangle_count),
+        offset_of(Recovery_Authored_Asset, version),
+        offset_of(Recovery_Authored_Asset, struct_bytes),
+        offset_of(Recovery_Authored_Asset, base),
+        offset_of(Recovery_Authored_Asset, vertices),
+        offset_of(Recovery_Authored_Asset, indices),
+        offset_of(Recovery_Authored_Asset, vertex_count),
+        offset_of(Recovery_Authored_Asset, triangle_count),
     }
 
     for expected, i in offsets {
@@ -93,8 +92,8 @@ authoring_asset_abi_check :: proc() -> Status {
             return status
         }
 
-        if size != size_of(Recovery_Asset_V2) ||
-           alignment != align_of(Recovery_Asset_V2) ||
+        if size != size_of(Recovery_Authored_Asset) ||
+           alignment != align_of(Recovery_Authored_Asset) ||
            uintptr(offset) != expected {
             return .Incompatible
         }
@@ -103,31 +102,9 @@ authoring_asset_abi_check :: proc() -> Status {
     return .Ok
 }
 
-recovery_catalog_create_v2 :: proc(
+recovery_catalog_create_authored :: proc(
     config: Recovery_Config,
-    assets: []Recovery_Asset_V2,
-) -> (
-    catalog: Recovery_Catalog,
-    status: Status,
-) {
-    status = authoring_asset_abi_check()
-
-    if status != .Ok {
-        return
-    }
-
-    if len(assets) == 0 || len(assets) > RECOVERY_MAX_ASSETS {
-        return {}, .Capacity
-    }
-
-    config := config
-    status = c_recovery_catalog_create_v2(&config, raw_data(assets), u32(len(assets)), &catalog._handle)
-    return
-}
-
-recovery_catalog_create_v3 :: proc(
-    config: Recovery_Config,
-    assets: []Recovery_Asset_V2,
+    assets: []Recovery_Authored_Asset,
 ) -> (
     catalog: Recovery_Catalog,
     status: Status,
@@ -143,7 +120,7 @@ recovery_catalog_create_v3 :: proc(
     }
 
     config_copy := config
-    status = c_recovery_catalog_create_v3(&config_copy, raw_data(assets), u32(len(assets)), &catalog._handle)
+    status = c_recovery_catalog_create_authored(&config_copy, raw_data(assets), u32(len(assets)), &catalog._handle)
     return
 }
 

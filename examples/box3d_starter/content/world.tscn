@@ -1,0 +1,59 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://addons/box3d_authoring/world_3d.gd" id="world"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/body_3d.gd" id="body"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/shape_3d.gd" id="shape"]
+[ext_resource type="Script" path="res://addons/box3d_authoring/box_shape_3d.gd" id="box"]
+
+[sub_resource type="Resource" id="floor_shape"]
+script = ExtResource("box")
+stable_key = "floor.shape"
+half_extents = Vector3(4, 0.25, 4)
+
+[sub_resource type="Resource" id="crate_shape"]
+script = ExtResource("box")
+stable_key = "crate.shape"
+half_extents = Vector3(0.5, 0.5, 0.5)
+density = 250.0
+friction = 0.6
+restitution = 0.15
+
+[sub_resource type="StandardMaterial3D" id="floor_material"]
+albedo_color = Color(0.16, 0.21, 0.28, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="crate_material"]
+albedo_color = Color(0.96, 0.53, 0.16, 1)
+roughness = 0.7
+
+[sub_resource type="BoxMesh" id="floor_mesh"]
+material = SubResource("floor_material")
+size = Vector3(8, 0.5, 8)
+
+[sub_resource type="BoxMesh" id="crate_mesh"]
+material = SubResource("crate_material")
+size = Vector3(1, 1, 1)
+
+[node name="World" type="Node3D"]
+script = ExtResource("world")
+stable_key = "offline.starter"
+
+[node name="Floor" type="Node3D" parent="."]
+position = Vector3(0, -0.25, 0)
+script = ExtResource("body")
+stable_key = "floor"
+shapes = Array[ExtResource("shape")]([SubResource("floor_shape")])
+
+[node name="Visual" type="MeshInstance3D" parent="Floor"]
+mesh = SubResource("floor_mesh")
+
+[node name="Crate" type="Node3D" parent="."]
+position = Vector3(0, 3, 0)
+rotation = Vector3(0.1, 0.3, 0.1)
+script = ExtResource("body")
+stable_key = "crate"
+body_type = 2
+shapes = Array[ExtResource("shape")]([SubResource("crate_shape")])
+
+[node name="Visual" type="MeshInstance3D" parent="Crate"]
+mesh = SubResource("crate_mesh")

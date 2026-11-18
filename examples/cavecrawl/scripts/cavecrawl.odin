@@ -172,6 +172,7 @@ CaveLobby :: struct {
     steam_on:        bool, // GodotSteam present + initialized (kit/steamgd)
     relic:           ^Relic, // the carryable (ownership-transfer demo); nil pre-world
     relic_id:        knet.Net_Id,
+    steam_signals:   steamgd.Subscription,
     steam_lobby:     u64, // the Steam lobby we host or sit in (invite target)
     deny_reason:     int, // last Ev_Join_Denied reason (-1 = none); drivers read it
     started:         bool, // the world is live
@@ -251,7 +252,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
 
     // The stock stack — lobby, chat+comms, scoreboard, stage/world, wire,
     // legend — is kit/boot's. Everything below is what makes this CAVECRAWL.
-    cave_lobby_net_attach(
+    if !cave_lobby_net_attach(
         self,
         kboot.Options {
             title       = "C A V E C R A W L",
@@ -272,7 +273,9 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
             },
         },
         net_cfg,
-    )
+    ) {
+        return
+    }
     // The factory, written by nobody: the generated table (from the scene
     // fields' entity= tags) instantiates/frees under boot.world; the typed
     // *_spawned/*_freed hooks in world.odin keep the census. `self` is also
@@ -301,7 +304,7 @@ cave_lobby_ready :: proc(self: ^CaveLobby) {
         self.steam_on = steamgd.init(gd.env_int("CAVE_APPID", steamgd.TEST_APP_ID))
 
         if self.steam_on {
-            steamgd.listen(self.owner, "on_lobby_created", "on_lobby_joined", "on_join_requested")
+            steamgd.listen(&self.steam_signals, self.owner, "on_lobby_created", "on_lobby_joined", "on_join_requested")
         }
     }
 
@@ -719,4 +722,35 @@ cave_show_won :: proc(g: ^CaveLobby) {
     gd.set_bool(cast(gd.Object)g.boot.ui.root, "visible", true)
     kui.lobby_set_status(&g.boot.ui, "The cave is conquered!")
     kui.lobby_show_menu(&g.boot.ui, false, g.ses.is_host)
+}
+
+// Unregister game riders before the generated Session/Boot cleanup.
+cave_lobby_finalize :: proc(self: ^CaveLobby) {
+    steamgd.unlisten(&self.steam_signals)
+
+    if self.steam_lobby != 0 {
+        steamgd.leave_lobby(self.steam_lobby)
+    }
+
+    kcombat.fire_route_destroy(&self.fires)
+    kitems.table_destroy(&self.table)
+    kboot.retire_nodes(
+        cast(gd.Node)self.prompt.label,
+        cast(gd.Node)self.inv.root,
+        cast(gd.Node)self.hud_hp.label,
+        cast(gd.Node)self.hud_ab.root,
+    )
+    kui.inv_destroy(&self.inv)
+    kui.abilities_destroy(&self.hud_ab)
+    kfx.bursts_destroy(&self.fx)
+    kfx.tracers_destroy(&self.tracers)
+    delete(self.flying)
+    delete(self.spelunkers)
+    delete(self.chests)
+    delete(self.doors)
+    delete(self.pickups)
+    delete(self.dwellers)
+    delete(self.avatar_of)
+    delete(self.respawn_at)
+    delete(self.brains)
 }

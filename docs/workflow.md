@@ -63,6 +63,26 @@ Defaults target `tests/phase35`; pass your project dir as the first argument. Th
 If the project has [script modules](modules.md) (`res://modules/<name>/`), the same command
 also builds one `libodinscripts_<name>.<ext>` per module (`BUILD_MODULES=0` opts out).
 
+Successful native builds prepare extension discovery for the next editor launch,
+including projects without Box3D. For a checked headless import in CI, use:
+
+```sh
+bash addons/odin_godot/build/import_project.sh .
+# Checkout equivalent: bash build/import_project.sh path/to/project
+```
+
+The helper also handles a deleted `.godot` cache. It registers extension manifests
+before the scan, performs one import, and fails on engine/import/cleanup errors.
+The full log defaults to `bin/odin_import.log`; pass a second argument to choose
+another log path. Do not suppress import failures or treat an old executable as
+proof that the current build succeeded.
+
+Odin uses Godot's built-in script editor. If reopening saved tabs reports that an
+external editor could not be opened, check **Editor Settings → Text Editor →
+External**: either supply its executable or turn off external-editor mode. An
+enabled external editor with an empty executable is an invalid Godot preference,
+not an Odin toolchain requirement.
+
 ## Live editing (show-on-save)
 
 Adding an Odin `@export` changes the compiled registration code. The property
@@ -106,11 +126,21 @@ Saving under `res://shared/` rebuilds every module because each can import
 that [read-only shared tree](modules.md#shared). See
 [Script Modules](modules.md) for details.
 
-**Finding the compiler.** The editor often has no `odin` on its `PATH` (e.g. launched from the
-macOS app, not a shell). Point it at the binary with the **`odin_godot/odin_bin`** project
-setting, or set the `ODIN` environment variable, or launch the editor from the Nix shell. If
-none resolves, reload-on-save warns once and is skipped (the editor keeps working). The scripts
-package defaults to `res://scripts`; override with **`odin_godot/scripts_dir`**.
+**Finding the compiler.** A successful build remembers resolved tools and the SDK
+root in `.godot/odin_godot/toolchain/`. Reopening through Project Manager can use
+these local paths without inheriting the development shell. The Bash build also
+remembers its Python interpreter; native and web exports reuse the selected
+backend for their target. These files are disposable editor data, not project
+configuration to commit.
+
+Explicit project settings and environment overrides take precedence. You can
+set **`odin_godot/odin_bin`**, set `ODIN`, or build once from the Nix shell. If no
+compiler resolves, a persistent **Odin: compiler not found** badge identifies the
+setup problem. A save that cannot compile blocks Play from running stale code;
+repair the path and save or choose **Build Odin Scripts**. Clearing `.godot/`
+also clears remembered paths, so rebuild from your toolchain shell afterward.
+The scripts package defaults to `res://scripts`; override with
+**`odin_godot/scripts_dir`**.
 
 **Manual trigger.** If save detection misses (or you changed something outside the saved
 file), force the rebuild+reload+refresh by reloading the script, for example with
@@ -182,6 +212,18 @@ variable, or `PATH`. The Nix shell includes `ols`.
 PascalCase types, proc calls). It's registered on the first editor frame and touches only the
 Script editor. Limitation: block comments are highlighted per-line, so a `/* … */` spanning
 lines isn't tracked across them.
+
+### Creating scripts and signal handlers
+
+**Attach Script** creates an Odin template with the selected base's handle type.
+Resource and RefCounted templates contain an owner-first struct; Node templates
+also include ready/process callbacks. The script adopts its destination
+package when saved beside existing Odin sources.
+
+The **Signals** dock can create typed Odin callbacks and navigate to existing
+ones. The method outline is derived from the current source, including unsaved
+changes. Helpers remain navigable; comments, strings, and nested local
+procedures do not become false method entries.
 
 ### Icons
 

@@ -1,5 +1,7 @@
 package box3d
 
+import types "godot:box3d/types"
+
 import bcap "godot:box3d/limits"
 
 import bg "godot:box3d/godot"
@@ -30,123 +32,38 @@ when ODIN_OS == .Linux {
 }
 
 ABI_VERSION :: 2
-MAX_RESTITUTION_ITERATIONS :: 63 // Box3D's B3_MAX_RESTITUTION_ITERATIONS
+MAX_RESTITUTION_ITERATIONS :: types.MAX_RESTITUTION_ITERATIONS
 
-Status :: enum i32 {
-    Ok               = 0,
-    Invalid_Argument = 1,
-    Invalid_Handle   = 2,
-    Out_Of_Memory    = 3,
-    Capacity         = 4,
-    Unsupported      = 5,
-    Incompatible     = 6,
-    Corrupt          = 7,
-}
+Status :: types.Status
 
 World :: distinct u32
 Body :: distinct u64
 Shape :: distinct u64
 Joint :: distinct u64
-Body_Key :: distinct u64
-Shape_Key :: distinct u64
+Body_Key :: types.Body_Key
+Shape_Key :: types.Shape_Key
 Joint_Key :: distinct u64
 
-Vec3 :: struct {
-    x, y, z: f32,
-}
+Vec3 :: types.Vec3
 
-Quat :: struct {
-    x, y, z, w: f32,
-}
+Quat :: types.Quat
 
-Pose :: struct {
-    position: Vec3,
-    rotation: Quat,
-}
+Pose :: types.Pose
 
-IDENTITY_ROTATION :: Quat {
-    w = 1,
-}
-IDENTITY_POSE :: Pose {
-    rotation = IDENTITY_ROTATION,
-}
+IDENTITY_ROTATION :: types.IDENTITY_ROTATION
+IDENTITY_POSE :: types.IDENTITY_POSE
 
-World_Def :: struct {
-    gravity:                        Vec3,
-    enable_sleep:                   u32,
-    enable_continuous:              u32,
-    // Solver tuning (ABI 2). Each 0 keeps Box3D's default, which Box3D scales by
-    // the length unit for the thresholds and speeds: restitution threshold 1 m/s,
-    // hit event threshold 1 m/s, contact hertz 30, contact damping ratio 10,
-    // contact (push-out) speed 3 m/s, maximum linear speed 400 m/s, isotropic
-    // inertia tolerance 0.2, two restitution iterations, no propagation.
-    restitution_threshold:          f32,
-    hit_event_threshold:            f32,
-    contact_hertz:                  f32,
-    contact_damping_ratio:          f32,
-    contact_speed:                  f32,
-    maximum_linear_speed:           f32,
-    isotropic_inertia_tolerance:    f32,
-    restitution_iterations:         u32,
-    enable_restitution_propagation: u32,
-}
+World_Def :: types.World_Def
 
-Body_Type :: enum i32 {
-    Static    = 0,
-    Kinematic = 1,
-    Dynamic   = 2,
-}
+Body_Type :: types.Body_Type
 
-Body_Def :: struct {
-    type:                      Body_Type,
-    pose:                      Pose,
-    linear_velocity:           Vec3,
-    angular_velocity:          Vec3,
-    linear_damping:            f32,
-    angular_damping:           f32,
-    gravity_scale:             f32,
-    sleep_threshold:           f32,
-    enable_sleep:              u32,
-    is_awake:                  u32,
-    is_bullet:                 u32,
-    is_enabled:                u32,
-    // Lift Box3D's angular speed cap (one eighth turn per step, 47 rad/s at
-    // 60 Hz) for round bodies that roll fast, such as wheels and balls.
-    allow_fast_rotation:       u32,
-    motion_locks:              Motion_Locks, // 0 = free
-    safety_factor:             f32, // continuous-collision margin; 0 keeps Box3D's 0.5
-    disable_contact_recycling: u32,
-}
+Body_Def :: types.Body_Def
 
-Motion_Lock :: enum u32 {
-    Linear_X,
-    Linear_Y,
-    Linear_Z,
-    Angular_X,
-    Angular_Y,
-    Angular_Z,
-}
+Motion_Lock :: types.Motion_Lock
 
-Motion_Locks :: distinct bit_set[Motion_Lock;u32]
+Motion_Locks :: types.Motion_Locks
 
-Shape_Def :: struct {
-    category_bits:               u64,
-    mask_bits:                   u64,
-    group_index:                 i32,
-    density:                     f32,
-    friction:                    f32,
-    restitution:                 f32,
-    is_sensor:                   u32,
-    enable_sensor_events:        u32,
-    enable_contact_events:       u32,
-    // ABI 2. All 0 keep Box3D's defaults: no rolling resistance (a torque
-    // opposing rolling, scaled by the shape's radius), no tangent (conveyor)
-    // velocity, contact creation on add, speculative contacts on.
-    rolling_resistance:          f32,
-    tangent_velocity:            Vec3,
-    skip_contact_creation:       u32,
-    disable_speculative_contact: u32,
-}
+Shape_Def :: types.Shape_Def
 
 Hinge_Def :: struct {
     body_a:            Body,
@@ -620,10 +537,8 @@ foreign native {
     raw_recovery_catalog_create :: proc(_: ^Recovery_Config, _: [^]Recovery_Asset, _: u32, _: ^rawptr) -> Status ---
     @(link_name = "ogb3_authoring_asset_layout")
     raw_authoring_asset_layout :: proc(_: u32, _: ^u32, _: ^u32, _: ^u32) -> Status ---
-    @(link_name = "ogb3_recovery_catalog_create_v2")
-    raw_recovery_catalog_create_v2 :: proc(_: ^Recovery_Config, _: [^]Recovery_Asset_V2, _: u32, _: ^rawptr) -> Status ---
-    @(link_name = "ogb3_recovery_catalog_create_v3")
-    raw_recovery_catalog_create_v3 :: proc(_: ^Recovery_Config, _: [^]Recovery_Asset_V2, _: u32, _: ^rawptr) -> Status ---
+    @(link_name = "ogb3_recovery_catalog_create_authored")
+    raw_recovery_catalog_create_authored :: proc(_: ^Recovery_Config, _: [^]Recovery_Authored_Asset, _: u32, _: ^rawptr) -> Status ---
     @(link_name = "ogb3_recovery_catalog_shape")
     raw_recovery_catalog_shape :: proc(_: rawptr, _: u32, _: Body, _: ^Shape_Def, _: ^Shape) -> Status ---
     @(link_name = "ogb3_recovery_catalog_clone")
@@ -977,9 +892,9 @@ c_authoring_asset_layout :: proc(field: u32, size, alignment, offset: ^u32) -> S
 }
 
 @(private)
-c_recovery_catalog_create_v2 :: proc(
+c_recovery_catalog_create_authored :: proc(
     config: ^Recovery_Config,
-    assets: [^]Recovery_Asset_V2,
+    assets: [^]Recovery_Authored_Asset,
     count: u32,
     out: ^rawptr,
 ) -> Status {
@@ -987,21 +902,7 @@ c_recovery_catalog_create_v2 :: proc(
         return status
     }
 
-    return raw_recovery_catalog_create_v2(config, assets, count, out)
-}
-
-@(private)
-c_recovery_catalog_create_v3 :: proc(
-    config: ^Recovery_Config,
-    assets: [^]Recovery_Asset_V2,
-    count: u32,
-    out: ^rawptr,
-) -> Status {
-    if status := domain_access_check(); status != .Ok {
-        return status
-    }
-
-    return raw_recovery_catalog_create_v3(config, assets, count, out)
+    return raw_recovery_catalog_create_authored(config, assets, count, out)
 }
 
 @(private)

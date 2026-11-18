@@ -119,16 +119,16 @@ configure them once:
    Use 4.0.20 to match the dylink/longjmp ABI of Godot 4.7's web templates.
    The Web caveats below describe verification with another emcc version.
 
-2. **Point the editor at the binaries.** When you launch Godot from Finder/Steam/the Project
-   Manager, the editor process doesn't inherit your shell `PATH`, so it can't see `odin` or
-   `emcc`. Set these **project settings** to their absolute paths (Project → Project Settings,
-   "Add" a custom property):
+2. **Build once from the toolchain shell.** Successful builds remember tool paths
+   in the project's ignored `.godot` directory. The editor can then find them
+   after reopening from Finder/Steam/the Project Manager without inheriting your
+   shell `PATH`. To supply explicit overrides, set these project settings:
    - `odin_godot/odin_bin` → your `odin`
    - `odin_godot/emcc_bin` → `…/emsdk/upstream/emscripten/emcc`
 
-   The export plugin uses these settings to find tools, build the wasm, and
-   bundle it from the export dialog. Alternatively, launch the editor from a terminal
-   where both are already on `PATH` (e.g. after `source ./emsdk/emsdk_env.sh`).
+   The export plugin uses the same tool resolution as the build helpers. You can
+   also launch the editor from a terminal where both tools are already on `PATH`
+   (e.g. after `source ./emsdk/emsdk_env.sh`).
 
 ### Build the wasm
 
@@ -159,6 +159,10 @@ The example projects configure these requirements:
   runtime).
 - The editor's export plugin runs `build/build_web.sh` at export time to
   produce the wasm file referenced by `.gdextension`.
+- **Thread Support** selects the memory mode for both Godot and the compiled
+  extension. The exporter passes the active preset to the build; ordinary
+  native-free games support either mode. The Box3D Web backend requires the
+  threaded mode and reports an incompatible preset before compilation.
 - Script code must not import `core:os`, because Odin's native OS layer does
   not compile for wasm. Importing it produces errors in `core/os` files, such
   as `Undeclared name: _read_directory_iterator`. Use engine APIs instead: `gd.singleton_os()` +
@@ -170,7 +174,12 @@ The example projects configure these requirements:
   `gd_instance_from_id` to return no object. Use `i64`/`gd.Int` for IDs and anything
   else that is 64-bit engine-side.
 
-**Serving:** Godot web needs `SharedArrayBuffer`, which requires two HTTP headers:
+Direct `build_web.sh` calls read the project's Web presets. If several presets
+use different memory modes, export the desired preset through Godot, or select
+`ODIN_WEB_THREADS=0` / `1` for a deliberate standalone side-module build. No
+duplicate setting is needed for normal editor or command-line Godot exports.
+
+**Serving:** threaded Web exports use `SharedArrayBuffer`, which requires two HTTP headers:
 
 ```
 Cross-Origin-Opener-Policy:   same-origin
@@ -189,6 +198,14 @@ Use the same two headers in deployment. On itch.io, enable
 
 ### Web caveats
 
+- **Engine shutdown:** on the tested Godot 4.7.1 single-threaded Web runtime,
+  quitting the entire engine after audio playback reports a
+  `WorkerThreadPool::Group` allocator diagnostic even in a plain GDScript project.
+  Scene/audio retirement and normal browser play/save/reload are separate checks;
+  error-free engine shutdown is not qualified for that runtime. Remove owned game
+  scenes and let their audio references retire before requesting engine exit.
+  The threaded variant passes that strict orderly-shutdown check. The reproduction
+  and exact scope are retained in `tests/web_memory/`.
 - The browser offers **no hot reload** (there is no `dlopen`, and only one shared linear
   memory is used with the engine).
 - **Native debugging isn't available**: debug with `gd.print`, which prints to the JS console

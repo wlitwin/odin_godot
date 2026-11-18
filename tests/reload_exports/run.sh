@@ -59,7 +59,7 @@ grep -q 'doctored-compatible-compiler' "$COMPATROOT/runtime/runtime.odin" || { e
 export ODIN_GODOT_COMPAT_ROOT="$COMPATROOT"
 
 # First pass: write .godot/extension_list.cfg + import so the editor loads the GDExtension.
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 echo "== editor --headless --script test_reload_exports.gd =="
 LOG="$(mktemp)"

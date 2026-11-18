@@ -40,62 +40,32 @@ they do not consume gameplay RNG or enter collision state.
 
 ## Existing Replay saves
 
-Cavecrawl content is `0x4341564552504c39`. C4 corrected wave pacing and den
-selection; C5 preserves avatar state on descent and separates run reset rules.
-C6 retains the relic across descent and releases it in place on restart.
-C7 retains relic ownership through death, respawn and ordinary disconnect.
-C8 records the observed authority and adopts the previous host’s relic on takeover.
-The ordinary loader rejects prior C1–C8 content, even where the value layout is unchanged.
-Gameplay protocol 7 and checkpoint format 4 are unchanged. This is an explicit
-conversion of earlier Replay saves, not an importer for original Kit saves.
+Cavecrawl uses content `0x4341564552504c39` (C9). Normal loads require the current
+schema/content contract. Retained C1–C8 checkpoints were migrated once before
+removing their readers. Current fixtures preserve floor definitions, player and
+relic values, membership and pending actions. [Original bytes and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json)
+record the migration separately from the active inputs.
 
-Build the converter and give it an existing source and a **new** destination:
-
-```sh
-nix develop --command odin build examples/replay_cavecrawl/tools/upgrade_save \
-  -collection:godot=. -out:/tmp/replay-cave-upgrade
-/tmp/replay-cave-upgrade /path/to/old.replay /path/to/converted.replay
-```
-
-The converter validates the old archive, copies its complete world and session
-ledgers, maps pending actions into the new command shape, and adds an already-playing
-lobby with default seat names. Content 1 receives the original default floors;
-content 2 retains its captured floors. The first connected seat becomes party leader.
-It then computes the new schema contract and hashes. The source remains
-unchanged, and the converter refuses to replace an existing file or symlink. Publication requires same-directory hard-link support. Conversion
-alone grants no authority and does not increment the epoch; normal resume or Room
-recovery still applies its authority rules. Use the owning profile/token when
-resuming and retain the original archive.
-
-The converter supports Protocol-7/content-1 through content-8 saves. C3 conversion preserves the complete checkpoint and
-its scheduled spawn/rest deadlines; later spawns use corrected pacing. C4/C5/C6/C7 conversion
-also preserves all saved values; future transitions use current rules.
-
-Content 3 added lobby metadata/commands; gameplay
-protocol 7 and checkpoint layout 4 remain unchanged.
-
-<a id="acceptance-gates"></a>
+A checkpoint restores its exact saved frame. The first committed tick under the
+new epoch applies current authority/adoption rules. Conversion itself grants no
+authority. Use the saved identity when resuming. Explicit generic schema-evolution
+APIs remain available; the game no longer carries retired application schemas.
 
 ## Validation
 
 ```sh
 nix develop --command bash examples/replay_cavecrawl/definitions_run.sh
 nix develop --command bash examples/replay_cavecrawl/definitions_network_run.sh
-nix develop --command bash tests/replay_cave/upgrade/run.sh
+nix develop --command bash tests/replay_cave/saved_fixtures/run.sh
 nix develop --command bash tests/replay_cave/scatter_run.sh
 ```
 
 These check captured Resource/marker edits and fresh-process resume, host settings
 received by default-resource clients/observers under simulated network faults,
-invalid definitions, a genuine old-binary save converted and resumed, and original
+invalid definitions, a retained current-format save resumed, and original
 versus native/WASM scatter coordinates. The broader campaign and migration gates
 exercise the same expanded world schema.
 
-C8 adds `authority_known` and `authority_seat` to World. Old-world descriptors keep
-the frozen C3–C7 layout. Conversion preserves prior fields and seeds the new
-observation from the validated checkpoint header’s `local_seat`, independently of
-lobby leadership. Adoption occurs on the first resumed simulation tick.
-
-C9 adds generation-bound dweller Hit occurrences without changing saved world
-layout. C8 conversion preserves its authority observation exactly. Both native
-converters refuse coordinated archives; see [impact compatibility](impacts.md).
+Current checkpoint fixtures include the authority observation and retain full
+world state. Current C9/O3 recording fixtures are new captures with generation-bound
+impact events; their old event histories remain historical evidence only.

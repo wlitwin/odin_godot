@@ -4,7 +4,7 @@
 
 This small Kit game opens two windows with one colored square per player; both
 screens display both players' movement. `scripts/hello.odin` handles the session
-and `scripts/player.odin` defines the moving player entity. Two 15-line scenes
+and `scripts/actors/player.odin` defines the moving player entity. Two 15-line scenes
 provide their Godot nodes. The walkthrough is
 [docs/kit/quickstart.md](../../docs/kit/quickstart.md); the server-authority
 promotion of this exact game is `examples/hello_sim`.
@@ -25,3 +25,7 @@ The generated attach selects `.Friends_Coop`: each entity owner—the player
 allowed to write that entity's owner-controlled fields—streams their movement.
 The host controls shared state and validates Kit commands, the generated requests
 that change entity state.
+
+The entity lives in `scripts/actors/`. Its game-specific birth callback stays
+in `scripts/player_hooks.odin`, beside the game owner. This package split needs
+no extra build configuration.

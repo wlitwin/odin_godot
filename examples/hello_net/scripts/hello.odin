@@ -5,7 +5,7 @@ package hello_net
 // ----------------------------------------------------------------------------
 // HELLO, MULTIPLAYER — the smallest complete kit game: two windows, one
 // square each, moving with the arrow keys on both screens. This file plus
-// player.odin is the WHOLE game; docs/kit/quickstart.md walks it line by
+// actors/player.odin and player_hooks.odin complete the game; docs/kit/quickstart.md walks it line by
 // line. Run it:
 //
 //   bash build/build_scripts.sh examples/hello_net
@@ -18,6 +18,7 @@ package hello_net
 // ----------------------------------------------------------------------------
 
 import "core:fmt"
+import actors "actors"
 import gd "godot:godot"
 import kboot "godot:kit/boot"
 import kcomms "godot:kit/comms"
@@ -41,8 +42,7 @@ HelloNet :: struct {
     // THE declaration: this exported scene bodies a replicated entity. The
     // tag mints the wire id, the factory, typed player_spawn(), the census
     // (player_mine / player_of / player_all), and the acid probes.
-    player_scene: ^gd.Resource `gd:"entity=Player:1"`,
-    me:           ^Player, // my avatar (set by the census hook in player.odin)
+    player_scene: ^gd.Resource `gd:"entity=actors.Player:1"`,
 
     // JOIN CODES (optional): with HELLO_RELAY set, hosting registers the ENet
     // port under a minted code and a friend joins with the CODE instead of an
@@ -56,7 +56,7 @@ now_s :: knet.now_s
 hello_net_ready :: proc(self: ^HelloNet) {
     // The stock stack: a lobby with Host/Join buttons, chat, a scoreboard,
     // the wire, entity factory, and transport forwards — one generated attach.
-    hello_net_attach(
+    if !hello_net_attach(
         self,
         kboot.Options {
             title       = "HELLO, MULTIPLAYER",
@@ -68,7 +68,9 @@ hello_net_ready :: proc(self: ^HelloNet) {
             // the standard eight names, and scriptgen still validates they exist.)
         },
         kboot.network_profile(.Friends_Coop),
-    )
+    ) {
+        return
+    }
 
     // With a relay configured, the lobby grows its join-code field — a human
     // types a friend's code and presses Join (see on_join).
@@ -102,10 +104,6 @@ hello_net_ready :: proc(self: ^HelloNet) {
     }
 }
 
-hello_net_exit_tree :: proc(self: ^HelloNet) {
-    hello_net_detach(self)
-    ksess.session_destroy(&self.ses)
-}
 
 hello_net_process :: proc(self: ^HelloNet, delta: f64) {
     // THE LIFECYCLE, read not kept. `.Menu` is "no seat and none coming" — the
@@ -131,7 +129,7 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
         }
     }
 
-    if self.me != nil {
+    if player, ok := player_mine(&self.boot); ok {
         // Drive MY square. The x/y writes are all it takes: they are
         // owner-streamed fields, so every other screen glides this body.
         dx, dy: f32
@@ -152,8 +150,8 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
             dy -= 1
         }
 
-        self.me.x = clamp(self.me.x + dx * SPEED * f32(delta), 8, 632)
-        self.me.y = clamp(self.me.y + dy * SPEED * f32(delta), 8, 352)
+        player.x = clamp(player.x + dx * SPEED * f32(delta), 8, 632)
+        player.y = clamp(player.y + dy * SPEED * f32(delta), 8, 352)
     }
     // Reactions live in the name-paired halves below; hello_net_pump forwards
     // them through the generated switch and role gates.
@@ -273,23 +271,4 @@ hello_net_player_joined_then :: proc(self: ^HelloNet, id: knet.Player_Id, rejoin
     if kboot.boot_phase(&self.boot) == .Playing && !rejoin {
         spawn_player(self, id)
     }
-}
-
-// The world reached this peer: the lobby gives way to the game. A LEVEL applied
-// per spawn, not a latch — `started` used to be one bool doing double duty
-// (level AND rising edge), and the edge is the only half that needed keeping:
-// it rides boot_phase in process(), where the receipt prints exactly once.
-@(gd_half)
-hello_net_entity_spawned :: proc(self: ^HelloNet, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-    _ = type
-    _ = owner
-
-    // BORN = the fields are set: the node's FIRST placement is here — the
-    // entity's _process carries it from the next frame on (Godot runs no
-    // _process on a node added mid-_process, which every host-step spawn is).
-    if p, ok := player_of(&self.boot, id); ok {
-        gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
-    }
-
-    gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 }

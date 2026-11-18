@@ -9,7 +9,6 @@ import p "godot:replay/play"
 import game "../../../examples/replay_scrapyard/shared/game"
 import content "../../../examples/replay_scrapyard/shared/content"
 import display "../../../examples/replay_scrapyard/shared/presentation"
-import upgrade "../../../examples/replay_scrapyard/shared/upgrade"
 
 Input :: struct {
     move: [2]f32,
@@ -116,30 +115,20 @@ checkpoint_takeover_preserves_remaining_charge_and_fires_once :: proc(t: ^testin
 }
 
 @(test)
-real_content49_checkpoint_converts_without_inventing_new_attack_configuration :: proc(t: ^testing.T) {
-    bytes, error := os.read_entire_file("tests/replay_stormcaller/fixtures/content49.checkpoint", context.allocator)
+saved_catalog_does_not_invent_new_attack_configuration :: proc(t: ^testing.T) {
+    bytes, error := os.read_entire_file(
+        "tests/replay_stormcaller/fixtures/without-pulses.checkpoint",
+        context.allocator,
+    )
     assert(error == nil)
     defer delete(bytes)
-    old: net.Checkpoint(upgrade.World_49, game.Control, upgrade.Action_50, game.SEATS)
-    defer net.checkpoint_destroy(&old)
-    testing.expect_value(t, net.checkpoint_decode(&old, bytes, upgrade.model_49(), upgrade.CONTENT_49), net.Error.None)
-    converted, err := upgrade.root_49(bytes)
-    testing.expect_value(t, err, net.Error.None)
-    defer delete(converted)
-
-    if err != .None {
-        return
-    }
-
     cp: net.Checkpoint(game.World, game.Control, game.Action, game.SEATS)
     defer net.checkpoint_destroy(&cp)
-    assert(net.checkpoint_decode(&cp, converted, game.model(), game.CONTENT) == .None)
-    expected, ok := upgrade.map_world_49(old.frame.state)
-    testing.expect(t, ok && reflect.equal(cp.frame.state, expected))
-
-    for row in cp.frame.state.catalog.mobs {
-        testing.expect_value(t, row.pulse, content.Pulse_Def{})
-    }
-
+    assert(net.checkpoint_decode(&cp, bytes, game.model(), game.CONTENT) == .None)
+    for row in cp.frame.state.catalog.mobs {testing.expect_value(t, row.pulse, content.Pulse_Def{})}
     testing.expect(t, cp.header.content == game.CONTENT && cp.frame.tick == 12)
+    again, encoded := net.checkpoint_encode(&cp, game.model())
+    defer delete(again)
+    testing.expect_value(t, encoded, net.Error.None)
+    testing.expect(t, reflect.equal(bytes, again, true), "current encode/decode preserves the saved catalog")
 }

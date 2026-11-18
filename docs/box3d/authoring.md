@@ -7,9 +7,8 @@ construct the runtime world. This guide assumes you have run
 ## Create the scene
 
 1. Copy `addons/box3d_authoring` from the SDK into your project's `addons/` directory.
-2. Add a `Box3DWorld3D` node and set an explicit `stable_key` namespace.
-3. Add `Box3DBody3D` or `Box3DSensor3D` descendants. Give each body a unique
-   `stable_key` within the world.
+2. Add a `Box3DWorld3D` node. The editor generates its saved stable ID.
+3. Add `Box3DBody3D` or `Box3DSensor3D` descendants; they also receive IDs.
 4. Assign shape Resources and set rigid poses, dimensions, materials, and filters.
 5. Validate the complete definition before constructing a runtime world. The
    optional [editor tools](editor.md) report field-specific diagnostics.
@@ -35,7 +34,9 @@ disabled. Unsupported geometry is rejected rather than approximated silently.
 
 ## Keep identity stable
 
-Use explicit keys for worlds, bodies, shapes, characters, and joints. Renaming a
+The editor creates saved keys for worlds, bodies, shapes, characters, and joints;
+use the [identity controls](editor.md#create-and-duplicate-authoring-objects) for
+rekeying and duplication. Runtime construction supplies explicit keys. Renaming a
 presentation node or reordering Resources must not change the logical object ID.
 Duplicate keys, conflicting reused Resource keys, unresolved references, and
 identity collisions fail validation.
@@ -53,6 +54,7 @@ selects the runtime profile:
 
 ```odin
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import ga "godot:box3d/godot/authoring"
 
 scene, diagnostic := ga.extract(world_object, allocator)
@@ -60,10 +62,16 @@ defer ga.diagnostic_destroy(&diagnostic)
 if diagnostic.error != .None {return}
 defer a.destroy(&scene)
 
-built, problem := a.build(&scene, profile_id)
-defer a.built_destroy(&built)
+built, problem := ar.build(&scene, profile_id)
+defer ar.built_destroy(&built)
 if problem.error != .None {return}
 ```
+
+`box3d/authoring` and `box3d/godot/authoring` contain pure baking and extraction;
+importing them does not register a native physics domain or require a solver
+library. `box3d/authoring/runtime` adds native construction, cleanup and copied
+runtime draw configuration. Shared PODs live in `box3d/types`; the native
+`box3d` API exposes the same types.
 
 The extractor copies scene data. The builder creates a native world, trusted
 catalog, and local logical-ID mappings. A failed candidate is cleaned up before

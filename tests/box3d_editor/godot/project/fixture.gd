@@ -14,5 +14,5 @@ static func make_world() -> Box3DWorld3D:
 		body.shapes.append(shapes[i]);world.add_child(body);body.owner=world;body.position=Vector3(i*3,0,0)
 	var sensor:=Box3DSensor3D.new();sensor.name="Sensor";sensor.stable_key="sensor";sensor.shapes.append(sphere);world.add_child(sensor);sensor.owner=world;sensor.position=Vector3(0,3,0)
 	var character:=Box3DCharacterMover3D.new();character.name="Character";character.stable_key="character";character.position=Vector3(0,5,0);world.add_child(character);character.owner=world
-	var joint:=Box3DHingeJoint3D.new();joint.name="Joint";joint.stable_key="joint";joint.body_a="body.0";joint.body_b="body.1";joint.local_frame_a.origin=Vector3(3,0,0);world.add_child(joint);joint.owner=world
+	var joint:=Box3DHingeJoint3D.new(); joint.frame_mode = Box3DJoint3D.FrameMode.BODY_LOCAL;joint.name="Joint";joint.stable_key="joint";joint.body_a="body.0";joint.body_b="body.1";joint.local_frame_a.origin=Vector3(3,0,0);world.add_child(joint);joint.owner=world
 	return world

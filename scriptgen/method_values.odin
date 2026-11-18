@@ -4,9 +4,8 @@ import "core:fmt"
 import "core:odin/ast"
 import "core:strings"
 
-// A bare method preserves the original boundary: owning Godot builtin argument
-// copies go to the callee; Godot returns are borrowed. New code can state a
-// different contract without invalidating existing methods returning fields.
+// Inputs are borrowed for the call; generated wrappers release builtin copies.
+// Returns are borrowed unless owned_return transfers a separate owned reference.
 method_ownership :: proc(m: ^Method_Info, vd: ^ast.Value_Decl, loc: Loc) -> bool {
     for attr in vd.attributes {
         for elem in attr.elems {
@@ -41,13 +40,14 @@ method_ownership :: proc(m: ^Method_Info, vd: ^ast.Value_Decl, loc: Loc) -> bool
         switch strings.trim_space(raw) {
         case "":
         case "borrowed_args":
-            m.borrowed_args = true
+            error_at(loc, "method %s: borrowed_args is now the default; remove this option", m.proc_name)
+            return false
         case "owned_return":
             m.owned_return = true
         case:
             error_at(
                 loc,
-                "method %s: unknown gd_method option %q; use borrowed_args and/or owned_return",
+                "method %s: unknown gd_method option %q; only owned_return is supported",
                 m.proc_name,
                 raw,
             )

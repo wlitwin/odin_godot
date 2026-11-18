@@ -1,0 +1,1681 @@
+{
+  "goal_complete": true,
+  "completed_tasks": 23,
+  "total_tasks": 23,
+  "review": "Current authoritative sources, concrete runtime/editor/browser/package reports and independent completed-task reviews support every agreed acceptance item. Superseded failed attempts remain preserved and diagnosed; supported limits are explicit.",
+  "tasks": [
+    {
+      "id": "P1-01",
+      "requirement": "Replace redundant transport/setup wiring, adopt standard generated lifecycle where ordering permits, inspect census usage and remove stale API guidance. Preserve intentional game ordering; validate solo, host/join, recovery and teardown.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Fresh installed-addon build passes.",
+        "Three successive game scenes each start solo, contain one runner and are removed; exact audio resource weak references retire; no final leaks/errors.",
+        "SY_ACTS=0,1,5,7,9: solo, duo, vault persistence, dedicated server and host succession passed first attempts under 120ms injected latency.",
+        "Independent read-only review found retained temporary SY_SHOT allocation; corrected to owned allocator and rebuilt.",
+        "git diff --check, bash -n run.sh and Python compile passed."
+      ],
+      "evidence_paths": []
+    },
+    {
+      "id": "P1-02",
+      "requirement": "Lead with installed-addon editor setup, correct Replay backend contradictions and Box3D plugin installation order, remove redundant settings and update examples that teach superseded APIs. Clean-start documented commands must work.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "npm run check passed all documentation links and anchors.",
+        "npm run build passed the complete documentation site (existing bundle-size advisory only).",
+        "Clean installed-addon Mover project built/imported/ran without ODIN_GODOT_ROOT or BOX3D_*; verified default Speed, movement and property editing.",
+        "Clean installed-addon Replay starter built/imported/ran existing solo driver without ODIN_GODOT_ROOT or BOX3D_*.",
+        "git diff --check passed."
+      ],
+      "evidence_paths": [
+        {
+          "name": "docs_log",
+          "path": "/tmp/odin-usability-docs-check.log",
+          "exists": true
+        },
+        {
+          "name": "onboarding_logs",
+          "path": "/tmp/nix-shell.VATj0O/odin-onboarding-hw7wa61n",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P1-03",
+      "requirement": "One consistent editor/CLI/export resolution path for project backend/profile and local compiler/tool paths. Missing tools must produce persistent actionable status; Project Manager reopen must work.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Six toolchain unit tests pass: cached reopen, invalid compiler, corrupt/stale entries, target separation, existing native deployment discovery and concurrent independent updates.",
+        "Core compiles; Bash build-helper cache/failure/staging/concurrent-publish regression passes.",
+        "Actual headless editor with stripped shell tools rejects Play after failed saves in two modules, restores local paths, rebuilds both through a root-only reload and exposes both new exports.",
+        "Fresh isolated Box3D backend passed all 14 native tests. Native initial build, cached rebuild, cached desktop export, editor import and game run passed; backend domain retained across export.",
+        "Complete docs link check and site build pass; Python compilation, shell syntax and git diff --check pass.",
+        "Final Nix addon builds and contains toolchain helper; Scrapyard builds through that installed package and passes the three-scene lifecycle regression."
+      ],
+      "evidence_paths": [
+        {
+          "name": "editor_log",
+          "path": "/tmp/odin-usability-toolchain-multimodule.log",
+          "exists": true
+        },
+        {
+          "name": "helper_docs_log",
+          "path": "/tmp/odin-usability-toolchain-final.log",
+          "exists": true
+        },
+        {
+          "name": "native_build_log",
+          "path": "/tmp/odin-usability-native-build.log",
+          "exists": true
+        },
+        {
+          "name": "physics_project",
+          "path": "/private/tmp/nix-shell.VstwLi/odin-toolchain-physics-_omupfu7",
+          "exists": true
+        },
+        {
+          "name": "addon_result",
+          "path": "/tmp/odin-usability-addon-current.json",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_log",
+          "path": "/tmp/odin-usability-scrapyard-current-sdk.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P1-04",
+      "requirement": "Generate owner handles matching the selected base, valid Resource templates and signal callbacks; locate functions from editor navigation. Check generated code and actual Godot integration.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Three parallel Odin tests pass for source parsing, helper/callback disambiguation, generated parameters, source lines, shared naming and collision diagnostics.",
+        "Actual self-contained Godot editor creates Node2D, CharacterBody3D, Resource, RefCounted, HTTPRequest and keyword-filename templates through ScriptCreateDialog; saved sources adopt the existing package and compile.",
+        "Actual editor callback requests use renamed unsaved receiver/import alias, another active Resource tab, scalar/Node/Variant arguments and a same-named plain helper; repeated requests navigate without duplication.",
+        "Serialized scene runtime emits five real signal connections and checks exported state; Resource script attachment works; editor/runtime finish without errors or resource-leak diagnostics.",
+        "Full scriptgen regression passes after shared-name and method-type alias changes.",
+        "Method value ownership regression passes natively and in an actual browser, including temporary Resource arrays and arbitrary Variant payload types; browser reports zero measured growth.",
+        "Documentation link check and complete site build pass; Nix addon build includes the new editor support files; git diff --check and runner Python/shell syntax checks pass."
+      ],
+      "evidence_paths": [
+        {
+          "name": "editor",
+          "path": "/tmp/odin-usability-editor-ui-final.log",
+          "exists": true
+        },
+        {
+          "name": "editor_project",
+          "path": "/private/tmp/nix-shell.RNZYKa/odin-editor-authoring-rmb3xbl_",
+          "exists": true
+        },
+        {
+          "name": "scriptgen",
+          "path": "/tmp/odin-usability-editor-generator-webcheck.log",
+          "exists": true
+        },
+        {
+          "name": "native_values",
+          "path": "/tmp/odin-usability-method-variants.log",
+          "exists": true
+        },
+        {
+          "name": "browser_values",
+          "path": "/tmp/odin-usability-method-variants-web.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-editor-docs.log",
+          "exists": true
+        },
+        {
+          "name": "addon",
+          "path": "/tmp/odin-usability-authoring-addon.json",
+          "exists": true
+        },
+        {
+          "name": "launch_diagnostic",
+          "path": "/tmp/odin-usability-editor-launch-diagnostic.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P1-05",
+      "requirement": "Expose field-specific setup reports through Session and network initialization instead of collapsing causes into Invalid_Config/Model/Schema. Test representative bad callbacks, bounds, initial state and schemas.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Nine focused tests pass: config bounds/actual values, required callbacks, invalid neutral/initial state, schema path lifetime after cleanup/copy, client identity, Session success/retry clearing, complete startup, pure transport preflight, truncation/cleanup retention and checkpoint restore diagnostics.",
+        "Actual Godot starter fixture with a missing model callback shows its precise path/message in the Status label, stays within viewport width and shuts down cleanly.",
+        "All 186 Replay network tests pass; the existing freestanding wasm network check passes.",
+        "Box3D framework Release gate passes all four ownership/provider tests and the pending-end native C probe against the coherent backend.",
+        "Replay Scrapyard scripts build with the new Session layout/accessors.",
+        "Complete documentation link check and site build pass; Python/shell syntax and git diff --check pass.",
+        "Current Nix addon builds and contains exact new diagnostic sources and wrapped starter status scene."
+      ],
+      "evidence_paths": [
+        {
+          "name": "targeted",
+          "path": "/tmp/odin-usability-replay-setup-final.log",
+          "exists": true
+        },
+        {
+          "name": "godot_ui",
+          "path": "/tmp/odin-usability-replay-setup-ui-final.log",
+          "exists": true
+        },
+        {
+          "name": "network",
+          "path": "/tmp/odin-usability-replay-net-final.log",
+          "exists": true
+        },
+        {
+          "name": "physics",
+          "path": "/tmp/odin-usability-replay-setup-physics.log",
+          "exists": true
+        },
+        {
+          "name": "physics_directory",
+          "path": "/tmp/odin-usability-setup-physics.L7xBwq",
+          "exists": true
+        },
+        {
+          "name": "game_docs",
+          "path": "/tmp/odin-usability-replay-setup-integration.log",
+          "exists": true
+        },
+        {
+          "name": "addon",
+          "path": "/tmp/odin-usability-setup-addon.json",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P1-06",
+      "requirement": "Save relevant dirty resources where possible; otherwise surface unsaved dependencies and prevent misleading publication. Test two edited Resources, scenes and failure results.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Thirteen focused scenarios pass in an isolated real Godot editor: multiple Resources/scenes with tab restoration; shared containers; live script buffers; closed scene edits; closed-scene write failure/recovery; stale open/closed scene references and copy recovery; released-owner recovery; Resource write failure/recovery; open-scene Resource-only failure/recovery; unnamed draft assignment; transient-node ownership; new edits during jobs; import queue/cancellation.",
+        "Fresh Replay Scrapyard native build/import and wasm check pass. Its actual editor plugin reports an invalid Odin Resource field, opens it from the issue, validates after correction, and publishes a successful canonical bake.",
+        "Documentation link check passes all 196 pages and 19,923 references; complete site build passes (existing chunk-size advisory only). Python compilation, shell syntax and git diff --check pass.",
+        "Current Nix addon builds. Packaged plugin, saved-data helper, installer and README byte-match current production sources.",
+        "Independent read-only reviews identified scene-save signal semantics, shared-container traversal, status ambiguity, stale SceneState ownership and transient child ownership; each was corrected and covered by the live editor regression."
+      ],
+      "evidence_paths": [
+        {
+          "name": "focused_editor",
+          "path": "/tmp/odin-usability-replay-save-inputs-final3.log",
+          "exists": true
+        },
+        {
+          "name": "focused_project",
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/replay-save-inputs-r2eb7831",
+          "exists": true
+        },
+        {
+          "name": "game_build",
+          "path": "/tmp/odin-usability-replay-save-game.log",
+          "exists": true
+        },
+        {
+          "name": "game_editor",
+          "path": "/tmp/odin-usability-replay-save-game-final.log",
+          "exists": true
+        },
+        {
+          "name": "game_project",
+          "path": "/tmp/odin-usability-replay-save-game.HZ2URb/editor/project",
+          "exists": true
+        },
+        {
+          "name": "game_editor_results",
+          "path": "/tmp/odin-usability-replay-save-game.HZ2URb/editor-ui-final/editor.log",
+          "exists": true
+        },
+        {
+          "name": "docs_build",
+          "path": "/tmp/odin-usability-replay-save-docs-build.log",
+          "exists": true
+        },
+        {
+          "name": "addon",
+          "path": "/tmp/odin-usability-save-addon-final.json",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P1-07",
+      "requirement": "Inventory live callers, old aliases, schema decoders and fixtures. Migrate owned content/fixtures/saves to the selected current contracts, delete unnecessary backwards compatibility and stale tests. Preserve reusable explicit evolution features and historical evidence where still meaningful; document removals.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Detailed results, diagnoses, migration receipts and limitations are in docs/design/usability-legacy-inventory.json, usability-compiler-evidence.json and usability-recovery-evidence.json.",
+        "Final addon replaces the installed Scrapyard SDK; deleted files are absent and selected current sources byte-match. Original game build/import and all focused acceptance checks pass without retry."
+      ],
+      "evidence_paths": []
+    },
+    {
+      "id": "P2-01",
+      "requirement": "Provide editable templates and editor/runtime validation for required bindings, ambiguity and types. Prefer explicit or unique references; renaming Host or replacing it with Label must fail clearly before gameplay.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Isolated real-editor suite passes template creation and non-overwrite, typed property hints, live rename/Undo/unique-name warnings, nested-placement detection, native scene save/reopen and retained-callable invalidation.",
+        "Runtime suite passes missing/wrong-type/ambiguous/duplicate/outside references, optional Code, compatible root roles, inherited scenes, custom root scripts, complete multi-widget diagnostics, atomic startup refusal and subsequent disabled frames. Same checks pass with assertions disabled.",
+        "Actual native-sized Variant slots with adjacent canaries verify NIL/int/String/Dictionary returns and UI getters; 20,000 real property queries pass.",
+        "Ordinary Web export executes in Chrome: native component, typed rejection, root binding, standard attach/cleanup and onExit(0). This UI-only fixture explicitly uses Dummy audio.",
+        "Repgen, Kit surface/docs/WASM and Kit lifecycle tests pass; HelloNet and HelloSim scene lifecycle gates pass.",
+        "Final Nix addon builds, byte-matches changed production sources/templates and replaces the installed Scrapyard SDK. Original game lifecycle, solo, duo and spray checks pass; final package rebuild/lifecycle passes.",
+        "Documentation check resolves 197 pages and 19,958 references; site build passes. Formatting and git diff --check pass."
+      ],
+      "evidence_paths": [
+        {
+          "name": "editor_runtime",
+          "path": "/tmp/odin-usability-kit-ui-current-final.log",
+          "exists": true
+        },
+        {
+          "name": "editor_runtime_directory",
+          "path": "/private/tmp/nix-shell.PeA8Ip/odin-kit-ui-rz0o6t8b",
+          "exists": true
+        },
+        {
+          "name": "browser",
+          "path": "/tmp/odin-usability-kit-ui-web-final.log",
+          "exists": true
+        },
+        {
+          "name": "browser_report",
+          "path": "/private/tmp/nix-shell.k7eD0C/odin-kit-ui-web-vrvemm3i/report.json",
+          "exists": true
+        },
+        {
+          "name": "repgen",
+          "path": "/tmp/odin-usability-kit-ui-repgen2.log",
+          "exists": true
+        },
+        {
+          "name": "surface",
+          "path": "/tmp/odin-usability-kit-ui-surface.log",
+          "exists": true
+        },
+        {
+          "name": "starters",
+          "path": "/tmp/odin-usability-kit-ui-starters.log",
+          "exists": true
+        },
+        {
+          "name": "addon",
+          "path": "/tmp/odin-usability-kit-ui-addon-final.json",
+          "exists": true
+        },
+        {
+          "name": "installed_sdk",
+          "path": "/tmp/odin-usability-kit-ui-sdk-final.json",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_selected",
+          "path": "/tmp/odin-usability-kit-ui-scrapyard.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_final",
+          "path": "/tmp/odin-usability-kit-ui-scrapyard-final.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-kit-ui-docs-final.log",
+          "exists": true
+        },
+        {
+          "name": "docs_build",
+          "path": "/tmp/odin-usability-kit-ui-docs.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-02",
+      "requirement": "Provide standard final cleanup with deliberate custom ownership escape hatch; scaffold teardown and validate repeated attach/detach and scene enter/exit without stale callbacks or retained allocation.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "All 31 reflection tests and the full generator gates pass, including named private-layout identity, generic and generated finalizers, manual ownership, and malformed declarations.",
+        "Actual Godot lifecycle tests pass for destruction with live children/resources, reparenting, script removal/replacement, child-exit reentrancy, accessors removing their script, never-entered instances, declarative signal ownership, authored-before-automatic cleanup, and stale UI/mock Steam subscriptions.",
+        "Native host and actual Box3D lifecycle checks pass: normal cleanup closes world/snapshot; retained detached checkpoint data stays readable; unsupported worker retirement synchronously revokes weak execution, retains quarantined storage, and reports unsuccessful native shutdown explicitly.",
+        "Live editor reload preserves same-layout owned state, pins old private-layout instances rather than copying invalid ownership, and respects the native edited-root deletion veto. ABI skew is rejected before manifest publication and recovery passes.",
+        "HelloNet and HelloSim preserve gameplay on reparent, reset/reattach in the same frame with exact node names, reuse ports, and close their original retained/displaced peer without touching a replacement.",
+        "All six larger Kit games pass gameplay, same-world reparent, destruction and script-removal cleanup without error/leak reports. First five pass in six-games2; Cave passes the final focused run, including save/resume and immediate port reuse after each retirement.",
+        "Cave multiplayer story, resume/rejoin, moderation/match flow and host migration pass first attempts under the existing 120ms injected latency. The retained harness copy forces one attempt and checks ordinary editor startup; fast --import is tracked separately.",
+        "Native-free Web UI export runs in Chrome with onExit=0; the wasm Kit compile check passes. This validates the lifecycle thread bootstrap, without claiming real audio or Steam-client qualification.",
+        "Final Nix addon builds; 167 handwritten source files across core/runtime/scriptgen/Kit/play match the checkout byte-for-byte. Scrapyard builds through that installed addon and passes isolated editor startup plus three actual scene cycles, spray decode/transfer, borrowed method inputs and script removal with owned child/audio retirement.",
+        "Documentation links and complete site build pass. Python compilation, shell syntax and git diff --check pass. Native CI registrations include the generic/reload/game lifecycle checks and the desktop physics lifecycle gate; remote CI was not executed locally."
+      ],
+      "evidence_paths": [
+        {
+          "name": "generic_fixture",
+          "path": "/tmp/odin-usability-instance-life.C0A8MC",
+          "exists": true
+        },
+        {
+          "name": "reflection_and_generator",
+          "path": "/tmp/odin-usability-lifecycle-generation.log",
+          "exists": true
+        },
+        {
+          "name": "fingerprint_named",
+          "path": "/tmp/odin-usability-lifecycle-fingerprint-final.log",
+          "exists": true
+        },
+        {
+          "name": "hello_initial",
+          "path": "/tmp/odin-usability-auto-kit-initial.log",
+          "exists": true
+        },
+        {
+          "name": "hello_reparent",
+          "path": "/tmp/odin-usability-auto-kit-reparent2.log",
+          "exists": true
+        },
+        {
+          "name": "examples",
+          "path": "/tmp/odin-usability-lifecycle-examples.log",
+          "exists": true
+        },
+        {
+          "name": "runtime",
+          "path": "/tmp/odin-usability-lifecycle-runtime-final.log",
+          "exists": true
+        },
+        {
+          "name": "runtime_directory",
+          "path": "/private/tmp/nix-shell.45bmjN/odin-instance-lifecycle-tuwhdyb3",
+          "exists": true
+        },
+        {
+          "name": "physics",
+          "path": "/tmp/odin-usability-lifecycle-physics-gates.log",
+          "exists": true
+        },
+        {
+          "name": "physics_directory",
+          "path": "/private/tmp/nix-shell.lmlAdo/odin-lifetime-physics-6pf96e46",
+          "exists": true
+        },
+        {
+          "name": "atomic_liveness",
+          "path": "/tmp/odin-usability-lifecycle-tombstone3.log",
+          "exists": true
+        },
+        {
+          "name": "reload",
+          "path": "/tmp/odin-usability-lifecycle-reload3.log",
+          "exists": true
+        },
+        {
+          "name": "reload_native_veto",
+          "path": "/private/tmp/nix-shell.8Q9m2j/odin-instance-reload-noyvdl4m/reload.log",
+          "exists": true
+        },
+        {
+          "name": "abi",
+          "path": "/tmp/odin-usability-lifecycle-abi.log",
+          "exists": true
+        },
+        {
+          "name": "web",
+          "path": "/tmp/odin-usability-lifecycle-web.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-lifecycle-docs-current.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard",
+          "path": "/tmp/odin-usability-lifecycle-scrapyard.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_script_removal",
+          "path": "/tmp/odin-usability-lifecycle-scrapyard-removal.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_script_removal_detail",
+          "path": "/Users/walter/data/code/odin/scrapyard/.runlogs/lifecycle-dqusztj_/game.log",
+          "exists": true
+        },
+        {
+          "name": "six_game_attempt",
+          "path": "/tmp/odin-usability-lifecycle-games-runtime.log",
+          "exists": true
+        },
+        {
+          "name": "fresh_import_disassembly",
+          "path": "/tmp/odin-usability-lifecycle-slopball-disassembly.log",
+          "exists": true
+        },
+        {
+          "name": "slopball_runtime",
+          "path": "/tmp/odin-usability-lifecycle-games-00ot7h2p/slopball-runtime-current.log",
+          "exists": true
+        },
+        {
+          "name": "slopball_release_scene",
+          "path": "/tmp/odin-usability-lifecycle-games-00ot7h2p/slopball-runtime-release-scene.log",
+          "exists": true
+        },
+        {
+          "name": "final_package",
+          "path": "/tmp/odin-usability-lifecycle-addon-current.json",
+          "exists": true
+        },
+        {
+          "name": "puppet_fix",
+          "path": "/tmp/odin-usability-lifecycle-games-00ot7h2p/slopball-runtime-variants-fixed.log",
+          "exists": true
+        },
+        {
+          "name": "six_game_regression",
+          "path": "/tmp/odin-usability-lifecycle-six-games.log",
+          "exists": true
+        },
+        {
+          "name": "six_game_first_five",
+          "path": "/tmp/odin-usability-lifecycle-six-games2.log",
+          "exists": true
+        },
+        {
+          "name": "six_game_first_five_directory",
+          "path": "/private/tmp/nix-shell.0RdtiK/odin-kit-game-lifecycle-9ut876d2",
+          "exists": true
+        },
+        {
+          "name": "cave_final_lifecycle",
+          "path": "/tmp/odin-usability-lifecycle-cave-nav-fixed.log",
+          "exists": true
+        },
+        {
+          "name": "cave_final_lifecycle_directory",
+          "path": "/private/tmp/nix-shell.sFjm1i/odin-kit-game-lifecycle-cm4h492l",
+          "exists": true
+        },
+        {
+          "name": "cave_network",
+          "path": "/tmp/odin-usability-lifecycle-cave-network.log",
+          "exists": true
+        },
+        {
+          "name": "cave_network_single_attempt_harness",
+          "path": "/tmp/odin-usability-cave-network-once.sh",
+          "exists": true
+        },
+        {
+          "name": "material_fix",
+          "path": "/tmp/odin-usability-lifecycle-slopball3d-ref-runtime.log",
+          "exists": true
+        },
+        {
+          "name": "nav_leak_diagnosis",
+          "path": "/tmp/odin-usability-lifecycle-cave-verbose.log",
+          "exists": true
+        },
+        {
+          "name": "installed_sdk",
+          "path": "/tmp/odin-usability-lifecycle-sdk-current.json",
+          "exists": true
+        },
+        {
+          "name": "final_scrapyard_build",
+          "path": "/tmp/odin-usability-lifecycle-scrapyard-current.log",
+          "exists": true
+        },
+        {
+          "name": "final_scrapyard_editor",
+          "path": "/tmp/odin-usability-lifecycle-scrapyard-isolated-editor.log",
+          "exists": true
+        },
+        {
+          "name": "final_scrapyard_runtime",
+          "path": "/Users/walter/data/code/odin/scrapyard/.runlogs/lifecycle-gs1e_z56/game.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-03",
+      "requirement": "Teach typed born hooks and current typed queries instead of raw cached mirrors; provide checked initialized-spawn convenience if warranted while retaining explicit transaction behavior. Verify birth ordering/cancellation.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "All 77 Kit Session tests pass with assertions enabled and disabled, with memory tracking. New coverage checks unpublished cancellation, one-shot commit, initial owner/blob delivery, initial-world and late-join publication during a draft window, snapshot/restore omission, later successful commit, normal committed despawn, and the assertion-disabled pump boundary.",
+        "All 58 Kit simulation tests pass with memory tracking.",
+        "Actual HelloNet lifecycle probe verifies scene defaults before commit, immediate initialized position/color after typed born, canceled census/node ownership, rejection of cancellation after commit, and current player lookup. Normal two-window replication and relay join-code scenarios pass first attempts under 120ms injected latency, with matching initialized player colors on both peers and no error/leak diagnostics.",
+        "Actual HelloSim ticking-entity probe verifies final lane ownership before raw Session commit returns, before immediate game hooks, and with no game dispatcher while preserving the queued birth event. Canceled drafts and committed despawns both leave the lane. Two real predicted windows pass the existing input/prediction/remote-motion checks on the first attempt.",
+        "Both Hello lifecycle runs also verify reparent preservation, same-frame reset/reattach, external peer/API protection and native-free wasm compilation. Both runners require the spawn transaction marker and now stop on importer/runtime errors or a failed first attempt.",
+        "Documentation link check and full site build pass. The final Nix addon builds; 167 handwritten core/runtime/scriptgen/Kit/play files match the checkout byte-for-byte. Scrapyard builds through the installed package and passes three scene cycles, script removal, borrowed method inputs, spray transfer and resource retirement.",
+        "Shell syntax and git diff --check pass in both framework and Scrapyard worktrees. Previous installed addon is retained in the SDK backup receipt."
+      ],
+      "evidence_paths": [
+        {
+          "name": "session",
+          "path": "/tmp/odin-usability-spawn-session-qualified.log",
+          "exists": true
+        },
+        {
+          "name": "sim_core",
+          "path": "/tmp/odin-usability-spawn-sim-core.log",
+          "exists": true
+        },
+        {
+          "name": "hello_net",
+          "path": "/tmp/odin-usability-spawn-hello_net-final.log",
+          "exists": true
+        },
+        {
+          "name": "hello_sim",
+          "path": "/tmp/odin-usability-spawn-hello_sim-qualified.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-spawn-docs-qualified.log",
+          "exists": true
+        },
+        {
+          "name": "addon",
+          "path": "/tmp/odin-usability-spawn-addon.json",
+          "exists": true
+        },
+        {
+          "name": "installed_sdk",
+          "path": "/tmp/odin-usability-spawn-sdk.json",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_build",
+          "path": "/tmp/odin-usability-spawn-scrapyard-build.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_lifecycle",
+          "path": "/tmp/odin-usability-spawn-scrapyard-runtime.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_lifecycle_detail",
+          "path": "/Users/walter/data/code/odin/scrapyard/.runlogs/lifecycle-l2oojmkc/game.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-04",
+      "requirement": "Persist stable identities on creation; support duplicate/rekey and update references without disturbing intentionally shared geometry. Cover undo/redo and scene persistence.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "The new real-editor gate runs with no installed/compiled Odin tool bridge. New and derived authoring classes receive IDs; initial save/reopen and a separate runtime process preserve them. Rename/reorder/reparent leaves IDs unchanged.",
+        "Duplicating two bodies, two joints and a character assigns new object keys, remaps internal endpoints/exclusions, preserves external endpoints and original references, and retains actual shared shape Resources. Whole-World duplicates change namespace while preserving local keys.",
+        "Repeated undo/redo restores exact keys, references, Resource assignments and parents; redo reuses the same clone objects and IDs. History still works while the plugin is disabled, and re-enabling does not rekey content.",
+        "Rekey tests cover both joint endpoints, character exclusion, nested World isolation, collision refusal, ambiguous existing IDs and unowned authoring children without partial publication. Shape-slot copies get a new Resource/key while original sharing remains intact.",
+        "Body and whole-World instances, editable non-World instance children, inherited scene overrides, and standalone component source editing survive fresh-process reload. Local-to-scene shape copies remain private while sharing within their copied graph is preserved.",
+        "Actual Inspector controls perform atomic rekeys; stored IDs are excluded from native parameter reset/copy. External Resource changes use native UndoRedo properties, and normal editor scene saves persist their edit/undo/redo to the external file.",
+        "The actual shared Odin baker accepts the editor before/after definitions, resolves all joint/character references and shape body IDs, and preserves unchanged original body IDs. Eleven bodies and twelve shape bindings still use one geometry asset across six Resource identities.",
+        "The bake probe compiles with an explicitly absent native solver archive; the default archive is absent too. Identity/persistence and this shared-bake gate need no native Box3D solver library.",
+        "Documentation links and full site build, Python compilation, shell syntax and git diff --check pass. The combined editor/reload/bake runner is registered in the native suite; remote CI was not executed locally."
+      ],
+      "evidence_paths": [
+        {
+          "name": "initial",
+          "path": "/tmp/odin-usability-box3d-identity-initial.log",
+          "exists": true
+        },
+        {
+          "name": "editor",
+          "path": "/tmp/odin-usability-box3d-identity2.log",
+          "exists": true
+        },
+        {
+          "name": "editor_and_bake",
+          "path": "/tmp/odin-usability-box3d-identity-persistence2.log",
+          "exists": true
+        },
+        {
+          "name": "directory",
+          "path": "/private/tmp/nix-shell.VwpWYT/odin-box3d-identity-p3swblbk",
+          "exists": true
+        },
+        {
+          "name": "native_free_compile",
+          "path": "/tmp/odin-usability-box3d-identity-no-backend.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-box3d-identity-docs.log",
+          "exists": true
+        },
+        {
+          "name": "pure_bake_initial",
+          "path": "/tmp/odin-usability-box3d-identity-bake.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-05",
+      "requirement": "Render valid authored geometry while marking offending objects; retain strict bake/runtime validation. Verify one duplicate/missing key does not blank unrelated geometry.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Four pure preview tests pass with memory tracking: invalid neighbors/missing keys, later small fragments after capacity omission, exact parity with strict geometry, strict atomic output, bad pose rejection and malformed/deep requests. Preview output contains no artifact, content hash or durable ID fields.",
+        "Five existing strict authoring artifact tests and eight existing debug-draw tests pass with memory tracking; strict bake/artifact validation and atomic runtime drawing remain intact.",
+        "Actual ordinary core/module build, editor import and live editor gate pass against the coherent native backend. Cases cover missing/duplicate body IDs, duplicate shape slots, conflicting Resource geometry, invalid sibling shape/placement/solver settings, bad and ambiguous joint references, shared-only hinge validation, character errors, unavailable tools, bounded fragments, float32 overflow and overflowing coordinate inverses.",
+        "Every live preview query compares authored properties/Resources and real Box3D engine/wrapper allocation counters before and after; none change. Repair restores the exact original valid points/colors.",
+        "Actual body gizmo redraws in the same frame verify edit and undo invalidate cached validation. Closing/reopening the watched scene and disabling the plugin exit cleanly without stale history callbacks.",
+        "The editor identity regression still passes import, actual editor operations and fresh-process reload with the new collector/body-header extraction.",
+        "Documentation link check and complete site build, Python compilation, shell syntax and git diff --check pass. The Nix addon builds and its three changed preview implementation files match source byte-for-byte. Pure checks are registered in the suite; the real editor gate is wired to the native desktop workflow. Remote CI was not executed locally."
+      ],
+      "evidence_paths": [
+        {
+          "name": "pure",
+          "path": "/tmp/odin-usability-preview-pure-final.log",
+          "exists": true
+        },
+        {
+          "name": "frontend_identity_regression",
+          "path": "/tmp/odin-usability-preview-parse2.log",
+          "exists": true
+        },
+        {
+          "name": "editor",
+          "path": "/tmp/odin-usability-preview-editor-lifecycle.log",
+          "exists": true
+        },
+        {
+          "name": "strict_artifacts",
+          "path": "/tmp/odin-usability-preview-strict.log",
+          "exists": true
+        },
+        {
+          "name": "strict_debugdraw",
+          "path": "/tmp/odin-usability-preview-debugdraw-final.log",
+          "exists": true
+        },
+        {
+          "name": "editor_directory",
+          "path": "/private/tmp/nix-shell.XX5TTk/odin-box3d-preview-lt7l0s3z",
+          "exists": true
+        },
+        {
+          "name": "identity_regression",
+          "path": "/tmp/odin-usability-preview-identity-final.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-preview-docs.log",
+          "exists": true
+        },
+        {
+          "name": "addon",
+          "path": "/tmp/odin-usability-preview-addon.json",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-06",
+      "requirement": "Author joints by selecting bodies and placing a viewport anchor; derive body-local frames and preserve advanced explicit editing. Validate transformed parents and undo/redo.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Actual isolated editor import, body picker, frame-mode dropdown, transformed parents, independent endpoint orientations, gizmo drag/cancel/commit and native undo/redo pass. Missing/ambiguous references, nested World scope, rekey/rename, invalid transforms, overflow and descendant-body cases are covered.",
+        "Fresh-process detached reload preserves canonical definition bytes. Shared and Dockyard migrated scenes preserve explicit endpoint frames; canonical shared content remains identical in Kit, Replay and Web copies.",
+        "The resulting definition builds through the shared Odin baker with four bodies, two joints and preserved frames and valid distinct body references.",
+        "The actual compiled partial-preview gate and identity editor/reload regressions pass after the shared transform changes.",
+        "Final ordinary SDK build/import/native motion gate passes all eight separate joint families and character motion. Source, native library and engine fences are unchanged; import and runtime logs contain no script errors, resource leaks or remaining-resource warnings.",
+        "Documentation link check and complete site build, Python compilation, shell syntax and git diff --check pass. The joint gate is registered in tests/run_all.sh; remote CI was not run."
+      ],
+      "evidence_paths": [
+        {
+          "name": "migration",
+          "path": "/tmp/odin-usability-joint-mode-migration.json",
+          "exists": true
+        },
+        {
+          "name": "editor_reload_legacy_bake",
+          "path": "/tmp/odin-usability-joint-legacy-full.log",
+          "exists": true
+        },
+        {
+          "name": "editor_directory",
+          "path": "/private/tmp/nix-shell.UFyDge/odin-box3d-joints-3g2nsel2",
+          "exists": true
+        },
+        {
+          "name": "preview_regression",
+          "path": "/tmp/odin-usability-joint-preview-regression.log",
+          "exists": true
+        },
+        {
+          "name": "identity_regression",
+          "path": "/tmp/odin-usability-joint-identity-regression.log",
+          "exists": true
+        },
+        {
+          "name": "native_motion",
+          "path": "/tmp/odin-usability-joint-native-motion-final/report.json",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-joint-docs.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-07",
+      "requirement": "Offer actionable install/build/update status for the tool bridge while protecting modified user sources. Present validate/bake tasks in game-author language and keep detailed contract JSON expandable.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "The registered box3dsetup suite gate passes from the built SDK: both sibling addons, no duplicate AuthoringTools class, actual setup button, missing compiler and recovery, ordinary module-only compilation, loaded-source fingerprint, clean source update, custom source preservation/build, and plugin disable/re-enable.",
+        "The gate deliberately selects a nonexistent native archive while retaining ordinary DLL domain admission. Pure validation, preview-bearing inspection, artifact bake and actual import succeed. The resulting tool DLL has no undefined ogb3 symbols.",
+        "Source update cases cover idempotence, added/removed managed files, hidden/user/generated file preservation, modified/deleted sources, invalid installation records, identical untracked adoption, and a second clean update after an explicit manual merge.",
+        "Actual editor checks pass for failed builds after removing a previously compiled main package twice, restoration, module-only periodic reconciliation, collision rejection with existing instances intact, an unrelated targeted rebuild that cannot clear the rejection, and repaired admission without restart. Only exact expected diagnostics inside marked negative checks are accepted.",
+        "The real artifact importer distinguishes unavailable tools, queues the existing source, automatically reimports after build, and yields a strictly valid Box3DBakeArtifact Resource. Concise Inspector output includes counts and offending object paths; technical JSON is initially collapsed and can be expanded.",
+        "Five pure authoring tests, four pure motion tests, five strict artifact tests, four partial-preview tests, one source-free native artifact test, and four serial native framework/presentation tests pass with memory tracking.",
+        "Ordinary SDK native motion qualification passes all eight joint families plus character movement with unchanged selected-source, native-library and engine fences. Import/runtime logs have no script errors or leaked-resource warnings.",
+        "Existing real editor identity operations/fresh reload and instance reload/finalization regressions pass. The new module loader retains the same ABI/domain/collision/generation gates and was reviewed independently.",
+        "Documentation link check and complete site build, Python compilation, shell syntax and git diff --check pass. The final Nix SDK builds with the frontend and new packages; all 743 files across the checked implementation directories match the SDK used by the passing suite. The last package rebuild updates documentation; its separately built core binary is not byte-identical to the tested build."
+      ],
+      "evidence_paths": [
+        {
+          "name": "package",
+          "path": "/tmp/odin-usability-setup-addon-final.json",
+          "exists": true
+        },
+        {
+          "name": "source_migration",
+          "path": "/tmp/odin-usability-authoring-runtime-migration.json",
+          "exists": true
+        },
+        {
+          "name": "pure_preview",
+          "path": "/tmp/odin-usability-setup-pure-split.log",
+          "exists": true
+        },
+        {
+          "name": "native_artifact",
+          "path": "/tmp/odin-usability-setup-native-artifacts2.log",
+          "exists": true
+        },
+        {
+          "name": "frameworks",
+          "path": "/tmp/odin-usability-setup-frameworks-serial.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-setup-docs-final.log",
+          "exists": true
+        },
+        {
+          "name": "package_source_parity",
+          "path": "/tmp/odin-usability-setup-package-parity.json",
+          "exists": true
+        },
+        {
+          "name": "packaged_acceptance",
+          "path": "/tmp/odin-usability-setup-editor6.log",
+          "exists": true
+        },
+        {
+          "name": "suite",
+          "path": "/tmp/odin-usability-setup-suite.log",
+          "exists": true
+        },
+        {
+          "name": "suite_report",
+          "path": "/tmp/odin-usability-setup-suite-report.json",
+          "exists": true
+        },
+        {
+          "name": "suite_editor_directory",
+          "path": "/private/tmp/nix-shell.27triR/odin-box3d-setup-x3absnow",
+          "exists": true
+        },
+        {
+          "name": "identity_regression",
+          "path": "/tmp/odin-usability-setup-identity.log",
+          "exists": true
+        },
+        {
+          "name": "native_motion",
+          "path": "/tmp/odin-usability-setup-native-motion/report.json",
+          "exists": true
+        },
+        {
+          "name": "reload_lifecycle",
+          "path": "/tmp/odin-usability-setup-lifecycle.log",
+          "exists": true
+        },
+        {
+          "name": "authoring_pure",
+          "path": "/tmp/odin-usability-setup-box3d_authoring-pure.log",
+          "exists": true
+        },
+        {
+          "name": "motion_pure",
+          "path": "/tmp/odin-usability-setup-box3d_motion-pure.log",
+          "exists": true
+        },
+        {
+          "name": "strict_artifact_pure",
+          "path": "/tmp/odin-usability-setup-box3d_editor-pure.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-08",
+      "requirement": "One authored world, bodies and visual binding with standard build/play/export and correct cleanup. Keep framework ownership qualification instrumentation in separate advanced examples.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "The registered box3dstarter suite gate passes from the final packaged SDK using normal build/import/play. Starter source/presets match the package, and all 52 selected native backend receipt inputs match byte-for-byte.",
+        "Gameplay checks cover falling/contact, Space impulse, repeated reset to initial positions, temporary tree exit/re-entry, script removal outside the tree, fresh scene creation and node deletion. Native engine/wrapper allocation totals return to zero after cleanup.",
+        "The separate test probe covers rotated/translated World and parents, plain Node inheritance breaks, nested bodies with reverse key order, nested World exclusion, Mesh offsets/scales, moving the presentation frame, timing and ancestry refusal before stepping, invalid-authoring cleanup, stale raw node pointers and freed source nodes. Tracked helper allocations return to zero.",
+        "A body transform notification synchronously removes the owning Odin script during pose publication. The helper returns Interrupted, stops touching released storage and leaves native allocations at zero.",
+        "The actual graphical game passes the same runtime checks; its viewport capture was inspected and is included in the guide. No telemetry or qualification logic was added to the shipped game script.",
+        "Normal macOS arm64 release export, strict deep codesign verification and exported gameplay/helper acceptance pass. Export and the exported app use a minimal system PATH with explicit compiler/backend variables removed; export recovers remembered tools and the game runs without a compiler.",
+        "The existing procedural tower passes ordinary build/import/play, temporary exit/re-entry and outside-tree script-removal cleanup after moving its cleanup hook to finalize.",
+        "Documentation link validation and full site build, Python compilation, shell syntax and git diff --check pass. Runtime instrumentation remains under tests; the product loop only owns gameplay and checked physics lifecycle."
+      ],
+      "evidence_paths": [
+        {
+          "name": "sdk",
+          "path": "/tmp/odin-usability-offline-sdk-final.json",
+          "exists": true
+        },
+        {
+          "name": "packaged_runtime",
+          "path": "/tmp/odin-usability-offline-play6.log",
+          "exists": true
+        },
+        {
+          "name": "suite",
+          "path": "/tmp/odin-usability-offline-suite.log",
+          "exists": true
+        },
+        {
+          "name": "suite_report",
+          "path": "/tmp/odin-usability-offline-suite-report.json",
+          "exists": true
+        },
+        {
+          "name": "visual_and_initial_export",
+          "path": "/tmp/odin-usability-offline-export.log",
+          "exists": true
+        },
+        {
+          "name": "export",
+          "path": "/tmp/odin-usability-offline-export-repaired.log",
+          "exists": true
+        },
+        {
+          "name": "export_report",
+          "path": "/private/tmp/nix-shell.jKIl33/odin-box3d-starter-z0k34tl6/export-report.json",
+          "exists": true
+        },
+        {
+          "name": "screenshot",
+          "path": "/Users/walter/data/code/odin/odin_godot/docs/img/box3d-starter.png",
+          "exists": true
+        },
+        {
+          "name": "procedural_lifecycle",
+          "path": "/tmp/odin-usability-tower-lifecycle.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-offline-docs-final.log",
+          "exists": true
+        },
+        {
+          "name": "fixture_abort_diagnosis",
+          "path": "/tmp/odin-usability-offline-abort-phases.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-09",
+      "requirement": "Provide a small safe standard owner for catalogs/codecs/checkpoints/allocation and callback leases, with checked ordered shutdown; simplify Kit/Replay authored samples while retaining ownership guarantees.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Eleven metered-storage tests pass: exact and first-field/root aliases, separate live-instance capabilities, detached allocator retention, another source while the prior context lives, partial creation/binding failure, late-drop retry, nil service rejection and final context refusal without retiring its retry alias.",
+        "All twenty Replay native codec/network tests pass, including refused final drops, init rollback and void runtime-release retention, with real native catalogs/schemas and memory tracking.",
+        "All sixteen Kit native tests pass, including existing physics/history/correction/failure cases and new codec/provider/Lane/network retained-cleanup and callback-reentry tests. Native, wrapper, provider and checkpoint teardown counters return to zero.",
+        "The real Core lifecycle gate passes unsupported role and rejected initializer rollback, epoch7 startup, concurrent Replay sources, detached checkpoints surviving source shutdown, reopening while an old checkpoint remains, managed temporary checkpoints, Kit busy-close retry, and synchronous script removal during initialization. All meter categories and native allocations return to baseline.",
+        "Fresh standard builds and ordinary real Host/Client pairs for both migrated authored samples reach tick120, preserve matching complete diagnostic views, and report checked zero cleanup with project/binary fences intact. The samples retain explicit game, input, roster, driver, rules and presentation policy.",
+        "The registered completephysicsowner gate passes. Fifty-eight existing Kit simulation tests and the managed reliable-wire/lifetime test also pass.",
+        "Documentation links and the complete site build, Python compilation, shell syntax and git diff --check pass. The Nix addon builds; all 38 checked implementation files across the new owners and affected libraries match the packaged SDK."
+      ],
+      "evidence_paths": [
+        {
+          "name": "storage",
+          "path": "/tmp/odin-usability-owner-storage-final.log",
+          "exists": true
+        },
+        {
+          "name": "kit_cleanup",
+          "path": "/tmp/odin-usability-owned-kit-cleanup6.log",
+          "exists": true
+        },
+        {
+          "name": "replay_codec",
+          "path": "/tmp/odin-usability-owner-replay-regression.log",
+          "exists": true
+        },
+        {
+          "name": "kit_pair",
+          "path": "/tmp/odin-usability-owned-kit-final-runtime/report.json",
+          "exists": true
+        },
+        {
+          "name": "replay_pair",
+          "path": "/tmp/odin-usability-owned-replay-final-runtime/report.json",
+          "exists": true
+        },
+        {
+          "name": "core_lifecycle",
+          "path": "/tmp/odin-usability-complete-owner-final.log",
+          "exists": true
+        },
+        {
+          "name": "suite",
+          "path": "/tmp/odin-usability-complete-owner-suite.log",
+          "exists": true
+        },
+        {
+          "name": "suite_report",
+          "path": "/tmp/odin-usability-complete-owner-suite-report.json",
+          "exists": true
+        },
+        {
+          "name": "kitsim",
+          "path": "/tmp/odin-usability-owner-kitsim.log",
+          "exists": true
+        },
+        {
+          "name": "wire",
+          "path": "/tmp/odin-usability-owner-wire-qualified3.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-owner-docs.log",
+          "exists": true
+        },
+        {
+          "name": "sdk",
+          "path": "/tmp/odin-usability-owner-sdk.json",
+          "exists": true
+        },
+        {
+          "name": "package_parity",
+          "path": "/tmp/odin-usability-owner-package-parity.json",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P2-10",
+      "requirement": "Add one sound and visual effect to the small starter using typed routes and identity/cancellation semantics. Teach task-oriented recipes and update existing game glue to current accessors.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "The final distribution runner builds a fresh SDK from a frozen source snapshot, copies it into an isolated consumer, compiles/imports the normal starter, and passes solo plus Host/Client/Observer gameplay. All roles wait beyond tick600 before pickup, display exactly one flash, play exactly one sound, capture nonzero Dummy mixer PCM, expire the flash, and exit without resource/instance warnings.",
+        "A test-only adapter probe exercises speculative Begin then Cancel without sound; repeat suppression after cancellation and expiry; confirmation without visual restart and exactly one sound; all three pending-delivery queue guards; minimum confirmed/watched retirement; reuse of a bounded ledger bucket after 512 ticks; authority retirement; newer/stale epoch handling; screen-only and world-only audio pools, empty/negative pool refusal, and unavailable voice-kind refusal.",
+        "The ordinary Web build/export and Chromium run pass after a real click. The browser observes one visual, one sound dispatch, expiry and successful gameplay, with no script/runtime errors. The browser viewport was inspected.",
+        "All 15 checked starter assets/sources and affected library/docs files match the final packaged SDK byte-for-byte; all 294 Replay Odin sources match its source snapshot. The consumer contains no original checkout references.",
+        "The migrated Replay Scrapyard example compiles through the normal build helper with all 26 declarations. Documentation links and the full site build pass. Shell/Python/JavaScript syntax checks and git diff --check pass."
+      ],
+      "evidence_paths": [
+        {
+          "name": "distribution",
+          "path": "/tmp/odin-usability-effects-final.log",
+          "exists": true
+        },
+        {
+          "name": "result",
+          "path": "/tmp/odin-usability-effects-final/result.json",
+          "exists": true
+        },
+        {
+          "name": "source_parity",
+          "path": "/tmp/odin-usability-effects-final/source-parity.json",
+          "exists": true
+        },
+        {
+          "name": "solo",
+          "path": "/tmp/odin-usability-effects-final/solo.log",
+          "exists": true
+        },
+        {
+          "name": "host",
+          "path": "/tmp/odin-usability-effects-final/host.log",
+          "exists": true
+        },
+        {
+          "name": "client",
+          "path": "/tmp/odin-usability-effects-final/client.log",
+          "exists": true
+        },
+        {
+          "name": "observer",
+          "path": "/tmp/odin-usability-effects-final/observer.log",
+          "exists": true
+        },
+        {
+          "name": "browser",
+          "path": "/tmp/odin-usability-effects-final/browser.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_build",
+          "path": "/tmp/odin-usability-effects-scrapyard-build.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-effects-final-docs.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P3-01",
+      "requirement": "Resolve module-wide Kit metadata with stable qualified identities/import direction. Move an entity into a subpackage without changing its wire contract; migrate fixtures and remove root-only restriction.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Final registered scriptgen, kitentities, wireabi and kitsession gates pass together (4/4), including current HelloNet/HelloSim host/guest journeys after the owned entities and inputs moved into subpackages.",
+        "Contextual types, private generic defaults/codecs/blends, profiles/messages, owner-bound field/command/event hooks and backup inference execute natively and compile for WASM. Alias and directory moves preserve canonical schemas/fingerprints; real field/type/ID conflicts are rejected before emission.",
+        "The final qualified-events fixture passes original, renamed and root-moved forms; package-local route collisions fail while unrelated procedures remain legal.",
+        "Real Web export executes event/private-backup assertions in Chrome, including authored-init descriptor cache access, with exit0 and no errors. Native cache ownership/cleanup, kitnet, kitsim and kitsession regressions pass.",
+        "Full docs-check passes. Earlier intermediate statements remain in validation_history and are superseded by these final results."
+      ],
+      "evidence_paths": [
+        {
+          "name": "event_repgen_regression",
+          "path": "/tmp/odin-usability-events-repgen-current.log",
+          "exists": true
+        },
+        {
+          "name": "event_command_binding_regression",
+          "path": "/tmp/odin-usability-events-bindings.log",
+          "exists": true
+        },
+        {
+          "name": "final_suite",
+          "path": "/tmp/odin-usability-p3-events-backups-suite/report.json",
+          "exists": true
+        },
+        {
+          "name": "final_suite_log",
+          "path": "/tmp/odin-usability-p3-events-backups-suite.log",
+          "exists": true
+        },
+        {
+          "name": "qualified_events",
+          "path": "/tmp/odin-usability-qualified-events-final/report.json",
+          "exists": true
+        },
+        {
+          "name": "qualified_backups",
+          "path": "/tmp/odin-usability-p3-events-backups/backups/report.json",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-p3-docs-check.log",
+          "exists": true
+        },
+        {
+          "name": "web",
+          "path": "/tmp/odin-usability-p3-web4/report.json",
+          "exists": true
+        },
+        {
+          "name": "web_console",
+          "path": "/tmp/odin-usability-p3-web4/console.json",
+          "exists": true
+        },
+        {
+          "name": "cache_regression",
+          "path": "/tmp/odin-usability-kit-cache-suite/report.json",
+          "exists": true
+        },
+        {
+          "name": "backup_compiler_opinion",
+          "path": "/tmp/odin-backup-inference-final-vsuk2w1l/results.json",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P3-02",
+      "requirement": "Separate gameplay schema identity from stable scene/variant identity; provide declarative resolver and spawn API without duplicated script structs. Migrate owned protocol/fixtures directly if needed.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Latest results are PASS for scriptgen, kitentities, kitvariants, authorsurface, wireabi, kitnet, kitsim, kitsession, kitstress, kitloot, kitarena, kitsave, repgen and kitacid; docs-check also passes.",
+        "Codegen runs native tests and freestanding WASM checks. Scene IDs/schema fingerprints stay equal under field reorder/rename, package move and alias changes; a variant-name change changes the contract. One entity kind and one gameplay schema represent both scenes.",
+        "Real HelloSim host/guest runs instantiate both authored scenes. Engine probes verify reverse-order predicted matching, provisional aliases, authoritative reuse, cancellation and actual rejected-command settlement replacing the unmatched variant. Standard scene lifecycle also passes.",
+        "Session tests verify live/world spawn, late join, interest resync, recording reconstruction, host recovery, identity mismatch refusal, unknown-variant skip and cleanup. The save saga restores the selected scene and preserves it for a reconnecting client.",
+        "Recording tests reject wrong magic/format/protocol/schema, truncated headers and old headerless captures before WELCOME, including FINGERPRINT_NONE. Native release-mode probes prove rekeyed identity refusal and wrong-scene cleanup without relying on assertions."
+      ],
+      "evidence_paths": [
+        {
+          "name": "suite",
+          "path": "/tmp/odin-usability-variants-final-suite/report.json",
+          "exists": true
+        },
+        {
+          "name": "suite_log",
+          "path": "/tmp/odin-usability-variants-final-suite.log",
+          "exists": true
+        },
+        {
+          "name": "surface_rerun",
+          "path": "/tmp/odin-usability-variants-surface-final-suite/report.json",
+          "exists": true
+        },
+        {
+          "name": "acid",
+          "path": "/tmp/odin-usability-variants-acid-suite/report.json",
+          "exists": true
+        },
+        {
+          "name": "codegen",
+          "path": "/tmp/odin-usability-variants-final/codegen/report.json",
+          "exists": true
+        },
+        {
+          "name": "peers",
+          "path": "/tmp/odin-usability-variants-final/peers/report.json",
+          "exists": true
+        },
+        {
+          "name": "guest",
+          "path": "/tmp/odin-usability-variants-final/peers/project/.runlogs/guest.log",
+          "exists": true
+        },
+        {
+          "name": "invalid_scene",
+          "path": "/tmp/odin-usability-variants-final/invalid/report.json",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-variants-docs.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P3-03",
+      "requirement": "Replace Scrapyard-specific dock assumptions with capability/action declarations and reusable worker support. Provide a small editor starter with one definition, entity, preview and validation.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "Five generic contract tests pass, including malformed manifests/requests, actual choice values, no handler load for describe/refused requests, and refusal of missing/malformed reports or failed/erroring validation processes.",
+        "An unrelated Orbit project passes actual-editor checks with different actions/resources, no project worker, no undeclared status polling, clickable validation errors, preview without a worker and unsaved tracking. Its worker resolves the saved Odin selection with a minimal GUI PATH.",
+        "The complete real-editor save suite passes external/embedded/shared Resources, inherited scene owners, stale objects, closed/released owners, script buffers, failed writes, orphan drafts, transient nodes, edits during jobs, queued input snapshots, cancellation, and failed-status recovery.",
+        "The full Scrapyard workflow passes native previews, dock invalid/recovery/bake checks, ability and actor drafts, duplicate refusal, invocation of the generated draft scenario, correction/takeover/network commands, cancellation/non-overwrite checks, 108 Scrapyard model tests, four Stormcaller model tests and native/WASM corpus equality.",
+        "A freshly built installed addon passes starter editor invalid/clickable/recovery/preview checks and default worker validation without checkout-relative dependencies. Runtime checks prove invalid preview edits preserve the last valid display, a running World keeps its copied reach, and a new run applies the edited reach to gameplay.",
+        "That packaged starter also passes solo pickup/effects, host/client/observer gameplay, native mixer checks, WASM checking and actual browser export execution. docs-check passes."
+      ],
+      "evidence_paths": [
+        {
+          "name": "contracts",
+          "path": "/tmp/odin-usability-authoring-generic-final.log",
+          "exists": true
+        },
+        {
+          "name": "generic_editor",
+          "path": "/tmp/odin-usability-authoring-generic-final/report.json",
+          "exists": true
+        },
+        {
+          "name": "save_boundaries",
+          "path": "/tmp/odin-usability-authoring-save-final.log",
+          "exists": true
+        },
+        {
+          "name": "save_editor",
+          "path": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/replay-save-inputs-w0luo3gd/editor.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_workflow",
+          "path": "/tmp/odin-usability-replay-authoring-final.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_editor",
+          "path": "/tmp/odin-usability-replay-authoring-final/editor-ui/editor.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_commands",
+          "path": "/tmp/odin-usability-replay-authoring-final/commands/result.json",
+          "exists": true
+        },
+        {
+          "name": "package",
+          "path": "/tmp/odin-usability-authoring-package-final/result.json",
+          "exists": true
+        },
+        {
+          "name": "package_editor",
+          "path": "/tmp/odin-usability-authoring-package-final/authoring-editor/editor.log",
+          "exists": true
+        },
+        {
+          "name": "package_validation",
+          "path": "/tmp/odin-usability-authoring-package-final/authoring-validation/result.json",
+          "exists": true
+        },
+        {
+          "name": "package_authoring_runtime",
+          "path": "/tmp/odin-usability-authoring-package-final/authoring-runtime.log",
+          "exists": true
+        },
+        {
+          "name": "package_log",
+          "path": "/tmp/odin-usability-authoring-package-final.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-authoring-docs.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P3-04",
+      "requirement": "Expose seat, epoch, reset identity and correction notifications through Session; migrate repeated server/client layout access while keeping gameplay presentation policy explicit.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "All 11 setup tests and 184 network tests pass. New coverage includes nil/closed/invalid ownership, Solo/Host/Server/client/observer roles, explicit epoch discovery, two independent correction readers, detached copies, stale/zero refusal, same-generation catch-up and epoch recovery.",
+        "A focused rerun after formatting passes, and the public package checks successfully. The real Scrapyard build and freestanding WASM check pass.",
+        "Actual actor, feedback and audio checks plus host/client/observer gameplay at120ms latency pass. Planned and host-crash recovery both preserve state and clear old-epoch effects. The separate menu peer flow passes, retaining connection-based choice rebasing.",
+        "Independent read-only review found no correctness blockers in context ownership/admission gating or migrated policy boundaries. docs-check passes."
+      ],
+      "evidence_paths": [
+        {
+          "name": "setup",
+          "path": "/tmp/odin-presentation-setup.log",
+          "exists": true
+        },
+        {
+          "name": "network",
+          "path": "/tmp/odin-presentation-net-final.log",
+          "exists": true
+        },
+        {
+          "name": "focused_final",
+          "path": "/tmp/odin-usability-presentation-focused/final.log",
+          "exists": true
+        },
+        {
+          "name": "compile",
+          "path": "/tmp/odin-usability-presentation-final-check.log",
+          "exists": true
+        },
+        {
+          "name": "scrapyard",
+          "path": "/tmp/odin-usability-presentation-scrapyard/checks/result.json",
+          "exists": true
+        },
+        {
+          "name": "scrapyard_log",
+          "path": "/tmp/odin-usability-presentation-scrapyard-runtime.log",
+          "exists": true
+        },
+        {
+          "name": "wasm",
+          "path": "/tmp/odin-usability-presentation-scrapyard/wasm.log",
+          "exists": true
+        },
+        {
+          "name": "migration",
+          "path": "/tmp/odin-usability-presentation-migration.log",
+          "exists": true
+        },
+        {
+          "name": "muster",
+          "path": "/tmp/odin-usability-presentation-muster.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-presentation-docs.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P3-05",
+      "requirement": "Share typed catalog discovery/validation and explicit bake declarations for copies, renames, checked narrowing and bounds. Retain explicit semantic rules and intentional mod overrides; reject accidental duplicate IDs.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "All six focused mapping tests pass, including candidate atomicity, exact copies/renames, nested fields, integer extremes and invalid narrowing declarations, finite-number/target overflow checks, overlapping fields, copied/truncated reports, and rejection of owned Odin/Godot values and opaque representation traversal.",
+        "Actual Godot catalog fixture and its freestanding WASM check pass: normalized interleaved source/remap deduplication, source-absent remap ordering, sparse high-water counts, ordered lists, duplicate IDs naming both files, reserved/out-of-range/negative IDs, wrong script types, capacity/missing directory failures and reinitialization refusal. Runtime closes without engine/leak errors.",
+        "Actual Kit admission fixture proves early invalid narrowing, late cross-reference and late duplicate failures preserve the full admitted catalog; sparse IDs preserve high-water width and corrected input restores the original digest. The WASM check passes using production custom-attribute flags.",
+        "Both native game builds pass. Replay catalog payload bytes, schema and semantic identity remain unchanged (canonical digest7605822622581753901). Kit stock table digest remains6b0405b42d025f. Replay nested-Resource artifact edit, invalid non-publication and stale source/binary rejection checks pass.",
+        "Replay actors, feedback, real native audio and host/client/observer gameplay at120ms latency pass. Kit three-scene reentry and explicit host-only weapon/status-chain/ability mods pass; all four mod processes shut down without engine/leak errors.",
+        "The actual editor passes invalid-range/clickable-error/recovery, duplicate-ID diagnostics naming both existing Resources, click navigation and successful rebake. The strict runner rejects all engine, script and leak errors.",
+        "The complete weapon authoring gate passes32 peer receipts across Kit and Replay, two repetitions, local/120ms conditions and shared/host-only Resource cases. Feature snapshots prove one added Resource and zero handwritten gameplay/network edits; native canonical catalogs and all22 report-integrity cases pass.",
+        "Nix addon builds and contains byte-matching authoring sources plus .gdignore. Whole SDK installed in sibling Scrapyard with prior addon retained; normal installed-addon build and three-scene runtime lifecycle pass. Docs link/API/site build, changed Python syntax, shell syntax and git diff --check pass.",
+        "Independent read-only reviews found no remaining blockers in neutral mapping/catalog ownership or Kit atomic publication and mod-name replacement."
+      ],
+      "evidence_paths": [
+        {
+          "name": "mapping",
+          "path": "/tmp/odin-usability-catalog-mapping-final3.log",
+          "exists": true
+        },
+        {
+          "name": "mapping_failure_before_fix",
+          "path": "/tmp/odin-usability-catalog-engine-ownership-before.log",
+          "exists": true
+        },
+        {
+          "name": "discovery",
+          "path": "/tmp/odin-usability-catalog-discovery-final.log",
+          "exists": true
+        },
+        {
+          "name": "discovery_runtime",
+          "path": "/tmp/odin-usability-catalog-discovery-final/runtime.log",
+          "exists": true
+        },
+        {
+          "name": "kit_admission",
+          "path": "/tmp/odin-usability-catalog-kit-admission/runtime.log",
+          "exists": true
+        },
+        {
+          "name": "kit_wasm",
+          "path": "/tmp/odin-usability-catalog-kit-admission/wasm-supported.log",
+          "exists": true
+        },
+        {
+          "name": "kit_reentry",
+          "path": "/tmp/odin-usability-catalog-kit-runtime.log",
+          "exists": true
+        },
+        {
+          "name": "kit_mods",
+          "path": "/tmp/odin-usability-catalog-kit-mods-report.json",
+          "exists": true
+        },
+        {
+          "name": "kit_mods_log",
+          "path": "/tmp/odin-usability-catalog-kit-mods2.log",
+          "exists": true
+        },
+        {
+          "name": "replay_build",
+          "path": "/tmp/odin-usability-catalog-replay-build.log",
+          "exists": true
+        },
+        {
+          "name": "replay_wasm",
+          "path": "/tmp/odin-usability-catalog-replay/wasm.log",
+          "exists": true
+        },
+        {
+          "name": "replay_runtime",
+          "path": "/tmp/odin-usability-catalog-replay/checks/result.json",
+          "exists": true
+        },
+        {
+          "name": "canonical_bake",
+          "path": "/tmp/odin-usability-catalog-replay-bake.log",
+          "exists": true
+        },
+        {
+          "name": "artifact",
+          "path": "/tmp/odin-usability-catalog-artifact/result.json",
+          "exists": true
+        },
+        {
+          "name": "editor",
+          "path": "/tmp/odin-usability-catalog-editor2/editor.log",
+          "exists": true
+        },
+        {
+          "name": "weapons",
+          "path": "/tmp/odin-usability-catalog-weapons3.log",
+          "exists": true
+        },
+        {
+          "name": "weapon_evidence",
+          "path": "/tmp/odin-usability-catalog-weapons3",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-catalog-docs-final.log",
+          "exists": true
+        },
+        {
+          "name": "package",
+          "path": "/tmp/odin-usability-catalog-addon.json",
+          "exists": true
+        },
+        {
+          "name": "installed_sdk",
+          "path": "/tmp/odin-usability-catalog-sdk-install.json",
+          "exists": true
+        },
+        {
+          "name": "installed_build",
+          "path": "/tmp/odin-usability-catalog-installed-scrapyard.log",
+          "exists": true
+        },
+        {
+          "name": "installed_lifecycle",
+          "path": "/tmp/odin-usability-catalog-installed-lifecycle.log",
+          "exists": true
+        }
+      ]
+    },
+    {
+      "id": "P3-06",
+      "requirement": "Exercise clean install, Project Manager reopen, Resource/signal creation, lobby customization, entity subpackage/variant, joint placement, crate duplication, resource baking, pickup effects, scene reentry and relevant export/network paths. Diagnose whether failed tests or implementation are wrong; document exact results and remaining supported limits.",
+      "status": "complete_with_scoped_evidence",
+      "validation": [
+        "The actual packaged Replay starter opens before its first build with the authoring dock enabled, discovers first-build tool paths live, and reopens with minimal GUI PATH for validation, clickable errors, recovery and preview. Cold imports of native-free Replay and the former Slopball failure case pass on their first checked attempts.",
+        "The current Resource/signal authoring gate passes parser checks, actual editor creation/navigation/connection actions and runtime signal execution. Prior Kit UI/subpackage/variant and Box3D joint/duplication/preview receipts remain explicitly mapped to their completed tasks and were independently audited.",
+        "Packaged Replay passes native solo pickup/effects with measured mixer output, host/client/observer play, authored definition validation/preview and real Chrome Web gameplay. Packaged Box3D passes build/import/play/reset/reentry, clean-environment native export, signature verification and exported gameplay.",
+        "Both native-free Web memory modes export through the active preset and run pickup/effects/audio in Chrome. Threaded orderly scene/audio/engine shutdown passes with exit0 and no errors. Single-threaded engine shutdown remains explicitly unqualified because its allocator diagnostic also reproduces without Odin; the separate diagnostic retains strict error rejection.",
+        "Native raw-checkpoint, wrong-owner, corrupted-save and invalid-port setup refusals all produce ordered cleanup receipts without script/engine/resource-leak errors or false READY messages. Existing identity/corruption-preservation assertions remain intact.",
+        "The optimized Scrapyard Web save gate passes13 receipts covering upload persistence, preference changes, save-conflict refusal, crash recovery, separate save slots, preference/bundle-only restoration, and missing-asset/wrong-identity/corruption refusals without overwriting stored data. Logs contain no unexpected engine/script/leak errors.",
+        "Large-state detached-read/zero-on-missing behavior passes natively and compiles as an optimized Wasm object within the bounded gate. All184 network and11 owned-state tests pass after the final transfer changes. Actual current actors, feedback, native audio and host/client/observer gameplay at120ms latency pass; owned benchmark callers compile after migration.",
+        "Compiler sampling and optimized IR identified whole-World aggregate merges and two checkpoint tuple transfers. Equivalent branches/pointer selection/bulk transfers reduce total optimized IR193MB\u219257MB; read_values34MB\u21926KB, server_init_core20MB\u2192399KB and session_rejoin45MB\u219247KB. The complete default optimized export and browser save run succeeds; no optimization level or diagnostic capacity was reduced.",
+        "Final Nix SDK builds and502 packaged Odin implementation files match the current worktree byte-for-byte. The compiler backport matches and applies to the pinned source. The whole final SDK replaces the sibling installation with a backup, and its normal consumer build succeeds. Installed sibling minimal-PATH reopen, three-scene lifecycle and solo/duo checks pass with clean teardown.",
+        "Final docs/API/link/site checks and git diff --check pass. Independent completed-task audit confirms all referenced evidence exists, all16 API/schema cleanup inventory items are complete, removed compatibility files are absent, and intentionally retained low-level APIs are distinguished from obsolete shims."
+      ],
+      "evidence_paths": [
+        {
+          "name": "first_open",
+          "path": "/tmp/odin-usability-final-package/first-open/result.json",
+          "exists": true
+        },
+        {
+          "name": "cold_import",
+          "path": "/tmp/odin-usability-cold-import2/result.json",
+          "exists": true
+        },
+        {
+          "name": "editor_authoring",
+          "path": "/tmp/odin-usability-final-editor-authoring.log",
+          "exists": true
+        },
+        {
+          "name": "replay_package",
+          "path": "/tmp/odin-usability-final-package/result.json",
+          "exists": true
+        },
+        {
+          "name": "box3d_package_export",
+          "path": "/tmp/odin-usability-final-box3d-starter2/report.json",
+          "exists": true
+        },
+        {
+          "name": "web_memory_modes",
+          "path": "/tmp/odin-usability-web-memory/result.json",
+          "exists": true
+        },
+        {
+          "name": "threaded_orderly_exit",
+          "path": "/tmp/odin-usability-web-memory-threaded-exit/threads/browser-result.json",
+          "exists": true
+        },
+        {
+          "name": "single_thread_exit_limitation",
+          "path": "/tmp/odin-usability-web-memory-orderly/single/browser-errors.json",
+          "exists": true
+        },
+        {
+          "name": "plain_godot_exit_comparison",
+          "path": "/tmp/odin-usability-web-audio-baseline/browser-original.json",
+          "exists": true
+        },
+        {
+          "name": "plain_godot_predelete_comparison",
+          "path": "/tmp/odin-usability-web-audio-baseline/browser.json",
+          "exists": true
+        },
+        {
+          "name": "negative_save_setup_cleanup",
+          "path": "/tmp/odin-usability-failure-cleanup/final",
+          "exists": true
+        },
+        {
+          "name": "browser_save",
+          "path": "/tmp/odin-usability-browser-save-bulk/result.json",
+          "exists": true
+        },
+        {
+          "name": "browser_save_receipts",
+          "path": "/tmp/odin-usability-browser-save-bulk/receipts.json",
+          "exists": true
+        },
+        {
+          "name": "browser_save_log",
+          "path": "/tmp/odin-usability-browser-save-bulk.log",
+          "exists": true
+        },
+        {
+          "name": "current_presentation_network",
+          "path": "/tmp/odin-usability-large-world-bridge/checks/result.json",
+          "exists": true
+        },
+        {
+          "name": "large_value_regression",
+          "path": "/tmp/odin-usability-large-values-regression.log",
+          "exists": true
+        },
+        {
+          "name": "network_owned_regression",
+          "path": "/tmp/odin-usability-bulk-checkpoint-regression.log",
+          "exists": true
+        },
+        {
+          "name": "compiler_diagnosis",
+          "path": "/tmp/odin-usability-web-compiler-sample.txt",
+          "exists": true
+        },
+        {
+          "name": "before_ir",
+          "path": "/tmp/odin-usability-web-ir/functions.json",
+          "exists": true
+        },
+        {
+          "name": "final_ir",
+          "path": "/tmp/odin-usability-web-ir/bulk-functions.json",
+          "exists": true
+        },
+        {
+          "name": "intermediate_optimized_object",
+          "path": "/tmp/odin-usability-web-ir/object-build.log",
+          "exists": true
+        },
+        {
+          "name": "benchmark_caller_compile",
+          "path": "/tmp/odin-usability-large-world-bench.log",
+          "exists": true
+        },
+        {
+          "name": "final_sdk",
+          "path": "/tmp/odin-usability-complete-sdk.json",
+          "exists": true
+        },
+        {
+          "name": "final_sdk_install",
+          "path": "/tmp/odin-usability-complete-sdk-install.json",
+          "exists": true
+        },
+        {
+          "name": "final_sdk_consumer_build",
+          "path": "/tmp/odin-usability-complete-sdk-build-consumer.log",
+          "exists": true
+        },
+        {
+          "name": "sibling_reopen",
+          "path": "/tmp/odin-usability-final-scrapyard-reopen.log",
+          "exists": true
+        },
+        {
+          "name": "sibling_peers",
+          "path": "/tmp/odin-usability-final-scrapyard-peers.log",
+          "exists": true
+        },
+        {
+          "name": "sibling_lifecycle",
+          "path": "/tmp/odin-usability-final-value-sdk-runtime.log",
+          "exists": true
+        },
+        {
+          "name": "compiler_patch_and_profile_diagnostic",
+          "path": "/tmp/odin-usability-profile-diagnostic.log",
+          "exists": true
+        },
+        {
+          "name": "docs",
+          "path": "/tmp/odin-usability-complete-docs.log",
+          "exists": true
+        },
+        {
+          "name": "audit",
+          "path": "/Users/walter/data/code/odin/odin_godot/docs/design/usability-completion-audit.json",
+          "exists": true
+        }
+      ]
+    }
+  ],
+  "remaining": [],
+  "known_limits": [
+    "Native editor/runtime/export qualification is macOS; browser qualification is Chrome. Existing Linux/Windows target-host runtime and PowerShell-host limitations remain documented rather than claimed tested.",
+    "Godot4.7.1 single-threaded Web engine exit reports a WorkerThreadPool::Group allocator diagnostic after observed scene/audio retirement, also reproduced in two plain GDScript/no-Odin comparisons. Strict engine-exit diagnosis remains failing for that variant. Threaded orderly exit passes with zero errors; normal single-threaded browser gameplay/save/reload passes.",
+    "The user global Godot external-editor preference is enabled with an empty executable. It was left unchanged; actual sibling reopen succeeds using isolated valid editor preferences and remembered tools. The workflow guide explains that local preference repair.",
+    "Remote CI services were not run; corresponding local gates and registered suite entries were validated."
+  ]
+}

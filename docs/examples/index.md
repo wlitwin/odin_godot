@@ -28,7 +28,7 @@ part before navigating a full game.
 | 3b | `examples/hello_sim` | Kit authority, fixed ticks, input prediction, reconciliation | [Simulation tutorial](../kit/quickstart-sim.md) |
 | 3c | `examples/replay_loot` | Complete state and corrected input without Godot | [Replay tutorial](../replay/quickstart.md) |
 | 3d | `build/template/replay` | Replay Session, devices, Godot presentation, direct host/client | [Session tutorial](../replay/godot.md) |
-| 4 | `examples/box3d_offline` | Explicit physics stepping and copied body poses | [Box3D tutorial](../box3d/quickstart.md) |
+| 4 | `examples/box3d_starter` | Editor-authored physics, automatic visual bindings and checked cleanup | [Box3D tutorial](../box3d/quickstart.md) |
 | 5 | `examples/kit_box3d_authoring`, `examples/replay_box3d_authoring` | Shared authored collision with separate framework owners | [Sample preparation](../box3d/multiplayer.md) |
 
 Steps 3a–3d are choices, rather than prerequisites for one another. Box3D can also

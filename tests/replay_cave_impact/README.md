@@ -6,15 +6,18 @@ REPLAY_CAVE_IMPACT_OUT=/absolute/fresh/output nix develop --command bash tests/r
 
 The model tests check projectile/target identity, nonlethal/lethal ordering,
 detached positions, slot reuse, correction and atomic event-capacity failure.
-Genuine C8/O2 checkpoints and recordings were captured before changing the reducer;
-their producer and hashes are in `fixtures`. They contain a flying rock about to
-hit a 70-HP dweller and one pending Door command. Conversion preserves the frame
-and all shared ledgers; fresh native Godot and WASM resumes produce the new impact.
-Explicit historical models reproduce old recordings; current models fail the
-ordered-event comparison when deliberately substituted.
+Current fixtures contain a flying rock approaching a 70-HP dweller and one
+pending Door command. Exact current checkpoint roundtrips retain the frame and
+ledgers; native Godot and WASM resumes apply one impact and settle the pending
+command once. `capture/main.odin` creates new current-model recordings from those
+checkpoints. Native/WASM verification rejects an altered expected event even
+when the recorded Worlds and inputs remain unchanged.
 
-The existing native converters exercise all 18 saved fixtures across C1–C8/O1–O2,
-including existing-destination and corruption preservation. Full C9 normal/faulted
+Historical checkpoint/recording bytes and migration receipts remain under
+`docs/replay/results/usability-legacy-2026-11-16/cavecrawl`; no historical reducer
+or converter is used by the active gate.
+
+Full C9 normal/faulted
 and O3 campaigns retain gameplay/world-hash checks and require at least 24 dweller
 impacts alongside player hits and deaths. Read-only authority history proves the
 accepted heal's exact 25-HP gain after same-tick damage, five stamina cost and

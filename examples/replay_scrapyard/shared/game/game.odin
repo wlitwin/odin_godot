@@ -13,7 +13,7 @@ import assets "godot:replay/assets"
 
 SEATS :: 4
 
-CONTENT :: u64(0x525343524150304b)
+CONTENT :: u64(0x525343524150304c)
 
 HZ :: u32(60)
 
@@ -129,11 +129,9 @@ World :: struct {
     turrets: r.Pool(Turret, MAX_TURRETS),
 }
 
-// dash is retained for already-recorded scheduled controls in older saves.
-// Current authored input submits Action.Dash and never sets this compatibility bit.
 Control :: struct {
     move, aim: [2]f32,
-    dash, fire, revive: bool,
+    fire, revive: bool,
 }
 
 Action_Kind :: enum u8 {
@@ -405,7 +403,7 @@ dash_schedule :: proc() -> net.Action_Schedule(Action) {
         }}
 }
 
-dash_start :: proc(w: ^World, seat: u16, direction: [2]f32, ctx: ^r.Step(Event), after_step: bool = false) -> bool {
+dash_start :: proc(w: ^World, seat: u16, direction: [2]f32, ctx: ^r.Step(Event)) -> bool {
     player := &w.players[seat - 1]
 
     if !player.connected ||
@@ -434,9 +432,8 @@ dash_start :: proc(w: ^World, seat: u16, direction: [2]f32, ctx: ^r.Step(Event),
     }
 
     player.dash_velocity = direction / n * DASH_SPEED
-    // Actions run after the movement step. Preserve ten future movement ticks;
-    // an imported legacy control begins movement in its current step instead.
-    player.dash_until, player.dash_ready = ctx.tick + DASH_TICKS + u64(after_step), ctx.tick + DASH_COOLDOWN
+    // Actions run after movement; retain ten future movement ticks.
+    player.dash_until, player.dash_ready = ctx.tick + DASH_TICKS + 1, ctx.tick + DASH_COOLDOWN
     player.dashes += 1
     r.emit(
         ctx,
@@ -542,7 +539,7 @@ action :: proc(w: ^World, seat: u16, a: Action, ctx: ^r.Step(Event)) -> bool {
     case .Turret_Dismount:
         return turret_dismount(w, seat, a.turret)
     case .Dash:
-        if !dash_start(w, seat, a.aim, ctx, after_step = true) {
+        if !dash_start(w, seat, a.aim, ctx) {
             return false
         }
     case .Profile:
@@ -718,10 +715,6 @@ move_players :: proc(w: ^World, controls: [SEATS]Control, ctx: ^r.Step(Event)) {
             t, _ := r.pool_get(&w.turrets, handle)
             t.aim = player.aim
             continue
-        }
-
-        if input.dash {
-            dash_start(w, u16(i + 1), input.move, ctx)
         }
 
         velocity :=

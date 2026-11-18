@@ -1,6 +1,7 @@
 package scrapyard_defs
 
 import "core:fmt"
+import a "godot:authoring"
 import gd "godot:godot"
 import content "../../shared/content"
 import scenegd "godot:replay/godot/scene"
@@ -17,17 +18,25 @@ bake_ability :: proc(resource: gd.Resource, ctx: ^scenegd.Bake_Context, path: st
     result := content.Ability {
         name = content.name(gd.gd_string_to_odin(source.name)),
         family = content.Ability_Family(family),
-        cooldown = scenegd.bake_integer(ctx, u16, source.cooldown, 1, 3600, fmt.tprintf("%s.cooldown", path)),
-        range = source.range,
-        radius = source.radius,
-        arc_cos = source.arc_cos,
-        speed = source.speed,
-        damage = scenegd.bake_integer(ctx, u8, source.dmg, 0, 255, fmt.tprintf("%s.dmg", path)),
         status = status_reference(ctx, cast(gd.Resource)source.status, fmt.tprintf("%s.status", path)),
-        self_buff = source.self_buff,
-        duration = scenegd.bake_integer(ctx, u16, source.duration, 0, 36000, fmt.tprintf("%s.duration", path)),
-        pulse = scenegd.bake_integer(ctx, u16, source.pulse, 1, 600, fmt.tprintf("%s.pulse", path)),
     }
+    scenegd.bake_fields(
+        ctx,
+        source,
+        &result,
+        []a.Field {
+            a.integer("cooldown", 1, 3600),
+            a.number("range", 0, 1000),
+            a.number("radius", 0, 1000),
+            a.number("arc_cos", -1, 1),
+            a.number("speed", 1, 100),
+            a.integer("dmg", 0, 255, "damage"),
+            a.field("self_buff"),
+            a.integer("duration", 0, 36000),
+            a.integer("pulse", 1, 600),
+        },
+        path,
+    )
 
     if source.turret != nil {
         turret := scenegd.bake_resource(ctx, cast(gd.Resource)source.turret, TurretDef, fmt.tprintf("%s.turret", path))
@@ -36,29 +45,23 @@ bake_ability :: proc(resource: gd.Resource, ctx: ^scenegd.Bake_Context, path: st
             return 0, {}
         }
 
-        result.turret = {
-            ammo = scenegd.bake_integer(ctx, u16, turret.ammo, 1, 1000, fmt.tprintf("%s.turret.ammo", path)),
-            cadence = scenegd.bake_integer(ctx, u16, turret.cadence, 1, 120, fmt.tprintf("%s.turret.cadence", path)),
-            damage = scenegd.bake_integer(ctx, u8, turret.damage, 1, 100, fmt.tprintf("%s.turret.damage", path)),
-            speed = turret.speed,
-            ttl = scenegd.bake_integer(ctx, u16, turret.ttl, 1, 600, fmt.tprintf("%s.turret.ttl", path)),
-            use_radius = turret.use_radius,
-        }
+        scenegd.bake_fields(
+            ctx,
+            turret,
+            &result.turret,
+            []a.Field {
+                a.integer("ammo", 1, 1000),
+                a.integer("cadence", 1, 120),
+                a.integer("damage", 1, 100),
+                a.number("speed", 0, 100),
+                a.integer("ttl", 1, 600),
+                a.number("use_radius", 24, 96),
+            },
+            fmt.tprintf("%s.turret", path),
+        )
 
         if !content.turret_valid(result.turret) {
             scenegd.bake_fail(ctx, fmt.tprintf("%s.turret", path), "invalid turret projectile or interaction radius")
-        }
-    }
-
-    names := [4]string{"range", "radius", "arc_cos", "speed"}
-
-    for value, i in ([4]f32{source.range, source.radius, source.arc_cos, source.speed}) {
-        field := names[i]
-        lower := i == 2 ? f32(-1) : i == 3 ? f32(1) : f32(0)
-        upper := i == 2 ? f32(1) : i == 3 ? f32(100) : f32(1000)
-
-        if !content.finite(value) || value < lower || value > upper {
-            scenegd.bake_fail(ctx, fmt.tprintf("%s.%s", path, field), "value is nonfinite or outside gameplay bounds")
         }
     }
 

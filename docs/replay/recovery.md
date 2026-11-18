@@ -17,10 +17,10 @@ releasing their transport, storage, catalogs, and callbacks. The
 [Room reference](https://github.com/wlitwin/odin_godot/blob/main/replay/godot/room.md)
 describes the complete options and lifecycle.
 
-The [explicit protocol-6 to 7 archive bridge](https://github.com/wlitwin/odin_godot/blob/main/replay/net/checkpoint_upgrade.md)
-preserves compatible Worlds while validating the old contract. It grants no
-new lease; coordinated upgrade remains an application transition. Normal loaders
-continue to reject incompatible versions.
+The [explicit conversion APIs](https://github.com/wlitwin/odin_godot/blob/main/replay/net/checkpoint_upgrade.md)
+validate application world/action changes within the current protocol. They grant
+no new lease; coordinated conversion remains an application transition. Normal
+loaders reject incompatible versions.
 
 ## Data boundary
 

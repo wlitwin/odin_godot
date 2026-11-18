@@ -76,10 +76,13 @@ class CapacityProfileTests(unittest.TestCase):
         profile['history_frames'] = 96
         self.assertIs(capacity.validate(profile), profile)
 
-    def test_legacy_project_profiles_gain_default_timing(self):
+    def test_current_partial_profiles_gain_defaults_and_old_schemas_fail(self):
         with tempfile.TemporaryDirectory() as work:
-            path = Path(work) / 'legacy.json'
+            path = Path(work) / 'profile.json'
             path.write_text('{"schema_version": 1, "max_bodies": 2048}')
+            with self.assertRaises(ValueError):
+                capacity.load(path)
+            path.write_text('{"max_bodies": 2048}')
             selected = capacity.load(path)
             self.assertEqual(selected['schema_version'], 2)
             self.assertEqual(selected['max_bodies'], 2048)

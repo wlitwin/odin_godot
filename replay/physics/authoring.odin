@@ -3,6 +3,7 @@ package replay_physics
 import "core:mem"
 import b "godot:box3d"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import r "godot:replay"
 
 // Converts the immutable shared bake to this adapter's value configuration.
@@ -11,7 +12,7 @@ import r "godot:replay"
 // materials/filter/sensor flags are already present in the actual native world.
 authoring_config :: proc(scene: ^ba.Baked_Scene) -> (Config, r.Error) {
     if scene == nil ||
-       (scene.data.schema_version != ba.LEGACY_SCHEMA_VERSION && scene.data.schema_version != ba.SCHEMA_VERSION) ||
+       scene.data.schema_version != ba.SCHEMA_VERSION ||
        len(scene.data.assets) == 0 ||
        len(scene.data.assets) > MAX_ASSETS {
         return {}, .Invalid_Config
@@ -72,7 +73,7 @@ authoring_config :: proc(scene: ^ba.Baked_Scene) -> (Config, r.Error) {
 // Copy logical-map keys into ordinary Game values as needed, never native
 // handles or Godot objects. Use the same Config/catalog with network_codec_init.
 authoring_checkpoint :: proc(
-    built: ^ba.Built_Scene,
+    built: ^ar.Built_Scene,
     config: Config,
     frame: r.Frame($S),
     $E: typeid,

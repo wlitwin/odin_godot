@@ -31,7 +31,7 @@ LOGDIR="$PROJ/.cooplogs"; mkdir -p "$LOGDIR"
 
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 launch() { COOP_ROLE="$1" COOP_PORT="$3" COOP_ADDR="127.0.0.1" "$GODOT" --headless --path "$PROJ" >"$2" 2>&1 & echo $!; }
 

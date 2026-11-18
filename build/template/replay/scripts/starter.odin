@@ -8,13 +8,15 @@ import r "godot:replay"
 import net "godot:replay/net"
 import v "godot:replay/view"
 import rgd "godot:replay/godot"
+import d "godot:replay/definitions"
 import game "../shared/game"
 
 ReplayStarter :: struct {
     owner:   gd.Node2d,
     status:  gd.Label `gd:"onready=Status"`,
     players: [game.SEATS]gd.Node2d,
-    coin:    gd.Node2d `gd:"onready=Coin"`,
+    coin:    ^PickupView `gd:"onready=Coin"`,
+    effects: Starter_Effects,
     session: rgd.Session(game.World, game.Control, game.Action, game.Event, game.SEATS),
     ready:   bool,
     drive:   i8,
@@ -22,6 +24,17 @@ ReplayStarter :: struct {
 }
 
 replay_starter_ready :: proc(self: ^ReplayStarter) {
+    if self.coin == nil {
+        gd.set_text(self.status, "Cannot start: Coin needs the PickupView script.")
+        gd.print_str("REPLAY_STARTER_ERROR Coin needs the PickupView script.")
+        return
+    }
+    rules, report := pickup_rules(cast(gd.Resource)self.coin.definition)
+    if report.error != .None {
+        gd.set_text(self.status, fmt.ctprintf("Cannot start: %s", d.report_message(&report)))
+        gd.print_str(fmt.tprintf("REPLAY_STARTER_ERROR %s: %s", d.report_path(&report), d.report_message(&report)))
+        return
+    }
     for &player, i in self.players {
         player = cast(gd.Node2d)gd.get_node(self.owner, fmt.ctprintf("Player%d", i + 1))
     }
@@ -49,15 +62,23 @@ replay_starter_ready :: proc(self: ^ReplayStarter) {
     }
 
     options.port = u16(port)
-    options.network.content = game.CONTENT
+    options.network.content = game.content(rules)
     options.address = fmt.ctprintf("%s", gd.env_string("REPLAY_STARTER_ADDRESS", "127.0.0.1"))
 
-    if error := rgd.session_open(&self.session, r.Frame(game.World){state = game.initial()}, game.model(), options);
+    if error := rgd.session_open(&self.session, r.Frame(game.World){state = game.initial(rules)}, game.model(), options);
        error != .None {
-        gd.print_str(fmt.tprintf("REPLAY_STARTER_ERROR %v", error))
+        detail := rgd.session_setup_message(&self.session)
+        gd.print_str(fmt.tprintf("REPLAY_STARTER_ERROR %v: %s", error, detail))
+        gd.set_text(self.status, fmt.ctprintf("Cannot start: %s", detail))
         return
     }
 
+    if !effects_open(&self.effects, self.owner, options.network.epoch) {
+        gd.set_string(self.status, "text", "Cannot load pickup effects. Check effects/pickup.tscn and pickup.wav.")
+        gd.error("REPLAY_STARTER_ERROR pickup effects could not initialize")
+        rgd.session_close(&self.session)
+        return
+    }
     self.ready = true
 }
 
@@ -83,11 +104,17 @@ replay_starter_process :: proc(self: ^ReplayStarter, dt: f64) {
         return
     }
 
-    // Consume presentation changes once per render frame. A larger game maps
-    // semantic event IDs to effects; replay does not directly play engine audio.
+    // Gameplay emits values; these typed routes own engine effects outside
+    // simulation. Forward every delivered change without replacing its ID.
     changes: [64]v.Change(net.Net_Event(game.Event))
 
-    for rgd.session_changes(&self.session, changes[:]) > 0 {}
+    for {
+        count := rgd.session_changes(&self.session, changes[:])
+        if count == 0 {break}
+        for change in changes[:count] {effects_change(&self.effects, change)}
+    }
+    effects_retire(self)
+    if !effects_frame(&self.effects, dt) {gd.error("REPLAY_STARTER_ERROR effect presentation failed")}
 
     frame, available := rgd.session_state(&self.session)
 
@@ -101,7 +128,7 @@ replay_starter_process :: proc(self: ^ReplayStarter, dt: f64) {
         gd.node2d_set_position(node, {f32(frame.state.positions[i]), 180})
     }
 
-    gd.canvas_item_set_visible(self.coin, frame.state.coins != 0)
+    gd.canvas_item_set_visible(self.coin.owner, frame.state.coins != 0)
     gd.set_string(
         self.status,
         "text",
@@ -114,8 +141,10 @@ replay_starter_process :: proc(self: ^ReplayStarter, dt: f64) {
     )
 }
 
-replay_starter_exit_tree :: proc(self: ^ReplayStarter) {
-    rgd.session_close(&self.session)
+replay_starter_finalize :: proc(self: ^ReplayStarter) {
+    self.ready = false
+    if rgd.session_close(&self.session) != .None {gd.error("REPLAY_STARTER_ERROR Session cleanup remains pending")}
+    effects_close(&self.effects)
 }
 
 @(gd_method)

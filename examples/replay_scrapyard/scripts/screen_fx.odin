@@ -33,7 +33,9 @@ screen_frame :: proc(self: ^ReplayScrapyard, dt: f64) {
         return
     }
 
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
     seat := rgd.session_seat(self.session)
     active := seat > 0 && frame.state.players[seat - 1].in_yard
     hp := active ? frame.state.players[seat - 1].hp : u8(0)

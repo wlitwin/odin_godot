@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def sources():
     for directory in ("scripts", "shared", "tools"):
         for path in sorted((ROOT / directory).rglob("*.odin")):
-            if ".gen." in path.name or "revisions" in path.relative_to(ROOT).parts:
+            if ".gen." in path.name:
                 continue
             yield path
 

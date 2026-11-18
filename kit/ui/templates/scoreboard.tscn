@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[node name="Scoreboard" type="CenterContainer"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+z_index = 10
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="Grid" type="GridContainer" parent="Panel/Margin"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 22
+
+[node name="Bindings" type="OdinKitUIBindings" parent="."]
+widget = 2
+grid = NodePath("%Grid")

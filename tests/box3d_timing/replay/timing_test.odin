@@ -6,6 +6,7 @@ import "core:reflect"
 import "core:testing"
 import b "godot:box3d"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bd "godot:box3d/diagnostics"
 import limits "godot:box3d/limits"
 import r "godot:replay"
@@ -37,7 +38,7 @@ scene_make :: proc(t: ^testing.T) -> ba.Baked_Scene {
     return scene
 }
 
-initial_state :: proc(built: ^ba.Built_Scene) -> State {
+initial_state :: proc(built: ^ar.Built_Scene) -> State {
     return {body = built.bodies[0].key, character = {position = {0, 10, 4}, velocity = {.5, 0, 0}}}
 }
 
@@ -125,14 +126,14 @@ profile_window_revision_and_history_wrap_use_complete_physics :: proc(t: ^testin
     defer cleanup(t)
     scene := scene_make(t)
     defer ba.destroy(&scene)
-    built, problem := ba.build(&scene, 0x54494d4552504c31)
+    built, problem := ar.build(&scene, 0x54494d4552504c31)
     testing.expect_value(t, problem.error, ba.Error.None)
 
     if problem.error != .None {
         return
     }
 
-    defer ba.built_destroy(&built)
+    defer ar.built_destroy(&built)
     configuration, error := ph.authoring_config(&scene)
     testing.expect_value(t, error, r.Error.None)
 
@@ -260,14 +261,14 @@ network_runtime_horizons_are_bounded_by_the_selected_profile :: proc(t: ^testing
     defer cleanup(t)
     scene := scene_make(t)
     defer ba.destroy(&scene)
-    built, problem := ba.build(&scene, 0x54494d4552504c32)
+    built, problem := ar.build(&scene, 0x54494d4552504c32)
     testing.expect_value(t, problem.error, ba.Error.None)
 
     if problem.error != .None {
         return
     }
 
-    defer ba.built_destroy(&built)
+    defer ar.built_destroy(&built)
     configuration, error := ph.authoring_config(&scene)
     testing.expect_value(t, error, r.Error.None)
 

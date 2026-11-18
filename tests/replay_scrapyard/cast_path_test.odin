@@ -8,7 +8,6 @@ import sc "godot:replay/schema"
 import net "godot:replay/net"
 import game "godot:examples/replay_scrapyard/shared/game"
 import flow "godot:examples/replay_scrapyard/shared/flow"
-import upgrade "godot:examples/replay_scrapyard/shared/upgrade"
 
 @(test)
 spread_records_actual_hops_credit_and_payload_before_reentry :: proc(t: ^testing.T) {
@@ -74,42 +73,6 @@ cast_paths_match_original_fan_and_kink_with_degenerate_guards :: proc(t: ^testin
     testing.expect(t, !zero)
 }
 
-@(test)
-frozen_world45_maps_canonical_values_and_rejects_new_arc_discriminator :: proc(t: ^testing.T) {
-    #assert(size_of(upgrade.World_45) == size_of(upgrade.World_48))
-    #assert(align_of(upgrade.World_45) == align_of(game.World))
-    w := yard()
-    w.catalog = upgrade.catalog_current(upgrade.stock_49())
-    w.clock = 10
-    game.flash_add(
-        &w,
-        {kind = .Cast, ability = 4, status = 4, seat = 1, generation = 1, serial = 1, origin = {700, 900}, until = 27},
-        &r.Step(game.Event){},
-    )
-    old := transmute(upgrade.World_45)upgrade.world_48(w)
-    mapped, ok := upgrade.map_world(old)
-    testing.expect(t, ok && reflect.equal(w, mapped))
-    a, b: sc.Schema
-    defer sc.destroy(&a)
-    defer sc.destroy(&b)
-    testing.expect_value(t, sc.init(&a, upgrade.World_45).error, sc.Error.None)
-    testing.expect_value(t, sc.init(&b, upgrade.World_49).error, sc.Error.None)
-    testing.expect(t, a.fingerprint != b.fingerprint && a.wire_size + 8 == b.wire_size)
-    left := make([]u8, a.wire_size)
-    defer delete(left)
-    right := make([]u8, b.wire_size)
-    defer delete(right)
-    testing.expect_value(t, sc.encode(&a, old, left).error, sc.Error.None)
-    testing.expect_value(t, sc.encode(&b, upgrade.world_49(mapped), right).error, sc.Error.None)
-    testing.expect(
-        t,
-        reflect.equal(left, right[:len(left)], true) &&
-        reflect.equal(right[len(left):], ([]u8{0, 0, 0, 0, 0, 0, 0, 0}), true),
-    )
-    old.flashes.values[0].kind = upgrade.Flash_45_Kind(5)
-    _, valid := upgrade.map_world(old)
-    testing.expect(t, !valid)
-}
 
 @(test)
 spread_hops_survive_checkpoint_restore_and_expire_without_changing_targets :: proc(t: ^testing.T) {

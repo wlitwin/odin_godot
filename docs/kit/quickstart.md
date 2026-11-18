@@ -11,8 +11,9 @@ default Kit stack:
 - the stock lobby, chat, transport, and reconnect flow.
 
 The guide uses focused excerpts. The complete, buildable sources are
-[`hello.odin`](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_net/scripts/hello.odin) and
-[`player.odin`](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_net/scripts/player.odin).
+[`hello.odin`](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_net/scripts/hello.odin),
+[`actors/player.odin`](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_net/scripts/actors/player.odin), and
+[`player_hooks.odin`](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_net/scripts/player_hooks.odin).
 
 ## Prerequisite
 
@@ -27,7 +28,7 @@ From the repository root:
 
 ```sh
 bash build/build_scripts.sh examples/hello_net
-"$GODOT" --headless --editor --path examples/hello_net --import
+"$GODOT" --editor --path examples/hello_net
 $GODOT --path examples/hello_net &
 $GODOT --path examples/hello_net
 ```
@@ -36,8 +37,8 @@ Select **Host** in the first window and **Join** in the second. Arrow keys move
 the square owned by the active window. A remote square is deliberately rendered
 slightly behind its owner so that Kit can interpolate between received samples.
 
-The import command lets a fresh project discover the extension before launching
-the game. You can also open it in the editor and wait for the initial import.
+Let the editor finish its initial import, then close it before running the two
+game commands. This lets a fresh project discover the extension and assets.
 
 If this checkpoint fails, check the build output first, then confirm that both
 processes use the same build and that port `4242` is available.
@@ -61,8 +62,6 @@ Player :: struct {
 	net_id: knet.Net_Id,
 	x, y:   f32 `gd:"owner,wire=f16"`, // float owner streams interpolate by default
 	pid:    u8 `gd:"replicate"`,
-	mine:   bool,
-	tinted: bool,
 }
 ```
 
@@ -71,7 +70,6 @@ Player :: struct {
 | `net_id` | Stable entity identifier assigned by the session. Generated entity helpers require this field. |
 | `x`, `y` | The entity owner writes these values. Other peers receive the stream and interpolate it. `wire=f16` reduces their encoded size. |
 | `pid` | The host writes this value and sends changes reliably on the delta lane. |
-| `mine`, `tinted` | Local implementation state. Untagged fields do not cross the network. |
 
 The script renders the current presentation values each frame. The same proc
 runs for local and remote entities:
@@ -79,14 +77,6 @@ runs for local and remote entities:
 ```odin
 player_process :: proc(self: ^Player, delta: f64) {
 	_ = delta
-	if !self.tinted && self.pid != 0 {
-		self.tinted = true
-		hues := [4]gd.Color{
-			{0.9, 0.5, 0.2, 1}, {0.3, 0.7, 0.9, 1},
-			{0.5, 0.9, 0.4, 1}, {0.9, 0.4, 0.7, 1},
-		}
-		gd.polygon2d_set_color(self.skin, hues[int(self.pid) % 4])
-	}
 	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.x, self.y})
 }
 ```
@@ -101,23 +91,24 @@ The game script owns the session components and exports the scene used to create
 players:
 
 ```odin
+import actors "actors"
+
 HelloNet :: struct {
 	owner: gd.Node2d,
 	ses:   ksess.Session,
 	comms: kcomms.Comms,
 	boot:  kboot.Boot,
 
-	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
-	me: ^Player,
+	player_scene: ^gd.Resource `gd:"entity=actors.Player:1"`,
 }
 ```
 
-The `entity=Player:1` tag associates wire type `1` with `Player` and generates:
+The `entity=actors.Player:1` tag associates wire type `1` with the imported `Player` and generates:
 
 - `hello_net_entities`, which installs the entity factory;
 - `player_spawn`, `player_of`, `player_owned_by`, and `player_mine`;
 - typed `player_ref` handles and `player_all` iteration over live players;
-- spawn/free bookkeeping hooks; and
+- optional typed spawn, birth, and free hooks; and
 - scalar probes used by the integration-test harness.
 
 Assign `player.tscn` to `player_scene` in the Inspector. Entity type numbers are
@@ -129,7 +120,7 @@ Set up Kit from the game's `_ready` proc:
 
 ```odin
 hello_net_ready :: proc(self: ^HelloNet) {
-	hello_net_attach(
+	if !hello_net_attach(
 		self,
 		kboot.Options{
 			title = "HELLO, MULTIPLAYER",
@@ -139,7 +130,7 @@ hello_net_ready :: proc(self: ^HelloNet) {
 			min_players = 1,
 		},
 		kboot.network_profile(.Friends_Coop),
-	)
+	) {return}
 }
 ```
 
@@ -223,6 +214,15 @@ spawn_player :: proc(self: ^HelloNet, pid: knet.Player_Id) {
 `boot_spawn_send` serializes the initialized fields. Call it only after all
 spawn-time values have been assigned.
 
+Finish this transaction in the same frame, before pumping the session. If initialization cannot finish,
+call `kboot.boot_spawn_cancel(&self.boot, id)` before returning. Cancellation
+releases the draft locally without announcing an entity or firing its born
+hook. It cannot cancel an already announced authoritative entity; use
+`player_despawn` for that. The explicit pair also lets a game configure values
+from several sources before committing them together. World catch-up and save
+snapshots omit unfinished drafts; their initial ownership and blob data travel
+with the committed spawn.
+
 When a player joins after the game has started, an authority-only generated
 event half creates that player's entity:
 
@@ -243,55 +243,44 @@ The `_then` suffix is significant: script generation routes this consequence on
 the authority. The proc still contains the game-specific decision about whether
 this event needs a new entity.
 
-## 6. Track the locally owned entity
+## 6. Present an initialized entity
 
-Generated entity hooks maintain any small amount of game-specific bookkeeping:
+`player_born` receives the typed player after its spawn fields have been applied,
+on both the host and clients. Place and color the node here so its first
+rendered frame already shows the right player:
+
+Put this callback in `scripts/player_hooks.odin`, beside the game, and import
+`actors "actors"`. The reusable entity package then needs no import of its game.
 
 ```odin
 @(gd_half)
-player_spawned :: proc(
+player_born :: proc(
 	game: ^HelloNet,
-	self: ^Player,
+	self: ^actors.Player,
 	id: knet.Net_Id,
 	owner: knet.Player_Id,
 ) {
 	_ = id
-	if owner == game.ses.me {
-		self.mine = true
-		game.me = self
-	}
-}
-
-@(gd_half)
-player_freed :: proc(game: ^HelloNet, self: ^Player, id: knet.Net_Id) {
-	_ = id
-	if self == game.me {game.me = nil}
-}
-```
-
-These hooks run when the generated entity census changes. Use the later
-`<game>_entity_spawned` session event for presentation that depends on replicated
-spawn fields. In particular, place a new node there so it does not render one
-frame at the scene's default origin:
-
-```odin
-@(gd_half)
-hello_net_entity_spawned :: proc(
-	self: ^HelloNet,
-	id: knet.Net_Id,
-	type: ksess.Entity_Type,
-	owner: knet.Player_Id,
-) {
-	_ = type
 	_ = owner
-	if p, ok := player_of(&self.boot, id); ok {
-		gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
+	hues := [4]gd.Color{
+		{0.9, 0.5, 0.2, 1}, {0.3, 0.7, 0.9, 1},
+		{0.5, 0.9, 0.4, 1}, {0.9, 0.4, 0.7, 1},
 	}
-	gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
+	gd.polygon2d_set_color(self.skin, hues[int(self.pid) % 4])
+	gd.node2d_set_position(cast(gd.Node2d)self.owner, {self.x, self.y})
+	gd.set_bool(cast(gd.Object)game.boot.ui.root, "visible", false)
 }
 ```
 
-At this point the spawn fields have been applied on every peer.
+On the host, this hook runs inside `boot_spawn_send`, before it returns. On a
+client, it runs when the received spawn is dispatched. Godot `_ready` and the
+optional `player_spawned` hook run earlier, while the node still has its scene
+defaults; reserve them for work that does not depend on initialized spawn fields.
+
+Kit already tracks ownership and live entities. Use `player_mine(&self.boot)`
+to find the local player's body instead of maintaining a `me` pointer and
+spawn/free bookkeeping. Use `player_owned_by` for another seat, `player_of` for
+an ID or typed reference, and `player_all` to iterate players.
 
 ## 7. Pump the session and move the local player
 
@@ -305,14 +294,14 @@ hello_net_process :: proc(self: ^HelloNet, delta: f64) {
 	if was == .Menu {return}
 
 	_ = hello_net_frame(self, delta, knet.now_s())
-	if self.me != nil {
+	if player, ok := player_mine(&self.boot); ok {
 		dx, dy: f32
 		if gd.is_action_pressed("ui_right") {dx += 1}
 		if gd.is_action_pressed("ui_left")  {dx -= 1}
 		if gd.is_action_pressed("ui_down")  {dy += 1}
 		if gd.is_action_pressed("ui_up")    {dy -= 1}
-		self.me.x = clamp(self.me.x + dx * 160 * f32(delta), 8, 632)
-		self.me.y = clamp(self.me.y + dy * 160 * f32(delta), 8, 352)
+		player.x = clamp(player.x + dx * 160 * f32(delta), 8, 632)
+		player.y = clamp(player.y + dy * 160 * f32(delta), 8, 352)
 	}
 	if was != .Playing && kboot.boot_phase(&self.boot) == .Playing {
 		gd.print_str("HELLO_STARTED")
@@ -337,22 +326,15 @@ movement from validated inputs.
 
 <a id="8-release-the-stack-on-scene-exit"></a>
 
-## 8. Release the stack on scene exit
+## 8. Let the standard stack clean up
 
-The scene owns the Godot nodes; your script owns the Kit allocations. Pair
-attachment with teardown when replacing or freeing the game scene:
+The generated stack cleans up automatically when its script instance is
+finished, including script removal or replacement. No `_exit_tree` boilerplate
+is needed. Reparenting preserves the stack and does not rerun `_ready`.
 
-```odin
-hello_net_exit_tree :: proc(self: ^HelloNet) {
-	hello_net_detach(self)
-	ksess.session_destroy(&self.ses)
-}
-```
-
-The generated detach stops the network stack in dependency order and resets
-the Session's run. `session_destroy` also releases its retained wiring. Use
-detach alone when the same game script will attach again; use both calls for
-final scene removal. Both operations are safe after an earlier detach.
+Use `hello_net_detach(self)` for an explicit reset before attaching again.
+Game-owned resources belong in `hello_net_finalize(self)`; it runs before the
+standard Kit cleanup. See [ownership and teardown](boot.md).
 
 ## Test with latency and packet loss
 

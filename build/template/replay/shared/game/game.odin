@@ -2,15 +2,28 @@ package starter_game
 
 import r "godot:replay"
 import net "godot:replay/net"
+import schema "godot:replay/schema"
 
 SEATS :: 2
 CONTENT :: u64(0x52504c5354415254)
+
+Pickup_Rules :: struct {reach: i32}
+DEFAULT_PICKUP :: Pickup_Rules{reach = 24}
+
+pickup_valid :: proc(rules: Pickup_Rules) -> bool {return rules.reach >= 1 && rules.reach <= 96}
+
+content :: proc(rules: Pickup_Rules) -> u64 {
+    value := u32(rules.reach)
+    bytes := [4]u8{u8(value), u8(value >> 8), u8(value >> 16), u8(value >> 24)}
+    return schema.digest(bytes[:], CONTENT)
+}
 
 World :: struct {
     positions: [SEATS]i32,
     connected: u8,
     coins:     u8,
     bags:      [SEATS]u8,
+    pickup:    Pickup_Rules,
 }
 
 Control :: struct {
@@ -25,8 +38,8 @@ Event :: struct {
     seat: u16,
 }
 
-initial :: proc() -> World {
-    return {positions = {220, 420}, coins = 1}
+initial :: proc(pickup := DEFAULT_PICKUP) -> World {
+    return {positions = {220, 420}, coins = 1, pickup = pickup}
 }
 
 model :: proc() -> net.Model(World, Control, Action, Event, SEATS) {
@@ -56,7 +69,7 @@ action :: proc(w: ^World, seat: u16, value: Action, ctx: ^r.Step(Event)) -> bool
        seat > SEATS ||
        w.connected & (u8(1) << uint(seat - 1)) == 0 ||
        w.coins == 0 ||
-       abs(w.positions[seat - 1] - 320) > 24 {
+       abs(w.positions[seat - 1] - 320) > w.pickup.reach {
         return false
     }
 
@@ -79,7 +92,7 @@ hold :: proc(c: Control) -> Control {
 }
 
 state_valid :: proc(w: World) -> bool {
-    if w.connected & ~u8(3) != 0 || w.coins > 1 {
+    if w.connected & ~u8(3) != 0 || w.coins > 1 || !pickup_valid(w.pickup) {
         return false
     }
 

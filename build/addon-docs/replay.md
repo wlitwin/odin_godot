@@ -8,8 +8,8 @@ guaranteed to remain stable. Kit and its authoring model remain available indepe
 ## Start with the included project
 
 Copy the contents of `template/replay/` into a new project that contains this addon.
-Build it with the installed addon's helpers and use this addon as
-`ODIN_GODOT_ROOT`; see [the install workflow](distribution.md). The value-only
+Build it with the installed addon's helpers, which resolve their own collection
+root; see [the install workflow](distribution.md). The value-only
 starter needs no Box3D backend. Complete native physics uses a separate
 [backend setup](box3d/building.md) and the optional
 `godot:replay/godot/physics` presentation reader.

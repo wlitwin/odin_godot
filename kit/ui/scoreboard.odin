@@ -7,6 +7,7 @@ package kit_ui
 // (classically: show while Tab is held).
 
 import gd "godot:godot"
+import binding "bindings"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
@@ -43,22 +44,34 @@ score_make :: proc(parent: gd.Node) -> Score {
     return sb
 }
 
-// Adopt a game-authored scoreboard scene (full replacement — see ui.odin's
-// header). The CONTRACT, by node name at any depth:
-//
-//   Grid (GridContainer — the kit sets its column count and pours the cells)
-//
-// The scene root is the panel: anchor it however you like (the stock build's
-// hand-centering is skipped for adopted scenes). Cell Labels are kit-created
-// — theme them from the scene root.
-score_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Score {
-    sb: Score
-    node := gd.instantiate(scene)
-    gd.add_child(parent, node)
-    sb.root = cast(gd.Control)node
-    sb.grid = cast(gd.Control)adopt_child(node, "Grid", "scoreboard")
+// Validate while detached, then transfer the complete widget to its parent.
+@(require_results)
+score_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> (Score, Binding_Report) {
+    prepared, report := prepare_scenes(nil, nil, scene)
+    defer prepared_destroy(&prepared)
+
+    if report.count > 0 {
+        return {}, report
+    }
+
+    if scene == nil {
+        return score_make(parent), {}
+    }
+
+    widget := prepared.widgets[.Scoreboard]
+    prepared.widgets[.Scoreboard] = {}
+    return score_bind(parent, widget), {}
+}
+
+@(private)
+score_bind :: proc(parent: gd.Node, widget: binding.Result) -> Score {
+    sb := Score {
+        root = cast(gd.Control)widget.root,
+        grid = cast(gd.Control)widget.nodes[.Grid],
+    }
     sb.authored = true
     gd.set_bool(cast(gd.Object)sb.root, "visible", false)
+    gd.add_child(parent, widget.root)
     return sb
 }
 

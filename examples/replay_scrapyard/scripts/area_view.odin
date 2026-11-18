@@ -1,5 +1,7 @@
 package replay_scrapyard
 
+import rgd "godot:replay/godot"
+
 
 import "core:math"
 import gd "godot:godot"
@@ -84,7 +86,9 @@ area_zones :: proc(self: ^ReplayScrapyard, world: ^game.World) {
     }
 
     points: [game.MAX_FLASHES]flow.Buff_Point
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
     count := flow.buff_points(&self.feedback[0].buffs, world, epoch, points[:])
 
     for point in points[:count] {

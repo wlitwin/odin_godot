@@ -123,16 +123,20 @@ cave_rejoin_to :: proc(self: ^CaveLobby, addr: string, to_port: int) {
     }
 
     kboot.boot_entities_wipe(&self.boot) // census-driven: _freed hooks + the wiped half
-    gd.multiplayer_clear_peer(self.owner)
 
-    if !gd.join(self.owner, fmt.ctprintf("%s", addr), to_port) {
+    if !kboot.boot_open_join(
+        &self.boot,
+        &netgd.ENET,
+        {addr = fmt.ctprintf("%s", addr), port = to_port},
+        my_name(self),
+        my_token(),
+        status = "Rejoining the cave...",
+    ) {
         kui.lobby_set_status(&self.boot.ui, "Could not start rejoining")
         return
     }
 
-    ksess.session_client_start(&self.ses, my_token(), my_name(self))
     self.host_gone = false
-    kui.lobby_set_status(&self.boot.ui, "Rejoining the cave...")
     gd.print_str("CAVE_REJOINING")
 }
 
@@ -150,33 +154,24 @@ cave_lobby_on_host :: proc(self: ^CaveLobby) {
         return
     }
 
-    if !gd.host(self.owner, port()) {
+    if !kboot.boot_open_host(&self.boot, &netgd.ENET, {port = port()}, my_name(self), my_token()) {
         kui.lobby_set_status(&self.boot.ui, "Could not host (port taken?)")
         gd.print_str("CAVE_HOST_FAIL")
         return
     }
 
-    begin_hosting(self)
+    host_ready(self)
 }
 
-// Everything hosting means AFTER a transport is up — shared verbatim by the
-// ENet path (gd.host above) and the Steam path (lobby_created below): the
-// session cannot tell the transports apart, which is the whole point.
-begin_hosting :: proc(self: ^CaveLobby) {
-    ksess.session_host_start(&self.ses, my_name(self))
-    // The ceremony's shape (cavecrawl raises its own transports — Steam is
-    // why — so the boot doors never saw this run's port/token/name).
-    kboot.boot_succ_config(&self.boot, .Native_Addr, port(), "", my_token(), my_name(self))
+// Game-specific scoreboard and status after Kit opens either transport.
+host_ready :: proc(self: ^CaveLobby) {
     self.cols = kcombat.combat_columns(&self.ses) // the ledger, on the scoreboard
     self.slain_col = ksess.session_stat_column(&self.ses, "slain") // the game's own column
     self.running = true
-    kui.lobby_show_menu(&self.boot.ui, false, false)
     kui.lobby_set_status(
         &self.boot.ui,
         self.steam_on ? "Hosting a Steam lobby — invite friends via the overlay" : fmt.tprintf("Hosting on :%d — waiting for friends", port()),
     )
-    kui.lobby_refresh(&self.boot.ui, &self.ses)
-    kui.chat_show(&self.boot.chat, true)
     gd.print_str("CAVE_HOSTING")
 }
 
@@ -192,21 +187,23 @@ cave_lobby_on_join :: proc(self: ^CaveLobby) {
         return
     }
 
-    if !gd.join(self.owner, "127.0.0.1", port()) {
+    if !kboot.boot_open_join(
+        &self.boot,
+        &netgd.ENET,
+        {addr = "127.0.0.1", port = port()},
+        my_name(self),
+        my_token(),
+        status = "Joining the cave...",
+    ) {
         kui.lobby_set_status(&self.boot.ui, "Could not start joining")
         return
     }
 
-    begin_joining(self)
+    join_ready(self)
 }
 
-begin_joining :: proc(self: ^CaveLobby) {
-    ksess.session_client_start(&self.ses, my_token(), my_name(self))
-    kboot.boot_succ_config(&self.boot, .Native_Addr, port(), "", my_token(), my_name(self))
+join_ready :: proc(self: ^CaveLobby) {
     self.running = true
-    kui.lobby_show_menu(&self.boot.ui, false, false)
-    kui.lobby_set_status(&self.boot.ui, "Joining the cave...")
-    kui.chat_show(&self.boot.chat, true)
     gd.print_str("CAVE_JOINING")
 }
 
@@ -222,12 +219,12 @@ cave_lobby_on_lobby_created :: proc(self: ^CaveLobby, result: gd.Int, lobby_id: 
 
     self.steam_lobby = u64(lobby_id)
 
-    if !steamgd.host_peer(self.owner) {
+    if !kboot.boot_open_host(&self.boot, &steamgd.TRANSPORT, {}, my_name(self), my_token()) {
         kui.lobby_set_status(&self.boot.ui, "Steam peer failed")
         return
     }
 
-    begin_hosting(self)
+    host_ready(self)
     steamgd.invite_overlay(self.steam_lobby)
 }
 
@@ -247,13 +244,20 @@ cave_lobby_on_lobby_joined :: proc(
 
     self.steam_lobby = u64(lobby_id)
 
-    if !steamgd.client_peer(self.owner, owner) {
+    if !kboot.boot_open_join(
+        &self.boot,
+        &steamgd.TRANSPORT,
+        {peer_id = owner},
+        my_name(self),
+        my_token(),
+        status = "Joining the cave...",
+    ) {
         kui.lobby_set_status(&self.boot.ui, "Steam peer failed")
         return
     }
 
     // connected_to_server will fire -> the wire's on_net_up seats us.
-    begin_joining(self)
+    join_ready(self)
 }
 
 @(gd_method)

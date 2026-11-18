@@ -23,6 +23,17 @@ framework guides instead.
 
 ## Validate a change
 
+The Nix shells and addon builds use the pinned April Odin compiler with the
+[upstream threaded-overload fix](https://github.com/odin-lang/Odin/pull/7052)
+backported. It addresses [intermittent checker crashes](https://github.com/odin-lang/Odin/issues/6526)
+without changing the pinned core-library APIs. `nix build .#odin` builds that
+compiler directly. After changing toolchains, build a project once from the shell
+so editor reopen uses its newly remembered compiler path.
+
+`tests/compiler_probes/run.sh` checks generic overload selection and dimensions
+with normal compiler threading, natively and in WASM type checking. Compiler
+failures stop the gate; they are not retried or treated as game-test failures.
+
 Enter `nix develop` and run the [component core](testing.md) for the behavior you
 changed. For example:
 

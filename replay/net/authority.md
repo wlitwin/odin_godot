@@ -45,13 +45,11 @@ with the policy disabled retain their previous negotiated contract. An enabled
 policy has a distinct contract, and games adding observation fields to their
 worlds must explicitly convert their old state schemas.
 
-`Batch` is also the diagnostic recording input type, so its schema fingerprint
-has changed for all network recordings. Normal recording decode rejects the old
-fingerprint. `recording_upgrade_without_authority` explicitly maps older inputs
-only for models whose authority policy remains disabled; it cannot fabricate
-missing host observations. It preserves the source context, frames, decisions
-and events. Verification remains separate from conversion. See
-[recording conversion](recording.md#older-network-recordings).
+`Batch` is also the diagnostic recording input type. Its fingerprint includes
+authority observations. Normal decode rejects other schemas; any offline
+migration must preserve the source's known/unknown observations and verify the
+copied expected frames/events under its target model. See
+[recording schema changes](recording.md#recording-schema-changes).
 
 This observation identifies the runner's local player seat. It does not represent
 all shared-authority object ownership, grant permission to host, or replace the

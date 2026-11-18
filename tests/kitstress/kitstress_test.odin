@@ -168,10 +168,12 @@ box_make_entity :: proc(
     type: ksess.Entity_Type,
     id: knet.Net_Id,
     owner: knet.Player_Id,
+    variant: ksess.Scene_Variant,
 ) -> (
     rawptr,
     ^knet.Command_Set,
 ) {
+    if variant != ksess.DEFAULT_SCENE_VARIANT {return nil, nil}
     b := cast(^Peer_Box)user
 
     if type != PROP_TYPE {

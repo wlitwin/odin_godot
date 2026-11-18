@@ -128,33 +128,87 @@ init :: proc(app_id := TEST_APP_ID) -> bool {
 //   on_lobby_created(result: int, lobby_id: int)   — result 1 = ok
 //   on_lobby_joined(lobby_id: int, perms: int, locked: bool, response: int)
 //   on_join_requested(lobby_id: int, friend_id: int) — overlay "Join Game"
+// Explicit ownership allows script replacement while the Node survives.
+Subscription :: struct {
+    source:    u64,
+    callbacks: [3]gd.Callable,
+    owned:     [3]bool,
+}
+
+@(private)
+LOBBY_SIGNALS := [3]cstring{"lobby_created", "lobby_joined", "join_requested"}
+
 listen :: proc "contextless" (
+    subscription: ^Subscription,
     node: gd.Node,
     on_lobby_created: cstring = "",
     on_lobby_joined: cstring = "",
     on_join_requested: cstring = "",
 ) -> bool {
-    s, ok := steam()
+    if subscription == nil || node == nil {
+        return false
+    }
+
+    unlisten(subscription)
+    source, ok := steam()
 
     if !ok {
         return false
     }
 
-    obj := cast(gd.Object)node
+    subscription.source = u64(gd.object_get_instance_id(source))
 
-    if on_lobby_created != "" {
-        gd.connect_to(s, "lobby_created", obj, on_lobby_created)
-    }
+    for method, index in ([3]cstring{on_lobby_created, on_lobby_joined, on_join_requested}) {
+        if method == "" {
+            continue
+        }
 
-    if on_lobby_joined != "" {
-        gd.connect_to(s, "lobby_joined", obj, on_lobby_joined)
-    }
+        name := gd.new_string_name_cstring(method, false)
+        callback := gd.new_callable_object_string_name(cast(gd.Object)node, name)
+        gd.free_string_name(name)
+        signal := gd.sname(LOBBY_SIGNALS[index])
 
-    if on_join_requested != "" {
-        gd.connect_to(s, "join_requested", obj, on_join_requested)
+        if gd.object_is_connected(source, signal, callback) {
+            gd.free_callable(callback)
+            continue
+        }
+
+        if gd.object_connect(source, signal, callback, 0) != .Ok {
+            gd.free_callable(callback)
+            unlisten(subscription)
+            return false
+        }
+
+        subscription.callbacks[index] = callback
+        subscription.owned[index] = true
     }
 
     return true
+}
+
+unlisten :: proc "contextless" (subscription: ^Subscription) {
+    if subscription == nil {
+        return
+    }
+
+    source := gdext.object_get_instance_from_id(subscription.source)
+
+    for owned, index in subscription.owned {
+        if !owned {
+            continue
+        }
+
+        callback := subscription.callbacks[index]
+        signal := gd.sname(LOBBY_SIGNALS[index])
+
+        if source != nil && gd.object_is_connected(cast(gd.Object)source, signal, callback) {
+            gd.object_disconnect(cast(gd.Object)source, signal, callback)
+        }
+
+        gd.free_callable(callback)
+    }
+
+    subscription^ = {}
 }
 
 // Ask Steam for a lobby; the answer arrives on the lobby_created signal.

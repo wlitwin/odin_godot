@@ -5,8 +5,6 @@ import "core:reflect"
 import r "godot:replay"
 import cave "../../examples/replay_cavecrawl/shared/cave"
 import net "godot:replay/net"
-import upgrade "../../examples/replay_cavecrawl/shared/upgrade"
-import "core:os"
 import "core:fmt"
 
 floor_state_world :: proc() -> cave.World {
@@ -156,51 +154,28 @@ revising_a_descent_matches_fresh_vitals_and_complete_events :: proc(t: ^testing.
 }
 
 @(test)
-content4_conversion_retains_saved_state_and_uses_new_transition_rules :: proc(t: ^testing.T) {
-    names := [3]string{"before-descent", "after-descent", "before-restart"}
+current_floor_checkpoints_preserve_descent_and_restart_state :: proc(t: ^testing.T) {
+    names := [3]string{"before_descent", "after_descent", "before_restart"}
 
     for name in names {
-        bytes, error := os.read_entire_file(
-            fmt.tprintf("tests/replay_cave/fixtures/content4/%s.replay", name),
-            context.allocator,
-        )
-        testing.expect(t, error == nil)
-        defer delete(bytes)
-        old: net.Checkpoint(upgrade.World_7, cave.Control, cave.Action, cave.SEATS)
-        current: net.Checkpoint(cave.World, cave.Control, cave.Action, cave.SEATS)
-        defer net.checkpoint_destroy(&old)
+        current := load_current_fixture(fmt.tprintf("floor_%s", name))
         defer net.checkpoint_destroy(&current)
-        testing.expect_value(
-            t,
-            net.checkpoint_decode(&old, bytes, upgrade.model4(), upgrade.CONTENT_4),
-            net.Error.None,
-        )
-        testing.expect(t, net.checkpoint_decode(&current, bytes, cave.model(), cave.CONTENT) != .None)
-        converted, result := upgrade.convert_archive(bytes)
-        defer delete(converted)
-        testing.expect_value(t, result, net.Error.None)
-        testing.expect_value(t, net.checkpoint_decode(&current, converted, cave.model(), cave.CONTENT), net.Error.None)
-        expected, _ := upgrade.convert_world7(old.frame.state)
-        expected.authority_known = true
-        expected.authority_seat = old.header.local_seat
-        testing.expect(t, reflect.equal(current.frame, r.Frame(cave.World){tick = old.frame.tick, state = expected}))
-        testing.expect(t, reflect.equal(current.peers[:], old.peers[:], true))
         w := current.frame.state
         events: [32]r.Occurrence(cave.Event)
         ctx := context_for(events[:], 101)
 
-        if name == "before-descent" {
+        if name == "before_descent" {
             cave.step(&w, [cave.SEATS]cave.Control{}, 0, 0, &ctx)
             testing.expect_value(t, w.depth, u8(2))
             testing.expect_value(t, w.players[0].hp, i32(65))
             testing.expect_value(t, w.players[0].rock_cd, u16(6))
         }
 
-        if name == "after-descent" {
+        if name == "after_descent" {
             testing.expect_value(t, w.players[0].hp, i32(100))
         } // Already-lost injury is not fabricated.
 
-        if name == "before-restart" {
+        if name == "before_restart" {
             testing.expect(t, cave.act(&w, 1, cave.Action{verb = .Lobby, lobby = {verb = .Restart}}, &ctx))
             testing.expect_value(t, w.players[0].chill, u16(13))
             testing.expect_value(t, w.players[0].hp, cave.MAX_HP)

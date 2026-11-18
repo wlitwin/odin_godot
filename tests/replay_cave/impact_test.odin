@@ -69,15 +69,12 @@ dweller_hits_keep_projectile_identity_target_generation_and_detached_pose :: pro
 impact_events_replay_and_overflow_atomically_without_changing_damage_rules :: proc(t: ^testing.T) {
     initial := impact_world()
     impact_rock(&initial)
-    old := initial
     events: [8]r.Occurrence(cave.Event)
     ctx := context_for(events[:], 2)
-    cave.step_rocks(&old, &ctx, false)
-    testing.expect_value(t, ctx.count, 0)
     current := initial
-    ctx = context_for(events[:], 2)
     cave.step_rocks(&current, &ctx)
-    testing.expect(t, reflect.equal(old, current))
+    testing.expect(t, ctx.count == 1 && current.dwellers.values[0].hp == 35 && current.rocks.count == 0)
+    testing.expect_value(t, current.players[0].damage, initial.players[0].damage + u32(cave.ROCK_DAMAGE))
     tl: r.Timeline(cave.World, bool, cave.Event)
 
     step := proc(w: ^cave.World, hit: bool, ctx: ^r.Step(cave.Event)) {

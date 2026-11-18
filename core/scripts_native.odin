@@ -747,8 +747,10 @@ load_scripts_dll :: proc(path: string, main: bool) -> (dll: Scripts_Dll, owned_p
     if !lok || !scripts_dll_has_required_symbols(&dll) {
         // Include the loader's own reason (dlerror / GetLastError text) — "failed to
         // load" alone has sent people chasing phantom linkage theories before.
-        gdext_print("odin: failed to load scripts dll", path)
-        gdext_print("odin: loader error:", dynlib.last_error())
+        if !main || os.is_file(path) || !bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
+            gdext_print("odin: failed to load scripts dll", path)
+            gdext_print("odin: loader error:", dynlib.last_error())
+        }
 
         if main {
             // Flag for the editor frame pump to surface ONE actionable warning in the editor
@@ -1293,12 +1295,31 @@ odin_scripts_reload :: proc(module := "") -> bool {
 
     mi := module_index(module)
 
-    if mi < 0 {
-        gdext_print("odin reload: unknown script module", module_display(module))
-        return false
+    // The first build of a newly installed module uses the same admission,
+    // collision and generation-publication path as an existing module reload.
+    // Do not require an editor restart just to discover its first DLL.
+    base: string
+    if mi >= 0 {
+        base = strings.clone(g_modules[mi].path)
+    } else {
+        if strings.contains_rune(module, '/') || strings.contains_rune(module, '\\') || strings.contains_rune(module, '.') {
+            gdext_print("odin reload: invalid script module name", module)
+            return false
+        }
+        main_path := scripts_dll_path()
+        if module == "" {
+            base = main_path
+        } else {
+            slash := strings.last_index_byte(main_path, '/')
+            when ODIN_OS == .Windows {
+                if back := strings.last_index_byte(main_path, '\\'); back > slash { slash = back }
+            }
+            if slash < 0 { delete(main_path); return false }
+            base = fmt.aprintf("%s/libodinscripts_%s%s", main_path[:slash], module, SCRIPTS_DLL_EXT)
+            delete(main_path)
+        }
     }
-
-    base := g_modules[mi].path
+    defer delete(base)
 
     // 1. Snapshot the freshly-built dll to a unique path (force a fresh image).
     data: []u8
@@ -1503,7 +1524,6 @@ odin_scripts_reload :: proc(module := "") -> bool {
 
     // 4. Re-index THIS module's script set (other modules' entries untouched). The
     //    `affected` set (old ∪ new identities) scopes cache invalidation + rebind below.
-    mod := &g_modules[mi]
     new_generation := script_generation_create(new_dll, module, len(data), unique)
 
     if new_generation == nil {
@@ -1512,7 +1532,13 @@ odin_scripts_reload :: proc(module := "") -> bool {
         return false
     }
 
+    if mi < 0 {
+        append(&g_modules, Scripts_Module{name = strings.clone(module), path = strings.clone(base)})
+        mi = len(g_modules) - 1
+    }
+    mod := &g_modules[mi]
     script_generation_register_manifest(new_generation, descs, int(n))
+    g_scripts_missing = false
     affected := make(map[string]bool, context.temp_allocator)
 
     for old in mod.classes {

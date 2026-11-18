@@ -13,9 +13,9 @@ presentation_wound :: proc(self: ^ReplayScrapyard, event: game.Event, id: r.Even
         return {}, false
     }
 
-    epoch := s.authority ? s.server.cfg.epoch : s.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(s)
 
-    if id.epoch != epoch {
+    if !scope_ready || id.epoch != scope_info.epoch {
         return {}, false
     }
 

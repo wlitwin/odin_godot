@@ -5,6 +5,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+python3 "$REPO_ROOT/tests/build_helpers/toolchain_test.py"
+python3 "$REPO_ROOT/tests/build_helpers/web_memory_test.py"
 WORK="$(mktemp -d)"
 
 fail() { echo "BUILD_HELPERS_FAIL: $*" >&2; exit 1; }

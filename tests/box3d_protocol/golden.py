@@ -14,7 +14,7 @@ def sha(data):
 def signature(parts):
     descriptors = (b"build:arm64:test", b"assets:test", b"solver:v3", b"game:test", b"observations:test", b"inputs:test")
     header = b"OGB3SIG1" + struct.pack("<II", 1, 0)
-    identity = struct.pack("<IIIIQ", 3, 1, 1, 1, 1) + b"".join(map(sha, descriptors))
+    identity = struct.pack("<IIIIQ", 3, 3, 1, 1, 1) + b"".join(map(sha, descriptors))
     body = header + identity + struct.pack("<QQ", 7, 42)
     body += b"".join(struct.pack("<Q", len(p)) + sha(p) for p in parts)
     assert len(body) == 448

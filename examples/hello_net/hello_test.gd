@@ -31,6 +31,13 @@ func _process(_delta: float) -> bool:
 		"boot":
 			# Both squares up on this screen (the guest's spawns on join).
 			if game.probe_player_count() == 2:
+				var colors: Array[Color] = []
+				for body in game.get_node("World").get_children():
+					colors.append(body.get_node("Skin").color)
+				if not (colors.size() == 2 and Color(0.3, 0.7, 0.9, 1) in colors and Color(0.5, 0.9, 0.4, 1) in colors):
+					print(role.to_upper(), "_FAIL: initialized birth colors missing")
+					quit(1); return true
+				print("HELLO_BORN_PRESENTATION_OK")
 				print("HELLO_TWO_UP me=", game.probe_my_player())
 				phase = "watch"; t0 = now
 				if role == "host":

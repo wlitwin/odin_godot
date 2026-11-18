@@ -55,6 +55,7 @@ body_impose :: proc(body: gd.Rigid_Body2d, x, y, rot: f32) {
         origin = {x, y},
     }
     v := gd.variant_from_transform2d(&t)
+    defer gd.variant_destroy(&v)
     gd.physics_server2d_body_set_state(
         gd.singleton_physics_server2d(),
         gd.collision_object2d_get_rid(cast(gd.Collision_Object2d)body),
@@ -76,6 +77,7 @@ body_cut :: proc(body: gd.Rigid_Body2d, x, y, rot: f32) {
 body_impel :: proc(body: gd.Rigid_Body2d, vx, vy: f32) {
     vel := gd.Vector2{vx, vy}
     v := gd.variant_from_vector2(&vel)
+    defer gd.variant_destroy(&v)
     gd.physics_server2d_body_set_state(
         gd.singleton_physics_server2d(),
         gd.collision_object2d_get_rid(cast(gd.Collision_Object2d)body),

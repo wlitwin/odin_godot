@@ -10,3 +10,5 @@ window/stretch/mode="canvas_items"
 [rendering]
 renderer/rendering_method="gl_compatibility"
 environment/defaults/default_clear_color=Color(0.055,0.075,0.11,1)
+[editor_plugins]
+enabled=PackedStringArray("res://addons/replay_authoring/plugin.cfg")

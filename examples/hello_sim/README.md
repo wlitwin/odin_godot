@@ -29,3 +29,12 @@ dedicated, avatarless authority. The role selects
 `.Listen_Server_Action`, with the same simulation code. `bash
 examples/hello_sim/run.sh` checks both
 profiles headless through generated read-only probes.
+
+The entity lives in `scripts/actors/`. Its game-specific birth callback stays
+in `scripts/player_hooks.odin`, beside the game owner. This package split needs
+no extra build configuration.
+
+The game also demonstrates [scene variants](../../docs/kit/boot.md#scene-variants):
+even-numbered seats use `player_diamond.tscn`, selected with `variant = .Diamond`.
+Both scenes share the same Player script, wire type, movement and callbacks.
+The host/guest test verifies that both screens instantiate one of each scene.

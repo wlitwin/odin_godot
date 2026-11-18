@@ -27,6 +27,7 @@ func invalid(world: Box3DWorld3D,label: String) -> bool:
 func joint_case(kind: String) -> bool:
 	var world:=make_world();world.stable_key="motion."+kind
 	var joint: Box3DJoint3D=load("res://addons/box3d_authoring/"+kind+"_joint_3d.gd").new()
+	joint.frame_mode=Box3DJoint3D.FrameMode.BODY_LOCAL
 	joint.name="JointPresentation";joint.stable_key="joint";joint.body_a="body.a";joint.body_b="body.b"
 	joint.local_frame_a.origin=Vector3(0,2,0);world.add_child(joint);joint.owner=world
 	var result: Dictionary=extract(world)

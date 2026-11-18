@@ -19,6 +19,21 @@ async function open(name, role, room = '') {
     args: ['--no-sandbox', '--enable-features=SharedArrayBuffer', '--disable-features=WebRtcHideLocalIpsWithMdns', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader', '--ignore-gpu-blocklist', '--enable-webgl']});
   browsers.push(browser);
   const page = await browser.newPage();
+  if ((mode === 'no_control_offer' && role === 'host') || (mode === 'no_control_answer' && role === 'join')) {
+    await page.evaluateOnNewDocument(() => {
+      const send = WebSocket.prototype.send;
+      WebSocket.prototype.send = function (data) {
+        if (typeof data === 'string') {
+          const packet = JSON.parse(data);
+          if (packet.type === 'signal' && packet.data?.kind === 'sdp') {
+            delete packet.data.control_stream;
+            data = JSON.stringify(packet);
+          }
+        }
+        return send.call(this, data);
+      };
+    });
+  }
   const p = { browser, page, name, lines: [], errors: [] }; peers.push(p);
   page.on('console', msg => {
     const line = msg.text(); p.lines.push(line);
@@ -35,7 +50,14 @@ try {
   const host = await open('host', 'host');
   await deadline(() => host.lines.some(x => x.includes(mode === 'game' ? 'REPLAY_RTC_GAME_ROOM' : 'REPLAY_RTC_ROOM')), 'host room');
   const room = host.lines.find(x => x.includes(mode === 'game' ? 'REPLAY_RTC_GAME_ROOM' : 'REPLAY_RTC_ROOM')).match(/REPLAY_RTC_(?:GAME_)?ROOM (\w+)/)[1];
-  const a = await open('client', 'join', room), b = await open('observer', mode === 'game' ? 'observer' : 'join', room);
+  const a = await open('client', 'join', room);
+  if (mode.startsWith('no_control_')) {
+    const receiver = mode === 'no_control_offer' ? a : host;
+    await deadline(() => receiver.lines.some(x => x.includes('REPLAY_RTC_CONTROL_REJECTED')), 'unsupported SDP rejection', 10000);
+    if ([host,a].some(p => p.lines.some(x => x.includes('REPLAY_RTC_CONNECTED')))) throw new Error('unsupported peer became ready');
+    console.log(`REPLAY_RTC_CONTROL_REJECTION_OK ${mode}`);
+  } else {
+  const b = await open('observer', mode === 'game' ? 'observer' : 'join', room);
   if (mode === 'game') {
     await deadline(() => [host,a,b].every(p => p.lines.some(x => x.includes('REPLAY_RTC_GAME_STATE'))), 'game convergence');
     const hashes = [host,a,b].map(p => p.lines.find(x => x.includes('REPLAY_RTC_GAME_STATE')).match(/hash=(\d+)/)[1]);
@@ -51,6 +73,7 @@ try {
   await deadline(() => replacement.lines.some(x => /REPLAY_RTC_DONE id=5/.test(x)) && [host,a].every(p => p.lines.some(x => /REPLAY_RTC_VERIFIED .*from=5/.test(x))), 'same adapter restart');
   await wait(1500);
   console.log('REPLAY_RTC_BROWSER_OK');
+  }
   }
 } finally {
   await Promise.allSettled(browsers.filter(b => b.connected).map(b => b.close()));

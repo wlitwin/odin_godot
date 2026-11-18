@@ -53,7 +53,7 @@ four forwarders, the channel plan, and the session.
   embedded in the engine loop). False means Steam is not running, there is no appid, or there is no
   extension, so show your non-Steam lobby instead. Call once, before any lobby work. `TEST_APP_ID` is 480
   (Spacewar, Valve's test app that every Steamworks account can develop against).
-- `listen(node, on_lobby_created := "", on_lobby_joined := "", on_join_requested := "") -> bool`:
+- `listen(subscription: ^Subscription, node, on_lobby_created := "", on_lobby_joined := "", on_join_requested := "") -> bool`:
   connects GodotSteam's lobby signals to the game's `@(gd_method)`s (Godot signals must
   land on script methods, the same contract as `netgd.wire_listen`). Empty names skip. The
   handler signatures:
@@ -127,22 +127,27 @@ Three `Transport` callbacks are nil in the current Steam integration:
 if steamgd.available() && env_int("CAVE_STEAM", 1) != 0 {
 	self.steam_on = steamgd.init(env_int("CAVE_APPID", steamgd.TEST_APP_ID))
 	if self.steam_on {
-		steamgd.listen(self.owner, "on_lobby_created", "on_lobby_joined", "on_join_requested")
+		steamgd.listen(&self.steam_signals, self.owner, "on_lobby_created", "on_lobby_joined", "on_join_requested")
 	}
 }
 ```
 
-The Host handler selects the transport. ENet calls `gd.host`; Steam waits for
-`lobby_created`. Both then call the shared `begin_hosting` session setup.
-Joining uses the corresponding shared `begin_joining` procedure.
+Store `steam_signals: steamgd.Subscription` on the game. Call
+`steamgd.unlisten(&self.steam_signals)` in its finalizer, before leaving the
+lobby. Only connections created by that subscription are disconnected.
+
+The Host handler selects the transport. ENet opens immediately; Steam waits
+for `lobby_created`. Both use `boot_open_host`, which starts the Session and
+owns the peer's cleanup. `host_ready` adds the game's scoreboard and status.
+Joining uses `boot_open_join` and the game's `join_ready` receipt.
 
 ```odin
 @(gd_method)
 cave_lobby_on_lobby_created :: proc(self: ^CaveLobby, result: gd.Int, lobby_id: gd.Int) {
 	if int(result) != 1 { ... return }
 	self.steam_lobby = u64(lobby_id)
-	if !steamgd.host_peer(self.owner) { ... return }
-	begin_hosting(self)
+	if !kboot.boot_open_host(&self.boot, &steamgd.TRANSPORT, {}, my_name(self), my_token()) { ... return }
+	host_ready(self)
 	steamgd.invite_overlay(self.steam_lobby)
 }
 ```
@@ -158,9 +163,9 @@ cave_lobby_on_lobby_joined :: proc(self: ^CaveLobby, lobby_id: gd.Int, _perms: g
 		return // our own lobby (hosts join what they create), or no Steam
 	}
 	self.steam_lobby = u64(lobby_id)
-	if !steamgd.client_peer(self.owner, owner) { ... return }
+	if !kboot.boot_open_join(&self.boot, &steamgd.TRANSPORT, {peer_id = owner}, my_name(self), my_token()) { ... return }
 	// connected_to_server triggers the wire's on_net_up session join.
-	begin_joining(self)
+	join_ready(self)
 }
 
 @(gd_method)

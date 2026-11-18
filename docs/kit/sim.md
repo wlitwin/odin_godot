@@ -301,7 +301,7 @@ when attaching, then override lane settings when measurements call for it:
 // ready(): Boot + entities + lane in one generated call
 cfg := kboot.network_profile(.Listen_Server_Action)
 cfg.lane.smooth_cut = 48
-game_net_attach(self, kboot.Options{/* ... */}, cfg)
+if !game_net_attach(self, kboot.Options{/* ... */}, cfg) {return}
 ```
 
 The generated `<class>_lane_init` supplies the input size, typed procedures,
@@ -342,6 +342,11 @@ Tests and games without generated code can call the same procedures directly:
 Until its first call, the `presented` latch allows received snapshots to update
 watched fields directly. After that call, presentation updates those fields.
 A client that omits `lane_present` therefore continues to show received state.
+
+Before using `lane_input_of` in a hand-built lane, register each exact input type
+with `lane_class_set_type(&lane, class_id, typeid_of(Input))`. Equal byte sizes do
+not identify input types. Raw `lane_input(&lane, player, class_id)` remains available
+when the caller deliberately manages byte-oriented input.
 
 Reinitializing a session does not reset lane state. The app route survives,
 but the tick anchor and state ledgers remain tied to the previous authority.
@@ -951,3 +956,8 @@ See [net](net.md) for the wire format, descriptors, blend math, and tick
 support used by this lane; [session](session.md) for identity and reliable
 state; and [play](play.md) for coop components, including Puppet for
 engine-driven physics and `play/sim` for replayable integration.
+
+`lane_destroy` returns a `World_Error`. A refused cleanup keeps the Lane and its
+remaining ownership state intact; check the result and retry after the active
+operation or dependent owner releases. Do not reset or reinitialize a Lane while
+cleanup is pending.

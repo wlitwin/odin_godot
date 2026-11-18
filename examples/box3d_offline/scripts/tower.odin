@@ -145,7 +145,7 @@ box_tower_process :: proc(self: ^Box_Tower, delta: f64) {
 	place_camera(self)
 }
 
-box_tower_exit_tree :: proc(self: ^Box_Tower) {
+box_tower_finalize :: proc(self: ^Box_Tower) {
 	destroy_world(self)
 }
 

@@ -1,5 +1,7 @@
 package scriptgen
 
+import decl "godot:decl"
+
 import "core:fmt"
 import "core:strings"
 import "core:odin/ast"
@@ -131,7 +133,7 @@ emit_replay_view :: proc(b: ^strings.Builder, s: ^Script) {
     }
 
     cls := s.struct_name
-    snake := to_snake(cls)
+    snake := decl.snake_name(cls)
     value := fmt.tprintf("type_of(%s{{}}.%s)", cls, info.value)
     base := fmt.tprintf("rview.Script_View(%s,%s)", value, cls)
     target := base

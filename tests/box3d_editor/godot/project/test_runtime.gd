@@ -41,8 +41,8 @@ func closed_outward_box(transform: Transform3D) -> bool:
 func _initialize() -> void:
 	probe=Node.new();probe.set_script(load("res://modules/editor_probe/probe.odin"));root.add_child(probe)
 	services=Box3DEditorServices.new(root)
-	var installed: Dictionary=services.install_once()
-	if not installed.get("ok",false) or installed.get("copied",-1)!=0 or not services.available():fail("ordinary installed tools: "+JSON.stringify(installed));return
+	var installed: Dictionary=services.install_tools()
+	if not installed.get("ok",false) or installed.get("changed",true) or not services.available():fail("ordinary installed tools: "+JSON.stringify(installed));return
 	var arrays: Array=[];arrays.resize(Mesh.ARRAY_MAX);arrays[Mesh.ARRAY_VERTEX]=PackedVector3Array([Vector3.ZERO,Vector3.RIGHT,Vector3.BACK]);arrays[Mesh.ARRAY_INDEX]=PackedInt32Array([0,1,2])
 	var source:=ArrayMesh.new();source.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays);source.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
 	var transform:=Transform3D(Basis.IDENTITY.scaled(Vector3(2,3,4)),Vector3(5,6,7))

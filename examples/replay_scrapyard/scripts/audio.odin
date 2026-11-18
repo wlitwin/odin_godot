@@ -109,7 +109,9 @@ audio_prepare :: proc(self: ^ReplayScrapyard) {
         return
     }
 
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
     baseline := self.session.authority ? u64(0) : self.session.client.journal.baseline
 
     if !a.scoped || epoch != a.route.ledger.epoch {
@@ -134,9 +136,9 @@ audio_prepare :: proc(self: ^ReplayScrapyard) {
         a.scoped = true
     }
 
-    if !self.session.authority && self.session.client.view_reset != a.view_reset {
+    if !self.session.authority && scope_info.reset != a.view_reset {
         a.observer = {}
-        a.view_reset = self.session.client.view_reset
+        a.view_reset = scope_info.reset
         scenegd.audio_pool_clear(&a.route.pool)
     }
 
@@ -208,10 +210,11 @@ audio_frame :: proc(self: ^ReplayScrapyard, dt: f64) {
 
     world: ^game.World
     frame, ok := rgd.session_authority_state(self.session)
+    scope_info, scope_ready := rgd.session_presentation(self.session)
 
-    if ok {
+    if ok && scope_ready {
         world = &frame.state
-        epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+        epoch := scope_info.epoch
         cues: [64]sound.Cue
         count := sound.observe(&a.observer, epoch, &frame, cues[:])
 

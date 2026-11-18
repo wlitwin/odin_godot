@@ -1,24 +1,23 @@
 # Cavecrawl carrier acceptance
 
 This suite checks that a carried relic retains its player identity and version
-through death, disconnect, save conversion and approved host recovery. Native
+through death, disconnect, current saved-state resume and approved host recovery. Native
 and browser fixtures below exercise different parts of that contract.
 
 ```sh
 REPLAY_CAVE_CARRIER_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_carrier/run.sh
 ```
 
-The native gate runs 33 Cave tests and WASM checking, builds an isolated Godot
+The native gate runs Cave model tests and WASM checking, builds an isolated Godot
 game and coordinator, then exercises
-fifteen C1–C7 conversion/resume cases, native retained-frame carrier checks,
+fifteen current saved-fixture resumes, native retained-frame carrier checks,
 four carrier migration scenarios and full normal/faulted campaigns. The aggregate
 gate is registered in `tests/run_all.sh`.
 
-The two C6 archives contain scripted pre-change dead/disconnected world states.
-They were encoded by C6's actual checkpoint API before changing the model. They
-exercise conversion and subsequent state advancement, not transport departure.
-Their producer, model sources, logs and hashes live under
-`tests/replay_cave/fixtures/content6`. Regeneration requires the archived C6 model.
+The two retained cases represent dead/disconnected carriers. Their current
+checkpoints live in `tests/replay_cave/fixtures/current`; originals and receipts
+remain under `docs/replay/results/usability-legacy-2026-11-16/cavecrawl`.
+They exercise saved-state advancement, not transport departure.
 
 `migrations.py PREPARED [LABEL]` runs real coordinator/host/successor/guest processes
 with 120 ms receive delay. Carrier seats 2 and 3 each cross planned and crash

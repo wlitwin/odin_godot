@@ -9,4 +9,6 @@ set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
 "${ODIN:-odin}" test "$ROOT/tests/kitsession" -collection:godot="$ROOT"
+# Publication guards must still refuse unfinished drafts in shipped builds.
+"${ODIN:-odin}" test "$ROOT/tests/kitsession" -collection:godot="$ROOT" -disable-assert
 echo "KITSESSION_OK"

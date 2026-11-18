@@ -43,7 +43,9 @@ spitter_spawn_grace_and_projectile_wound_are_tick_owned :: proc(t: ^testing.T) {
 @(test)
 popper_death_has_no_loot_and_rewind_removes_its_blast :: proc(t: ^testing.T) {
     w := yard()
-    game.spawn_mob(&w, 3, {536, 1040})
+    // Leave time to issue the dash action before contact. Actions execute after
+    // movement and cannot retroactively prevent an explosion on their own tick.
+    game.spawn_mob(&w, 3, {548, 1040})
     timeline: r.Timeline(game.World, Input, game.Event)
     r.init(&timeline, r.Frame(game.World){state = w}, step)
     defer r.destroy(&timeline)
@@ -58,10 +60,10 @@ popper_death_has_no_loot_and_rewind_removes_its_blast :: proc(t: ^testing.T) {
     testing.expect_value(t, before.state.players[0].hp, u8(8))
     testing.expect_value(t, before.state.drops.count, u32(0))
     input: Input
+    input.dash = true
     input.controls[0] = {
         move = {-1, 0},
         aim  = {-1, 0},
-        dash = true,
     }
     testing.expect_value(t, r.revise_input(&timeline, 1, input).error, r.Error.None)
     after, _ := r.current(&timeline)

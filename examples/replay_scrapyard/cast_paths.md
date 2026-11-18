@@ -28,19 +28,10 @@ continues the saved lifetime rather than replaying an old launch.
 
 ## Compatibility
 
-Arc paths introduced content **`0x5253435241503046`**; [dash actions](controls.md)
-subsequently introduced **`0x5253435241503047`**. Adding the Arc enum member changed
-the canonical schema/contract while the World remained 52,600 bytes. Gameplay
-protocol 7 and checkpoint layout 4 were unchanged by that transition. Older peers
-fail admission; older saves require the explicit [offline converter](saves.md#converting-older-replay-runs).
-The save guide records the current content identity and accepted input formats.
-
-The converter paths for contents 42–45 use frozen old World/Flash and event/action
-descriptors, map World fields and pending actions, and retain the existing
-identity, outcomes, inputs and asset checks. The content-45 fixture was created
-with the actual old converter before the enum changed. Existing destinations and
-source files are never overwritten. Earlier shared value types remain reused
-where their shape is unchanged; future changes must preserve those source shapes.
+The game requires its current content and schema contract. Retained captures
+were migrated with their paths, counters and pending action metadata preserved;
+[current saved fixtures](saves.md#current-saved-fixtures) exercise direct decoding
+and fresh-process resume. Historical conversion code has been retired.
 
 ```sh
 nix develop --command bash examples/replay_scrapyard/cast_path_run.sh

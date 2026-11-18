@@ -42,6 +42,7 @@ shapes = Array[ExtResource("shape_base")]([ExtResource("sensor_shape")])
 [node name="PendulumHinge" type="Node3D" parent="."]
 script = ExtResource("hinge")
 stable_key = "pendulum.hinge"
+frame_mode = 1
 body_a = "ground"
 body_b = "pendulum"
 local_frame_a = Transform3D(1,0,0,0,1,0,0,0,1,-2,3.25,0)

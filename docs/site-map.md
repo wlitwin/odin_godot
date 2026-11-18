@@ -132,7 +132,8 @@ the whole map or use your browser's Find command to locate a subject.
 | Page | Topics |
 | --- | --- |
 | [Box3D overview](box3d/index.md) | Offline physics and separate Kit and Replay adapters |
-| [Knock down a tower](box3d/quickstart.md) | World creation, stepping, copied poses, density, and a browser build |
+| [Offline starter](box3d/quickstart.md) | Authored physics, automatic visual binding, reset and cleanup |
+| [Procedural tower](box3d/procedural.md) | Explicit spawning, density and a browser build |
 | [Physics ownership](box3d/ownership.md) | Authored content, the live solver, complete checkpoints, presentation, and cleanup |
 | [Author a world](box3d/authoring.md) | Bodies, sensors, shapes, stable keys, extraction, and construction |
 | [Editor tools and baking](box3d/editor.md) | Mesh collision, winding, cleanup, artifacts, and debug drawing |

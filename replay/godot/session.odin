@@ -11,6 +11,7 @@ import rec "godot:replay/recovery"
 import tr "godot:replay/transport"
 import view "godot:replay/view"
 import "core:mem"
+import "core:fmt"
 import storagegd "godot:replay/godot/storage"
 import transportgd "godot:replay/godot/transport"
 
@@ -99,6 +100,7 @@ Session :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) {
     reset_index:                     int,
     recovery:                        net.Client_Recovery,
     recovery_serial:                 u64,
+    setup_report:                    net.Setup_Report,
 }
 
 session_open :: proc(
@@ -108,12 +110,41 @@ session_open :: proc(
     options := SESSION_OPTIONS,
     allocator := context.allocator,
     ownership: Session_Ownership = {},
-) -> net.Error {
-    if s.ready || (options.discover_epoch && options.network.require_permit) {
-        return .Invalid_Config
+) -> (
+    result: net.Error,
+) {
+    report: net.Setup_Report
+    stage := "session"
+
+    defer {
+        net.setup_finish(&report, result, stage, "session initialization failed at this step")
+        s.setup_report = report
     }
 
-    if error := session_begin(s, model, options, allocator, ownership); error != .None {
+    if s.ready {
+        return session_setup_fail(
+            &report,
+            .Invalid_Config,
+            "session.ready",
+            "close the current Session before opening another",
+        )
+    }
+
+    if s.cleanup {
+        return session_setup_fail(
+            &report,
+            .Wrong_Phase,
+            "session.cleanup",
+            "finish pending session_close cleanup before opening another Session",
+        )
+    }
+
+    if detail := session_options_check(options); detail.error != .None {
+        report = detail
+        return detail.error
+    }
+
+    if error := session_begin(s, model, options, allocator, ownership, &report); error != .None {
         return error
     }
 
@@ -122,7 +153,8 @@ session_open :: proc(
     s.options.rtc = {}
     s.options.steam.peer = nil // transient caller strings are not retained
 
-    if err := session_connect(s, options); err != .None {
+    if err := session_connect(s, options, setup = &report); err != .None {
+        report.cleanup_error = session_close(s)
         return err
     }
 
@@ -147,6 +179,7 @@ session_open :: proc(
             incarnation = options.incarnation,
             allocator = s.allocator,
             ownership = session_runner_ownership(s, s.authority),
+            setup = &report,
         )
 
         if err == .None {
@@ -156,6 +189,7 @@ session_open :: proc(
         }
 
         if err == .None && s.server.local_seat != 0 {
+            stage = "options.token"
             err = net.server_set_local_token(&s.server, s.token)
         }
     } else {
@@ -170,9 +204,11 @@ session_open :: proc(
             incarnation = options.incarnation,
             allocator = s.allocator,
             ownership = session_runner_ownership(s, s.authority),
+            setup = &report,
         )
 
         if err == .None && options.discover_epoch {
+            stage = "options.discover_epoch"
             err = net.client_discover_epoch(&s.client, storagegd.session_token())
         }
 
@@ -192,7 +228,7 @@ session_open :: proc(
     }
 
     if err != .None {
-        session_close(s)
+        report.cleanup_error = session_close(s)
         return err
     }
 
@@ -217,19 +253,43 @@ session_resume :: proc(
     resume: net.Resume_Options,
     allocator := context.allocator,
     ownership: Session_Ownership = {},
-) -> net.Error {
-    if s.ready || (options.role != .Solo && options.role != .Host && options.role != .Server) {
-        return .Wrong_Phase
+) -> (
+    result: net.Error,
+) {
+    report: net.Setup_Report
+    stage := "checkpoint"
+
+    defer {
+        net.setup_finish(&report, result, stage, "checkpoint resume failed at this step")
+        s.setup_report = report
     }
 
-    if error := session_begin(s, model, options, allocator, ownership); error != .None {
+    if s.ready || s.cleanup || (options.role != .Solo && options.role != .Host && options.role != .Server) {
+        return session_setup_fail(
+            &report,
+            .Wrong_Phase,
+            "options.role",
+            "resume needs a closed authority Session (Solo, Host or Server)",
+        )
+    }
+
+    if detail := session_options_check(options); detail.error != .None {
+        report = detail
+        return detail.error
+    }
+
+    if cp == nil {
+        return session_setup_fail(&report, .Invalid_Checkpoint, "checkpoint", "a checkpoint is required")
+    }
+
+    if error := session_begin(s, model, options, allocator, ownership, &report); error != .None {
         return error
     }
 
     committed := false
 
     defer if !committed {
-        session_close(s)
+        report.cleanup_error = session_close(s)
     }
 
     s.options = options
@@ -238,26 +298,46 @@ session_resume :: proc(
     s.options.steam.peer = nil
 
     if options.discover_epoch && (cp.settings.require_permit || options.network.require_permit) {
-        return .Invalid_Config
+        return session_setup_fail(
+            &report,
+            .Invalid_Config,
+            "options.discover_epoch",
+            "epoch discovery cannot resume a permit-gated checkpoint",
+        )
     }
 
     if !cp.ready || cp.header.content != options.network.content || cp.settings.hz != options.network.hz {
-        return .Checkpoint_Contract
+        return session_setup_fail(
+            &report,
+            .Checkpoint_Contract,
+            "checkpoint",
+            "checkpoint must be ready and match the Session content identity and tick rate",
+        )
     }
 
     if options.role == .Server {
         if resume.local_seat != 0 {
-            return .Invalid_Config
+            return session_setup_fail(
+                &report,
+                .Invalid_Config,
+                "resume.local_seat",
+                "a dedicated Server resumes with seat 0",
+            )
         }
     } else {
         seat, found := net.checkpoint_seat(cp, options.token)
 
         if !found || seat != resume.local_seat {
-            return .Invalid_Input
+            return session_setup_fail(
+                &report,
+                .Invalid_Input,
+                "resume.local_seat",
+                "must match the checkpoint seat belonging to options.token",
+            )
         }
     }
 
-    if err := session_connect(s, options); err != .None {
+    if err := session_connect(s, options, setup = &report); err != .None {
         return err
     }
 
@@ -275,6 +355,7 @@ session_resume :: proc(
         resume,
         allocator = s.allocator,
         ownership = session_runner_ownership(s, true),
+        setup = &report,
     ); err != .None {
         return err
     }
@@ -370,19 +451,29 @@ session_connect :: proc(
     s: ^Session($State, $Control, $Action, $Event, $Seats),
     options: Session_Options,
     preserve_runtime: bool = false,
-) -> net.Error {
+    setup: ^net.Setup_Report = nil,
+) -> (
+    result: net.Error,
+) {
+    stage := "transport"
+    defer net.setup_finish(setup, result, stage, "could not initialize this transport component")
     s.role = options.role
     s.authority = options.role == .Solo || options.role == .Host || options.role == .Server
 
     if !r.owner_is_nil(s.ownership.container.owner) {
         if options.backend != .Enet && options.backend != .Rtc {
-            return .Invalid_Config
+            return session_setup_fail(
+                setup,
+                .Invalid_Config,
+                "options.backend",
+                "managed Sessions support Enet or Rtc",
+            )
         }
 
         connection := s.connection
 
         if connection == nil {
-            opened, error := session_connection_open(s, options)
+            opened, error := session_connection_open(s, options, setup)
 
             if error != .None {
                 return error
@@ -400,37 +491,59 @@ session_connect :: proc(
     if options.role != .Solo {
         switch options.backend {
         case .Enet:
+            stage = "options.enet"
             ok :=
                 s.authority ? transportgd.enet_host(&s.enet, options.port, 16) : transportgd.enet_join(&s.enet, options.address, options.port)
 
             if !ok {
-                return .Transport
+                return session_setup_fail(
+                    setup,
+                    .Transport,
+                    "options.enet",
+                    fmt.tprintf(
+                        "ENet open failed on port %d; check address, port availability and target support",
+                        options.port,
+                    ),
+                )
             }
 
             s.base_wire = transportgd.enet_transport(&s.enet)
         case .Rtc:
+            stage = "options.rtc"
             cfg := options.rtc
             cfg.host = s.authority
 
             if !transportgd.rtc_open(&s.rtc, cfg, s.allocator) {
-                return .Transport
+                return session_setup_fail(
+                    setup,
+                    .Transport,
+                    "options.rtc",
+                    "RTC open failed; check relay, room/peer identity and ICE settings",
+                )
             }
 
             s.base_wire = transportgd.rtc_transport(&s.rtc)
         case .Steam:
-            if transportgd.steam_open(&s.steam, options.steam, s.authority) != .None {
-                return .Transport
+            if error := transportgd.steam_open(&s.steam, options.steam, s.authority); error != .None {
+                return session_setup_fail(
+                    setup,
+                    .Transport,
+                    "options.steam",
+                    fmt.tprintf("Steam open failed: %v", error),
+                )
             }
 
             s.base_wire = transportgd.steam_transport(&s.steam)
         case:
-            return .Invalid_Config
+            return session_setup_fail(setup, .Invalid_Config, "options.backend", "choose Enet, Rtc or Steam")
         }
 
         if options.latency_ms > 0 ||
            options.jitter_ms > 0 ||
            options.loss_permyriad > 0 ||
            options.duplicate_permyriad > 0 {
+            stage = "options.latency_ms"
+
             if !tr.delay_init(&s.delay, s.base_wire, options.latency_ms) {
                 if preserve_runtime {
                     session_disconnect(s)
@@ -443,6 +556,8 @@ session_connect :: proc(
 
             s.base_wire = tr.delay_transport(&s.delay)
 
+            stage = "options.jitter_ms/loss_permyriad/duplicate_permyriad"
+
             if !tr.delay_faults(&s.delay, options.jitter_ms, options.loss_permyriad, options.duplicate_permyriad, 42) {
                 if preserve_runtime {
                     session_disconnect(s)
@@ -453,6 +568,8 @@ session_connect :: proc(
                 return .Invalid_Config
             }
         }
+
+        stage = "options.replication"
 
         if !rec.link_init(session_link(s), s.base_wire, options.replication) {
             if preserve_runtime {
@@ -901,15 +1018,31 @@ session_begin :: proc(
     options: Session_Options,
     allocator: mem.Allocator,
     ownership: Session_Ownership,
-) -> net.Error {
+    setup: ^net.Setup_Report = nil,
+) -> (
+    result: net.Error,
+) {
+    stage := "ownership"
+    defer net.setup_finish(setup, result, stage, "Session ownership check or retain failed")
+
     if s.ready || s.cleanup {
-        return .Wrong_Phase
+        return session_setup_fail(
+            setup,
+            .Wrong_Phase,
+            "session",
+            "close the current Session and finish pending cleanup before opening another",
+        )
     }
 
     managed := !r.owner_is_nil(ownership.container.owner)
 
     if session_sdk_physics(model) && !managed {
-        return .Invalid_Model
+        return session_setup_fail(
+            setup,
+            .Invalid_Model,
+            "ownership.container",
+            "SDK complete physics requires managed Session ownership",
+        )
     }
 
     if !managed {
@@ -918,7 +1051,12 @@ session_begin :: proc(
     }
 
     if (options.backend != .Enet && options.backend != .Rtc) || options.role == .Solo {
-        return .Invalid_Config
+        return session_setup_fail(
+            setup,
+            .Invalid_Config,
+            "options.role/backend",
+            "managed Sessions require a network role with Enet or Rtc",
+        )
     }
 
     if r.owner_contexts_check(
@@ -961,14 +1099,24 @@ session_begin :: proc(
             )
 
             if error != .None {
-                session_close(s)
+                cleanup := session_close(s)
+
+                if setup != nil {
+                    setup.cleanup_error = cleanup
+                }
+
                 return error
             }
 
             alias = created
         } else {
             if r.owned_context_access(alias, user, true, .Execute) != .None || r.owner_retain(alias.owner) != .None {
-                session_close(s)
+                cleanup := session_close(s)
+
+                if setup != nil {
+                    setup.cleanup_error = cleanup
+                }
+
                 return .Invalid_Model
             }
         }
@@ -1025,10 +1173,13 @@ session_connection_alias :: proc(
 session_connection_open :: proc(
     s: ^Session($S, $C, $A, $E, $N),
     options: Session_Options,
+    setup: ^net.Setup_Report = nil,
 ) -> (
     result: ^Session_Connection(S, C, A, E, N),
     error: net.Error,
 ) {
+    stage := "connection.ownership"
+    defer net.setup_finish(setup, error, stage, "managed connection initialization failed at this step")
     service := bg.service_get()
     ctx, status := meter.create(service, bg.CATEGORY_REPLAY_CORE)
 
@@ -1072,13 +1223,20 @@ session_connection_open :: proc(
     defer if !committed {
         if cleanup_error := session_connection_close(&c); cleanup_error != .None {
             s.retired_connection = c
+
+            if setup != nil {
+                setup.cleanup_error = cleanup_error
+            }
         }
     }
 
     base_owner: r.Owned_Context
 
+    stage = "options.backend"
+
     switch options.backend {
     case .Enet:
+        stage = "options.enet"
         packets, pe := session_connection_alias(c, &c.enet.packets, size_of(c.enet.packets))
 
         if pe != .None {
@@ -1100,6 +1258,7 @@ session_connection_open :: proc(
         c.base_wire = transportgd.enet_transport(&c.enet)
         base_owner = packets
     case .Rtc:
+        stage = "options.rtc"
         container, ce := session_connection_alias(c, &c.rtc, size_of(c.rtc))
 
         if ce != .None {
@@ -1148,6 +1307,8 @@ session_connection_open :: proc(
     case .Steam:
         return nil, .Invalid_Config
     }
+
+    stage = "options.delay"
 
     if options.latency_ms != 0 ||
        options.jitter_ms != 0 ||
@@ -1234,6 +1395,8 @@ session_connection_open :: proc(
     owned.lane_owner = proc(user: rawptr, router: ^tr.Router, wire: tr.Transport) -> (r.Owned_Context, net.Error) {
         return session_lane_owner(cast(^Session_Connection(S, C, A, E, N))user, router, wire)
     }
+
+    stage = "options.replication"
 
     if !rec.link_init(&c.link, c.base_wire, options.replication, alloc, ownership = owned) {
         return nil, .Invalid_Config

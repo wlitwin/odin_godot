@@ -84,9 +84,10 @@ claimball_ready :: proc(self: ^Claimball) {
     net_cfg := kboot.network_profile(.Listen_Server_Action)
     net_cfg.lane.smooth_cut = 60
     net_cfg.lane.tolerance = 0.5
+
     // (The wire-contract version gate is on by default — the generated guard
     // file registers NET_FINGERPRINT as the session default at load.)
-    claimball_net_attach(
+    if !claimball_net_attach(
         self,
         kboot.Options {
             title       = "C L A I M B A L L",
@@ -107,7 +108,9 @@ claimball_ready :: proc(self: ^Claimball) {
             },
         },
         net_cfg,
-    )
+    ) {
+        return
+    }
 
     // PREDICT-SELF (echo_inputs = false — the claimball/speedball fork): no input
     // echo, so each peer ticks only ITS OWN kicker (fresh from its ring) and the
@@ -118,7 +121,7 @@ claimball_ready :: proc(self: ^Claimball) {
     // influencing it. tolerance: sub-half-pixel drift rides uncorrected — the
     // reconcile fires on real divergence, not float noise.
     install_controls()
-    self.bot = gd.env_string("CLB_BOT", "")
+    self.bot = gd.env_string("CLB_BOT", "", context.allocator)
     self.goals_to = u8(gd.env_int("CLB_GOALS", 3))
 
     role := gd.env_string("CLB_ROLE", "")
@@ -638,4 +641,9 @@ ball_tick_then :: proc(g: ^Claimball, self: ^Ball, by: knet.Player_Id, scored: u
     if self.score.l >= g.goals_to || self.score.r >= g.goals_to {
         self.score.won = scored
     }
+}
+
+// Game-owned state; the generated finalizer releases the standard Kit stack afterward.
+claimball_finalize :: proc(self: ^Claimball) {
+    delete(self.bot)
 }

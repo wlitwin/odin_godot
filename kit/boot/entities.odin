@@ -36,28 +36,35 @@ package kit_boot
 // simply replaces the driver.
 
 import gd "godot:godot"
+import "godot:gdext"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import ksim "godot:kit/sim"
 import "core:fmt"
 
+Entity_Scene :: struct {
+    variant:      ksess.Scene_Variant,
+    name:         string,
+    scene_offset: uintptr, // the PackedScene field on the owning game
+}
+
 // One row of the generated table — pure data, no state (state lives on Boot;
 // generated code has no globals to fork across script dlls).
 Entity_Kind :: struct {
-    type:         ksess.Entity_Type,
-    name:         string, // "Mob" — diagnostics only
-    set:          ^knet.Command_Set,
-    script_of:    proc(node: gd.Node) -> rawptr, // generated typed rt.script_of thunk
-    scene_offset: uintptr, // the ^gd.Resource field's offset on the GAME struct
-    spawned:      proc(game: rawptr, entity: rawptr, id: knet.Net_Id, owner: knet.Player_Id), // nil = no hook
-    freed:        proc(game: rawptr, entity: rawptr, id: knet.Net_Id), // nil = no hook
-    sim_set:      ^ksim.Sim_Set, // generated from @(gd_tick); with boot_lane the
+    type:      ksess.Entity_Type,
+    name:      string, // "Mob" — diagnostics only
+    set:       ^knet.Command_Set,
+    script_of: proc(node: gd.Node) -> rawptr, // generated typed rt.script_of thunk
+    scenes:    []Entity_Scene, // one Default plus optional named variants
+    spawned:   proc(game: rawptr, entity: rawptr, id: knet.Net_Id, owner: knet.Player_Id), // nil = no hook
+    freed:     proc(game: rawptr, entity: rawptr, id: knet.Net_Id), // nil = no hook
+    sim_set:   ^ksim.Sim_Set, // generated from @(gd_tick); with boot_lane the
     // factory tracks/untracks the entity on the lane itself
     // Declared knobs off the tag's trailing tokens:
-    stream_hz:    int, // `entity=Mob:3,stream_hz=30` — the kind's owner-stream rate, installed
+    stream_hz: int, // `entity=Mob:3,stream_hz=30` — the kind's owner-stream rate, installed
     // on the session per TYPE (session_set_type_stream_hz) so every spawn
     // on every peer — the heir's resume rebuild included — carries it
-    avatar:       bool, // `entity=Runner:2,avatar` — this kind is a SEAT'S BODY, not an NPC:
+    avatar:    bool, // `entity=Runner:2,avatar` — this kind is a SEAT'S BODY, not an NPC:
     // a host takeover parks it with its seat (reclaimable) instead of
     // adopting it like the dead host's NPCs (session_set_avatar_type)
 }
@@ -97,6 +104,12 @@ boot_entities :: proc(b: ^Boot, game: rawptr, kinds: []Entity_Kind, events: Even
     // re-init like the factory): a per-type stream rate, and which kinds are
     // seats' bodies.
     for &k in kinds {
+        has_default := false
+        for scene, i in k.scenes {
+            has_default |= scene.variant == ksess.DEFAULT_SCENE_VARIANT
+            for previous in k.scenes[:i] {assert(previous.variant != scene.variant, "duplicate entity scene variant")}
+        }
+        assert(has_default, "each entity kind needs a Default scene")
         if k.stream_hz > 0 {
             ksess.session_set_type_stream_hz(b.ses, k.type, k.stream_hz)
         }
@@ -106,26 +119,31 @@ boot_entities :: proc(b: ^Boot, game: rawptr, kinds: []Entity_Kind, events: Even
         }
     }
 
-    // Only with a dispatcher to hand the event to — a nil hook keeps the
-    // session's queue path, so a batch-draining game never silently loses
-    // its own spawns.
-    ksess.session_set_born(b.ses, b, events != nil ? boot_born : nil)
+    // Always synchronize final spawn ownership before presentation. Without
+    // a game dispatcher, boot_born preserves the normal event queue.
+    ksess.session_set_born(b.ses, b, boot_born)
 }
 
-// The authority's spawn is BORN (kit/session's born hook, installed above):
-// the fields are set and announced — dress it NOW, inside the spawn site's
-// call. The game's dispatcher runs on a one-element batch, so the SAME
-// `<game>_entity_spawned` half fires, with the same role gate, as it would
-// from boot_pump's batch on any other peer. Two things boot_forward's
-// Ev_Spawned arm does NOT happen here on purpose: (1) the phase latch is
-// deferred to the next pump (world_pending — boot_phase rises only in
-// boot_pump, the level games edge-detect across it); (2) nothing is queued —
-// the host's own Ev_Spawned is not in that frame's batch. Re-entrant by
-// construction: the census already ran at make, the registry row exists, a
-// handler that spawns again just recurses this door.
+// Synchronize framework ownership at birth, then either dispatch the game's
+// initialized-field hooks immediately or preserve its normal event queue.
+// With a dispatcher, only the phase latch waits for the next pump; the event
+// itself is not repeated there. Re-entrant handlers may spawn another entity.
 @(private = "file")
 boot_born :: proc(user: rawptr, ev: ksess.Ev_Spawned) {
     b := cast(^Boot)user
+
+    // The factory tracked the make-time owner. Draft initialization may
+    // change it without publishing an ownership-transfer event, so bind the
+    // committed owner before any game hook or simulation can observe birth.
+    if b.lane != nil {
+        ksim.lane_set_owner(b.lane, ev.id, ev.owner)
+    }
+
+    if b.ent_events == nil {
+        append(&b.ses.events, ev)
+        return
+    }
+
     b.world_pending = true
     one := [1]ksess.Event{ev}
     b.ent_events(b.ent_game, one[:])
@@ -198,6 +216,13 @@ boot_entity_raw :: proc(
 boot_entity :: proc(b: ^Boot, id: knet.Net_Id, type: ksess.Entity_Type) -> (rawptr, bool) {
     e, _, ok := boot_entity_raw(b, id, type)
     return e, ok
+}
+
+// The immutable scene choice, including a still-provisional predicted spawn.
+boot_entity_variant :: proc(b: ^Boot, id: knet.Net_Id) -> (ksess.Scene_Variant, bool) {
+    cid := boot_entity_canonical(b, id)
+    _, tracked := b.ent_types[cid]
+    return b.ent_variants[cid], tracked
 }
 
 // Who owns an entity (PLAYER_ID_INVALID = host-owned / unknown id) — the
@@ -289,7 +314,7 @@ boot_entity_rows :: proc(
 // one operation. Net_Id zero is the end sentinel; authority ids are positive
 // and provisional ids reserve the high bit, so every live id is representable.
 @(private = "file")
-boot_entity_track :: proc(b: ^Boot, type: ksess.Entity_Type, id: knet.Net_Id) {
+boot_entity_track :: proc(b: ^Boot, type: ksess.Entity_Type, id: knet.Net_Id, variant: ksess.Scene_Variant) {
     assert(id != knet.NET_ID_INVALID)
     _, exists := b.ent_types[id]
     assert(!exists, "boot entity tracked twice")
@@ -303,6 +328,7 @@ boot_entity_track :: proc(b: ^Boot, type: ksess.Entity_Type, id: knet.Net_Id) {
     }
 
     b.ent_types[id] = type
+    b.ent_variants[id] = variant
     b.ent_prev[id] = prev
     b.ent_next[id] = next
 
@@ -346,6 +372,7 @@ boot_entity_forget :: proc(b: ^Boot, id: knet.Net_Id) -> bool {
     delete_key(&b.ent_prev, cid)
     delete_key(&b.ent_next, cid)
     delete_key(&b.ent_types, cid)
+    delete_key(&b.ent_variants, cid)
 
     // A real despawn retires every provisional handle that was rekeyed to it.
     for from, to in b.ent_alias {
@@ -360,9 +387,10 @@ boot_entity_forget :: proc(b: ^Boot, id: knet.Net_Id) -> bool {
 @(private = "file")
 boot_entity_rekey :: proc(b: ^Boot, from, to: knet.Net_Id) {
     type, tracked := b.ent_types[from]
+    variant := b.ent_variants[from]
     assert(tracked, "boot entity rekey source is not tracked")
     assert(boot_entity_forget(b, from))
-    boot_entity_track(b, type, to)
+    boot_entity_track(b, type, to, variant)
     b.ent_alias[from] = to
 }
 
@@ -376,10 +404,28 @@ boot_entities_clear :: proc(b: ^Boot) {
 
     clear(&b.ent_nodes)
     clear(&b.ent_types)
+    clear(&b.ent_variants)
     clear(&b.ent_heads)
     clear(&b.ent_next)
     clear(&b.ent_prev)
     clear(&b.ent_alias)
+}
+
+@(private = "file")
+boot_kind_scene :: proc(b: ^Boot, kind: ^Entity_Kind, variant: ksess.Scene_Variant) -> (gd.Packed_Scene, bool) {
+    for choice in kind.scenes {
+        if choice.variant != variant {continue}
+        scene := (cast(^gd.Packed_Scene)(uintptr(b.ent_game) + choice.scene_offset))^
+        if scene == nil {
+            assert(
+                false,
+                fmt.tprintf("entity %s variant %s: assign its PackedScene in the Inspector", kind.name, choice.name),
+            )
+            return nil, false
+        }
+        return scene, true
+    }
+    return nil, false // no implicit fallback to a different scene
 }
 
 @(private = "file")
@@ -388,6 +434,7 @@ boot_make_entity :: proc(
     type: ksess.Entity_Type,
     id: knet.Net_Id,
     owner: knet.Player_Id,
+    variant: ksess.Scene_Variant,
 ) -> (
     rawptr,
     ^knet.Command_Set,
@@ -399,12 +446,15 @@ boot_make_entity :: proc(
             continue
         }
 
+        scene, known := boot_kind_scene(b, &k, variant)
+        if !known {return nil, nil}
+
         // PREDICTED-SPAWN MATCH: a projectile WE fired is already on our screen,
         // flying under a provisional id — reuse it (rekey our node to the real
         // one), never a second. The lane already rekeyed its tracking + opened a
         // received-truth ledger; here we just carry the node ledger across.
         if b.lane != nil {
-            if entity, from, matched := ksim.lane_spawn_match(b.lane, id, owner, type); matched {
+            if entity, from, matched := ksim.lane_spawn_match(b.lane, id, owner, type, variant); matched {
                 if node, ok := b.ent_nodes[from]; ok {
                     b.ent_nodes[id] = node
                     delete_key(&b.ent_nodes, from)
@@ -415,29 +465,24 @@ boot_make_entity :: proc(
             }
         }
 
-        scene := (cast(^^gd.Resource)(uintptr(b.ent_game) + k.scene_offset))^
-        assert(
-            cast(rawptr)scene != nil,
-            fmt.tprintf(
-                "entity %s (type %d): its tagged scene field is nil — assign the PackedScene in the Inspector",
-                k.name,
-                u16(type),
-            ),
-        )
-        node := gd.instantiate(cast(gd.Packed_Scene)scene)
+        node := gd.instantiate(scene)
         entity := k.script_of(node)
-        assert(
-            entity != nil,
-            fmt.tprintf(
-                "entity %s (type %d): the scene's root does not carry the %s script — attach it in the editor",
-                k.name,
-                u16(type),
-                k.name,
-            ),
-        )
+        if entity == nil {
+            if node != nil {gdext.object_destroy(node)}
+            assert(
+                false,
+                fmt.tprintf(
+                    "entity %s (type %d): the scene's root does not carry the %s script — attach it in the editor",
+                    k.name,
+                    u16(type),
+                    k.name,
+                ),
+            )
+            return nil, nil
+        }
         gd.add_child(b.world, node)
         b.ent_nodes[id] = node
-        boot_entity_track(b, type, id)
+        boot_entity_track(b, type, id, variant)
 
         if k.spawned != nil {
             // Bookkeeping-time, like the hand factories were: the entity exists
@@ -531,15 +576,16 @@ boot_fire_spawn :: proc(
     b: ^Boot,
     type: ksess.Entity_Type,
     owner: knet.Player_Id,
+    variant := ksess.DEFAULT_SCENE_VARIANT,
 ) -> (
     entity: rawptr,
     id: knet.Net_Id,
 ) {
     if b.ses != nil && b.ses.is_host {
-        return ksess.session_spawn_make(b.ses, type, owner)
+        return ksess.session_spawn_make(b.ses, type, owner, variant)
     }
 
-    return boot_spawn_predicted(b, type, owner)
+    return boot_spawn_predicted(b, type, owner, variant)
 }
 
 // The second half — and the ONE announce for both models: the host sends the
@@ -583,18 +629,28 @@ boot_spawn_predicted :: proc(
     b: ^Boot,
     type: ksess.Entity_Type,
     owner: knet.Player_Id,
+    variant := ksess.DEFAULT_SCENE_VARIANT,
 ) -> (
     entity: rawptr,
     id: knet.Net_Id,
 ) {
     assert(b.lane != nil, "boot_spawn_predicted needs a sim lane (boot_lane) — a projectile flies on it")
 
-    if e0, id0, exists := ksim.lane_spawn_of_exec(b.lane); exists {
+    if previous, exists := ksim.lane_spawn_of_exec(b.lane); exists {
         // A reject-chain re-execution (cmd_settle re-runs surviving verb
         // bodies): this fire's projectile already exists — still provisional,
         // or already rekeyed by the authority's spawn. Hand it back; a second
         // node would be a ghost the FIFO match can never pair.
-        return e0, id0
+        if previous.type == type && previous.variant == variant {
+            return previous.entity, previous.id
+        }
+        if !ksim.lane_id_provisional(previous.id) {
+            assert(false, "a replayed spawn cannot replace an authoritative entity's type or scene variant")
+            return nil, 0
+        }
+        // Earlier command rejection can change a surviving fire's choice.
+        // Replace only an unmatched prediction, using the normal cleanup path.
+        if !ksim.lane_spawn_cancel(b.lane, previous.id) {return nil, 0}
     }
 
     for &k in b.ent_kinds {
@@ -603,15 +659,19 @@ boot_spawn_predicted :: proc(
         }
 
         assert(k.sim_set != nil, "a predicted projectile must @(gd_tick) — it flies itself with no inputs")
-        scene := (cast(^^gd.Resource)(uintptr(b.ent_game) + k.scene_offset))^
-        assert(cast(rawptr)scene != nil, fmt.tprintf("entity %s: its tagged scene field is nil", k.name))
-        node := gd.instantiate(cast(gd.Packed_Scene)scene)
+        scene, known := boot_kind_scene(b, &k, variant)
+        if !known {return nil, 0}
+        node := gd.instantiate(scene)
         entity = k.script_of(node)
-        assert(entity != nil, fmt.tprintf("entity %s: the scene's root does not carry the %s script", k.name, k.name))
+        if entity == nil {
+            if node != nil {gdext.object_destroy(node)}
+            assert(false, fmt.tprintf("entity %s: the scene's root does not carry the %s script", k.name, k.name))
+            return nil, 0
+        }
         gd.add_child(b.world, node)
-        id = ksim.lane_spawn_predicted(b.lane, entity, k.sim_set, owner, type)
+        id = ksim.lane_spawn_predicted(b.lane, entity, k.sim_set, owner, type, variant)
         b.ent_nodes[id] = node
-        boot_entity_track(b, type, id)
+        boot_entity_track(b, type, id, variant)
 
         if k.spawned != nil {
             k.spawned(b.ent_game, entity, id, owner)

@@ -13,36 +13,50 @@ cp -R "$package" "$project/addons/odin_godot"
 chmod -R u+w "$project"
 cp -R "$project/addons/odin_godot/template/replay/." "$project/"
 cp "$ROOT/tests/replay_distribution/driver.gd" "$project/driver.gd"
+cp "$ROOT/tests/replay_distribution/effect_probe.odin.txt" "$project/scripts/effect_probe.odin"
+cp "$ROOT/tests/replay_distribution/authoring_probe.odin.txt" "$project/scripts/authoring_probe.odin"
+cp "$ROOT/tests/replay_distribution/authoring_probe.gd" "$project/authoring_probe.gd"
 addon="$project/addons/odin_godot"
 export ODIN_GODOT_ROOT="$addon"
 unset ODIN_SCRIPTS_DLL
+python3 "$ROOT/tests/replay_distribution/first_open.py" "$ROOT" "$project" "$work/first-open"
 SKIP_CORE=1 bash "$addon/build/build_scripts.sh" "$project" >"$work/consumer-build.log" 2>&1
 "$GODOT" --headless --path "$project" --editor --quit-after 120 >"$work/import.log" 2>&1
 python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/wait.json"
 SKIP_CORE=1 bash "$addon/build/build_scripts.sh" "$project" >"$work/consumer-final-build.log" 2>&1
-REPLAY_STARTER_ROLE=solo "$GODOT" --headless --path "$project" --script driver.gd >"$work/solo.log" 2>&1
+python3 "$ROOT/tests/replay_distribution/authoring_editor.py" "$ROOT" "$project" "$work/authoring-editor"
+[[ -f "$addon/replay/editor/worker.py" && -f "$project/replay_authoring.json" && -f "$project/data/pickup.tres" ]]
+python3 "$addon/replay/editor/worker.py" --project "$project" --framework "$addon" --godot "$GODOT" --result "$work/authoring-validation/result.json" --action validate >"$work/authoring-validation.log" 2>&1
+REPLAY_STARTER_ROLE=solo "$GODOT" --headless --audio-driver Dummy --max-fps 60 --quit-after 600 --path "$project" --script authoring_probe.gd >"$work/authoring-runtime.log" 2>&1
+rg -q REPLAY_STARTER_AUTHORING_OK "$work/authoring-runtime.log"
+REPLAY_STARTER_ROLE=solo "$GODOT" --headless --audio-driver Dummy --max-fps 60 --path "$project" --script driver.gd >"$work/solo.log" 2>&1
 rg -q REPLAY_PACKAGE_SOLO_OK "$work/solo.log"
 export REPLAY_STARTER_PORT=$((41000+RANDOM%8000)) REPLAY_STARTER_TEST_DIR="$work"
 for role in host client observer;do
- REPLAY_STARTER_ROLE="$role" "$GODOT" --headless --max-fps 60 --path "$project" --script driver.gd >"$work/$role.log" 2>&1 &pids+=("$!");sleep 0.3
+ REPLAY_STARTER_ROLE="$role" "$GODOT" --headless --audio-driver Dummy --max-fps 60 --path "$project" --script driver.gd >"$work/$role.log" 2>&1 &pids+=("$!");sleep 0.3
 done
 for pid in "${pids[@]}";do wait "$pid";done;pids=()
 for role in host client observer;do rg -q "REPLAY_PACKAGE_NETWORK_OK role=$role" "$work/$role.log";done
-if rg -q 'REPLAY_PACKAGE_FAIL|REPLAY_STARTER_ERROR|SCRIPT ERROR|ERROR:|instances were leaked|resources still in use' "$work"/solo.log "$work"/host.log "$work"/client.log "$work"/observer.log "$work"/import.log;then exit 1;fi
+if rg -q 'REPLAY_PACKAGE_FAIL|REPLAY_STARTER_ERROR|SCRIPT ERROR|ERROR:|instances were leaked|resources still in use' "$work"/solo.log "$work"/host.log "$work"/client.log "$work"/observer.log "$work"/import.log "$work"/authoring-runtime.log;then exit 1;fi
 odin check "$project/scripts" -collection:godot="$addon" -target:freestanding_wasm32 -no-entry-point -custom-attribute:gd_method
 python3 - "$ROOT" "$project" "$work" <<'PY'
 from pathlib import Path
 import hashlib,json,sys
 root,project,out=map(Path,sys.argv[1:]);addon=project/'addons/odin_godot'
-for name in ['core','godot','gdext','libgd','runtime','decl','flow','flowgd','events','kit','play','replay','box3d','scriptgen','template','build','docs']:
+for name in ['core','godot','gdext','libgd','runtime','decl','flow','flowgd','events','kit','play','replay','box3d','authoring','scriptgen','template','build','docs']:
  assert (addon/name/'.gdignore').exists(),name
 for p in (addon/'replay').rglob('*.odin'):
  assert p.read_bytes()==(out/'source'/p.relative_to(addon)).read_bytes(),p
+for p in (out/'source/authoring').glob('*.odin'):
+ assert p.read_bytes()==(addon/p.relative_to(out/'source')).read_bytes(),p
+for p in (out/'source/build/template/replay').rglob('*'):
+ if p.is_file():assert p.read_bytes()==(addon/'template/replay'/p.relative_to(out/'source/build/template/replay')).read_bytes(),p
+assert (project/'effects/pickup.wav').read_bytes()==(addon/'template/replay/effects/pickup.wav').read_bytes()
 source_refs=[]
 for p in project.rglob('*.odin'):
  if str(root) in p.read_text(errors='replace'):source_refs.append(str(p.relative_to(project)))
 assert not source_refs,source_refs
-(out/'result.json').write_text(json.dumps({'addon':str(addon),'solo':True,'browser':False,'network_roles':['host','client','observer'],'original_checkout_references':source_refs,'replay_files':len(list((addon/'replay').rglob('*.odin')))},indent=2)+'\n')
+(out/'result.json').write_text(json.dumps({'addon':str(addon),'solo':True,'pickup_effects':True,'native_mixer_pcm':True,'browser':False,'network_roles':['host','client','observer'],'original_checkout_references':source_refs,'replay_files':len(list((addon/'replay').rglob('*.odin')))},indent=2)+'\n')
 print('REPLAY_PACKAGE_ISOLATED_OK')
 PY
 if [[ "${SKIP_WEB:-0}" == 1 ]]; then

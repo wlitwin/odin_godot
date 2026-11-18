@@ -70,6 +70,12 @@ collections are hidden from Godot's scene scanner using `.gdignore`; the Odin
 compiler still resolves imports from them. The default Hello starter does not
 use Replay.
 
+The `template/box3d/` starter supplies a minimal offline authored world and normal
+desktop export presets. Its game loop uses `box3d/godot/scene`; a native backend
+is required for simulation. The SDK retains the native source/test inputs used
+by backend receipt validation, so selecting a coherent backend works against the
+installed collection without weakening those checks.
+
 The value-only Replay Session starter uses the bundled core and source
 collection without a Box3D backend. Complete Box3D games additionally use the
 [backend setup](box3d/building.md) and the optional
@@ -137,20 +143,28 @@ scr   .dll: PE32+ executable (DLL) x86-64, for MS Windows, 11 sections
 
 ## Install into a Godot project
 
-1. Copy `addons/odin_godot/` from the build output into your project's `res://addons/`.
+1. Copy the build output's `addons/` directory into your project. It contains
+   `odin_godot/` and the optional `box3d_authoring/` frontend. Enable Box3D
+   Authoring in Project Settings → Plugins when using its editor tools.
 2. Godot auto-discovers `res://addons/odin_godot/odin_godot.gdextension` on next open. Your
-   `.odin` files are now recognized as scripts.
-3. **Compile your scripts dll** (only the scripts, since the core is prebuilt). The core looks
+   `.odin` files are now recognized as scripts. Do not add another core manifest
+   at the project root.
+3. Choose **Project → Tools → Set Up Odin Scripts**, then **Build Odin Scripts**.
+   The setup creates a starter only when `res://scripts/` has no Odin sources.
+   Saving scripts triggers subsequent builds automatically. See
+   [Your first Odin scene](scripting/first-scene.md) for an editor walkthrough.
+
+   **From a terminal**, compile just the scripts, since the core is prebuilt. The core looks
    for `res://bin/libodinscripts.<ext>` (and, in exports, beside the core dll):
 
    ```sh
-   ODIN_GODOT_ROOT=/abs/path/to/your_project/addons/odin_godot \
-     SKIP_CORE=1 bash your_project/addons/odin_godot/build/build_scripts.sh your_project
+   SKIP_CORE=1 bash your_project/addons/odin_godot/build/build_scripts.sh your_project
    # -> your_project/bin/libodinscripts.<ext>
    ```
 
    `SKIP_CORE=1` skips rebuilding the core (you already have the prebuilt one). Re-run this
-   whenever you change a script (the editor's reload-on-save does it automatically in-repo).
+   when building outside the editor. The script locates the addon from its own
+   path; `ODIN_GODOT_ROOT` is only needed to override that collection root.
 
 Compiling scripts requires an `odin` compiler on `PATH`. Use the bundled
 release by default. The native loader can accept a different compiler release

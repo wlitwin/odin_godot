@@ -677,7 +677,12 @@ read_values :: proc(t: ^Timeline($S, $I, $E), tick: u64) -> (Frame(S), bool) {
     }
 
     record := record_at(t, tick)
-    return record != nil ? record.frame : Frame(S){}, record != nil
+    // Branch before copying: an aggregate conditional can make LLVM expand a
+    // large World into one SSA value per field during optimized Wasm lowering.
+    if record == nil {
+        return {}, false
+    }
+    return record.frame, true
 }
 
 current_values :: proc(t: ^Timeline($S, $I, $E)) -> (Frame(S), bool) {

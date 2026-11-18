@@ -6,6 +6,7 @@ import "core:testing"
 import "core:fmt"
 import b "godot:box3d"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import r "godot:replay"
 import rp "godot:replay/physics"
 import rn "godot:replay/net"
@@ -95,14 +96,14 @@ replay_family :: proc(t: ^testing.T, kind: string) {
         return
     }
 
-    built, problem := ba.build(&scene, PROFILE)
+    built, problem := ar.build(&scene, PROFILE)
     testing.expect_value(t, problem.error, ba.Error.None)
 
     if problem.error != .None {
         return
     }
 
-    defer ba.built_destroy(&built)
+    defer ar.built_destroy(&built)
     movement := built.characters[0].config
     initial, error := rp.authoring_checkpoint(&built, config, r.Frame(State){state = initial_state(&built)}, u8)
     testing.expect_value(t, error, r.Error.None)
@@ -247,14 +248,14 @@ replay_actual_action_savepoint_restores_joint_replacement_and_character :: proc(
         return
     }
 
-    built, problem := ba.build(&scene, PROFILE)
+    built, problem := ar.build(&scene, PROFILE)
     testing.expect_value(t, problem.error, ba.Error.None)
 
     if problem.error != .None {
         return
     }
 
-    defer ba.built_destroy(&built)
+    defer ar.built_destroy(&built)
     movement := built.characters[0].config
     initial, error := rp.authoring_checkpoint(
         &built,
@@ -332,14 +333,14 @@ replay_ignored_invalid_character_result_cannot_commit :: proc(t: ^testing.T) {
         return
     }
 
-    built, problem := ba.build(&scene, PROFILE)
+    built, problem := ar.build(&scene, PROFILE)
     testing.expect_value(t, problem.error, ba.Error.None)
 
     if problem.error != .None {
         return
     }
 
-    defer ba.built_destroy(&built)
+    defer ar.built_destroy(&built)
     movement := built.characters[0].config
     initial, error := rp.authoring_checkpoint(&built, config, r.Frame(State){state = initial_state(&built)}, u8)
     testing.expect_value(t, error, r.Error.None)

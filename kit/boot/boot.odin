@@ -172,7 +172,7 @@ Options :: struct {
     // here instead of re-capping by hand right after boot_attach
     // FULL REPLACEMENT (nil = the kit's stock build): a game that wants its
     // own look authors a scene in the editor and the kit ADOPTS it — resolves
-    // the nodes it drives by NAME and pours the stock behavior in. The
+    // the checked references on its OdinKitUIBindings child. The
     // contracts live on each widget's *_adopt in kit/ui: the lobby wants
     // Title/Status/Players/Host/Join/Start; chat wants Lines/Input; the
     // scoreboard wants Grid. Anything else in a scene is the game's own.
@@ -223,6 +223,70 @@ unthrottle_desktop :: proc(max_fps: int) {
     gd.engine_set_max_fps(gd.singleton_engine(), gd.Int(max_fps > 0 ? max_fps : 120))
 }
 
+@(private)
+UI_Connection :: struct {
+    emitter:  u64,
+    callback: gd.Callable,
+    owned:    bool,
+}
+
+@(private)
+UI_SIGNAL_NAMES := [4]cstring{"pressed", "pressed", "pressed", "text_submitted"}
+
+@(private)
+boot_connect_ui :: proc(b: ^Boot, slot: int, emitter: gd.Object, target: gd.Node, method: cstring) {
+    if method == "" {
+        return
+    }
+
+    name := gd.new_string_name_cstring(method, false)
+    callback := gd.new_callable_object_string_name(cast(gd.Object)target, name)
+    gd.free_string_name(name)
+    signal := gd.sname(UI_SIGNAL_NAMES[slot])
+
+    if gd.object_is_connected(emitter, signal, callback) || gd.object_connect(emitter, signal, callback, 0) != .Ok {
+        gd.free_callable(callback)
+        return
+    }
+
+    b.ui_signals[slot] = {u64(gd.object_get_instance_id(emitter)), callback, true}
+}
+
+@(private)
+boot_disconnect_ui :: proc(b: ^Boot) {
+    for &connection, index in b.ui_signals {
+        if !connection.owned {
+            continue
+        }
+
+        emitter := gdext.object_get_instance_from_id(connection.emitter)
+        signal := gd.sname(UI_SIGNAL_NAMES[index])
+
+        if emitter != nil && gd.object_is_connected(cast(gd.Object)emitter, signal, connection.callback) {
+            gd.object_disconnect(cast(gd.Object)emitter, signal, connection.callback)
+        }
+
+        gd.free_callable(connection.callback)
+        connection = {}
+    }
+}
+
+// Drop a subtree from live paths immediately, then defer destruction so this
+// remains safe inside gameplay/signal callbacks.
+retire_nodes :: proc(nodes: ..gd.Node) {
+    for node in nodes {
+        if node == nil {
+            continue
+        }
+
+        if parent := gd.node_get_parent(node); parent != nil {
+            gd.node_remove_child(parent, node)
+        }
+
+        gd.node_queue_free(node)
+    }
+}
+
 Boot :: struct {
     // every piece public: the game repositions/restyles/reads them freely
     ui:               kui.Lobby,
@@ -235,6 +299,7 @@ Boot :: struct {
     fx_layer:         gd.Node, // CanvasLayer BETWEEN the field and the widgets — screen fades,
     // vignettes, full-rect flashes (kui.overlay_attach); games used to
     // node_move_child their overlays under the chat at index 0/1
+    ui_signals:       [4]UI_Connection,
     ui_layer:         gd.Node, // CanvasLayer all the widgets live on — ABOVE the field
     ses:              ^ksess.Session,
     comms:            ^kcomms.Comms,
@@ -273,6 +338,7 @@ Boot :: struct {
     // kit/session's despawn contract and finding a second home for provisional
     // ids; keeping it costs one map entry per live entity.
     ent_types:        map[knet.Net_Id]ksess.Entity_Type,
+    ent_variants:     map[knet.Net_Id]ksess.Scene_Variant,
     // Per-kind linked indexes over ent_types. The old census scanned EVERY
     // entity to answer `<kind>_ids` / owner queries, then hot loops looked each
     // id up again. Heads + links make a kind walk proportional to that kind and
@@ -357,7 +423,21 @@ boot_lane :: proc(b: ^Boot, lane: ^ksim.Lane) {
 
 // The ready() ceremony. Call once, after installing your factory/hooks is
 // fine either side — this wires UI + comms + transport, nothing session-run.
-boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms.Comms, opts: Options) {
+@(require_results)
+boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms.Comms, opts: Options) -> bool {
+    prepared, report := kui.prepare_scenes(opts.lobby_scene, opts.chat_scene, opts.score_scene)
+    defer kui.prepared_destroy(&prepared)
+
+    if report.count > 0 {
+        // Ready must return on failure. Also stop later process/physics/input
+        // callbacks from reaching an unpublished stack. Fix the scene and Play
+        // again; failed startup does not install an in-process retry owner.
+        gd.node_set_process_mode(node, .Process_Mode_Disabled)
+        kui.report_binding_error(&report)
+        gd.print_str("Kit UI setup failed: fix the scene bindings and run again.")
+        return false
+    }
+
     opts := opts
 
     if opts.methods == (Methods{}) {
@@ -387,30 +467,29 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
     gd.add_child(node, cast(gd.Node)layer)
     b.ui_layer = cast(gd.Node)layer
 
-    if cast(rawptr)opts.lobby_scene != nil {
-        b.ui = kui.lobby_adopt(b.ui_layer, opts.lobby_scene, opts.title)
-    } else {
-        b.ui = kui.lobby_make(b.ui_layer, opts.title)
+    attached: bool
+    b.ui, b.chat, b.score, attached = kui.attach_scenes(&prepared, b.ui_layer, opts.title)
+
+    if !attached {
+        boot_detach(b)
+        return false
     }
 
     if opts.status != "" {
         kui.lobby_set_status(&b.ui, opts.status)
     }
 
-    gd.connect_to(cast(gd.Object)b.ui.host_btn, "pressed", node, opts.methods.host)
-    gd.connect_to(cast(gd.Object)b.ui.join_btn, "pressed", node, opts.methods.join)
-    gd.connect_to(cast(gd.Object)b.ui.start_btn, "pressed", node, opts.methods.start)
+    boot_connect_ui(b, 0, cast(gd.Object)b.ui.host_btn, node, opts.methods.host)
+
+    boot_connect_ui(b, 1, cast(gd.Object)b.ui.join_btn, node, opts.methods.join)
+
+    boot_connect_ui(b, 2, cast(gd.Object)b.ui.start_btn, node, opts.methods.start)
 
     kcomms.comms_init(comms, ses)
 
-    if cast(rawptr)opts.chat_scene != nil {
-        b.chat = kui.chat_adopt(b.ui_layer, opts.chat_scene)
-    } else {
-        b.chat = kui.chat_make(b.ui_layer)
-    }
-
     kui.chat_show(&b.chat, false)
-    gd.connect_to(cast(gd.Object)b.chat.input, "text_submitted", node, opts.methods.chat)
+
+    boot_connect_ui(b, 3, cast(gd.Object)b.chat.input, node, opts.methods.chat)
 
     // Node2D containers (not plain Nodes) so games can offset them together —
     // screen shake (kfx.Shake) nudges stage+world as one. Children unaffected.
@@ -422,12 +501,6 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
     b.world = opts.spatial ? cast(gd.Node)gd.new_node3d() : cast(gd.Node)gd.new_node2d()
     gd.node_set_name(b.world, gd.new_string_name_cstring("World", true))
     gd.add_child(node, b.world)
-
-    if cast(rawptr)opts.score_scene != nil {
-        b.score = kui.score_adopt(b.ui_layer, opts.score_scene)
-    } else {
-        b.score = kui.score_make(b.ui_layer)
-    }
 
     b.env = opts.env
     netgd.wire_attach(&b.wire, node, ses, opts.msg_kind)
@@ -472,6 +545,8 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
         gd.set_string(cast(gd.Object)b.legend, "text", fmt.ctprintf("%s", opts.legend))
         gd.set_bool(cast(gd.Object)b.legend, "visible", false)
     }
+
+    return true
 }
 
 // Boot's teardown verb — boot_attach's symmetric twin, for the ONE flow that
@@ -502,6 +577,7 @@ boot_attach :: proc(b: ^Boot, node: gd.Node, ses: ^ksess.Session, comms: ^kcomms
 // under it is the one overlap, and Godot's deletion queue validates each id, so
 // the parent-then-child pair is safe by construction).
 boot_detach :: proc(b: ^Boot) {
+    boot_disconnect_ui(b)
     // Widgets: drop the Odin tracking arrays. The NODES ride ui_layer, freed
     // with its subtree below — these calls never touch the tree (their own
     // contract, stated on each *_destroy).
@@ -521,6 +597,7 @@ boot_detach :: proc(b: ^Boot) {
     boot_entities_clear(b)
     delete(b.ent_nodes)
     delete(b.ent_types)
+    delete(b.ent_variants)
     delete(b.ent_heads)
     delete(b.ent_next)
     delete(b.ent_prev)
@@ -533,23 +610,9 @@ boot_detach :: proc(b: ^Boot) {
     delete(b.succ_room)
     delete(b.rdv_name)
 
-    // The container nodes boot created — one free each carries the whole subtree
-    // (ui_layer: lobby/chat/score/legend; world: every live entity).
-    if cast(rawptr)b.ui_layer != nil {
-        gd.node_queue_free(b.ui_layer)
-    }
-
-    if cast(rawptr)b.fx_layer != nil {
-        gd.node_queue_free(b.fx_layer)
-    }
-
-    if cast(rawptr)b.stage != nil {
-        gd.node_queue_free(b.stage)
-    }
-
-    if cast(rawptr)b.world != nil {
-        gd.node_queue_free(b.world)
-    }
+    // Only Boot-owned subtrees are detached; external nodes/peers stay owned by
+    // their installer. Deferring deletion must not leave stale named children.
+    retire_nodes(b.ui_layer, b.fx_layer, b.stage, b.world)
 
     b^ = {} // back to pre-attach — the ses/comms/lane pointers included (a fresh
     // boot_attach re-supplies them); env / ent_kinds were the game's, never ours.
@@ -570,7 +633,10 @@ boot_net_detach :: proc(b: ^Boot) {
     ses := b.ses
 
     if lane != nil {
-        ksim.lane_destroy(lane)
+        if error := ksim.lane_destroy(lane); error != .Ok {
+            gd.error("Kit Lane cleanup remains pending; retry stack teardown after the active operation completes.")
+            return
+        }
     }
 
     if comms != nil {
@@ -581,6 +647,27 @@ boot_net_detach :: proc(b: ^Boot) {
 
     if ses != nil {
         ksess.session_reset(ses)
+    }
+}
+
+// Final ownership of the recognized standard fields, including initialization
+// performed before attach or state retained after an explicit detach.
+boot_net_destroy :: proc(b: ^Boot, ses: ^ksess.Session, comms: ^kcomms.Comms, lane: ^ksim.Lane = nil) {
+    if lane != nil {
+        if error := ksim.lane_destroy(lane); error != .Ok {
+            gd.error("Kit Lane cleanup remains pending; retry stack teardown after the active operation completes.")
+            return
+        }
+    }
+
+    if comms != nil {
+        kcomms.comms_destroy(comms)
+    }
+
+    boot_net_detach(b)
+
+    if ses != nil {
+        ksess.session_destroy(ses)
     }
 }
 

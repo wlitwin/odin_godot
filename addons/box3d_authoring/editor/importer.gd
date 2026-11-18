@@ -5,14 +5,19 @@ extends EditorImportPlugin
 var services: Box3DEditorServices
 func _init(value: Box3DEditorServices=null) -> void:services=value
 func _get_importer_name() -> String:return "box3d_authoring.artifact"
-func _get_visible_name() -> String:return "Box3D checked owning definition"
+func _get_visible_name() -> String:return "Box3D physics world"
 func _get_recognized_extensions() -> PackedStringArray:return PackedStringArray(["b3authoring"])
 func _get_save_extension() -> String:return "res"
 func _get_resource_type() -> String:return "Resource"
 func _get_preset_count() -> int:return 1
-func _get_preset_name(_index: int) -> String:return "Shared schema/version/hash validation"
+func _get_preset_name(_index: int) -> String:return "Validated physics data"
 func _get_import_options(_path: String,_preset: int) -> Array[Dictionary]:return []
 func _import(source_file: String,save_path: String,_options: Dictionary,_variants: Array[String],_generated: Array[String]) -> Error:
+	if services == null or not services.available():
+		if services != null and not services.pending_imports.has(source_file):
+			services.pending_imports.append(source_file)
+			push_warning("Box3D: build the authoring tools to import " + source_file + ". Import will retry when the tools are ready.")
+		return ERR_UNAVAILABLE
 	var file:=FileAccess.open(source_file,FileAccess.READ)
 	if file==null:return ERR_FILE_CANT_OPEN
 	if file.get_length()>4194304:file.close();return ERR_OUT_OF_MEMORY

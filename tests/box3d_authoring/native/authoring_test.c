@@ -13,8 +13,8 @@ extern ogb3_status ogb3_recovery_test_mutate(const ogb3_recovery_catalog *,
     const uint8_t *,uint64_t,uint32_t,uint8_t *,uint64_t,uint64_t *);
 #define OK(x) do {ogb3_status s_=(x);if(s_){fprintf(stderr,"status %d line %d\n",s_,__LINE__);abort();}} while(0)
 
-static ogb3_recovery_asset_v2 asset(uint32_t id,uint32_t kind) {
-  ogb3_recovery_asset_v2 a={0};a.version=2;a.struct_bytes=sizeof(a);a.base.id=id;a.base.kind=kind;return a;
+static ogb3_recovery_authored_asset asset(uint32_t id,uint32_t kind) {
+  ogb3_recovery_authored_asset a={0};a.version=2;a.struct_bytes=sizeof(a);a.base.id=id;a.base.kind=kind;return a;
 }
 static ogb3_world world(void) {
   ogb3_world_def d;ogb3_world w=0;OK(ogb3_world_def_default(&d));OK(ogb3_world_create(&d,&w));return w;
@@ -32,66 +32,112 @@ static uint64_t live(void) {
 }
 static void descriptor_rejections(ogb3_recovery_config *cfg) {
   ogb3_vec3 p[]={{0,0,0},{1,0,0},{0,1,0},{0,0,1}};
-  uint32_t idx[]={0,2,1};ogb3_recovery_asset_v2 a=asset(1,OGB3_RECOVERY_HULL);
+  uint32_t idx[]={0,2,1};ogb3_recovery_authored_asset a=asset(1,OGB3_RECOVERY_HULL);
   a.vertices=p;a.vertex_count=4;
   ogb3_recovery_catalog *c=NULL;
   for(unsigned mode=0;mode<9;mode++) {
-    ogb3_recovery_asset_v2 v=a;ogb3_vec3 old=p[3];uint64_t before=live();
+    ogb3_recovery_authored_asset v=a;ogb3_vec3 old=p[3];uint64_t before=live();
     switch(mode) {
     case 0:v.version=1;break;case 1:v.struct_bytes--;break;case 2:v.base.id=0;break;
     case 3:v.vertex_count=257;break;case 4:v.vertex_count=3;break;case 5:p[3]=(ogb3_vec3){1,1,0};break;
     case 6:p[3].x=NAN;break;case 7:v.indices=idx;v.triangle_count=1;break;case 8:v.base.a.x=1;break;
     }
-    c=(void *)(uintptr_t)1;assert(ogb3_recovery_catalog_create_v2(cfg,&v,1,&c)!=OGB3_OK && !c);assert(live()==before);p[3]=old;
+    c=(void *)(uintptr_t)1;assert(ogb3_recovery_catalog_create_authored(cfg,&v,1,&c)!=OGB3_OK && !c);assert(live()==before);p[3]=old;
   }
   a=asset(1,OGB3_RECOVERY_MESH);a.vertices=p;a.vertex_count=4;a.indices=idx;a.triangle_count=1;
   for(unsigned mode=0;mode<5;mode++) {
-    ogb3_recovery_asset_v2 v=a;uint32_t old=idx[2];uint64_t before=live();
+    ogb3_recovery_authored_asset v=a;uint32_t old=idx[2];uint64_t before=live();
     if(mode==0)idx[2]=4;if(mode==1)idx[2]=0;if(mode==2)v.indices=NULL;if(mode==3)v.triangle_count=0;if(mode==4)v.triangle_count=UINT32_MAX;
-    c=(void *)(uintptr_t)1;assert(ogb3_recovery_catalog_create_v2(cfg,&v,1,&c)!=OGB3_OK && !c);assert(live()==before);idx[2]=old;
+    c=(void *)(uintptr_t)1;assert(ogb3_recovery_catalog_create_authored(cfg,&v,1,&c)!=OGB3_OK && !c);assert(live()==before);idx[2]=old;
   }
   /* Distinct input arrays / order and an interior point, identical native hull. */
   ogb3_vec3 q[]={{0,0,1},{0,1,0},{1,0,0},{0,0,0},{.1f,.1f,.1f}};
-  ogb3_recovery_asset_v2 aliases[2]={asset(1,OGB3_RECOVERY_HULL),asset(2,OGB3_RECOVERY_HULL)};
+  ogb3_recovery_authored_asset aliases[2]={asset(1,OGB3_RECOVERY_HULL),asset(2,OGB3_RECOVERY_HULL)};
   aliases[0].vertices=p;aliases[0].vertex_count=4;aliases[1].vertices=q;aliases[1].vertex_count=5;
   uint64_t before=live();c=(void *)(uintptr_t)1;
-  assert(ogb3_recovery_catalog_create_v2(cfg,aliases,2,&c)==OGB3_INVALID_ARGUMENT && !c);assert(live()==before);
+  assert(ogb3_recovery_catalog_create_authored(cfg,aliases,2,&c)==OGB3_INVALID_ARGUMENT && !c);assert(live()==before);
   /* Fail each owned construction allocation; no partial catalog is published. */
   a=aliases[0];int succeeded=0;
   for(int64_t fail=0;fail<12;fail++) {
     before=live();ogb3_snapshot_test_fail_allocation_after(fail);c=NULL;
-    ogb3_status s=ogb3_recovery_catalog_create_v2(cfg,&a,1,&c);ogb3_snapshot_test_fail_allocation_after(-1);
+    ogb3_status s=ogb3_recovery_catalog_create_authored(cfg,&a,1,&c);ogb3_snapshot_test_fail_allocation_after(-1);
     if(!s){assert(c);ogb3_recovery_catalog_release(c);succeeded=1;assert(live()==before);break;}
     assert(s==OGB3_OUT_OF_MEMORY && !c);assert(live()==before);
   }
   assert(succeeded);puts("authoring descriptors/aliases/owned-construction-failure PASS");
 }
-static void primitive_v1(ogb3_recovery_config *cfg) {
+static void primitive_catalog(ogb3_recovery_config *cfg) {
   ogb3_recovery_asset a={.id=1,.kind=OGB3_RECOVERY_BOX,.a={.5f,.5f,.5f}};
   ogb3_recovery_catalog *c=NULL;OK(ogb3_recovery_catalog_create(cfg,&a,1,&c));
-  ogb3_recovery_identity id;OK(ogb3_recovery_identity_get(c,&id));assert(id.recovery_format==1);
+  ogb3_recovery_identity id;OK(ogb3_recovery_identity_get(c,&id));assert(id.recovery_format==3);
+  ogb3_recovery_authored_asset authored=asset(1,OGB3_RECOVERY_BOX);authored.base=a;
+  ogb3_recovery_catalog *other=NULL;OK(ogb3_recovery_catalog_create_authored(cfg,&authored,1,&other));
+  ogb3_recovery_identity other_id;OK(ogb3_recovery_identity_get(other,&other_id));assert(!memcmp(&id,&other_id,sizeof(id)));
+  /* Alias rejection is shared, including reversed capsule endpoints. */
+  for(uint32_t kind=OGB3_RECOVERY_BOX;kind<=OGB3_RECOVERY_CAPSULE;kind++){
+    ogb3_recovery_asset aliases[2]={{.id=1,.kind=kind},{.id=2,.kind=kind}};
+    if(kind==OGB3_RECOVERY_BOX)aliases[0].a=(ogb3_vec3){.5f,.5f,.5f};
+    else {aliases[0].radius=.5f;if(kind==OGB3_RECOVERY_CAPSULE){aliases[0].a.y=-1;aliases[0].b.y=1;}}
+    aliases[1]=aliases[0];aliases[1].id=2;
+    if(kind==OGB3_RECOVERY_CAPSULE){aliases[1].a=aliases[0].b;aliases[1].b=aliases[0].a;}
+    ogb3_recovery_authored_asset expanded[2]={asset(1,kind),asset(2,kind)};
+    expanded[0].base=aliases[0];expanded[1].base=aliases[1];
+    uint64_t before=live();ogb3_recovery_catalog *rejected=(void *)(uintptr_t)1;
+    assert(ogb3_recovery_catalog_create(cfg,aliases,2,&rejected)==OGB3_INVALID_ARGUMENT&&!rejected);assert(live()==before);
+    rejected=(void *)(uintptr_t)1;assert(ogb3_recovery_catalog_create_authored(cfg,expanded,2,&rejected)==OGB3_INVALID_ARGUMENT&&!rejected);assert(live()==before);
+  }
   ogb3_world w=world(),r=world();ogb3_body b=body(w,OGB3_DYNAMIC,0,2,0);ogb3_shape_def d;ogb3_shape shape=0;
   OK(ogb3_shape_def_default(&d));OK(ogb3_recovery_catalog_shape(c,1,b,&d,&shape));
   ogb3_snapshot *s=NULL,*decoded=NULL;OK(ogb3_snapshot_capture(w,&s));uint64_t n=0;OK(ogb3_recovery_write(c,s,NULL,0,&n,NULL));
-  uint8_t *bytes=malloc(n);assert(bytes);OK(ogb3_recovery_write(c,s,bytes,n,&n,NULL));assert(bytes[8]==1);
-  OK(ogb3_recovery_read(c,bytes,n,0,&decoded,NULL));OK(ogb3_snapshot_restore(r,decoded));equal(w,r);
+  uint8_t *bytes=malloc(n);assert(bytes);OK(ogb3_recovery_write(c,s,bytes,n,&n,NULL));assert(bytes[8]==3);
+  uint8_t *again=malloc(n);assert(again);uint64_t m=0;OK(ogb3_recovery_write(other,s,again,n,&m,NULL));assert(m==n&&!memcmp(bytes,again,n));free(again);
+  OK(ogb3_recovery_read(other,bytes,n,0,&decoded,NULL));OK(ogb3_snapshot_restore(r,decoded));equal(w,r);ogb3_recovery_catalog_release(other);
   free(bytes);ogb3_snapshot_release(decoded);ogb3_snapshot_release(s);OK(ogb3_world_destroy(r));OK(ogb3_world_destroy(w));ogb3_recovery_catalog_release(c);
-  puts("authoring legacy primitive constructor/format/roundtrip PASS");
+  puts("authoring shared primitive/authored identity/bytes/aliases/roundtrip PASS");
 }
+/* Native requested-byte admission at the catalog boundary. Virtual allocation
+ * keeps this independent of the selected memory profile; wasm has a smaller
+ * linear-memory ceiling and exercises allocation/cleanup failures above. */
+#ifndef __EMSCRIPTEN__
+extern void *ogb3_snapshot_internal_alloc(size_t);
+extern void ogb3_snapshot_internal_free(void *);
+static void primitive_budget(ogb3_recovery_config *cfg) {
+  ogb3_recovery_authored_asset a=asset(1,OGB3_RECOVERY_BOX);a.base.a=(ogb3_vec3){.5f,.5f,.5f};
+  uint64_t before=live();ogb3_recovery_catalog *c=NULL;
+  OK(ogb3_recovery_catalog_create(cfg,&a.base,1,&c));uint64_t bytes=live()-before;ogb3_recovery_catalog_release(c);
+  assert(bytes && bytes<4u*1024u*1024u);
+  for(int fits=0;fits<=1;fits++) {
+    ogb3_allocation_stats engine;OK(ogb3_engine_allocation_stats(&engine));
+    uint64_t available=bytes+(fits?1024:0)-(fits?0:1);
+    assert(OGB3_MEMORY_BYTES>engine.live_bytes+live()+available);
+    size_t reserve=(size_t)(OGB3_MEMORY_BYTES-engine.live_bytes-live()-available);
+    void *held=ogb3_snapshot_internal_alloc(reserve);assert(held);
+    for(int authored=0;authored<=1;authored++) {
+      uint64_t start=live();c=(void *)(uintptr_t)1;
+      ogb3_status status=authored?ogb3_recovery_catalog_create_authored(cfg,&a,1,&c):ogb3_recovery_catalog_create(cfg,&a.base,1,&c);
+      if(fits){assert(status==OGB3_OK && c && live()-start==bytes);ogb3_recovery_catalog_release(c);}
+      else assert(status==OGB3_CAPACITY && !c);
+      assert(live()==start);
+    }
+    ogb3_snapshot_internal_free(held);assert(live()==before);
+  }
+  puts("authoring primitive/authored exact catalog budget/no geometry staging reserve PASS");
+}
+#endif
 static void advanced(ogb3_recovery_config *cfg) {
   ogb3_vec3 hull[]={{-.4f,0,-.4f},{.4f,0,-.4f},{0,.8f,0},{0,0,.5f}};
   ogb3_vec3 floor[]={{-8,0,-8},{-8,0,8},{8,0,-8},{8,0,8}};uint32_t floor_i[]={0,1,2,2,1,3};
   /* An externally baked 2x2 heightfield, represented only as deterministic Mesh. */
   ogb3_vec3 baked[]={{-2,0,-2},{-2,.25f,2},{2,.5f,-2},{2,.75f,2}};uint32_t baked_i[]={0,1,2,2,1,3};
-  ogb3_recovery_asset_v2 a[6];
+  ogb3_recovery_authored_asset a[6];
   a[0]=asset(1,OGB3_RECOVERY_BOX);a[0].base.a=(ogb3_vec3){.4f,.4f,.4f};
   a[1]=asset(2,OGB3_RECOVERY_SPHERE);a[1].base.radius=.4f;
   a[2]=asset(3,OGB3_RECOVERY_CAPSULE);a[2].base.a.y=-.25f;a[2].base.b.y=.25f;a[2].base.radius=.3f;
   a[3]=asset(4,OGB3_RECOVERY_HULL);a[3].vertices=hull;a[3].vertex_count=4;
   a[4]=asset(5,OGB3_RECOVERY_MESH);a[4].vertices=floor;a[4].vertex_count=4;a[4].indices=floor_i;a[4].triangle_count=2;
   a[5]=asset(6,OGB3_RECOVERY_MESH);a[5].vertices=baked;a[5].vertex_count=4;a[5].indices=baked_i;a[5].triangle_count=2;
-  ogb3_recovery_catalog *c=NULL;OK(ogb3_recovery_catalog_create_v2(cfg,a,6,&c));
-  ogb3_recovery_identity id;OK(ogb3_recovery_identity_get(c,&id));assert(id.recovery_format==2);
+  ogb3_recovery_catalog *c=NULL;OK(ogb3_recovery_catalog_create_authored(cfg,a,6,&c));
+  ogb3_recovery_identity id;OK(ogb3_recovery_identity_get(c,&id));assert(id.recovery_format==3);
   /* Caller buffers can disappear immediately; the factory uses catalog copies. */
   memset(hull,0,sizeof(hull));memset(floor,0,sizeof(floor));memset(floor_i,0,sizeof(floor_i));memset(baked,0,sizeof(baked));memset(baked_i,0,sizeof(baked_i));
   ogb3_world w=world();ogb3_shape_def d;OK(ogb3_shape_def_default(&d));d.enable_contact_events=1;
@@ -108,7 +154,7 @@ static void advanced(ogb3_recovery_config *cfg) {
   if(write_status)fprintf(stderr,"advanced write status%d section%u record%u field%u reason%u\n",write_status,diag.section,diag.record,diag.field,diag.reason);
   OK(write_status);assert(n && n<=cfg->max_bytes);
   uint8_t *bytes=malloc(n),*again=malloc(n),*mut=malloc(n+1024);assert(bytes&&again&&mut);
-  OK(ogb3_recovery_write(c,source,bytes,n,&n,NULL));assert(bytes[8]==2);
+  OK(ogb3_recovery_write(c,source,bytes,n,&n,NULL));assert(bytes[8]==3);
   ogb3_snapshot *decoded=NULL;OK(ogb3_recovery_read(c,bytes,n,0,&decoded,NULL));
   uint64_t m=0;OK(ogb3_recovery_write(c,decoded,again,n,&m,NULL));assert(m==n&&!memcmp(bytes,again,n));
   ogb3_world r=world();OK(ogb3_snapshot_restore(r,decoded));equal(w,r);
@@ -137,7 +183,11 @@ static void advanced(ogb3_recovery_config *cfg) {
 }
 int main(void) {
   assert(ogb3_build_fingerprint());uint64_t before=live();ogb3_recovery_config cfg;OK(ogb3_recovery_config_default(&cfg));
-  uint32_t size=0,alignment=0,offset=0;OK(ogb3_authoring_asset_layout(3,&size,&alignment,&offset));assert(size==sizeof(ogb3_recovery_asset_v2)&&offset==48&&alignment==_Alignof(ogb3_recovery_asset_v2));
-  descriptor_rejections(&cfg);primitive_v1(&cfg);advanced(&cfg);assert(live()==before);
+  uint32_t size=0,alignment=0,offset=0;OK(ogb3_authoring_asset_layout(3,&size,&alignment,&offset));assert(size==sizeof(ogb3_recovery_authored_asset)&&offset==48&&alignment==_Alignof(ogb3_recovery_authored_asset));
+  descriptor_rejections(&cfg);primitive_catalog(&cfg);
+#ifndef __EMSCRIPTEN__
+  primitive_budget(&cfg);
+#endif
+  advanced(&cfg);assert(live()==before);
   puts("Native authored catalog controls PASS");return 0;
 }

@@ -34,6 +34,12 @@ open :: proc(self: ^ReplayScrapyard, role: rgd.Session_Role) {
     }
 
     if err := open_session(self, world, options); err != .None {
+        if self.session != nil {
+            if detail := rgd.session_setup_message(self.session); detail != "" {
+                gd.print_str(fmt.tprintf("REPLAY_SCRAPYARD_SETUP %s", detail))
+            }
+        }
+
         when gd.IS_WEB {
             if self.resume_requested {
                 self.saved_run[0].phase = .Failed

@@ -6,20 +6,10 @@ import d "godot:replay/diagnostic"
 import net "godot:replay/net"
 import game "../../../examples/replay_scrapyard/shared/game"
 import recording "../../../examples/replay_scrapyard/shared/recording"
-import upgrade "../../../examples/replay_scrapyard/shared/upgrade"
-LEGACY_48 :: #config(REPLAY_RECORDING_CONTENT48, false)
-
-when LEGACY_48 {
-    World :: upgrade.World_48
-    Action :: upgrade.Action_50
-    IDENTITY :: upgrade.RECORDING_48
-    source_model :: upgrade.model_48
-} else {
-    World :: game.World
-    Action :: game.Action
-    IDENTITY :: recording.CONTEXT
-    source_model :: game.model
-}
+World :: game.World
+Action :: game.Action
+IDENTITY :: recording.CONTEXT
+source_model :: game.model
 
 Archive :: d.Recording(World, net.Batch(game.Control, Action, game.SEATS), net.Net_Event(game.Event))
 

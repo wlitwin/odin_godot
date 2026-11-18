@@ -142,7 +142,9 @@ feedback_prepare :: proc(self: ^ReplayScrapyard) {
         return
     }
 
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
     baseline := self.session.authority ? u64(0) : self.session.client.journal.baseline
 
     if !f.scoped || epoch != f.epoch {
@@ -167,9 +169,9 @@ feedback_prepare :: proc(self: ^ReplayScrapyard) {
         f.epoch, f.scoped = epoch, true
     }
 
-    if !self.session.authority && f.reset != self.session.client.view_reset {
+    if !self.session.authority && f.reset != scope_info.reset {
         feedback_clear(f)
-        f.reset = self.session.client.view_reset
+        f.reset = scope_info.reset
     }
 
     frontier :=

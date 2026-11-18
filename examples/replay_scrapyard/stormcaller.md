@@ -59,14 +59,10 @@ The Stormcaller addition changed the catalog schema by adding a bounded
 Pulse_Def to each mob definition. It advanced semantic content from 49/I to
 **50/J** (`0x525343524150304a`), with network protocol 7 unchanged. Old peers cannot silently share the new contract.
 
-The offline converter accepts content 49 as well as older supported saves.
-Historical Mob/Catalog shapes are frozen rather than aliasing today's live structs.
-Conversion fills the new component with zeros, preserving the prior catalog and
-behavior. It does not add enemies or retrofit new balance settings into an old run.
-The source-49 checkpoint fixture was captured with the code from before the
-Stormcaller addition.
-See [save conversion](saves.md) for the existing offline command and identity
-requirements; write to a new destination. The recording verifier also exposes `--content49` for the retained historical model.
+The retained pre-Stormcaller checkpoint was migrated with zero pulse definitions,
+preserving its catalog and behavior. Loading an archived catalog does not add
+enemies or retrofit current balance settings. [Current saved fixtures](saves.md#current-saved-fixtures)
+cover that guarantee; historical readers are no longer part of the game.
 
 <a id="what-this-authoring-exercise-revealed"></a>
 

@@ -20,7 +20,7 @@ for impl in implementations():
  if baseline:
   s=s.replace('abilities={player.ab_l,player.ab_r}}','abilities={player.ab_l,player.ab_r},dashes=u32(player.dash_seq),mode=u8(player.weapon.mode)}')
   s=s.replace('if fx.kind==4 && fx.left>0 {compare_people[i].rally=true}', 'if fx.kind==4 && fx.left>0 {compare_people[i].rally=true};if fx.kind==2 && fx.left>0 {compare_people[i].burn=true};if fx.kind==5 && fx.left>0 {compare_people[i].salve=true};if fx.kind==8 && fx.left>0 {compare_people[i].surge=true}')
-  hazard='''if self.ses.is_host {for seat in 1..=2 {if player,ok:=runner_of(self,kn.Player_Id(seat));ok {runner_apply_status(self,player,compare_hazard_pending,1);compare_hazards_sent+=1} else {compare_hazards_refused+=1}}}'''
+  hazard='''if self.ses.is_host {for seat in 1..=2 {if player,ok:=runner_owned_by(&self.boot,kn.Player_Id(seat));ok {runner_apply_status(self,player,compare_hazard_pending,1);compare_hazards_sent+=1} else {compare_hazards_refused+=1}}}'''
   p2=project/'scripts/input.odin';input_text=p2.read_text();needle='if !want || r.health.hp == 0 {return}';assert input_text.count(needle)==1;input_text=input_text.replace(needle,'want = want || compare_dash_pending\n compare_dash_pending=false\n '+needle);p2.write_text(input_text)
  else:
   s=s.replace('gd.Int(compare_move[1]),false)', 'gd.Int(compare_move[1]),compare_dash_pending);compare_dash_pending=false')

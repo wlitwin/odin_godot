@@ -60,8 +60,8 @@ your_project/
   must be unique across modules (see [Collisions](#global-class-alias-collisions)).
 - **A module is a tree of packages, not one flat directory.** Every subdirectory holding
   authored `.odin` sources is its own Odin package, and an engine-native script class may
-  live there and be attached from there (`res://scripts/ui/hud.odin`). Kit-coupled
-  declarations stay in the module root. See [Script subpackages](#script-subpackages) for
+  live there and be attached from there (`res://scripts/ui/hud.odin`). Kit entities,
+  inputs and composed blocks can live in subpackages too. See [Script subpackages](#script-subpackages) for
   the full rules. An edit anywhere under `res://modules/<name>/` counts as an edit to that
   module for rebuild-on-save.
 - An empty module directory is skipped during the build with this message:
@@ -73,7 +73,7 @@ your_project/
 
 | File | Where | What it is |
 |---|---|---|
-| `odin_godot_scripts.gen.odin` | in **each package directory that has annotated scripts** (the module root, and each script subpackage) | the registration boilerplate for every script in that directory, one banner-marked section per source |
+| `odin_godot_scripts.gen.odin` | each package with annotated scripts, plus module-local helper packages requiring generated accessors | registration and Kit adapters; helper-only outputs contain accessors without script registration |
 | `odin_godot_guard.gen.odin` | the module root only | the staleness guard (one compile-time `#load_hash` per authored source in the whole tree) plus the import manifest that links the script subpackages |
 | `odin_godot_boot.gen.odin` | the module root only | the `odin_scripts_boot` export the core calls after it loads the dll |
 
@@ -135,33 +135,77 @@ guard file contains an import manifest, with entries such as `import _ "ui"`,
 that links each script subpackage's generated registration. Build commands,
 the `.gdextension`, and export remain the same.
 
-`NET_FINGERPRINT` includes class names from the whole tree. Moving a class
-between the root and a subfolder therefore leaves its contribution to the
-fingerprint unchanged, preserving network compatibility for that move.
+Engine-native declarations and Kit declarations both work in subpackages:
+replication, ownership, prediction, backups, commands, simulation inputs/ticks,
+profiles, messages, events and game lifecycle wiring. The generator resolves
+the complete module before producing its wire schema. Import aliases and
+source directories are not wire identity: moving an entity or renaming an
+import preserves the schema when its declarations and numeric IDs stay the same.
 
-**Supported subpackage declarations.** Engine-native classes can use: `//gd:extends` /
-`//gd:class` / `//gd:tool` / `//gd:icon`, lifecycle procs, `@(gd_method)`, `@(gd_connect)`,
-`@(gd_rpc)`, typed signal fields with their generated emitters, `gd:"export"` fields and
-their hints, and `gd:"onready=…"` references. A subdirectory with no annotated scripts is
-a helper package and receives no generated registration file.
+### Organizing a Kit game
 
-**What must stay in the module root.** Every **kit** declaration: `gd:"replicate"`,
-`gd:"owner"`, `gd:"predict"`, `gd:"backup"` and `gd:"profile="` field tags, `entity=` scene
-fields, a `net_id` field, `@(gd_command)`, `@(gd_tick)`, `@(gd_input)`, `@(gd_sample)`, `@(gd_step)`,
-`@(gd_message)`, `@(gd_event)`, session and succession halves, the sim lane's input class, and
-a `kboot.Boot` field. Scriptgen resolves Kit declarations in the module root
-to construct `NET_FINGERPRINT`, including replicated field order, command ids,
-entity type ids, tick input structs, and event tuples. Peers compare that
-fingerprint during admission. A Kit declaration in a subfolder would fall
-outside that resolution, so `scriptgen` rejects it with the class and field
-or attribute name:
+Keep reusable entity behavior with the entity, and game-specific consequences
+with the game that owns its scene binding:
 
+```text
+scripts/
+  game.odin             Boot, Session, Lane, entity scene fields
+  consequences.odin     game-specific command/tick/edge callbacks and events
+  actors/
+    player.odin         Player, commands and tick
+    input.odin          Player_Input
+  blocks/
+    inventory.odin      reusable composed state and behavior
 ```
-scriptgen: error: scripts/ui/hud.odin: Hud declares a gd:"replicate" field tag in the script
-subpackage "ui" — kit wiring is part of the MODULE's wire contract (fingerprint, lanes, input
-struct) and is game-coupled; move this file to the module root (…). Subfolders like ui/ hold
-engine-native script classes: extends/class, methods, signals, exports, onready, rpc
+
+The game's scene tag names the imported type using the imports in that file:
+
+```odin
+import actors "actors"
+
+Game :: struct {
+    // owner, Boot, Session and other game fields omitted
+    player_scene: gd.Packed_Scene `gd:"entity=actors.Player:1,avatar"`,
+}
 ```
+
+Entity-side commands and ticks may stay package-private with `@(private)`.
+Generated adapters expose the calls needed by the owner. A callback that needs
+`^Game` belongs in the game's package, so the entity package does not have to
+import its owner. For example, `game_player_hit_then` can specialize
+`player_hit_then` for that game. Another game may bind the same entity with
+different consequences; a callback taking the wrong game's type is rejected.
+Self-only defaults on the entity remain available when an owner supplies no
+override. Declare callback halves with `@(gd_half)` as usual.
+
+If separate packages both declare `Actor`, give them distinct entity kind IDs.
+The wire schema distinguishes them as `Actor#11` and `Actor#22`. Generated
+owner helpers use scene-field names to disambiguate them; for fields `first`
+and `second` on `Game`, use `game_first_…` and `game_second_…`. A single source
+entity keeps the same kind ID when used by multiple owners. An unbound wire
+type with an ambiguous name needs a distinct `//gd:class` alias.
+
+`@(gd_event)` callbacks also belong beside their owning game. Their entity
+parameters can name imported types, including equal local names in different
+packages. Use `anchor=parameter` when an event has several entity parameters.
+The selected entity determines the session or simulation presentation clock;
+subpackage placement does not add another clock or change event ordering.
+
+Profiles, message payloads and composed fields resolve types in the file that
+declares them. Generic blocks retain both the caller's type arguments and the
+block's own local types. Supported numeric generic arguments are integer
+literals and aliases to integer literals; arbitrary compile-time expressions
+are not evaluated by scriptgen. Export a public alias when exposing a private
+input type through a sampler. Generated input adapters cover private inputs
+that have no sampler.
+
+Use package privacy (`@(private)`) for declarations called by generated code.
+`@(private="file")` cannot be accessed from the separate generated file.
+Helper packages can receive generated procedure/value adapters; the generator
+does not write into SDK or `shared/` dependencies. Custom codec declaration
+names identify their wire format/version, so use a distinct name for each
+format. Renaming an import preserves that identity; changing the codec name
+or encoded width changes it.
 
 **A subpackage may not import the module root.** The root's generated manifest
 already imports every script subpackage, so a reverse import creates a cycle.
@@ -206,12 +250,14 @@ therefore binds `ui` even when the imported package declares `package game_ui`;
 `import "defs"` binds `defs`. Choose another binding with an explicit alias,
 such as `import d "defs"`.
 
-**When to use a subpackage.** Group related engine-native classes such as HUD
-widgets, menus, editor tools, and effects. A save still rebuilds the whole
+**When to use a subpackage.** Group related entities, reusable gameplay blocks,
+HUD widgets, menus, editor tools, and effects. A save still rebuilds the whole
 module dll. Use a separate module when the goal is to reduce the amount of
 code rebuilt on save.
 
-`tests/subpkg_spike/` is the worked example, including the four refusals above.
+`tests/subpkg_spike/` exercises attachment and hot reload. The Kit package
+fixtures in `tests/kit_subpackages/` cover gameplay bindings and unchanged wire
+contracts across package moves.
 
 ## No imports between script modules
 
@@ -563,7 +609,7 @@ Use the diagnostic text to identify the source declaration or build setting:
 | Message (abridged) | Meaning / fix |
 |---|---|
 | `build_scripts: ILLEGAL cross-module import in '<dir>': …` (or `scriptgen: error: … ILLEGAL cross-module import …`) | A module imports another module (any import that resolves outside the module's own directory and outside `shared/`, `..`-relative or absolute). Remove it; communicate through the engine, move the shared state into one module, or, if it is only types/constants/pure procs, move the package under [`res://shared/`](#shared). |
-| `scriptgen: error: …: <Class> declares <what> in the script subpackage "<dir>" — kit wiring is part of the MODULE's wire contract …` | A kit declaration (a lane tag, `@(gd_command)`, `@(gd_tick)`, an `entity=` field, a half, …) sits in a subfolder. Move that file to the module root; subfolders hold engine-native classes only. |
+| `scriptgen: error: …: declare the event callback in the game owner's package …` | Move the callback beside its game. Its entity types can remain imported from subpackages; this avoids a reverse import from an entity to its owner. |
 | `scriptgen: error: …: a subfolder script package cannot import the module root (…) — … this is an import CYCLE` | A script subpackage imports `..`. Move the shared code down into a subpackage both sides import (sibling imports are legal), or pass what it needs in as an argument. |
 | `scriptgen: error: duplicate package name "X" — declared in both "…" and "…"` | Two directories in one module tree declare the same `package` name. Give each its own. |
 | `scriptgen: error: …: duplicate explicit //gd:class "X" in "…" and "…"` | Two scripts in one module tree claim one optional global alias. Rename or remove one marker; both scripts otherwise bind by path. |

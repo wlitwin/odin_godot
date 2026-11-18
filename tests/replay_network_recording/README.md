@@ -25,12 +25,12 @@ The full game simulation and math routines execute inside WASM; the module has n
 imports. Mutated test files/logs are retained per input. Odin object compilation
 plus Emscripten linking supplies the math library and normal WASM optimization.
 
-`upgrade.sh` uses the compressed historical recordings under
-[`fixtures/authority-before-observation`](fixtures/authority-before-observation/README.md).
-It verifies their original hashes, requires explicit conversion from the old
-input schema, and checks source/destination preservation before running the same
-native and WASM verification and corruption checks. It has no dependency on
-documentation build output or archived investigation directories.
+`fixtures.sh` checks the compressed current recordings under `fixtures/current`,
+verifies their hashes, then runs native/WASM replay and corruption/divergence
+checks. These recordings were migrated by copying their expected frames and
+events and independently replaying them under the target model. Historical bytes
+and [migration receipts](../../docs/replay/results/usability-legacy-2026-11-16/scrapyard/receipt.json)
+remain separate evidence; the active gate requires no old decoder.
 
 `tests/replay_net/recording_test.odin` independently checks replay after transport
 destruction, decision preservation without admission callbacks, and preflight of

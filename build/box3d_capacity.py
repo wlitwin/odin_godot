@@ -53,10 +53,6 @@ def load(filename=None):
         if unknown:
             raise ValueError('unknown capacity fields: ' + ', '.join(sorted(unknown)))
         profile.update(overrides)
-        # Capacity-only project files remain usable; resolve them into the
-        # current complete profile before hashing or passing compiler flags.
-        if type(profile['schema_version']) is int and profile['schema_version'] == 1:
-            profile['schema_version'] = SCHEMA_VERSION
     return validate(profile)
 
 

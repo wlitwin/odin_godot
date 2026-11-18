@@ -11,6 +11,22 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
+        # The pinned April compiler can mutate shared generic array dimensions
+        # during threaded overload probes (Odin #6526). Backport the focused
+        # upstream #7052 fix without changing the compiler/core-library API set.
+        # Remove the backport when the nixpkgs pin includes ca878a1de7e90b.
+        odin = pkgs.odin.overrideAttrs (previous: {
+          __intentionallyOverridingVersion = true;
+          version = previous.version + "-checker-fix";
+          patches = (previous.patches or []) ++ [ ./build/patches/odin-polymorphic-probes.patch ];
+          # An archive build otherwise reports the wall-clock month as its
+          # compiler version, hiding that this is a patched April toolchain.
+          postPatch = (previous.postPatch or "") + ''
+            substituteInPlace build_odin.sh \
+              --replace-fail 'GIT_DATE=$(date +"%Y-%m")' 'GIT_DATE="${pkgs.lib.removePrefix "dev-" previous.version}-checker-fix"'
+          '';
+        });
+
         # Cross toolchains for the distributable desktop targets. Odin's OWN linker driver
         # refuses to cross-LINK a dll ("Linking for cross compilation … not yet supported"),
         # so we emit a single relocatable object with Odin (`-build-mode:obj
@@ -52,8 +68,7 @@
         # bash build/build_web.sh`. An emsdk install (`./emsdk install 4.0.20`) fetches the
         # matching prebuilt LLVM; a pure-nix emsdk-4.0.20 derivation remains a rabbit hole
         # (nixpkgs couples emscripten to a bundled LLVM) and is unnecessary given the above.
-        toolchain = with pkgs; [
-          odin
+        toolchain = [ odin ] ++ (with pkgs; [
           ols           # Odin language server — backs editor autocomplete (_complete_code)
           llvm
           lld
@@ -73,7 +88,7 @@
           git           # Frozen source snapshots and build provenance
           openssl       # Native authority-service fixtures generate local TLS certificates
           file          # Inspect native and exported binary formats
-        ];
+        ]);
 
         # GODOT is exported from shellHook (NOT a mkShell env attr): an env attr would
         # CLOBBER a caller's exported GODOT, breaking the documented `GODOT=… nix develop`
@@ -107,12 +122,12 @@
         # Emscripten, or platform cross toolchains.
         devShells.docs = pkgs.mkShell {
           name = "odin_godot-docs";
-          packages = with pkgs; [ odin clang nodejs python3 ];
+          packages = [ odin ] ++ (with pkgs; [ clang nodejs python3 ]);
         };
 
         devShells.capacity = pkgs.mkShell {
           name = "odin_godot-capacity";
-          packages = with pkgs; [ odin clang cmake gnumake python3 ];
+          packages = [ odin ] ++ (with pkgs; [ clang cmake gnumake python3 ]);
         };
 
         # Cross-compile shell: the default toolchain PLUS the Linux/Windows cross C
@@ -160,15 +175,17 @@
         # which pulls in the heavy cross toolchains — kept as a SEPARATE package so the
         # default `nix build` does not drag in a from-source glibc/gcc.
         # ----------------------------------------------------------------------
+        packages.odin = odin;
+
         packages.default = pkgs.callPackage ./build/dist.nix {
-          inherit (pkgs) odin;
+          inherit odin;
           src = self;
           crossLinuxCC = null;
           crossWindowsCC = null;
         };
 
         packages.dist-cross = pkgs.callPackage ./build/dist.nix {
-          inherit (pkgs) odin;
+          inherit odin;
           src = self;
           crossLinuxCC = pkgs.pkgsCross.gnu64.stdenv.cc;
           crossWindowsCC = pkgs.pkgsCross.mingwW64.stdenv.cc;

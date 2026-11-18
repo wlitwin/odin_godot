@@ -1,6 +1,7 @@
 package box3d_host
 
 import bg "godot:box3d/godot"
+import "core:sync"
 Status :: bg.Status
 Domain_Contract :: bg.Domain_Contract
 Allocation_Stats :: bg.Allocation_Stats
@@ -86,7 +87,8 @@ Capsule_Record :: struct {
 @(private)
 Context_Record :: struct {
     generation:     u32,
-    active, alive:  bool,
+    active:         bool,
+    live:           u32, // atomic source liveness; source_present pins this cell
     producer, refs: u64,
     borrowed_base:  rawptr,
     borrowed_size:  u64,
@@ -424,7 +426,7 @@ origin_enter :: proc "contextless" (user: rawptr, weak: u64 = 0) -> (Origin_Scop
     if weak != 0 {
         c := context_find(weak)
 
-        if c == nil || c.producer != id || !c.alive {
+        if c == nil || c.producer != id || !context_alive(c) {
             return {}, INVALID_HANDLE
         }
     }
@@ -438,6 +440,29 @@ origin_enter :: proc "contextless" (user: rawptr, weak: u64 = 0) -> (Origin_Scop
 origin_leave :: proc "contextless" (scope: Origin_Scope) {
     active_producer = scope.producer
     active_context = scope.ctx
+}
+
+@(private)
+context_alive :: proc "contextless" (record: ^Context_Record) -> bool {
+    return sync.atomic_load_explicit(&record.live, .Acquire) != 0
+}
+
+// Core-only source handle, acquired on the protected thread while the source
+// lease is present. The address stays stable until context_release. The source
+// owner may revoke execution from another thread by atomically storing zero;
+// it must retain the source lease and must never write one or mutate the slot.
+context_liveness_cell :: proc "contextless" (token: u64) -> ^u32 {
+    if protected() != OK {
+        return nil
+    }
+
+    record := context_find(token)
+
+    if record == nil || !record.source_present {
+        return nil
+    }
+
+    return &record.live
 }
 
 context_create :: proc "contextless" (user: rawptr, out: ^u64) -> Status {
@@ -457,7 +482,7 @@ context_create :: proc "contextless" (user: rawptr, out: ^u64) -> Status {
             c = {
                 generation     = gen,
                 active         = true,
-                alive          = true,
+                live           = 1,
                 source_present = true,
                 producer       = u64(uintptr(user)),
             }
@@ -472,7 +497,7 @@ context_create :: proc "contextless" (user: rawptr, out: ^u64) -> Status {
 context_bind :: proc "contextless" (token: u64, base: rawptr, size: u64) -> Status {
     c := context_find(token)
 
-    if c == nil || !c.alive || base == nil || size == 0 {
+    if c == nil || !context_alive(c) || base == nil || size == 0 {
         return INVALID_ARGUMENT
     }
 
@@ -512,7 +537,7 @@ context_invalidate :: proc "contextless" (token: u64) -> Status {
         return s
     }
 
-    c.alive = false
+    sync.atomic_store_explicit(&c.live, 0, .Release)
 
     if c.refs == 0 && !c.source_present {
         c.active = false
@@ -539,7 +564,7 @@ context_release :: proc "contextless" (token: u64) -> Status {
         return status
     }
 
-    c.alive = false
+    sync.atomic_store_explicit(&c.live, 0, .Release)
     c.source_present = false
 
     if c.refs == 0 {
@@ -585,7 +610,7 @@ owner_guard :: proc "contextless" (user: rawptr, access: u32) -> (^Owner_Record,
     if access == EXECUTE && o.weak != 0 {
         c := context_find(o.weak)
 
-        if c == nil || !c.alive {
+        if c == nil || !context_alive(c) {
             return nil, INVALID_HANDLE
         }
     }
@@ -659,7 +684,7 @@ owner_drop :: proc "c" (user: rawptr) -> Status {
 
             c.refs -= 1
 
-            if !c.alive && !c.source_present && c.refs == 0 {
+            if !context_alive(c) && !c.source_present && c.refs == 0 {
                 c.active = false
             }
         }
@@ -726,7 +751,7 @@ service_owner_create :: proc "c" (user: rawptr, require_live: u32, data: ^Data_L
     if require_live != 0 {
         c := context_find(active_context)
 
-        if c == nil || !c.alive || c.producer != active_producer {
+        if c == nil || !context_alive(c) || c.producer != active_producer {
             return INVALID_HANDLE
         }
 
@@ -771,7 +796,7 @@ service_owner_create :: proc "c" (user: rawptr, require_live: u32, data: ^Data_L
                 c := context_find(weak)
                 c.refs -= 1
 
-                if !c.alive && !c.source_present && c.refs == 0 {
+                if !context_alive(c) && !c.source_present && c.refs == 0 {
                     c.active = false
                 }
             }
@@ -1332,7 +1357,7 @@ capsule_inspect :: proc "contextless" (value: ^Capsule) -> (Capsule_Inspection, 
 
     if owner.weak != 0 {
         weak := context_find(owner.weak)
-        live = weak != nil && weak.alive
+        live = weak != nil && context_alive(weak)
     }
 
     return {realm = c.producer, execute_live = live}, OK

@@ -1,10 +1,18 @@
-Shared authoring API: legacy schema 1, motion schema 2.
+Shared authoring API: schema 2.
 
 Package `godot:box3d/authoring`, input types are in `types.odin`.
 `bake(Scene_Input, allocator=context.allocator) -> (Baked_Scene, Diagnostic)`;
 `parse_and_bake(json_bytes:[]u8, allocator=context.allocator) -> (Baked_Scene, Diagnostic)`;
-`destroy(^Baked_Scene)`; `build(^Baked_Scene, profile:u64) -> (Built_Scene, Diagnostic)`;
-`built_destroy(^Built_Scene) -> b.Status`.
+`destroy(^Baked_Scene)`; `baked_validate(^Baked_Scene) -> Diagnostic`.
+These operations, artifacts, inspection and authored previews are native-free.
+
+Package `godot:box3d/authoring/runtime` owns
+`build(^Baked_Scene, profile:u64) -> (Built_Scene, Diagnostic)`,
+`built_destroy(^Built_Scene) -> b.Status`, the runtime maps and
+`Debug_Scene` / `debug_scene_create` / `debug_scene_destroy`.
+Import this package when constructing physics; it retains ordinary native-domain
+admission. The old native operations are removed from the pure authoring package.
+Shared POD definitions live in `godot:box3d/types`, also exposed by the native API.
 
 JSON uses the EXACT field names/types of Scene_Input, Body_Input and Shape_Input.
 Vectors are arrays, poses are `{position:[x,y,z],rotation:[x,y,z,w]}`. Types/kinds
@@ -43,27 +51,25 @@ shape retention. Every failure destroys the partial unpublished candidate.
 
 Native advanced-catalog ABI is in `box3d/native/authoring_catalog.h`: V2 descriptor
 size72/align8 on supported64-bit targets, verified through actual C layout queries.
-Legacy primitive catalogs remain recovery1; authored catalogs are recovery2.
-Pure5, Native-facing Odin3 and both framework cases pass on the declared macOS
-reference; Native Debug/Release/ASanUBSan11each and actual Godot SDK resource/scene
-roundtrip/source-free construction pass. Export GateC remains separate.
+All catalogs use recovery format 3, including scenes with no joints or
+characters. Editor scenes authored with the current nodes/Resources can be
+rebaked to replace older generated artifacts.
 
-P5.2 motion additions (validated on the recorded P5.2 graph):
+Motion definitions:
 
-`scene_input_default(namespace, schema_version=1)` preserves the P5.1 default;
-pass `2` for motion. Schema1 accepts no joints/characters and retains its exact
-old content-hash projection and authored recovery2 catalog. Schema2 binds appended
-motion arrays and uses `recovery_catalog_create_v3`/recovery3. Both schemas retain
-the original body/shape/resource IDs. Logical joint/character IDs use distinct
+`scene_input_default(namespace)` selects the current schema. Older schema
+numbers are rejected. All scene hashes include the motion arrays, which can be
+empty; adding a joint or character needs no schema configuration. Body, shape
+and resource IDs retain their stable-key definitions. Logical joint/character IDs use distinct
 `joint`/`character` domains, namespace+stable_key, never native keys.
 
-`Scene_Input.joints:[]Joint_Input` (maximum ONE) contains stable_key, lowercase
+`Scene_Input.joints:[]Joint_Input` (bounded by the capacity profile) contains stable_key, lowercase
 kind (`pin`, `hinge`, `slider`, `spherical`, `distance`, `motor`, `weld`, `wheel`),
 body_a/body_b authored stable-key strings, local_frame_a/b Pose_Input, common
 force_threshold/torque_threshold/constraint_hertz/constraint_damping_ratio f32,
 collide_connected bool, and named `axis`, `distance`, `spherical`, `motor`, `weld`,
 `wheel` settings. These named settings exactly mirror the public fixed-width types
-in box3d/joints.odin / native/motion.h. Their Vec3/Quat values are JSON objects
+in box3d/types/types.odin / native/motion.h. Their Vec3/Quat values are JSON objects
 `{x,y,z}` / `{x,y,z,w}`; frame poses remain arrays as above. Unused setting blocks
 must be zero. `joint_input_default` is a pure explicit authoring default, while
 `b.motion_joint_default` exposes the pinned engine's actual defaults. Angles are
@@ -124,3 +130,10 @@ artifact identity correctly change. This is corruption checking, not authenticat
 identities/counts. Optional authored SHAPE preview delegates debug_preview (the
 shared pure outline generator), no fake frame/stamp or Native world. Optional
 Godot module methods and installation are in addons/box3d_authoring/tool_module.
+
+`box3d.recovery_catalog_create` accepts primitive descriptors.
+`box3d.recovery_catalog_create_authored` accepts `Recovery_Authored_Asset`
+descriptors, including hulls and meshes. Both use the same recovery identity
+and support all joint families; there is no format-selection API. Equivalent
+geometry must share one asset ID. The descriptor ABI version remains
+`AUTHORING_ASSET_VERSION`; it is separate from the recovery wire format.

@@ -55,6 +55,24 @@ $projAbs = (Resolve-Path $Project).Path
 $rootAbs = (Resolve-Path $Root).Path
 Set-Location -LiteralPath $projAbs
 
+# Same disposable local cache as the Bash build and editor resolver. Native
+# Windows setup does not need Python just to remember the compiler.
+$toolchainDirectory = Join-Path $projAbs ".godot/odin_godot/toolchain"
+$toolchainCache = @{}
+if (Test-Path -LiteralPath $toolchainDirectory) {
+    $cachedOdin = Join-Path $toolchainDirectory "odin"
+    if (Test-Path -LiteralPath $cachedOdin) {
+        $toolchainCache["odin"] = [IO.File]::ReadAllText($cachedOdin).TrimEnd([char[]]"`r`n")
+    }
+}
+if (-not $PSBoundParameters.ContainsKey("Odin") -and $env:ODIN) { $Odin = $env:ODIN }
+$odinResolved = Get-Command $Odin -ErrorAction SilentlyContinue
+if (-not $odinResolved -and $Odin -eq "odin" -and $toolchainCache.ContainsKey("odin")) {
+    $odinResolved = Get-Command $toolchainCache["odin"] -ErrorAction SilentlyContinue
+}
+if (-not $odinResolved) { throw "Odin compiler not found. Pass -Odin with its executable or build once from the toolchain shell." }
+$Odin = $odinResolved.Source
+
 $RootRel = (Resolve-Path -LiteralPath $rootAbs -Relative)   # e.g. .\addons\odin_godot  (space-free inside)
 $Bin     = "bin"
 $WinBin  = Join-Path $RootRel "bin\windows"
@@ -72,7 +90,7 @@ if (-not (Test-Path $Scripts) -or -not (Get-ChildItem -Path $Scripts -Filter *.o
     throw @"
 no Odin scripts found at '$Scripts' (project: $projAbs).
 odin_godot ships the engine core; your .odin scripts are yours and go in a 'scripts'
-folder. A scripts package also needs a boot.odin (required boilerplate). Quick start:
+folder. Registration and boot code are generated automatically. Quick start:
 copy the bundled template, then re-run:
   Copy-Item -Recurse "$RootRel\template\scripts" "$projAbs\scripts"
 (the template lives at addons\odin_godot\template\ — see its README.md)
@@ -461,3 +479,21 @@ Write-Host ""
 if (-not $SkipCore) { Write-Host "Built core:    $(Join-Path $WinBin 'libodin_godot.dll')" }
 foreach ($d in $builtDlls) { Write-Host "Built scripts: $d" }
 Write-Host "Open the project in Godot and press Play."
+
+$toolchainCache = @{odin = $Odin; root = $rootAbs}
+foreach ($tool in @("ols", "odinfmt", "emcc", "python3")) {
+    $candidate = [Environment]::GetEnvironmentVariable($tool.ToUpperInvariant())
+    if (-not $candidate) { $candidate = $tool }
+    $command = Get-Command $candidate -ErrorAction SilentlyContinue
+    if ($command) { $toolchainCache[$tool] = $command.Source }
+}
+New-Item -ItemType Directory -Force -Path $toolchainDirectory | Out-Null
+foreach ($key in $toolchainCache.Keys) {
+    $toolchainTemporary = Join-Path $toolchainDirectory (".tools.$PID." + [Guid]::NewGuid().ToString("N"))
+    try {
+        [IO.File]::WriteAllText($toolchainTemporary, $toolchainCache[$key] + "`n", [Text.UTF8Encoding]::new($false))
+        PublishFileAtomic $toolchainTemporary (Join-Path $toolchainDirectory $key)
+    } finally {
+        Remove-Item -LiteralPath $toolchainTemporary -Force -ErrorAction SilentlyContinue
+    }
+}

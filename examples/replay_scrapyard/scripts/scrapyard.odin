@@ -98,6 +98,7 @@ ReplayScrapyard :: struct {
     smoothing: [game.SEATS]v.Smoother2,
     buttons: r.Buttons,
     selected, declared, ready, manual, dash_next, arena_built: bool,
+    failing: bool,
     dash_intent: [1]net.Action_Intent(game.Action),
     declare_sequence, ready_sequence: u64,
     ready_wanted, ready_retry: bool,
@@ -109,7 +110,7 @@ ReplayScrapyard :: struct {
     development_sequence: u64,
     development_result, development_reason: gd.Int,
     shot_effects, shot_cancels: u32,
-    last_reset, last_correction: u64,
+    presentation: rgd.Presentation_Context,
     built_key: u32,
     dash_effects, dash_cancels: u32,
 }
@@ -159,6 +160,7 @@ replay_scrapyard_ready :: proc(self: ^ReplayScrapyard) {
         open(self, .Server)
     }
 
+    if self.failing {return}
     gd.print_str(fmt.tprintf("RSY_PROTOCOL content=%x protocol=%d", game.CONTENT, net.PROTOCOL_VERSION))
     gd.print_str("REPLAY_SCRAPYARD_READY")
 }
@@ -193,8 +195,16 @@ replay_scrapyard_process :: proc(self: ^ReplayScrapyard, dt: f64) {
 }
 
 fail :: proc(self: ^ReplayScrapyard, message: string) {
+    if self.failing {return}
+    self.failing = true
+    self.ready = false
+    gd.node_set_process(self.owner, false)
     gd.print_str(fmt.tprintf("REPLAY_SCRAPYARD_FAIL %s", message))
-    gd.scene_tree_quit(gd.get_tree(self.owner), 1)
+    scene := gd.load_scene("res://failure_exit.tscn")
+    defer gd.release_ref(scene)
+    exit := gd.instantiate(scene)
+    gd.set_int(exit, "target_id", i64(gd.object_get_instance_id(self.owner)))
+    gd.add_child_deferred(gd.scene_tree_get_root(gd.get_tree(self.owner)), exit)
 }
 
 replay_scrapyard_exit_tree :: proc(self: ^ReplayScrapyard) {

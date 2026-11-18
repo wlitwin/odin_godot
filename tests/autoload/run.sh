@@ -15,7 +15,7 @@ bash "$ROOT/build/build_scripts.sh" "$PROJ"
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 # ---- editor --headless smoke: open the project in the editor and quit. The autoload
 # node is instantiated in the editor too; this guards against `signal 11` / "must be

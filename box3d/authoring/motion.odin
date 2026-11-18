@@ -2,38 +2,16 @@ package box3d_authoring
 
 import "core:encoding/json"
 import "core:math"
-import b "godot:box3d"
+import b "godot:box3d/types"
 import bd "godot:box3d/diagnostics"
 
 @(private)
 schema_supported :: proc(version: u32) -> bool {
-    return version == LEGACY_SCHEMA_VERSION || version == SCHEMA_VERSION
+    return version == SCHEMA_VERSION
 }
 
 @(private)
 scene_hash :: proc(data: Scene_Data) -> (bd.Digest, bool) {
-    // Preserve the exact schema1 field order/representation. Appended motion
-    // fields must not change a saved P5.1 scene's content identity.
-    if data.schema_version == LEGACY_SCHEMA_VERSION {
-        legacy := struct {
-            schema_version: u32,
-            namespace:      string,
-            world:          b.World_Def,
-            bodies:         []Baked_Body,
-            shapes:         []Baked_Shape,
-            assets:         []Baked_Asset,
-            resources:      []Baked_Resource,
-        }{data.schema_version, data.namespace, data.world, data.bodies, data.shapes, data.assets, data.resources}
-        bytes, error := json.marshal(legacy)
-
-        if error != nil {
-            return {}, false
-        }
-
-        defer delete(bytes)
-        return bd.hash_bytes(bytes), true
-    }
-
     bytes, error := json.marshal(data)
 
     if error != nil {
@@ -430,10 +408,6 @@ bake_character :: proc(scene: ^Baked_Scene, input: Character_Input) -> (Baked_Ch
 bake_motion :: proc(scene: ^Baked_Scene, input: Scene_Input) -> Diagnostic {
     if len(input.joints) > MAX_JOINTS || len(input.characters) > MAX_CHARACTERS {
         return fail(.Capacity, "motion.counts")
-    }
-
-    if input.schema_version == LEGACY_SCHEMA_VERSION && (len(input.joints) != 0 || len(input.characters) != 0) {
-        return fail(.Schema, "schema1.motion_not_supported")
     }
 
     ok := false

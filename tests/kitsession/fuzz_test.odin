@@ -28,9 +28,8 @@ welcome_decoder_commits_only_complete_packets :: proc(t: ^testing.T) {
     knet.write_bool(&w, true)
     packet := knet.writer_bytes(&w)
 
-    // The last AOI byte is intentionally optional for old peers. Every prefix
-    // before that compatibility boundary must commit no roster and no seat.
-    for cut in 0 ..< len(packet) - 1 {
+    // Every truncated prefix, including the routing flag, commits no state.
+    for cut in 0 ..< len(packet) {
         client: Peer_Box
         box_make(&client, 100)
         ksess.session_client_start(&client.s, TOKEN_ALICE, "alice")

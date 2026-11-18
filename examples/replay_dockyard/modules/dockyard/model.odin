@@ -3,6 +3,7 @@ package dockyard_duo
 import "core:math"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bd "godot:box3d/diagnostics"
 import bp "godot:box3d/presentation"
 import r "godot:replay"
@@ -79,7 +80,7 @@ Game :: struct {
 
 Codec :: ph.Network_Codec(Game, Control, Action, Event, 2)
 
-initial_game :: proc(scene: ^a.Baked_Scene, built: ^a.Built_Scene) -> (Game, bool) {
+initial_game :: proc(scene: ^a.Baked_Scene, built: ^ar.Built_Scene) -> (Game, bool) {
     if len(scene.data.bodies) != BODY_COUNT || len(scene.data.shapes) != BODY_COUNT || len(scene.data.joints) != 1 {
         return {}, false
     }

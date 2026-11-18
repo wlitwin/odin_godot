@@ -14,12 +14,11 @@ Spectators remove the turret view when their observed clock reaches the final
 shot; that shot clears occupancy on the authority. The crash fixture waits for a backup that contains
 the occupied turret before killing only its own original host process.
 
-`fixtures/content50.checkpoint` is a genuine tick-12 content-50/J checkpoint,
-captured before live types changed (local reservation token bytes start with 77).
-The conversion test decodes it with frozen types and verifies all mapped state,
-an empty turret pool and zero new definition fields. Do not regenerate it with
-current codecs. The frozen catalog/action source and schemas live under
-`examples/replay_scrapyard/shared/revisions/content50`.
+`fixtures/without-turrets.checkpoint` is the current-format migration of a
+pre-turret tick-12 checkpoint. Tests retain its original catalog, empty turret
+pool and lack of occupation. Original bytes and the
+[migration receipt](../../docs/replay/results/usability-legacy-2026-11-16/scrapyard/receipt.json)
+are preserved separately; no retired types are needed by the test.
 
 See [feature documentation](../../examples/replay_scrapyard/shared-turret.md)
 and [recorded evidence](../../docs/replay/support.md).

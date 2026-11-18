@@ -112,11 +112,6 @@ sim_cmd_find :: proc(cmds: []Sim_Cmd, id: Cmd_Id) -> int {
 // — an untrusted-input cap, far above any honest burst.
 CMD_HOST_CAP :: 16
 
-// Tick verbs are small intent tuples, not an upload channel. The generated
-// encoders normally emit a handful of scalar bytes; this generous ceiling
-// bounds the authority's clone/allocation even for hand-written commands.
-CMD_ARGS_MAX :: knet.ACTION_ARGS_DEFAULT
-
 // The internal ledger state of an issued verb — deliberately NOT knet's
 // Action_Outcome. Its state is the ISSUE WRAPPER'S game-facing return
 // (Rejected/Predicted/Applied); this is a Cmd_Out's private in-flight state

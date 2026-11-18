@@ -1,0 +1,367 @@
+{
+  "task": "P1-07",
+  "policy": "Unlaunched/internal-only: migrate owned callers and content, then delete obsolete APIs and schema readers. This inventory expands the task without changing the full three-phase goal. Root is the sole writer; three independent reviewers supplied read-only evidence.",
+  "items": [
+    {
+      "id": "kit_records",
+      "title": "Require exact local record framing/layout; migrate retained Scrapyard files",
+      "status": "complete",
+      "files": [
+        "kit/save/save.odin",
+        "tests/kitsave",
+        "../scrapyard/scripts/flow.odin",
+        "../scrapyard/scripts/vault.odin"
+      ],
+      "notes": "One retained pre-envelope settings v3 file migrated with backup and semantic readback. Ten current profile records left untouched.",
+      "validation": [
+        "Removed implicit zero-fill/truncation and require exact envelope consumption. Three kitsave tests pass with different-size layouts, every truncated prefix, oversized declarations and trailing bytes.",
+        "Migrated retained historical Scrapyard settings v3 to current RECD using archived source semantics and the actual current Settings decoder; preserved backup and all ten current profile files.",
+        "Installed SDK Scrapyard solo/duo/vault persistence checks pass."
+      ]
+    },
+    {
+      "id": "kit_welcome",
+      "title": "Require current WELCOME routing flag and bump admission revision",
+      "status": "complete",
+      "files": [
+        "kit/session/session.odin",
+        "tests/kitsession"
+      ],
+      "notes": "Current writer always sends the flag. Complete-prefix rejection and 74 session tests pass; real game join qualification remains.",
+      "validation": [
+        "PROTOCOL_REV=14; required routing flag is preflighted before committing roster state.",
+        "All 74 kitsession tests pass, including the formerly exempt final-byte truncation. Updated SDK Scrapyard joins pass."
+      ]
+    },
+    {
+      "id": "play_trail",
+      "title": "Remove former play.Trail aliases; retain kit/combat implementation",
+      "status": "complete",
+      "files": [
+        "play/trail.odin",
+        "kit/combat/trail.odin",
+        "docs/kit/play.md"
+      ],
+      "notes": "No executable owned caller uses the old path. Final author-surface/docs checks remain.",
+      "validation": [
+        "Deleted play/trail.odin aliases, kept kit/combat implementation, updated guides/comments.",
+        "Author-surface gate, Kit wasm checks, current addon build and Scrapyard builds pass."
+      ]
+    },
+    {
+      "id": "kit_typed_input",
+      "title": "Require exact type registration for typed lane input",
+      "status": "complete",
+      "files": [
+        "kit/sim/lane.odin",
+        "tests/kitsim",
+        "tests/kit_box3d",
+        "tests/box3d_framework",
+        "tests/box3d_presentation"
+      ],
+      "notes": "Migrate unstamped hand-built fixtures; retain explicit raw class-ID input.",
+      "validation": [
+        "Removed size-only lookup and orphan CMD_ARGS_MAX alias. Updated 38 lane fixtures and four physics integration fixtures to register exact types.",
+        "All 58 kitsim tests pass, including missing-type and same-size wrong-type assertions. Nine Kit physics, four paired framework and five presentation tests pass."
+      ]
+    },
+    {
+      "id": "rtc_control",
+      "title": "Remove old control-channel config/fallback; require separate control stream",
+      "status": "complete",
+      "files": [
+        "replay/godot/transport/rtc.odin",
+        "replay/godot/transport/rtc_signal.odin",
+        "tests/replay_rtc"
+      ],
+      "notes": "Owned signaling relay preserves SDP metadata; current browser and rejection paths qualified.",
+      "validation": [
+        "Removed legacy_control and per-peer channel fallback; require control_stream=1 in offers/answers and all three channels ready; controls only accepted on channel 2.",
+        "Actual Chrome peers pass fragmentation/credit traffic, departure/replacement/restart and gameplay convergence. Missing control capability is rejected in both offer and answer directions."
+      ]
+    },
+    {
+      "id": "method_arguments",
+      "title": "Standardize borrowed method inputs and remove compatibility option boilerplate",
+      "status": "complete",
+      "files": [
+        "scriptgen/method_values.odin",
+        "core/editor_authoring.odin",
+        "tests/method_values",
+        "examples",
+        "../scrapyard"
+      ],
+      "notes": "Owned return lifetime remains explicit; all inputs use one borrowed convention. Fresh installed SDK tested in Scrapyard.",
+      "validation": [
+        "Methods and all property setters now borrow inputs; generated wrappers always release builtin copies. Removed borrowed_args option/field and redundant annotations, retaining an actionable rejection diagnostic and owned_return.",
+        "Migrated six explicit argument frees and checked setter/signal retention sites. New tests prove input-as-borrowed-return, direct-method retention and unannotated-setter retention.",
+        "Full scriptgen gate, three editor-source tests and actual editor template/callback/runtime gate pass. Native and real Chrome lifetime tests pass; native repeated-string growth is zero.",
+        "Slopball, Slopball3D and Quickdraw UI/profile checks pass. Installed SDK Scrapyard duo/spray transfer plus three scene lifecycles with chat and file-picker calls pass.",
+        "Quickdraw final WASM check had one empty-log compiler SIGSEGV. An identical standalone check passed without source/test changes; preserve as a toolchain-flake observation for final qualification."
+      ]
+    },
+    {
+      "id": "box3d_authoring",
+      "title": "Emit only current authoring schema; delete schema-1 hash/build paths",
+      "status": "complete",
+      "files": [
+        "box3d/authoring",
+        "addons/box3d_authoring",
+        "replay/physics/authoring.odin",
+        "tests/box3d_authoring",
+        "tests/box3d_motion"
+      ],
+      "notes": "Make constructor current-only, migrate editor extraction/gizmo data and fixtures, rebake generated artifacts. No checked-in b3authoring artifacts found by review.",
+      "validation": [
+        "Deleted schema1 support/hash projection/build branch and made scene_input_default(namespace) current-only. Editor/Gizmo emit current schema with empty motion arrays. No retained b3authoring artifacts found in owned example/Scrapyard source trees; fixtures/artifacts regenerated.",
+        "Thirty-four authoring/motion/artifact/framework unit checks pass, including current recovery3 construction and old-schema rejection.",
+        "Real Godot authoring and eight-family motion transactions pass .tres/.tscn roundtrips and source-free construction. Actual editor Inspector/Gizmo, single-body preview, artifact importer, runtime and detached Kit/Replay frame rendering pass.",
+        "Migrated active Dockyard old-provider test adapter to the current shared schema while preserving its deliberately different provider identity; rounds package type-checks."
+      ]
+    },
+    {
+      "id": "box3d_capacity",
+      "title": "Reject explicitly old capacity schemas while keeping current defaults",
+      "status": "complete",
+      "files": [
+        "build/box3d_capacity.py",
+        "tests/box3d_capacity"
+      ],
+      "notes": "Checked-in capacity profile already current. Omitted current fields/schema remain useful defaults.",
+      "validation": [
+        "Removed explicit schema1 promotion; partial current profiles still receive defaults. Seven capacity-profile tests pass.",
+        "Rebuilt the native backend coherently after the loader changed; all 14 registered native checks pass. Actual SDK/Godot tests use the new shared library and manifest."
+      ]
+    },
+    {
+      "id": "box3d_recovery",
+      "title": "Unify native recovery formats on current format 3",
+      "status": "complete",
+      "files": [
+        "box3d/native/recovery_codec.c",
+        "box3d/recovery.odin",
+        "box3d/bindings.odin",
+        "core/box3d_native.odin",
+        "core/box3d_native_web.odin",
+        "build/box3d_profile.py",
+        "tests/box3d_recovery",
+        "tests/box3d_motion"
+      ],
+      "notes": "Native recovery now has one current format (3). Primitive and authored catalog conveniences share one constructor, identical identity/bytes, all joint families, alias validation and exact primitive allocation cost. Removed format-1/2 codecs, version-selecting APIs/constants and versioned descriptor names; descriptor ABI remains 2. Updated desktop/web domain admission and deployment metadata; independent reference vectors/generator and active callers use current contracts.",
+      "validation": [
+        "All 14 native Release CTest checks pass, including exact constructor identity/byte parity, every joint family, old-header rejection, primitive near-budget controls and malformed/ownership failure checks.",
+        "Executed WebScalar and WebSIMD backend suites pass eight actual C programs plus independent reference parser each.",
+        "46 Odin recovery/authoring/Kit/Replay/diagnostics tests, 4 framework ownership tests with native pending-end probe, and 14 motion tests pass. Native and WASM diagnostic golden vectors match.",
+        "Actual Godot authored fixture builds/imports/reloads and destroys source data successfully. Ordinary Web export passes Chrome recovery, source-free continuation, 70,000 owner cycles and engine shutdown.",
+        "No tracked native save binaries or candidates in the scoped standard user-data locations required migration. Per-run binary fixtures regenerate from current inputs; historical build/report evidence remains unchanged."
+      ],
+      "evidence": "docs/design/usability-recovery-evidence.json"
+    },
+    {
+      "id": "scrapyard_archives",
+      "title": "Migrate current acceptance archives; delete content42-50 upgrade stack",
+      "status": "complete",
+      "files": [
+        "examples/replay_scrapyard/shared/upgrade",
+        "examples/replay_scrapyard/shared/upgrade_catalog",
+        "examples/replay_scrapyard/shared/revisions",
+        "examples/replay_scrapyard/tools",
+        "tests/replay_scrapyard",
+        "tests/replay_stormcaller",
+        "tests/replay_turret",
+        "tests/replay_diagnostics"
+      ],
+      "notes": "Migrated 13 checkpoints (including two diagnostics copies) and four recordings using a private frozen source build. Seventeen repository fixtures published with historical originals/receipts; the native workbench recording was atomically migrated with backup. The existing current native profile was unchanged. Deleted game-specific upgrade/revision schema packages and converter CLIs.",
+      "validation": [
+        "Every checkpoint passed full typed source decode, reviewed historical defaults, explicit false-dash control mapping, target encode/decode and metadata/ledger comparison. Asset records/payloads remained byte-identical. True legacy dash and corrupt source were refused.",
+        "All four recordings preserve copied base/expected frames, input decisions and event IDs/payloads/boundaries. Source and target simulation verification passed; expected results were never regenerated. Current native/WASM verification of the three retained network recordings passes corruption, forged-state and invalid-input rejection.",
+        "Eight current plain/spray/captured fixtures resume in fresh Godot processes with exact public hash/tick, asset restoration and continued combat. Source bytes remain unchanged.",
+        "Independent evolution tests now use small synthetic schemas while preserving exact freeze/contract/scaffold checks, unreviewed-default refusal and changed-leaf detection. Six tests and current Catalog/World/Control/Action contract export pass.",
+        "Catalog exporter/runtime baker/stock reader now share content.SEMANTIC independently of the gameplay/control identity. A real Godot rebake and source receipt check pass; the canonical catalog value digest is unchanged."
+      ]
+    },
+    {
+      "id": "scrapyard_controls",
+      "title": "Remove scheduled dash compatibility field and update game identity",
+      "status": "complete",
+      "files": [
+        "examples/replay_scrapyard/shared/game",
+        "tests/replay_scrapyard"
+      ],
+      "notes": "Removed Control.dash and its pre-movement execution path. All dashes use Action.Dash with ten future movement ticks. Gameplay content advanced to 0x525343524150304c; only false legacy controls were migrated.",
+      "validation": [
+        "All 108 current Scrapyard model tests pass, including nonempty hit-history/pending-action roundtrips, explicit and automatic profiles, bundle-only storage, action dash timing and correction behavior.",
+        "Active-dash restore matches uninterrupted position/timers/count, preserves and settles the queued Ready sequence, changes the ready flag and emits exactly one matching action result in each continuation.",
+        "Four Stormcaller and seven Turret tests pass; migrated saved catalogs retain zero pulse/turret additions rather than silently acquiring current stock definitions. Scrapyard wasm model check passes."
+      ]
+    },
+    {
+      "id": "scrapyard_profiles",
+      "title": "Migrate profile-v1 data once; remove automatic old-record decoder",
+      "status": "complete",
+      "files": [
+        "examples/replay_scrapyard/shared/profile",
+        "tests/replay_scrapyard/fixtures/profile1",
+        "tests/replay_scrapyard/automatic_test.odin"
+      ],
+      "notes": "Migrated the retained profile-v1 fixture to the current profile-v2 codec, removed Legacy_Record/content fallback, and verified the native user profile was already current and byte-identical. Identity and explicit/automatic choices are preserved.",
+      "validation": [
+        "Current fixture decode matches pinned identity, epoch/tick, automatic=0, look2/iron1/abilities5+1 and cores7/parts2; roundtrip and wrong-identity checks pass. Original v1 bytes now reject without retaining its schema type.",
+        "Private native user files are backed up under the migration workspace; after all tests, the current profile and migrated workbench recording still match their target hashes."
+      ]
+    },
+    {
+      "id": "replay_hardcoded_upgrades",
+      "title": "Delete protocol6 checkpoint and pre-authority recording converters",
+      "status": "complete",
+      "files": [
+        "replay/net/checkpoint_upgrade.odin",
+        "replay/net/recording_upgrade.odin",
+        "tests/replay_net",
+        "tests/replay_network_recording"
+      ],
+      "notes": "Deleted checkpoint_upgrade_v6 and recording_upgrade_without_authority, prior Batch type, old-protocol validation/contract parameters and CLI legacy verifier flags. Current checkpoint value decoding remains shared by value/physics archives; generic application world/action conversion APIs remain.",
+      "validation": [
+        "All 183 Replay network tests and the network wasm check pass. Current full-section checkpoint roundtrip uses nonempty actions/inputs/outcomes/bans/policy data, and validates rejection of unsupported protocol numbers with valid checksums.",
+        "Replay physical-archive generic/native regression suites and Godot import check pass after the shared decoder change; the native suite has 17 tests.",
+        "Current native/WASM recording fixtures verify without old models or converters. Generic conversion and action scheduling tests remain in the network suite."
+      ]
+    },
+    {
+      "id": "cavecrawl_archives",
+      "title": "Migrate C1-C8/O1-O2 fixtures and remove owned game conversion stacks",
+      "status": "complete",
+      "files": [
+        "examples/replay_cavecrawl/shared/upgrade",
+        "examples/replay_cavecrawl/shared/owner_upgrade",
+        "examples/replay_cavecrawl/tools",
+        "tests/replay_cave",
+        "tests/replay_cave_owner",
+        "tests/replay_cave_director",
+        "tests/replay_cave_floor",
+        "tests/replay_cave_relic",
+        "tests/replay_cave_carrier",
+        "tests/replay_cave_adoption",
+        "tests/replay_cave_impact"
+      ],
+      "notes": "Published all 18 migrated C9/O3 checkpoints after current decode, canonical byte roundtrip, exact full-frame digest and pending-action verification. Replaced old impact recordings with freshly captured current-model traces; preserved originals, producer sources and hashes as inert historical evidence. Deleted both Cave conversion stacks and migrated all active runners/docs to current fixtures.",
+      "validation": [
+        "35 Cave, 12 owner and 2 impact tests pass; impact fixtures execute in WASM, including event-only divergence detection.",
+        "15 saved fixtures resume with exact current full-frame hashes in fresh Godot processes. Floor, relic, carrier, accepted-pose and both impact runtime gates pass.",
+        "Definitions and lobby full gameplay/save/resume gates pass. Documentation and current Nix addon build pass."
+      ]
+    },
+    {
+      "id": "bundle_format",
+      "title": "Make bundle decoding require the bundle envelope; keep explicit raw checkpoint API",
+      "status": "complete",
+      "files": [
+        "replay/godot/storage/storage_assets.odin",
+        "tests/replay_scrapyard/save_run.sh"
+      ],
+      "notes": "Game bundle readers require the bundle envelope; removed implicit raw-checkpoint fallback. Current raw checkpoint APIs remain explicit for custom storage. No native raw game save requiring migration was present; retained standalone checkpoint fixtures use explicit SDK decoding.",
+      "validation": [
+        "Pure test proves bundle acceptance, raw input rejection with an empty destination, and successful explicit raw checkpoint decoding.",
+        "Actual save/kill/fresh-resume gate passes and now rejects raw input, wrong identity and corruption while preserving rejected files. Its existing immediate-failure quit path emits deferred resource warnings; tracked for final journey qualification."
+      ]
+    },
+    {
+      "id": "final_qualification",
+      "title": "Rebuild affected examples/packages and finish removal/documentation checks",
+      "status": "complete",
+      "files": [
+        "tests/run_all.sh",
+        "docs",
+        "build",
+        "examples",
+        "../scrapyard"
+      ],
+      "notes": "Final Nix addon builds with patched pinned Odin and byte-matches current recovery, domain, bundle and setup sources. Replaced the whole installed Scrapyard SDK after preserving its old copy; verified removed checkpoint/recording upgrade files and play.Trail are absent. Original game rebuild/import, three-scene lifecycle, solo, two-peer join, profile persistence and host succession pass with no retries. Focused current Cave/Scrapyard archive/model/runtime checks and native/Web physics gates are recorded under their inventory areas. Independent final review found no missed authored callers and every registered suite script exists.",
+      "validation": [
+        "Packaged SDK source/removal verification and full replacement receipt: /tmp/odin-usability-recovery-sdk-refresh.json.",
+        "Scrapyard lifecycle plus selected acts 0,1,5,9 pass with one attempt each: /tmp/odin-usability-recovery-scrapyard.log.",
+        "Current docs check resolves 196 pages and 19,889 references; production site build passes.",
+        "All 16 cleanup areas complete; earlier qualification limitations remain explicit and queued journey improvements stay in P2/P3."
+      ]
+    }
+  ],
+  "retain": [
+    "Generic replay/evolution and explicit checkpoint_convert/state/actions facilities, with small synthetic schema tests instead of obsolete game contracts.",
+    "Current value-only/custom composition: room_close_legacy, wire_receive_legacy, field-only lanes, primitive physics constructors, raw class-ID input and raw checkpoint APIs.",
+    "Current native memory-budget reconciliation exposed as legacy_extra; changing its name is optional and must preserve all admission/deduplication semantics.",
+    "Useful diagnostics rejecting old script prefixes/attributes; removing rejection alone can silently lose lifecycle callbacks.",
+    "Historical reports, frozen comparison sources and receipts when still meaningful evidence; no old gameplay decoder obligations inferred from retained evidence.",
+    "Owned/borrowed return lifetime choice, current type aliases and explicit feature negotiation that still serves supported behavior."
+  ],
+  "evidence": {
+    "kit_units": "/tmp/odin-usability-legacy-kit.log",
+    "kit_sim_surface_wasm": "/tmp/odin-usability-legacy-kit-sim.log",
+    "kit_physics": "/tmp/odin-usability-legacy-kit-physics.log",
+    "scrapyard_join_persistence": "/tmp/odin-usability-legacy-scrapyard.log",
+    "settings_migration": "/tmp/odin-usability-kit-record-migration-gz_1kutc/receipt.json",
+    "rtc_browser": "/tmp/odin-usability-rtc-current.log",
+    "box_authoring_units": "/tmp/odin-usability-authoring-current.log",
+    "box_motion_artifact_units": "/tmp/odin-usability-authoring-motion-current.log",
+    "native_build": "/tmp/odin-usability-native-recovery-fixed-build.log",
+    "native_directory": "/tmp/odin-usability-native-recovery-fixed.I7qQDC",
+    "box_godot_authoring": "/tmp/odin-usability-authoring-godot.jwMp1P/final/report.json",
+    "box_godot_motion": "/tmp/odin-usability-motion-godot.l2hrSw/final/report.json",
+    "box_editor_runtime": "/tmp/odin-usability-box3d-editor-current.8bBCpO/editor/report.json",
+    "dockyard_compile_only": "/tmp/odin-usability-dockyard-typecheck.log",
+    "method_generator": "/tmp/odin-usability-method-default-generator.log",
+    "method_values": "/tmp/odin-usability-method-default.log",
+    "method_editor": "/tmp/odin-usability-method-default-editor.log",
+    "method_slopball": "/tmp/odin-usability-method-slopball.log",
+    "method_slopball3d": "/tmp/odin-usability-method-slopball3d.log",
+    "method_quickdraw": "/tmp/odin-usability-method-quickdraw.log",
+    "quickdraw_wasm_followup": "/tmp/odin-usability-method-quickdraw-wasm-check.log",
+    "method_scrapyard": "/tmp/odin-usability-method-scrapyard.log",
+    "addon": "/tmp/odin-usability-legacy-current-addon.json",
+    "docs": "/tmp/odin-usability-method-docs-build.log",
+    "scrapyard_migration_receipt": "docs/replay/results/usability-legacy-2026-11-16/scrapyard/receipt.json",
+    "scrapyard_private_migration": "/tmp/odin-usability-scrap-migrate-hgpnrt4d/published.json",
+    "cavecrawl_candidates": "/tmp/odin-usability-cave-migrate.HCZLYk/converted/result.json",
+    "current_recordings": "/tmp/odin-usability-current-recordings.log",
+    "current_net": "/tmp/odin-usability-current-net.log",
+    "current_models": "/tmp/odin-usability-scrap-current-model2.log",
+    "current_fixture_models_diagnostics": "/tmp/odin-usability-current-fixture-models.log",
+    "current_saved_fixture_runtime": "/tmp/odin-usability-scrap-saved-fixtures.log",
+    "current_save_runtime": "/tmp/odin-usability-current-save-runtime.log",
+    "current_physics_archives": "/tmp/odin-usability-current-archive-physics.log",
+    "current_catalog_bake": "/tmp/odin-usability-current-archives-bake-final.log",
+    "current_final_checks": "/tmp/odin-usability-current-archives-final-checks.log",
+    "current_addon": "/tmp/odin-usability-cave-current-addon.json",
+    "current_docs": "/tmp/odin-usability-cave-final-docs.log",
+    "cavecrawl_receipt": "docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json",
+    "cavecrawl_model": "/tmp/odin-usability-cave-current-only.log",
+    "cavecrawl_runtime": "/tmp/odin-usability-cave-current-godot-d2nwcv0_",
+    "cavecrawl_save": "/tmp/odin-usability-cave-save-current.log",
+    "cavecrawl_owner_impact": "/tmp/odin-usability-cave-owner-patched-compiler.log",
+    "compiler": "docs/design/usability-compiler-evidence.json",
+    "native_recovery": "docs/design/usability-recovery-evidence.json",
+    "final_addon": "/tmp/odin-usability-recovery-addon-final.json",
+    "final_sdk_refresh": "/tmp/odin-usability-recovery-sdk-refresh.json",
+    "final_scrapyard": "/tmp/odin-usability-recovery-scrapyard.log",
+    "final_docs": "/tmp/odin-usability-recovery-docs.log"
+  },
+  "test_diagnosis": [
+    "The old record migration test structs had equal padded sizes; replaced with genuinely different-size layouts and strict framing cases instead of preserving implicit coercion.",
+    "Removed WELCOME final-byte exemption and migrated typed-input fixtures instead of retaining historical fallback behavior.",
+    "An old motion fixture expected capacity failure at two joints. Current capacity is configurable (default256), so duplicate IDs now test Duplicate and MAX_JOINTS+1 tests Capacity. The Godot asset-boundary fixture now uses selected MAX_ASSETS+1 instead of the obsolete nine-asset threshold.",
+    "Initial Godot authoring runs were invoked with a static archive; corrected to the required shared library. Its old build manifest then correctly refused the changed capacity loader; rebuilt a new backend rather than editing provenance or weakening validation.",
+    "One-time settings verifier initially used an older Odin os.read_entire_file signature, then expected odin run to retain its executable. Corrected the validation tool to current allocator/error APIs and explicit build, then read back the installed file through current kit/save. Source settings stayed backed up; every field was verified.",
+    "Quickdraw WASM and owner scripts SIGSEGV failures were compiler defects: identical checker-worker stacks, default-threaded reproduction, and upstream shared-specialization mutation fix. Backported the exact fix to pinned Odin; 28 normal-threading probes and a permanent native/WASM generic-overload gate pass. See usability-compiler-evidence.json.",
+    "One-time migration initially needed unique frozen Odin package names and a real Audit_Capture owner for recording_verify; corrected the temporary tooling, then all19 candidates validated before publication.",
+    "The old popper correction fixture relied on legacy dash running before same-tick damage. With the current action path, moved contact later so the dash can be issued beforehand; retained the assertions that correction removes the blast, damage and flash.",
+    "Synthetic evolution fixture constants needed an addressable local array before slicing; corrected test setup without changing the API.",
+    "Independent review found that a gameplay content bump could make a successful catalog bake unreadable by the hardcoded stock decoder. Introduced one catalog semantic constant shared by baker/exporter/reader and regenerated artifact/receipt. Catalog value bytes/digest are unchanged.",
+    "Independent review found pending Ready was only checked at serialization. Strengthened continuation to require the ready-state change, settled sequence and exactly one result in both original/resumed servers.",
+    "New native motion test initially expected Incompatible for a format header mismatch; existing public contract returns Corrupt. Corrected the expected category while retaining empty-owner, unchanged-state and allocation checks.",
+    "The old semantic corruption fixture attempted to encode negative torque through the newly strict current scalar writer. Enabled scalar validation bypass only inside the OGB3_TESTING corruption generator; public read/write validation remains strict, and the invalid packet still must be rejected before native allocation."
+  ],
+  "limitations": [
+    "Historical native user data found in the named projects was handled; browser-origin IndexedDB contents and arbitrary save-path overrides were not scanned. Current migrated browser recording fixtures were verified in WASM.",
+    "The existing Replay Scrapyard fail() calls SceneTree.quit immediately. Negative save rejection cases log deferred audio/resource cleanup warnings; fix/qualify this shutdown path before final journey completion.",
+    "Runtime editor/native qualification is on macOS. The compiler failure was diagnosed and fixed; native/WASM guards are registered for CI."
+  ]
+}

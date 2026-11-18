@@ -5,9 +5,8 @@ work="${REPLAY_DIAGNOSTICS_OUT:-$(mktemp -d)}";mkdir -p "$work"
 trap 'echo "Diagnostic logs: $work"' EXIT
 odin build "$ROOT/examples/replay_scrapyard/tools/inspect_run" -collection:godot="$ROOT" -out:"$work/inspect_run"
 odin build "$ROOT/tests/replay_diagnostics/fixtures" -collection:godot="$ROOT" -out:"$work/fixture"
-odin build "$ROOT/examples/replay_scrapyard/tools/upgrade_run" -collection:godot="$ROOT" -out:"$work/upgrade_run"
 for name in plain spray; do
-  "$work/upgrade_run" "$ROOT/tests/replay_diagnostics/fixtures/$name.replay" "$work/$name.replay" --token protocol-upgrade-owner
+  cp "$ROOT/tests/replay_diagnostics/fixtures/$name.replay" "$work/$name.replay"
 done
 "$work/fixture" "$work/plain.replay" "$work/changed.replay"
 python3 "$ROOT/tests/replay_diagnostics/verify.py" "$work"

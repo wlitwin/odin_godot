@@ -6,7 +6,7 @@ package kit_sim
 // .Predicted fields of an Entity_Desc, struct-layout, tightly packed in desc
 // order. One more consumer of the one-serialization-many-masters descriptor.
 //
-// History is play.Trail generalized: where Trail hand-notes a [2]f32, History
+// History is kit/combat.Trail generalized: where Trail hand-notes a [2]f32, History
 // notes the whole predict set, descriptor-driven. Same ledger contract — each
 // slot stores the tick that wrote it, so an unwritten or lapped slot reads
 // ok=false instead of a sentinel; a caller finding no history decides what to

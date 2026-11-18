@@ -12,8 +12,11 @@ WIRE_FIXTURE_VALUE :: Wire_Payload {
 }
 
 #assert(size_of(Wire_Payload) == len(WIRE_FIXTURE_BYTES))
-#assert(NET_ABI_FINGERPRINT == 0x6bf5e741849bef4a)
-#assert(NET_FINGERPRINT == 0xfc3f66e9fcd2414b)
+#assert(NET_ABI_FINGERPRINT == 0x948638687f891ca8)
+// Normalized type representations replace alias-sensitive source spellings.
+// The canonical message tag records its byte, not its source identifier.
+// Exact sizes, offsets and the byte vector remain separately asserted.
+#assert(NET_FINGERPRINT == 0xe3f298604ea6f896)
 #assert(ODIN_ENDIAN == .Little)
 #assert(offset_of(Wire_Payload, stamp) == 0)
 #assert(offset_of(Wire_Payload, inner) == 4)

@@ -17,7 +17,7 @@ import kn "godot:kit/net"
 audit_positions:[4][2]f32
 audit_pending:[4]i32
 audit_position_note :: proc(self:^Scrapyard,index:int) {
- if r,ok:=runner_of(self,self.ses.me);ok {audit_positions[index]={r.x,r.y}}
+ if r,ok:=runner_owned_by(&self.boot,self.ses.me);ok {audit_positions[index]={r.x,r.y}}
  audit_pending[index]=i32(kn.pending_count(&self.ses.ctx.pending))
 }
 @(gd_method)

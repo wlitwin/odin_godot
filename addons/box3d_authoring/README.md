@@ -1,11 +1,29 @@
-Box3D authoring schema1
+Box3D authoring
 
-Copy this directory into a Godot project's addons directory and enable the
-standard editor plugin if desired. Create Box3DWorld3D with explicit stable_key
-(namespace), then Box3DBody3D/Box3DSensor3D children. Resource classes are
+The SDK ships this addon beside `addons/odin_godot`. Copy both directories
+into the project and enable Box3D Authoring in Project Settings → Plugins.
+Use Project → Tools → Box3D: setup and status, then Install tools and build.
+The same setup panel appears in the Inspector. It uses the ordinary Odin build
+and reports progress, missing compiler, failures and loaded-tool readiness.
+
+Updates replace only unchanged managed tool sources. Local changes are listed
+and preserved; merge them with tool_module or build your customized sources.
+Commit modules/box3d_authoring_tools/.box3d-tools.json with the module so its
+installation record survives clones and cache cleanup.
+
+ Create a Box3DWorld3D, then
+Box3DBody3D/Box3DSensor3D children. New editor objects receive saved stable IDs;
+runtime construction still supplies explicit stable_key values. Resource classes are
 Box3DBoxShape3D, Box3DSphereShape3D, Box3DCapsuleShape3D, Box3DHullShape3D,
 Box3DMeshShape3D and Box3DHeightfieldShape3D. Ordinary .tres/.tscn serialization
 stores exported values/scripts. Nodes never step physics or become rollback state.
+
+Use **Duplicate Box3D selection** in the Scene tree context menu or Inspector to
+copy connected authoring objects. It remaps references to copied bodies, preserves
+shared shape Resources, and supports exact undo/redo. **Duplicate shape** gives a
+body-local shape copy its own Resource and ID. **Stable ID** / **New ID** updates
+incoming references when rekeying a body. These controls do not need the compiled
+Odin tools. Runtime data extraction does not require the editor plugin.
 
 World `box3d_definition()` returns a detached Dictionary; `box3d_definition_json()`
 returns exact Scene_Input JSON using full float precision. Invalid input returns

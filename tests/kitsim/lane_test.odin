@@ -282,7 +282,9 @@ lane_two_peers_converge :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, lbox_step)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, lbox_step)
 
@@ -368,7 +370,9 @@ lane_pair :: proc(host: ^Lane_Box, alice: ^Lane_Box, desc: ^knet.Entity_Desc) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, host, lbox_sample, lbox_step)
     ksim.lane_set_sim(&alice.lane, alice, lbox_sample, lbox_step)
     lbox_track(host, 10, 1, desc)
@@ -498,6 +502,7 @@ lane_watched_fresh_spawn_holds_at_muzzle :: proc(t: ^testing.T) {
 
     for b in boxes {
         ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+        ksim.lane_class_set_type(&b.lane, 0, typeid_of(i8))
         ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
     }
 
@@ -652,6 +657,7 @@ lane_gaining_a_hidden_spawn_reveals_it :: proc(t: ^testing.T) {
 
     for b in boxes {
         ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+        ksim.lane_class_set_type(&b.lane, 0, typeid_of(i8))
         ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
     }
 
@@ -791,6 +797,7 @@ lane_two_input_classes_route_per_entity :: proc(t: ^testing.T) {
 
     for b in boxes {
         ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg) // primary class 0 (i8)
+        ksim.lane_class_set_type(&b.lane, 0, typeid_of(i8))
         ksim.lane_add_input_class(&b.lane, 1, 2, mc_sample1) // class 1 (i16)
         ksim.lane_set_sim(&b.lane, b, mc_sample0, nil) // no world pass: sets drive themselves
     }
@@ -895,8 +902,7 @@ lane_input_of_routes_by_type_not_size :: proc(t: ^testing.T) {
     }
     ksim.lane_init(&box.lane, &box.s, size_of(Steer_In), cfg = cfg) // primary class 0
     ksim.lane_add_input_class(&box.lane, 1, size_of(Aim_In), two_aim_sample) // class 1, SAME size
-    // The stamps that make type the resolver key. Remove these two lines and the
-    // test asserts "input size ambiguous" — the pre-fix behaviour, on purpose.
+    // Every typed accessor requires the exact registered type.
     ksim.lane_class_set_type(&box.lane, 0, typeid_of(Steer_In))
     ksim.lane_class_set_type(&box.lane, 1, typeid_of(Aim_In))
     ksim.lane_set_sim(&box.lane, &box, two_steer_sample, two_class_probe_step)
@@ -968,6 +974,7 @@ lane_rejects_replayed_bounded_and_stale_authority_traffic :: proc(t: ^testing.T)
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     m := new(Mover)
     m.hp = 10
@@ -1098,6 +1105,7 @@ lane_rewind_envelope_uses_authority_link_evidence :: proc(t: ^testing.T) {
         rewind_max  = 15,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
 
     DT :: 1.0 / 60.0
@@ -1180,6 +1188,7 @@ lane_action_byte_budget_is_per_seat_and_refills :: proc(t: ^testing.T) {
     lane_pump(boxes)
 
     ksim.lane_init(&host.lane, &host.s, 1)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     m := new(Mover)
     m.hp = 10
@@ -1250,7 +1259,9 @@ lane_commands_predict_reject_and_revert :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -1455,7 +1466,9 @@ lane_contested_and_chained_verbs :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -1556,7 +1569,9 @@ lane_apply_verbs_ride_resims :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -1660,7 +1675,9 @@ lane_auto_tick_drives_entities :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     // NO step proc: the entities drive themselves through their Sim_Set.
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
@@ -1732,7 +1749,9 @@ lane_two_step_slots_split_by_role :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     // Both slots wired: lbox_step everywhere, lbox_step_auth on the authority.
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, lbox_step, lbox_step_auth)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, lbox_step, lbox_step_auth)
@@ -2037,7 +2056,9 @@ lane_smoothing_glides_reconcile_corrections :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -2126,7 +2147,9 @@ lane_possession_switches_the_driver :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -2221,7 +2244,9 @@ lane_contested_presents_on_the_claim :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -2299,7 +2324,9 @@ lane_echo_extrapolates_remote_avatars :: proc(t: ^testing.T) {
         echo_inputs = true,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -2503,7 +2530,9 @@ lane_predicted_projectile :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -2618,7 +2647,9 @@ lane_predicted_projectile_rejected :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -2712,9 +2743,9 @@ chain_fire_exec :: proc(
         return .None
     }
 
-    if e0, id0, exists := ksim.lane_spawn_of_exec(lane); exists {
-        b.cli_proj = cast(^Mover)e0
-        b.cli_proj_id = id0
+    if previous, exists := ksim.lane_spawn_of_exec(lane); exists {
+        b.cli_proj = cast(^Mover)previous.entity
+        b.cli_proj_id = previous.id
         return .None
     }
 
@@ -2767,7 +2798,9 @@ lane_reject_chain_keeps_one_projectile :: proc(t: ^testing.T) {
         margin     = 2,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, nil)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, nil)
 
@@ -2927,6 +2960,7 @@ lane_facts_reach_every_screen_on_time :: proc(t: ^testing.T) {
 
     for b in boxes {
         ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+        ksim.lane_class_set_type(&b.lane, 0, typeid_of(i8))
         ksim.lane_set_sim(&b.lane, b, lbox_sample, nil)
 
         for p in pairs {
@@ -3193,6 +3227,7 @@ lane_declared_facts_world_pass :: proc(t: ^testing.T) {
 
     for b in boxes {
         ksim.lane_init(&b.lane, &b.s, 1, cfg = cfg)
+        ksim.lane_class_set_type(&b.lane, 0, typeid_of(i8))
         ksim.lane_set_sim(&b.lane, b, lbox_sample, df_step, df_step_auth)
         ksim.lane_set_facts(&b.lane, df_table[:])
 
@@ -3422,7 +3457,9 @@ lane_deep_surplus_sheds_cold_start :: proc(t: ^testing.T) {
         margin     = MARGIN,
     }
     ksim.lane_init(&host.lane, &host.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&host.lane, 0, typeid_of(i8))
     ksim.lane_init(&alice.lane, &alice.s, 1, cfg = cfg)
+    ksim.lane_class_set_type(&alice.lane, 0, typeid_of(i8))
     ksim.lane_set_sim(&host.lane, &host, lbox_sample, lbox_step)
     ksim.lane_set_sim(&alice.lane, &alice, lbox_sample, lbox_step)
     lbox_track(&host, 10, 1, &desc)

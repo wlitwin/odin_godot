@@ -206,7 +206,6 @@ replay_quickdraw_early_claim :: proc(self: ^ReplayQuickdraw) -> bool {
 
 @(gd_method)
 replay_quickdraw_probe :: proc(self: ^ReplayQuickdraw, name: gd.String, seat: gd.Int) -> gd.Int {
-    defer gd.free_string(name)
     field := gd.gd_string_to_odin(name)
 
     if self.session == nil {

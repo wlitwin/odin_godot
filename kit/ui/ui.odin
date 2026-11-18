@@ -18,12 +18,13 @@ package kit_ui
 // FULL REPLACEMENT: the kit provides the implementation, never the final
 // look. A game that wants its own lobby/chat/scoreboard authors a scene in
 // the editor and hands it to boot (Options.lobby_scene / chat_scene /
-// score_scene) — the kit ADOPTS it: resolves the nodes it drives BY NAME
-// (any depth; see each widget's *_adopt contract) and pours the same
+// score_scene) — the kit ADOPTS it: resolves the explicit references on its OdinKitUIBindings child
+// (see each widget's *_adopt contract) and pours the same
 // behavior into them. Everything else in the scene is the game's own chrome;
 // the kit never touches what it didn't name.
 
 import gd "godot:godot"
+import binding "bindings"
 import knet "godot:kit/net"
 import ksess "godot:kit/session"
 import "core:fmt"
@@ -43,23 +44,6 @@ set_text :: proc(obj: gd.Object, text: string) {
     sv := gd.variant_from_string(&s)
     defer gd.variant_destroy(&sv)
     gd.set_value(obj, "text", sv)
-}
-
-// Resolve an adopted scene's contract node by NAME, searching the whole tree
-// — the game nests its chrome however it likes. A missing node is reported
-// LOUDLY (once, at boot, greppable) and comes back nil; the setters tolerate
-// nil so a violated contract degrades to a dead widget, not a crash.
-@(private)
-adopt_child :: proc(root: gd.Node, name: cstring, widget: string) -> gd.Node {
-    pat := gd.new_string_cstring(name)
-    defer gd.free_string(pat)
-    n := gd.node_find_child(root, pat, true, false)
-
-    if cast(rawptr)n == nil {
-        gd.print_str(fmt.tprintf("kit/ui: adopted %s scene has no node named \"%s\"", widget, name))
-    }
-
-    return n
 }
 
 Lobby :: struct {
@@ -144,46 +128,41 @@ lobby_make :: proc(parent: gd.Node, title: string) -> Lobby {
     return l
 }
 
-// Adopt a game-authored lobby scene (full replacement — see the header).
-// The CONTRACT, by node name at any depth:
-//
-//   Title (Label) · Status (Label) · Players (any container — rows land here)
-//   Host (Button) · Join (Button) · Start (Button)
-//
-// The kit instances the scene, wires those six, and drives them exactly as it
-// drives its stock build (Start ships hidden; refresh pours rows into
-// Players). Extra nodes — a Single Player key, an address field, the plate —
-// are the game's to wire after boot_attach, through l.root. The scene owns
-// its OWN layout (anchors under the boot layer bind to the viewport); none
-// of the stock builder's sizing hacks apply.
-lobby_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene, title: string) -> Lobby {
-    l: Lobby
-    node := gd.instantiate(scene)
-    gd.add_child(parent, node)
-    l.root = cast(gd.Control)node
-    // (l.panel stays nil — "the column" is a stock-builder detail; an adopted
-    // scene arranges itself.)
-    l.title = cast(gd.Label)adopt_child(node, "Title", "lobby")
-    l.status = cast(gd.Label)adopt_child(node, "Status", "lobby")
-    l.rows_box = cast(gd.Control)adopt_child(node, "Players", "lobby")
-    l.host_btn = cast(gd.Button)adopt_child(node, "Host", "lobby")
-    l.join_btn = cast(gd.Button)adopt_child(node, "Join", "lobby")
-    l.start_btn = cast(gd.Button)adopt_child(node, "Start", "lobby")
+// Adopt an editor-authored scene with an OdinKitUIBindings child. Failure
+// returns an empty widget and an owning diagnostic; no node is published.
+@(require_results)
+lobby_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene, title: string) -> (Lobby, Binding_Report) {
+    prepared, report := prepare_scenes(scene, nil, nil)
+    defer prepared_destroy(&prepared)
 
-    // OPTIONAL contract node — a "Code" LineEdit for join-code games. Quiet
-    // when absent: most lobbies never show one (lobby_show_code turns it on).
-    {
-        pat := gd.new_string_cstring("Code")
-        defer gd.free_string(pat)
-        l.code_edit = cast(gd.Line_Edit)gd.node_find_child(node, pat, true, false)
+    if report.count > 0 {
+        return {}, report
     }
 
+    if scene == nil {
+        return lobby_make(parent, title), {}
+    }
+
+    widget := prepared.widgets[.Lobby]
+    prepared.widgets[.Lobby] = {}
+    return lobby_bind(parent, widget, title), {}
+}
+
+@(private)
+lobby_bind :: proc(parent: gd.Node, widget: binding.Result, title: string) -> Lobby {
+    l := Lobby {
+        root      = cast(gd.Control)widget.root,
+        title     = cast(gd.Label)widget.nodes[.Title],
+        status    = cast(gd.Label)widget.nodes[.Status],
+        rows_box  = cast(gd.Control)widget.nodes[.Players],
+        host_btn  = cast(gd.Button)widget.nodes[.Host],
+        join_btn  = cast(gd.Button)widget.nodes[.Join],
+        start_btn = cast(gd.Button)widget.nodes[.Start],
+        code_edit = cast(gd.Line_Edit)widget.nodes[.Code],
+    }
     set_text(cast(gd.Object)l.title, title)
-
-    if cast(rawptr)l.start_btn != nil {
-        gd.set_bool(cast(gd.Object)l.start_btn, "visible", false)
-    }
-
+    gd.set_bool(cast(gd.Object)l.start_btn, "visible", false)
+    gd.add_child(parent, widget.root)
     return l
 }
 

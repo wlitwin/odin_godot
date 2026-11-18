@@ -1,97 +1,31 @@
 package box3d
 
-MOTION_VERSION :: 1
-MOTION_RECOVERY_FORMAT :: 3
+import types "godot:box3d/types"
+
+MOTION_VERSION :: types.MOTION_VERSION
 MOTION_MAX_HITS :: 256
 MOTION_MAX_PLANES :: 256
 
-Motion_Joint_Kind :: enum u32 {
-    Pin = 1,
-    Hinge,
-    Slider,
-    Spherical,
-    Distance,
-    Motor,
-    Weld,
-    Wheel,
-}
+Motion_Joint_Kind :: types.Motion_Joint_Kind
 
-Motion_Joint_Axis :: struct {
-    flags:                                                              u32,
-    hertz, damping_ratio, target, lower, upper, motor_speed, max_motor: f32,
-}
+Motion_Joint_Axis :: types.Motion_Joint_Axis
 
-Motion_Joint_Distance :: struct {
-    axis:                                           Motion_Joint_Axis,
-    length, lower_spring_force, upper_spring_force: f32,
-}
+Motion_Joint_Distance :: types.Motion_Joint_Distance
 
-Motion_Joint_Spherical :: struct {
-    flags:                                                                        u32,
-    hertz, damping_ratio, cone_angle, lower_twist, upper_twist, max_motor_torque: f32,
-    target_rotation:                                                              Quat,
-    motor_velocity:                                                               Vec3,
-}
+Motion_Joint_Spherical :: types.Motion_Joint_Spherical
 
-Motion_Joint_Motor :: struct {
-    linear_velocity,
-    angular_velocity:                                                                                                                      Vec3,
-    max_velocity_force,
-    max_velocity_torque,
-    linear_hertz,
-    linear_damping_ratio,
-    angular_hertz,
-    angular_damping_ratio,
-    max_spring_force,
-    max_spring_torque: f32,
-}
+Motion_Joint_Motor :: types.Motion_Joint_Motor
 
-Motion_Joint_Weld :: struct {
-    linear_hertz, angular_hertz, linear_damping_ratio, angular_damping_ratio: f32,
-}
+Motion_Joint_Weld :: types.Motion_Joint_Weld
 
-Motion_Joint_Wheel :: struct {
-    flags:                                                                                                                                                                                                                           u32,
-    suspension_hertz,
-    suspension_damping_ratio,
-    lower_suspension,
-    upper_suspension,
-    max_spin_torque,
-    spin_speed,
-    steering_hertz,
-    steering_damping_ratio,
-    target_steering_angle,
-    max_steering_torque,
-    lower_steering,
-    upper_steering: f32,
-}
+Motion_Joint_Wheel :: types.Motion_Joint_Wheel
 
 // Body_Key is an execution-world allocation key, not an authored logical ID.
-Motion_Joint_Def :: struct {
-    version:                                                                       u32,
-    kind:                                                                          Motion_Joint_Kind,
-    body_a, body_b:                                                                Body_Key,
-    local_frame_a, local_frame_b:                                                  Pose,
-    force_threshold, torque_threshold, constraint_hertz, constraint_damping_ratio: f32,
-    collide_connected, reserved:                                                   u32,
-    axis:                                                                          Motion_Joint_Axis,
-    distance:                                                                      Motion_Joint_Distance,
-    spherical:                                                                     Motion_Joint_Spherical,
-    motor:                                                                         Motion_Joint_Motor,
-    weld:                                                                          Motion_Joint_Weld,
-    wheel:                                                                         Motion_Joint_Wheel,
-}
+Motion_Joint_Def :: types.Motion_Joint_Def
 
-Motion_Filter :: struct {
-    category_bits, mask_bits:  u64,
-    exclude_body:              Body_Key,
-    include_sensors, reserved: u32,
-}
+Motion_Filter :: types.Motion_Filter
 
-Motion_Capsule :: struct {
-    center1, center2: Vec3,
-    radius:           f32,
-}
+Motion_Capsule :: types.Motion_Capsule
 
 Motion_Hit :: struct {
     shape:           Shape_Key,

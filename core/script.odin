@@ -200,7 +200,11 @@ odin_script_resolve_desc :: proc(self: ^OdinScript) -> (rt.Class_Desc, bool) {
     // Marker-less helper files are valid `.odin` resources during the editor scan and
     // intentionally have no descriptor. A marked resource missing from the manifest is
     // actionable (usually stale generated output), so surface it once.
-    if !self.warned_missing && (self.base_type != "" || self.class_name != "") {
+    warn_missing := true
+    when ODIN_OS != .Freestanding {
+        warn_missing = !g_scripts_missing
+    }
+    if warn_missing && !self.warned_missing && (self.base_type != "" || self.class_name != "") {
         self.warned_missing = true
         msg := godot.new_string_odin(
             fmt.tprintf(
@@ -776,6 +780,11 @@ v_get_script_method_list :: proc "c" (
             for atype in rt.method_arg_types(m) {
                 // Method descriptors carry no per-arg names; an empty name is valid.
                 pi := make_property_info("", atype)
+
+                if atype == .Nil {
+                    dict_set(&pi, "usage", v_i64(i64(godot.Property_Usage_Flags.Property_Usage_Nil_Is_Variant)))
+                }
+
                 pv := godot.variant_from_dictionary(&pi)
                 godot.array_push_back(&m_args, pv)
             }
@@ -865,7 +874,7 @@ v_get_rpc_config :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
     }
 
     // `_get_rpc_config` returns a Variant (per extension_api.json); wrap the Dictionary.
-    (cast(^godot.Variant)ret)^ = godot.variant_from_dictionary(&d)
+    ret_variant(ret, godot.variant_from_dictionary(&d))
 }
 
 // ---- safe typed return stubs for the remaining REQUIRED ScriptExtension virtuals.
@@ -897,10 +906,10 @@ v_dict_empty :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gd
     (cast(^godot.Dictionary)ret)^ = godot.new_dictionary_default()
 }
 
-// Variant return slot is uninitialized; a zeroed Variant is type NIL — write that.
+// Construct NIL in the native-size, uninitialized engine return slot.
 @(private = "file")
 v_variant_nil :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
-    (cast(^godot.Variant)ret)^ = godot.Variant{}
+    gdext.variant_new_nil(ret)
 }
 
 @(private = "file")
@@ -980,7 +989,7 @@ v_get_property_default_value :: proc "c" (
         }
     }
 
-    (cast(^godot.Variant)ret)^ = out
+    ret_variant(ret, out)
 }
 
 @(private = "file")

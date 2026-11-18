@@ -11,9 +11,11 @@ for impl in implementations:
   base=out/impl/variant;project=base/'project';assert not project.exists()
   if impl=='kit':
    subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/prepare_baseline.py'),str(root.parent/'scrapyard'),str(project),str(root)],check=True)
-   subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/baseline_cleanup.py'),str(project)],check=True)
   else:shutil.copytree(root/'examples/replay_scrapyard',project,ignore=shutil.ignore_patterns('.godot','bin','out','node_modules','*.gen.odin','*.uid','*.import','__pycache__'))
   p=project/'project.godot';text=p.read_text();text=re.sub(r'config/name="[^"]+"',f'config/name="weapon_authoring_{out.name}_{impl}_{variant}"',text);text=text.replace('config/custom_user_dir_name="replay_scrapyard"',f'config/custom_user_dir_name="weapon_authoring_{out.name}_{impl}_{variant}"');p.write_text(text)
+  # Framework installation is setup, before measuring the authored feature.
+  # Keep the installed sources in the snapshot so later unexpected edits fail.
+  subprocess.run([sys.executable,str(root/'replay/editor/install.py'),str(project)],check=True)
   before=snapshot(project);(base/'before.json').write_text(json.dumps(before,indent=2)+'\n')
   feature=base/'feature';feature.mkdir()
   if variant=='new':
@@ -43,5 +45,5 @@ if sys.platform=='darwin':
 (out/'environment.json').write_text(json.dumps(metadata,indent=2)+'\n')
 for name,repo in [('framework',root)]+([('original',root.parent/'scrapyard')] if 'kit' in implementations else []):
  (out/(name+'-status.txt')).write_bytes(subprocess.check_output(['git','status','--short'],cwd=repo));(out/(name+'-diff.patch')).write_bytes(subprocess.check_output(['git','diff','--binary','--no-ext-diff'],cwd=repo))
-paths=subprocess.check_output(['rg','--files','core','godot','gdext','runtime','kit','play','replay','build','scriptgen'],cwd=root,text=True).splitlines();(out/'framework-source.json').write_text(json.dumps({p:digest(root/p) for p in sorted(paths) if Path(p).suffix in ('.odin','.sh','.py','.nix')},indent=2)+'\n')
+paths=subprocess.check_output(['rg','--files','core','godot','gdext','runtime','kit','play','replay','authoring','build','scriptgen'],cwd=root,text=True).splitlines();(out/'framework-source.json').write_text(json.dumps({p:digest(root/p) for p in sorted(paths) if Path(p).suffix in ('.odin','.sh','.py','.nix')},indent=2)+'\n')
 print('REPLAY_WEAPON_AUTHORING_PREPARED implementations='+','.join(implementations))

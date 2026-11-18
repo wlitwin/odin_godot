@@ -1,8 +1,9 @@
 # Box3D offline: tower knockdown
 
 A single-player Box3D example with no Kit, no Replay and no network: one script
-owns a Box3D world and steps it itself. Start here if you want Box3D physics in an
-offline game.
+owns a Box3D world and steps it itself. This procedural example shows explicit spawning and body-to-mesh updates.
+For the smaller editor-authored starting point, use
+[Box3D Starter](../box3d_starter/README.md).
 
 A pyramid of 15 boxes stands on the ground. The HUD counts the boxes knocked down.
 
@@ -34,10 +35,10 @@ To work on it in the Godot editor, pass `-e`; other arguments go to Godot as wel
 nix develop --command bash examples/box3d_offline/play.sh -e
 ```
 
-The editor rebuilds the scripts whenever you save an `.odin` file, and that rebuild
-needs `BOX3D_NATIVE_LIBRARY`, which `play.sh` sets for you. If you open the project
-another way, such as from Godot's Project Manager, it still runs, but saving a
-script fails to link Box3D and keeps the previous build until you run `play.sh` again.
+The first successful build remembers its compiler and Box3D selection locally.
+You can reopen from Godot's Project Manager and rebuild on save without inheriting
+`BOX3D_NATIVE_LIBRARY`. Run `play.sh` again if you clear `.godot/` or move the
+backend build. The backend's manifest and identity checks still apply on reuse.
 
 ## Put it on itch.io
 
@@ -91,7 +92,8 @@ Everything is in [`scripts/tower.odin`](scripts/tower.odin):
 - **Drawing.** Each body has an ordinary `MeshInstance3D`. After every step,
   `sync_nodes` copies each body's pose onto its node. The nodes never feed back into
   the simulation.
-- **Cleanup.** `box_tower_exit_tree` destroys the world when the scene closes.
+- **Cleanup.** `box_tower_finalize` destroys the world when the owning instance is
+  destroyed or its script is removed. Temporary tree exit/re-entry preserves it.
 
 Densities are in kg/m³, and Box3D's default is 1000 (water). The boxes use 250 and
 the ball 4000, so each box weighs about 128 kg and the ball about 450 kg. Set

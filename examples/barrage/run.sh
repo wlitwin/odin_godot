@@ -13,7 +13,7 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 for m in barrage enemies powerups ui; do
     ls "$PROJ/bin/libodinscripts_${m}."* >/dev/null 2>&1 || { echo "BARRAGE_FAIL: module dll for '$m' missing"; exit 1; }
 done
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 OUT="$(BARRAGE_TEST=1 "$GODOT" --headless --path "$PROJ" --script test_barrage.gd 2>&1 || true)"
 echo "$OUT" | grep -E "BARRAGE_" || true

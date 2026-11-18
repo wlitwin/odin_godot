@@ -26,7 +26,7 @@ trap 'rm -f "$EXPORT_LOG"' EXIT
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null 2>&1
 
 # Import so the editor writes .godot/extension_list.cfg (extension loads on export).
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 # 2. Headless export. The export plugin compiles + bundles the scripts dll.
 rm -rf "$PROJ/out"

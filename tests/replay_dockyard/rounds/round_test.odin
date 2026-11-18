@@ -7,6 +7,7 @@ import "core:mem"
 import "core:testing"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bp "godot:box3d/presentation"
 import bd "godot:box3d/diagnostics"
 import ph "godot:replay/physics"
@@ -38,8 +39,8 @@ open :: proc(t: ^testing.T, f: ^Fixture, layout: u8, hazard := false) -> bool {
         return false
     }
 
-    built, problem := a.build(&baked, game.PROFILE)
-    defer a.built_destroy(&built)
+    built, problem := ar.build(&baked, game.PROFILE)
+    defer ar.built_destroy(&built)
 
     if !check(t, problem.error == .None, "actual Native shared builder") {
         return false

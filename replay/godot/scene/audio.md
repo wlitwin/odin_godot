@@ -4,7 +4,9 @@ Use `Audio_Pool` to play presentation cues with bounded voices and to match
 replayed events by identity. It owns a fixed set of positional and screen-space
 Godot players.
 `audio_pool_init` accepts their parent and capacities (12 world / 3 screen by
-default). The parent must outlive the pool. `audio_pool_destroy` stops playback,
+default). Set either capacity to zero when that kind of voice is unnecessary;
+the total must be between 1 and 128. A cue requesting an absent voice kind is
+refused. The parent must outlive the pool. `audio_pool_destroy` stops playback,
 releases player-held streams and queues the child players for deletion.
 
 An `Audio_Cue` supplies a borrowed stream, position, gain, pitch and spatial flag.

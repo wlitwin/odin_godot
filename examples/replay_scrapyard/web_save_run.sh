@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}";export ODIN_GODOT_ROOT="$ROOT"
-PROJ="$ROOT/examples/replay_scrapyard";work="${RSB_SAVE_LOGS:-$(mktemp -d)}";mkdir -p "$work" "$PROJ/out";touch "$PROJ/out/.gdignore"
+PROJ="${REPLAY_SCRAPYARD_PROJECT:-$ROOT/examples/replay_scrapyard}";work="${RSB_SAVE_LOGS:-$(mktemp -d)}";mkdir -p "$work" "$PROJ/out";touch "$PROJ/out/.gdignore"
 echo "Scrapyard browser save logs: $work"
 if [[ "${REPLAY_PREBUILT:-0}" != 1 ]];then
  bash "$ROOT/build/build_web.sh" "$PROJ" >"$work/web-build.log" 2>&1
@@ -9,8 +9,8 @@ if [[ "${REPLAY_PREBUILT:-0}" != 1 ]];then
 fi
 case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.$ext"
-"$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$work/import.log" 2>&1
-if rg -q 'SCRIPT ERROR|ERROR:' "$work/import.log";then cat "$work/import.log";exit 1;fi
+bash "$ROOT/build/import_project.sh" "$PROJ" "$work/import.log"
+python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$PROJ" "$work/wait.json"
 "$GODOT" --headless --path "$PROJ" --export-release Web "$PROJ/out/index.html" >"$work/export.log" 2>&1
 [[ -f "$PROJ/out/libodin_godot.wasm" ]]
 if [[ ! -e "$PROJ/node_modules" ]];then ln -s "$ROOT/tests/web/node_modules" "$PROJ/node_modules";fi

@@ -105,6 +105,7 @@ shapes = Array[ExtResource("shape_base")]([ExtResource("delivery_shape")])
 [node name="crane_hinge" type="Node3D" parent="."]
 script = ExtResource("hinge")
 stable_key = "crane.hinge"
+frame_mode = 1
 body_a = "crane_anchor"
 body_b = "crane"
 local_frame_a = Transform3D(1,0,0,0,0,-1,0,1,0,0,0,0)

@@ -9,12 +9,13 @@ import "core:encoding/json"
 import gd "godot:godot"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import ga "godot:box3d/godot/authoring"
 import bg "godot:box3d/godot"
 import meter "godot:box3d/godot/meter"
 
 State :: struct {
-    built:  a.Built_Scene,
+    built:  ar.Built_Scene,
     player: b.Body_Key,
     keys:   [4]b.Body_Key,
 }
@@ -74,7 +75,7 @@ web_probe_ready :: proc(self: ^WebProbe) {
     }
 
     problem: a.Diagnostic
-    self.state.built, problem = a.build(&baked, PROFILE)
+    self.state.built, problem = ar.build(&baked, PROFILE)
     assert(problem.error == .None)
 
     for body in self.state.built.bodies {
@@ -210,7 +211,7 @@ exercise :: proc(self: ^WebProbe) -> u64 {
     ok(reencoded)
     assert(m == n && mem.compare_ptrs(raw_data(bytes), raw_data(again), int(n)) == 0)
     // Release the original world, catalog and baked maps before restoration.
-    ok(a.built_destroy(&state.built))
+    ok(ar.built_destroy(&state.built))
     left, left_status := b.world_create(b.world_def_default())
     ok(left_status)
 
@@ -260,8 +261,8 @@ web_probe_exercise :: proc(self: ^WebProbe) -> gd.String {
     } {
         true,
         u32(size_of(rawptr) * 8),
-        u32(size_of(b.Recovery_Asset_V2)),
-        u32(align_of(b.Recovery_Asset_V2)),
+        u32(size_of(b.Recovery_Authored_Asset)),
+        u32(align_of(b.Recovery_Authored_Asset)),
         bytes,
         engine.live_bytes,
         wrapper.live_bytes,

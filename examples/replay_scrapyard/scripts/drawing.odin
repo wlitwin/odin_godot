@@ -3,6 +3,7 @@ package replay_scrapyard
 import "core:fmt"
 import "core:math"
 import gd "godot:godot"
+import rgd "godot:replay/godot"
 import "godot:gdext"
 import r "godot:replay"
 import net "godot:replay/net"
@@ -155,7 +156,7 @@ runner_scenes_init :: proc(self: ^ReplayScrapyard) -> bool {
     return true
 }
 
-paint :: proc(self: ^ReplayScrapyard, predicted, truth: r.Frame(game.World), dt: f64) {
+paint :: proc(self: ^ReplayScrapyard, predicted, truth: ^r.Frame(game.World), dt: f64) {
     w := truth.state
 
     if !self.arena_built || self.built_key != w.layout.key {
@@ -163,15 +164,17 @@ paint :: proc(self: ^ReplayScrapyard, predicted, truth: r.Frame(game.World), dt:
         gd.print_str(fmt.tprintf("RSY_ARENA seed=%d floor=%d sum=%d", w.seed, w.floor, w.layout.checksum))
     }
 
-    seat := self.session.authority ? self.session.server.local_seat : self.session.client.seat
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    seat := rgd.session_seat(self.session)
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
     observed := w
     interpolate_observation(self, &observed)
     self.bot_scene[0] = observed
     // Turrets use the local predicted shared simulation; spectators observe authority.
-    turret_world := seat > 0 ? predicted.state : observed
-    turret_bridge_paint(self, turret_world)
-    paint_runner_views(self, &observed, predicted.state.players, &turret_world, seat, epoch, dt)
+    turret_world := seat > 0 ? &predicted.state : &observed
+    turret_bridge_paint(self, turret_world^)
+    paint_runner_views(self, &observed, predicted.state.players, turret_world, seat, epoch, dt)
     camera_paint(self, &w, seat)
     inside := seat > 0 && w.players[seat - 1].in_yard
 
@@ -189,7 +192,7 @@ paint :: proc(self: ^ReplayScrapyard, predicted, truth: r.Frame(game.World), dt:
     paint_ability_cooldowns(self, &w, predicted.state.players[seat > 0 ? seat - 1 : 0], seat, inside)
     hud_present(
         self.hud,
-        display.hud(turret_world, predicted.state.players[seat > 0 ? seat - 1 : 0], predicted.tick, seat, inside),
+        display.hud(turret_world^, predicted.state.players[seat > 0 ? seat - 1 : 0], predicted.tick, seat, inside),
         gd.control_get_size(self.shop).y,
     )
     status := gameplay_status(&w, predicted.state.players[seat > 0 ? seat - 1 : 0], seat, inside)

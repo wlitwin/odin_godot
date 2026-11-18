@@ -1,6 +1,7 @@
 package replay_net
 
 import "core:reflect"
+import "core:fmt"
 import "core:mem"
 import r "godot:replay"
 import bd "godot:box3d/diagnostics"
@@ -18,9 +19,19 @@ server_init :: proc(
     permit: Permit = {},
     incarnation: u64 = 0,
     ownership: Runner_Ownership = {},
+    setup: ^Setup_Report = nil,
 ) -> Error {
+    if setup != nil {
+        setup^ = {}
+    }
+
     if model.complete_state {
-        return .Incomplete_State
+        return setup_fail(
+            setup,
+            .Incomplete_State,
+            "initial",
+            "complete physics needs server_init_complete and a complete checkpoint",
+        )
     }
 
     checkpoint: ^r.Complete_Checkpoint(State, Net_Event(Event))
@@ -36,6 +47,7 @@ server_init :: proc(
         incarnation,
         checkpoint,
         ownership,
+        setup,
     )
 }
 
@@ -50,17 +62,40 @@ server_init_complete :: proc(
     permit: Permit = {},
     incarnation: u64 = 0,
     ownership: Runner_Ownership = {},
+    setup: ^Setup_Report = nil,
 ) -> Error {
-    if initial == nil || !model.complete_state || !complete_codec_valid(model.complete_codec) {
-        return .Incomplete_State
+    if setup != nil {
+        setup^ = {}
+    }
+
+    if initial == nil {
+        return setup_fail(setup, .Incomplete_State, "initial", "a complete checkpoint is required")
+    }
+
+    if !model.complete_state {
+        return setup_fail(setup, .Incomplete_State, "model.complete_state", "must be true for server_init_complete")
+    }
+
+    if report := complete_codec_check(model.complete_codec); report.error != .None {
+        return setup_assign(setup, report)
     }
 
     if r.owner_access(initial.owner, .Execute) != .None {
-        return .Invalid_Frame
+        return setup_fail(
+            setup,
+            .Invalid_Frame,
+            "initial.owner",
+            "complete checkpoint owner does not grant execution access",
+        )
     }
 
     if initial.epoch != cfg.epoch {
-        return .Invalid_Config
+        return setup_fail(
+            setup,
+            .Invalid_Config,
+            "initial.epoch",
+            fmt.tprintf("checkpoint epoch %d must match network.epoch %d", initial.epoch, cfg.epoch),
+        )
     }
 
     return server_init_core(
@@ -75,6 +110,7 @@ server_init_complete :: proc(
         incarnation,
         initial,
         ownership,
+        setup,
     )
 }
 
@@ -91,33 +127,70 @@ server_init_core :: proc(
     incarnation: u64,
     initial_complete: ^r.Complete_Checkpoint(State, Net_Event(Event)),
     ownership: Runner_Ownership,
-) -> Error {
+    setup: ^Setup_Report,
+) -> (
+    result: Error,
+) {
+    stage := "server"
+    defer setup_finish(setup, result, stage, "initialization failed at this step")
     initial_complete := initial_complete
     #assert(Seats >= 1 && Seats <= 8)
 
-    if model.complete_state && (!physics_config_valid(model, cfg) || initial_complete == nil) {
-        return .Invalid_Config
+    if model.complete_state {
+        if report := physics_config_check(model, cfg); report.error != .None {
+            return setup_assign(setup, report)
+        }
+
+        if initial_complete == nil {
+            return setup_fail(setup, .Invalid_Config, "initial", "complete physics requires its complete checkpoint")
+        }
     }
 
-    if s.owner_cleanup || s.initialized || !config_valid(cfg) || int(local_seat) > Seats {
-        return .Invalid_Config
+    if s.owner_cleanup || s.initialized {
+        return setup_fail(
+            setup,
+            .Invalid_Config,
+            "server",
+            "destroy the previous runner and finish pending owner cleanup before initializing again",
+        )
+    }
+
+    if report := config_check(cfg); report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if int(local_seat) > Seats {
+        return setup_fail(
+            setup,
+            .Invalid_Config,
+            "local_seat",
+            fmt.tprintf("expected 0..%d, got %d", Seats, local_seat),
+        )
     }
 
     if cfg.require_permit && permit.allow == nil {
-        return .Fenced
+        return setup_fail(setup, .Fenced, "permit.allow", "required when network.require_permit is true")
     }
+
+    stage = "ownership.runner"
 
     if error := runner_context_check(ownership, allocator, &s.model, model.complete_state); error != .None {
         return error
     }
 
+    stage = "model.ownership"
+
     if error := model_context_check(model, runner_managed(ownership)); error != .None {
         return error
     }
 
+    stage = "wire.ownership"
+
     if error := owned_context_check(ownership.wire, wire.user, runner_managed(ownership)); error != .None {
         return error
     }
+
+    stage = "permit.ownership"
 
     if error := owned_context_check(ownership.permit, permit.user, runner_managed(ownership)); error != .None {
         return error
@@ -129,41 +202,60 @@ server_init_core :: proc(
     s.wire = wire
     s.permit = permit
 
+    stage = "server.ownership"
+
     if error := server_access(s); error != .None {
         s^ = {}
         return error
     }
 
+    stage = "ownership.retains"
+
     if error := runner_retain(&s.owner_retains, ownership, &s.model); error != .None {
-        server_destroy(s)
+        cleanup := server_destroy(s)
+
+        if setup != nil {
+            setup.cleanup_error = cleanup
+        }
+
         return error
     }
 
     committed := false
 
     defer if !committed {
-        server_destroy(s)
+        cleanup := server_destroy(s)
+
+        if setup != nil {
+            setup.cleanup_error = cleanup
+        }
     }
 
-    if (model.step == nil && model.step_view == nil) ||
-       model.control_valid == nil ||
-       model.hold == nil ||
-       model.state_valid == nil ||
-       !model.control_valid(model.neutral) ||
-       !model.state_valid(initial.state) ||
-       !group_config_valid(model.group) ||
-       !replication_config_valid(model.replication) ||
-       model.control_timing > .Latest_Observation ||
-       model.action_timing > .Receipt ||
-       !action_schedule_valid(model.action_schedule) ||
-       !authority_policy_valid(model.authority) {
-        return .Invalid_Model
+    if report := model_check(model); report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if !model.control_valid(model.neutral) {
+        return setup_fail(setup, .Invalid_Model, "model.neutral", "control_valid rejected the neutral input")
+    }
+
+    if !model.state_valid(initial.state) {
+        return setup_fail(
+            setup,
+            .Invalid_Model,
+            "initial.state",
+            "state_valid rejected the initial state; check the game's predicate",
+        )
     }
 
     s.allocator, s.model, s.cfg, s.wire, s.local_seat = allocator, model, cfg, wire, local_seat
     s.permit = permit
 
+    stage = "model.complete_codec"
+
     if model.complete_state {
+        stage = "model.complete_codec.acquire"
+
         if model.complete_codec.acquire != nil {
             if error := model.complete_codec.acquire(model.complete_codec.catalog); error != .None {
                 return error
@@ -172,6 +264,7 @@ server_init_core :: proc(
             s.complete_lease = true
         }
 
+        stage = "State"
         payload := physics_server_payload(State, Control, Action, Event, Seats)
 
         if payload > 8 * 1024 * 1024 {
@@ -179,6 +272,8 @@ server_init_core :: proc(
         }
 
         bytes := payload + PHYSICS_SCHEMA_RESERVE
+
+        stage = "model.complete_codec.reserve"
 
         if error := model.complete_codec.reserve(model.complete_codec.catalog, bytes); error != .None {
             return error
@@ -193,9 +288,13 @@ server_init_core :: proc(
         r.complete_checkpoint_destroy(&bound)
     }
 
+    stage = "initial.complete_attachment"
+
     if model.complete_state && model.complete_codec.attach != nil {
-        var_error: Error
-        bound, var_error = model.complete_codec.attach(model.complete_codec.catalog, initial_complete)
+        attached, var_error := model.complete_codec.attach(model.complete_codec.catalog, initial_complete)
+        // Transfer into the outer cleanup slot as one value copy. Tuple
+        // assignment can scalarize every field of a large embedded World.
+        mem.copy(&bound, &attached, size_of(bound))
 
         if var_error != .None {
             return var_error
@@ -204,8 +303,9 @@ server_init_core :: proc(
         initial_complete = &bound
     }
 
-    if !codecs_init(&s.codecs, State, Control, Action, Event, Seats, allocator, model.replication.id != 0) {
-        return .Invalid_Schema
+    if report := codecs_init(&s.codecs, State, Control, Action, Event, Seats, allocator, model.replication.id != 0);
+       report.error != .None {
+        return setup_assign(setup, report)
     }
 
     s.contract = contract_hash(
@@ -223,14 +323,20 @@ server_init_core :: proc(
         network_step(state, input, ctx)
     }
 
+    stage = "timeline"
     frame_error: r.Error
 
     if model.complete_state {
         if s.codecs.state.excluded_fields != 0 {
-            return .Invalid_Model
+            return setup_fail(
+                setup,
+                .Invalid_Model,
+                "State",
+                "complete physics requires all state fields; public schema excludes authority-only fields",
+            )
         }
 
-        if error := server_physics_init(s); error != .None {
+        if error := server_physics_init(s, setup); error != .None {
             return error
         }
 
@@ -259,14 +365,28 @@ server_init_core :: proc(
 
     if frame_error != .None {
         s.frame_error = frame_error
-        return .Invalid_Frame
+        error := setup_fail(
+            setup,
+            .Invalid_Frame,
+            "initial",
+            fmt.tprintf("timeline rejected the initial frame: %v", frame_error),
+        )
+
+        if setup != nil {
+            setup.frame_error = frame_error
+        }
+
+        return error
     }
 
+    stage = "server.storage"
     s.inputs = make([]Input_Slot(Control), MAX_PEERS * cfg.history, allocator)
     s.facts = make([]Facts_Packet(Event), cfg.history, allocator)
     s.checkpoints = make([]Welcome_Packet(State, Control, Seats), MAX_PEERS, allocator)
     s.rxb = make([]u8, tr.MAX_PACKET_BYTES, allocator)
     s.txb = make([]u8, tr.MAX_PACKET_BYTES, allocator)
+
+    stage = "snapshot.cache"
 
     for &tx in s.snapshot_tx {
         if model.complete_state {
@@ -282,7 +402,12 @@ server_init_core :: proc(
         max(s.codecs.welcome.wire_size, max(s.codecs.snapshot.wire_size, s.codecs.facts.wire_size)) + sc.HEADER_BYTES
 
     if cfg.egress_bytes_per_pump < maximum {
-        return .Invalid_Config
+        return setup_fail(
+            setup,
+            .Invalid_Config,
+            "network.egress_bytes_per_pump",
+            fmt.tprintf("must fit the largest encoded packet (%d bytes); got %d", maximum, cfg.egress_bytes_per_pump),
+        )
     }
 
     s.tx_remaining = cfg.egress_bytes_per_pump

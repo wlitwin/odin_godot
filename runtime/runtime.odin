@@ -30,6 +30,10 @@ Lifecycle :: struct {
     // like flow.Action), which on a same-layout reload are preserved byte-for-byte and so
     // still point at the OLD code until this hook refreshes them. Authored as `<class>_reload`.
     reload:          proc "c" (self: rawptr),
+    // Once, while owner/children/exports/context are still valid, before instance
+    // storage is retired. The owner may already be outside the scene tree.
+    // Do not free or replace the owner from this terminal cleanup callback.
+    finalize:        proc "c" (self: rawptr),
 }
 
 // ----------------------------------------------------------------------------
@@ -207,6 +211,8 @@ Class_Desc :: struct {
     size:                   uintptr,
     align:                  uintptr,
     lifecycle:              Lifecycle,
+    instance_layout:        u64, // full native/private layout, zero means unknown
+    owns_state:             b8, // private ownership must not be export-only migrated
     exports:                [^]Export,
     exports_count:          i32,
     methods:                [^]Method,
@@ -425,7 +431,8 @@ odin_scripts_manifest :: proc "c" (out_count: ^i32) -> [^]Class_Desc {
 // padding, so a semantic bump was required by the old size-only hash.
 // Generation 4: fixed-width metadata plus the complete layout-fingerprint export; exact
 // compiler-version equality is diagnostic rather than the compatibility gate.
-ABI_GENERATION :: 4
+// Generation 5: finalization and complete private instance-layout ownership.
+ABI_GENERATION :: 5
 ABI_VERSION :: u32(ABI_GENERATION)
 
 @(private = "file")
@@ -481,6 +488,7 @@ abi_layout_fingerprint :: proc "contextless" () -> u64 {
         offset_of(Lifecycle, process),
         offset_of(Lifecycle, physics_process),
         offset_of(Lifecycle, reload),
+        offset_of(Lifecycle, finalize),
     )
     mix(
         &h,
@@ -564,6 +572,8 @@ abi_layout_fingerprint :: proc "contextless" () -> u64 {
         offset_of(Class_Desc, size),
         offset_of(Class_Desc, align),
         offset_of(Class_Desc, lifecycle),
+        offset_of(Class_Desc, instance_layout),
+        offset_of(Class_Desc, owns_state),
         offset_of(Class_Desc, exports),
         offset_of(Class_Desc, exports_count),
         offset_of(Class_Desc, methods),

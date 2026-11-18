@@ -86,3 +86,23 @@ Read [Support](support.md) for correction, memory, and target bounds, and
 [Build and export](building.md) for deployment. The lower-level adapter contracts
 are [Kit physics](https://github.com/wlitwin/odin_godot/tree/main/kit/physics)
 and [Replay physics](https://github.com/wlitwin/odin_godot/tree/main/replay/physics).
+
+
+## Standard authored owners
+
+Use `godot:kit/godot/physics.Authored_World` or
+`godot:replay/godot/physics.Authored_Session` for the standard Godot path. They
+manage metered storage, exact callback leases, catalogs/codecs and temporary
+checkpoints, and close resources in dependency order. The authored samples use
+these helpers while keeping their input, roster, rules, presentation and test
+telemetry explicit.
+
+Kit keeps ordinary lane/model and network attachment choices. Replay composes
+its existing Session. Both expose managed temporary checkpoint borrows and allow
+explicit independent clones. Failed setup/close retains cleanup state for retry;
+keep the control record until close succeeds. Finalize terminal ownership instead
+of destroying it during temporary tree exit.
+
+See the [Kit owner source guide](https://github.com/wlitwin/odin_godot/tree/main/kit/godot/physics)
+and [Replay owner source guide](https://github.com/wlitwin/odin_godot/blob/main/replay/godot/physics/OWNERSHIP.md)
+for the complete contracts. Lower-level APIs remain available for custom ownership.

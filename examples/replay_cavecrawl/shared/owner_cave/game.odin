@@ -230,17 +230,6 @@ reconcile :: proc(w: ^World, ctx: ^r.Step(Event), floor_change: bool, revived: u
 }
 
 step :: proc(w: ^World, controls: [SEATS]Control, joins, leaves: u64, ctx: ^r.Step(Event)) {
-    step_impacts(w, controls, joins, leaves, ctx, true)
-}
-
-// Explicit historical replay entry point; live model() always emits impacts.
-step_impacts :: proc(
-    w: ^World,
-    controls: [SEATS]Control,
-    joins, leaves: u64,
-    ctx: ^r.Step(Event),
-    impact_events: bool,
-) {
     depth, run, phase := w.depth, w.lobby.run, w.lobby.phase
     dead := dead_mask(w)
 
@@ -272,7 +261,7 @@ step_impacts :: proc(
         }
     }
 
-    base.step_motion(&w.cave, [SEATS]base.Control{}, joins, leaves, ctx, false, impact_events)
+    base.step_motion(&w.cave, [SEATS]base.Control{}, joins, leaves, ctx, false)
     reconcile(w, ctx, w.depth != depth || w.lobby.run != run || w.lobby.phase != phase, dead &~ dead_mask(w))
 }
 

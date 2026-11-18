@@ -13,12 +13,9 @@
 #                 methods and typed signal work; the root reads it TYPED in-dll via
 #                 rt.script_of; a helper subpackage is shared by both; and reloading the
 #                 subfolder script swaps the module dll with instance state preserved.
-#   3. NEGATIVE — scriptgen driven DIRECTLY over four bad trees, asserting the exact
-#                 teaching error each time: a kit annotation in a subpackage, a subpackage
-#                 importing the module root, a duplicate package name, a duplicate class
-#                 name. Each must also leave NO generated file behind. The kit refusal
-#                 must also LEAD: it is the root cause of the root's own resolve failures,
-#                 so it is the first error on screen and they are gone.
+#   3. NEGATIVE — real import cycles, duplicate package names and duplicate
+#                 global class aliases still fail before generated files are written.
+#                 Kit entity relocation is exercised by the separate kitentities gate.
 #   4. FINGERPRINT — NET_FINGERPRINT is the join door (Deny_Reason.Version), so ORGANIZATION
 #                 must not knock on it: moving a class between the module root and a
 #                 subfolder leaves the hash identical, a flat module hashes to what it
@@ -75,7 +72,12 @@ echo "  ok  layout: one artifact per annotated package dir, root-only guard+boot
 # ---- phase 2: headless main ----
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+if ! "$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$work/editor.log" 2>&1; then
+    cat "$work/editor.log"; fail "editor import failed"
+fi
+if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$work/editor.log"; then
+    cat "$work/editor.log"; fail "editor import errors"
+fi
 
 "$GODOT" --headless --path "$PROJ" --script test_subpkg.gd 2>&1 | tee "$LOG"
 RC=${PIPESTATUS[0]}
@@ -88,7 +90,7 @@ echo "  ok  subfolder script: attachable, exports/methods/signal live, typed in-
 # Leave the checkout on v1 (the mid-test rebuild left the dll on -define:HUD_V=2).
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null 2>&1 || fail "v1 restore build failed"
 
-# ---- phase 3: the four refusals ----
+# ---- phase 3: structural refusals ----
 # Each fixture is a throwaway module tree; scriptgen is driven directly (no Godot).
 neg() { # neg <name> <expected-substring> [lead]  — `lead`: must be the FIRST error line
     local name="$1" want="$2" lead="${3:-}" out rc
@@ -124,79 +126,8 @@ SHARED :: 3
 EOF
 }
 
-# (a) a KIT annotation in a subpackage — with the DERIVED errors it causes upstream.
-# The root here is a real game shape: it tags the moved class as a wire entity and
-# carries the half that pairs with it. Both of those fail once the class is in a
-# subfolder, and they used to print FIRST — three complaints (one of them dumping the
-# shell's thirty-odd pairing names) before the one that explains them. The refusal is
-# the root cause, so it leads and they are gone.
-mkdir -p "$work/kit/scripts/ui"
-cat >"$work/kit/scripts/game.odin" <<'EOF'
-//gd:extends Node
-//gd:class Game
-package neg_kit_main
-import gd "godot:godot"
-import kboot "godot:kit/boot"
-Game :: struct {
-	owner:     gd.Node,
-	boot:      kboot.Boot,
-	hud_scene: gd.PackedScene `gd:"entity=Hud:1"`,
-}
-@(gd_half)
-hud_spawned :: proc(game: ^Game, self: ^Hud) {}
-EOF
-cat >"$work/kit/scripts/ui/hud.odin" <<'EOF'
-//gd:extends Node
-//gd:class Hud
-package neg_kit_ui
-import gd "godot:godot"
-import knet "godot:kit/net"
-Hud :: struct {
-	owner:  gd.Node,
-	net_id: knet.Net_Id,
-	hp:     f32 `gd:"replicate"`,
-}
-EOF
-neg kit 'Hud declares a gd:"replicate" field tag in the script subpackage "ui" — kit wiring is part of the MODULE'"'"'s wire contract' lead
-kit_out="$("$SGEN" "$work/kit/scripts" "-godot:$ROOT" 2>&1)"
-if grep -qE 'no script struct named|pairs with nothing' <<<"$kit_out"; then
-    echo "$kit_out"
-    fail "[kit] the derived errors survived the refusal — they are noise once the cause is named"
-fi
-echo "  ok  refused [kit]: the refusal LEADS and the derived root errors are suppressed"
-
-# (a2) the SAME move without any kit surface: no refusal to fire, so the root's own
-# errors are what the author sees — and each must name where the class actually went
-# rather than claim it does not exist.
-mkdir -p "$work/subword/scripts/ui"
-cat >"$work/subword/scripts/game.odin" <<'EOF'
-//gd:extends Node
-//gd:class Game
-package neg_subword_main
-import gd "godot:godot"
-import kboot "godot:kit/boot"
-Game :: struct {
-	owner:     gd.Node,
-	boot:      kboot.Boot,
-	hud_scene: gd.PackedScene `gd:"entity=Hud:1"`,
-}
-@(gd_half)
-hud_spawned :: proc(game: ^Game, self: ^Hud) {}
-EOF
-cat >"$work/subword/scripts/ui/hud.odin" <<'EOF'
-//gd:extends Node
-//gd:class Hud
-package neg_subword_ui
-import gd "godot:godot"
-Hud :: struct { owner: gd.Node, label: string `gd:"export"` }
-EOF
-neg subword 'entity Hud: "Hud" is declared in the script subpackage "ui", not the module root'
-sub_out="$("$SGEN" "$work/subword/scripts" "-godot:$ROOT" 2>&1)"
-grep -qF 'is written against Hud, which is declared in the script subpackage "ui"' <<<"$sub_out" \
-    || { echo "$sub_out"; fail "[subword] the stranded half does not say where its class went"; }
-grep -qF 'in this module' <<<"$sub_out" \
-    && { echo "$sub_out"; fail "[subword] a resolution error still says \"in this module\" where it means the module root"; }
-echo "  ok  refused [subword]: entity + stranded half both name the subpackage the class moved to"
+# Replicated entities are supported in subpackages. Positive entity/input moves,
+# independently spelled imports and real peers are checked by kitentities.
 
 # (b) a subpackage importing the module ROOT (the manifest makes it a cycle)
 mk_root cycle neg_cycle_main
@@ -240,9 +171,9 @@ neg clsname 'duplicate explicit //gd:class "Game"'
 # ---- phase 4: NET_FINGERPRINT survives a pure layout move ----
 # The fingerprint is the join door: two builds whose hashes differ refuse each other with
 # Deny_Reason.Version. It must therefore answer to the WIRE CONTRACT and to nothing else —
-# and a class in a subfolder has no wire contract (phase 3's first refusal is why). So
-# scriptgen folds subpackage CLASS NAMES into the same sorted class stream as the root's:
-# moving a class between the root and a subfolder writes the same line in the same place.
+# scriptgen folds classes from every package into the same module contract.
+# This small fixture moves an engine-only class; kitentities also moves full
+# replicated entities, inputs and callbacks while preserving their wire schema.
 #
 # Three fixtures, one class each: `Game` carries the module's whole wire surface (net_id +
 # a replicated field) and stays put; `Hud` is engine-native and moves.

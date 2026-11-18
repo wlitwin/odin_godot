@@ -2,7 +2,7 @@
 class_name Box3DCharacterMover3D
 extends Node3D
 
-@export var stable_key: String=""
+@export_storage var stable_key: String=Box3DIdentityKey.initial("character")
 @export var exclude_body: String=""
 @export var config: Box3DCharacterConfig3D=Box3DCharacterConfig3D.new()
 @export var initial_velocity: Vector3=Vector3.ZERO

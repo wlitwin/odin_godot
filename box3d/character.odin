@@ -1,20 +1,12 @@
 package box3d
 
+import types "godot:box3d/types"
+
 // Configuration is copied immutable caller data. Explicit state belongs to
 // framework Game/Side; this wrapper neither steps nor mutates any body/clock.
-Character_Config :: struct {
-    version, max_slides: u32,
-    capsule:             Motion_Capsule,
-    up:                  Vec3,
-    floor_cosine:        f32,
-    filter:              Motion_Filter,
-}
+Character_Config :: types.Character_Config
 
-Character_State :: struct {
-    position, velocity, ground_normal: Vec3,
-    ground_shape:                      Shape_Key,
-    grounded, reserved:                u32,
-}
+Character_State :: types.Character_State
 
 Character_Result :: struct {
     state:                   Character_State,

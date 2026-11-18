@@ -11,8 +11,8 @@ func _check() -> void:
 	var addon: EditorPlugin=nodes[0]
 	var status: Dictionary=addon.editor_status()
 	if not status.inspector or not status.gizmo or not status.importer or not status.tools_available:fail("registered Inspector/Gizmo/importer/tools: "+JSON.stringify(status));return
-	var installed: Dictionary=addon.services.install_once()
-	if not installed.get("ok",false) or installed.get("copied",-1)!=0:fail("install-once standard module");return
+	var installed: Dictionary=addon.services.install_tools()
+	if not installed.get("ok",false) or installed.get("changed",true):fail("install-once standard module");return
 	var world:=Box3DEditorFixture.make_world();var packed:=PackedScene.new()
 	if packed.pack(world)!=OK or ResourceSaver.save(packed,"res://editor-world.tscn")!=OK:world.free();fail("scene fixture");return
 	world.free();packed=null
@@ -28,6 +28,8 @@ func _check() -> void:
 	if not inspected.get("ok",false) or not geometry.get("ok",false) or geometry.lines<=0 or geometry.points.size()!=geometry.lines*2:fail("shared shape +authored joint/character gizmo geometry: "+JSON.stringify(geometry));return
 	if addon.inspector.panel_count<=0 or addon.gizmos.redraw_count<=0:fail("actual registered Inspector/Gizmo callbacks not observed");return
 	var body: Box3DBody3D=edited.get_children()[0]
+	var body_geometry: Dictionary=addon.gizmos.geometry_for(body)
+	if not body_geometry.get("ok",false) or body_geometry.lines<=0:fail("single-body gizmo keeps the current schema: "+JSON.stringify(body_geometry));return
 	var shape: Box3DShape3D=body.shapes[0]
 	var panels_before: int=addon.inspector.panel_count
 	get_editor_interface().get_inspector().edit(shape)
@@ -37,7 +39,8 @@ func _check() -> void:
 	if shape.get("friction")!=0.625:fail("real exported property editing");return
 	shape.friction=old
 	body.scale=Vector3(2,1,1)
-	if addon.inspect_object(edited).get("ok",true) or addon.gizmos.geometry_for(edited).get("ok",true):fail("invalid transform diagnostics/preview");return
+	var partial: Dictionary=addon.gizmos.geometry_for(edited)
+	if addon.inspect_object(edited).get("ok",true) or not partial.get("ok",false) or partial.get("complete",true) or partial.get("lines",0)<=0 or partial.get("markers",0)<=0:fail("invalid transform retains unrelated preview and diagnostic marker");return
 	body.scale=Vector3.ONE
 	var baked: Dictionary=addon.services.bake_definition(edited.box3d_definition(),"res://editor-world.tscn","editor1")
 	if not baked.get("ok",false):fail("editor shared artifact: "+JSON.stringify(baked));return

@@ -52,11 +52,11 @@ or the admitted gameplay transport supplies the applicable identity protection.
 4. Restore only after the relevant identity, lease, history and policy checks.
    Conversion itself grants no authority and does not advance an epoch.
 
-`checkpoint_upgrade_v6` bridges compatible protocol-6/layout-4 authority archives
-to protocol 7. State, policy, control/action/event and game-content changes require
-the applicable explicit conversion callbacks/types. The game-specific converters
-in the ports demonstrate that workflow; they are not universal loaders. See
-[checkpoint conversion](net/checkpoint_upgrade.md).
+Generic [checkpoint conversion](net/checkpoint_upgrade.md) supports explicit
+application world/action schema changes within the current protocol. Unsupported
+protocols require a separately reviewed one-time migration; the runtime keeps one
+current reader. Retire old application types after owned data and fixtures have
+been migrated and validated.
 
 Recordings retain the model decisions needed to reproduce their historical run.
 Changing gameplay events can require executing the old model, even when a world

@@ -1,0 +1,10 @@
+package scripts
+
+import gd "godot:godot"
+import rgd "godot:replay/godot"
+
+@(gd_method)
+replay_starter_authoring_reach :: proc(self: ^ReplayStarter) -> gd.Int {
+    frame, ok := rgd.session_authority_state(&self.session)
+    return ok ? gd.Int(frame.state.pickup.reach) : -1
+}

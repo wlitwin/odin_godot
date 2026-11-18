@@ -1,0 +1,66 @@
+package core
+
+import "godot:gdext"
+import gd "godot:godot"
+
+// Injected only into a copied Core for this fixture. Godot's stock Variant is
+// 24 bytes on both tested pointer widths, while the SDK reserves 40 on 64-bit.
+// Real constructor/destructor dispatch must preserve adjacent native memory.
+variant_slots_probe :: proc() {
+    Guard :: struct #align(8) { before: [16]u8, slot: [24]u8, after: [16]u8 }
+    for kind in 0..<4 {
+        guard: Guard
+        for &byte in guard.before { byte = 0xa5 }
+        for &byte in guard.after { byte = 0x5a }
+        value: gd.Variant
+        switch kind {
+        case 0:
+        case 1:
+            number: i64 = 42
+            value = gd.variant_from_int(&number)
+        case 2:
+            text := gd.new_string_cstring("native slot")
+            value = gd.variant_from_string(&text)
+            gd.free_string(text)
+        case 3:
+            dictionary := gd.new_dictionary_default()
+            value = gd.variant_from_dictionary(&dictionary)
+            gd.free_dictionary(dictionary)
+        }
+        target := cast(gdext.VariantPtr)&guard.slot
+        ret_variant(target, value)
+        for byte in guard.before { if byte != 0xa5 { panic("Core Variant prefix overwritten") } }
+        for byte in guard.after { if byte != 0x5a { panic("Core Variant suffix overwritten") } }
+        expected := [?]gdext.Variant_Type{.Nil,.Int,.String,.Dictionary}
+        if gdext.variant_get_type(target) != expected[kind] { panic("Core Variant return type") }
+        if kind == 1 && gd.variant_to_int(cast(^gd.Variant)target) != 42 { panic("Core Variant int value") }
+        if kind == 2 {
+            text := gd.variant_to_string(cast(^gd.Variant)target)
+            if gd.gd_string_to_odin(text) != "native slot" { panic("Core Variant string lifetime") }
+            gd.free_string(text)
+        }
+        if kind == 3 {
+            dictionary := gd.variant_to_dictionary(cast(^gd.Variant)target)
+            if gd.dictionary_size(&dictionary) != 0 { panic("Core Variant dictionary lifetime") }
+            gd.free_dictionary(dictionary)
+        }
+        gdext.variant_destroy(target)
+    }
+    self: UI_Bindings
+    self.kind = 1
+    self.paths[.Host] = gd.new_node_path_cstring("%Host")
+    defer gd.free_node_path(self.paths[.Host])
+    for name in ([?]cstring{"widget","host"}) {
+        guard: Guard
+        for &byte in guard.before { byte = 0xa5 }
+        for &byte in guard.after { byte = 0x5a }
+        key := gd.new_string_name_cstring(name, false)
+        target := cast(gdext.VariantPtr)&guard.slot
+        if !ui_bindings_get(&self, &key, target) { panic("Core UI getter failed") }
+        gd.free_string_name(key)
+        for byte in guard.before { if byte != 0xa5 { panic("Core UI getter prefix overwritten") } }
+        for byte in guard.after { if byte != 0x5a { panic("Core UI getter suffix overwritten") } }
+        gdext.variant_destroy(target)
+    }
+    gd.print_str("KIT_UI_NATIVE_VARIANT_SLOTS_OK")
+}

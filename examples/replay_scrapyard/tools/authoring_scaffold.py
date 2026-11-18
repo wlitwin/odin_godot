@@ -52,11 +52,13 @@ ability = ExtResource("definition")
 Actor drafts inherit baseline behavior; write feature assertions before adoption.
 """
 from pathlib import Path
-import argparse,subprocess,sys
+import argparse,json,subprocess,sys
 parser=argparse.ArgumentParser();parser.add_argument('--framework',required=True);parser.add_argument('--godot',required=True);parser.add_argument('--result',required=True)
 args=parser.parse_args();project=Path(__file__).resolve().parents[3]
 action={'"correction"' if kind=='ability' else '"validate"'}
-subprocess.run([sys.executable,str(project/'tools/authoring.py'),'--project',str(project),'--framework',args.framework,'--godot',args.godot,'--result',args.result,action,'--selection','{uri}/definition.tres'],check=True)
+request=Path(args.result).with_suffix('.request.json');request.parent.mkdir(parents=True,exist_ok=True)
+request.write_text(json.dumps({{"action":action,"inputs":{{"definition":"{uri}/definition.tres"}}}}))
+subprocess.run([sys.executable,str(Path(args.framework)/'replay/editor/worker.py'),'--project',str(project),'--framework',args.framework,'--godot',args.godot,'--result',args.result,'--request',str(request)],check=True)
 ''')
         (stage/'README.md').write_text(f'''# {name}: {kind} draft (stable ID {stable_id})
 

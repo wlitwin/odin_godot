@@ -6,6 +6,7 @@ import "core:encoding/base64"
 import "core:mem"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bg "godot:box3d/godot"
 import meter "godot:box3d/godot/meter"
 import gd "godot:godot"
@@ -100,10 +101,10 @@ editor_draw_probe_build_artifact :: proc(self: ^EditorDrawProbe, encoded: gd.Str
     artifact, problem := a.artifact_load(decoded, meter.allocator(scope))
     report.artifact_error = problem.error
     report.phase = "artifact.load"
-    built: a.Built_Scene
+    built: ar.Built_Scene
 
     if problem.error == .None {
-        candidate, build_problem := a.build(&artifact.scene, 0x454449544f525344)
+        candidate, build_problem := ar.build(&artifact.scene, 0x454449544f525344)
         built = candidate
         report.build_error = build_problem.error
         report.native_status = build_problem.native_status
@@ -127,7 +128,7 @@ editor_draw_probe_build_artifact :: proc(self: ^EditorDrawProbe, encoded: gd.Str
         }
     }
 
-    drop := a.built_destroy(&built)
+    drop := ar.built_destroy(&built)
     a.artifact_destroy(&artifact)
     scope_drop := meter.destroy(&scope)
     engine, es := b.engine_allocation_stats()

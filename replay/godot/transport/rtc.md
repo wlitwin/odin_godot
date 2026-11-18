@@ -70,7 +70,7 @@ limit. The fragment header is 20 bytes, with a message ID, total length and part
 index/count; all integers are little endian. Fragments validate bounds before
 allocation and deliver reliable logical messages in send order.
 
-New peers advertise `control_stream: 1` alongside their SDP and use negotiated
+Peers advertise the required `control_stream: 1` alongside their SDP and use negotiated
 channel 2 (`replay-control-v1`) for cumulative credit acknowledgments and fences.
 This channel is reliable and unordered: older cumulative acknowledgments can be
 ignored safely, and fences already use a monotonic receive frontier. Application
@@ -79,15 +79,12 @@ The separate stream avoids waiting for ordered checkpoint messages to be deliver
 before credit messages become available. It still shares SCTP congestion control;
 it does not guarantee latency or solve all snapshot-freshness stalls under loss.
 
-Absent the peer capability, controls retain their original reliable channel-0
-path. `Rtc_Config.legacy_control` explicitly omits the capability and third channel.
-Receiving application data on control stream 2, control on unreliable stream 1,
-or an acknowledgment beyond the sender's issued sequence remains a protocol error.
-Channel 2 is required to open only after both local support and remote capability
-are known. This capability does not change the packet header, gameplay protocol,
-checkpoint format, identity or authority checks. Real mixed-version loaded-game
-handoffs cover both offerer/answerer directions; native-extension deployment and
-broader platform validation remain additional coverage.
+An offer or answer without this capability is rejected. Signaling relays must
+preserve the SDP metadata. All three channels must open before the peer is ready.
+Application data on stream 2, controls on streams 0/1, and acknowledgments beyond
+the sender's issued sequence are protocol errors. This requirement does not
+change the packet header, gameplay protocol, checkpoint format, identity or
+authority checks.
 
 The browser adapter requires Godot's `network/limits/webrtc/max_channel_in_buffer_kb`
 to be at least its default 64 KiB; smaller settings fail opening explicitly.

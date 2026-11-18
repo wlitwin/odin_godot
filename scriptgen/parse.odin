@@ -3,6 +3,7 @@ package scriptgen
 import "core:fmt"
 import "core:odin/ast"
 import "core:odin/parser"
+import "core:odin/tokenizer"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
@@ -85,7 +86,6 @@ is_odin_ident :: proc(s: string) -> bool {
     return true
 }
 
-@(private = "file")
 is_ident_byte :: proc(c: byte) -> bool {
     return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
@@ -139,33 +139,6 @@ godot_import_alias :: proc(file: ^ast.File) -> string {
     return ""
 }
 
-// Convert Ada_Case and PascalCase identifiers to snake_case. Existing word
-// separators stay single; acronym runs form one word (HUD_View -> hud_view).
-to_snake :: proc(s: string) -> string {
-    b := strings.builder_make()
-
-    for r, i in s {
-        if r >= 'A' && r <= 'Z' {
-            if i > 0 && s[i - 1] != '_' {
-                previous_lower := s[i - 1] >= 'a' && s[i - 1] <= 'z'
-                previous_digit := s[i - 1] >= '0' && s[i - 1] <= '9'
-                next_lower := i + 1 < len(s) && s[i + 1] >= 'a' && s[i + 1] <= 'z'
-                previous_upper := s[i - 1] >= 'A' && s[i - 1] <= 'Z'
-
-                if previous_lower || ((previous_upper || previous_digit) && next_lower) {
-                    strings.write_rune(&b, '_')
-                }
-            }
-
-            strings.write_rune(&b, r + ('a' - 'A'))
-        } else {
-            strings.write_rune(&b, r)
-        }
-    }
-
-    return strings.to_string(b)
-}
-
 // Recognize the former per-capital spelling only to report a migration. It
 // must not silently turn an existing lifecycle callback into an unused helper.
 @(private = "file")
@@ -190,7 +163,7 @@ legacy_script_prefix :: proc(s: string) -> string {
 
 @(private = "file")
 validate_struct_prefix :: proc(proc_name, struct_name: string, loc: Loc) -> bool {
-    prefix := strings.concatenate({to_snake(struct_name), "_"})
+    prefix := strings.concatenate({decl.snake_name(struct_name), "_"})
     legacy_prefix := legacy_script_prefix(struct_name)
 
     if prefix == legacy_prefix || !strings.has_prefix(proc_name, legacy_prefix) {
@@ -220,7 +193,7 @@ net_facade_name :: proc(snake, verb: string) -> string {
 
 // Strip a leading `<snake_struct>_` prefix from a proc name, if present.
 strip_struct_prefix :: proc(proc_name, struct_name: string) -> string {
-    prefix := strings.concatenate({to_snake(struct_name), "_"})
+    prefix := strings.concatenate({decl.snake_name(struct_name), "_"})
 
     if strings.has_prefix(proc_name, prefix) {
         return proc_name[len(prefix):]
@@ -378,6 +351,12 @@ scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
         } else if _, ok := marker_arg(body, "tool"); ok {
             s.marked = true
             s.tool = true
+        } else if rest, ok := marker_arg(body, "kit_cleanup"); ok {
+            s.kit_cleanup_manual = strings.trim_space(rest) == "manual"
+
+            if !s.kit_cleanup_manual {
+                error_at(loc, "//gd:kit_cleanup accepts only `manual`; omit it for automatic standard Kit cleanup")
+            }
         } else if rest, ok := marker_arg(body, "icon"); ok {
             s.marked = true
             s.icon = strings.trim_space(rest)
@@ -410,7 +389,11 @@ scan_markers :: proc(src: string, s: ^Script, pkg_line: int) {
             // A `//gd:` line that matches no known marker is almost always a typo
             // (`//gd:extend`, `//gd:singal`) that would otherwise silently no-op — and the
             // `//gd:` namespace is reserved, so erroring is safe.
-            error_at(loc, "unknown //gd: marker %q (expected one of: extends/class/tool/icon/group/replay_view)", body)
+            error_at(
+                loc,
+                "unknown //gd: marker %q (expected one of: extends/class/tool/icon/group/replay_view/kit_cleanup)",
+                body,
+            )
         }
     }
 }
@@ -1169,6 +1152,11 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
             r.path = extend_path(tf.path_base, nm)
             r.type_dir = tf.type_ctx.dir
             r.type_imports = tf.type_ctx.imports
+            r.tag_context = Struct_Def {
+                dir     = dir_of(tf.loc.path),
+                imports = g_file_imports[norm_path(tf.loc.path)],
+                loc     = tf.loc,
+            }
             append(&s.replicates, r)
         }
 
@@ -1193,7 +1181,14 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
         for nm in tf.names {
             append(
                 &s.backups,
-                Backup_Info{field = nm, path = extend_path(tf.path_base, nm), kind = kind, key = key, elem = elem},
+                Backup_Info {
+                    field = nm,
+                    path = extend_path(tf.path_base, nm),
+                    kind = kind,
+                    key = key,
+                    elem = elem,
+                    type_context = tf.type_ctx,
+                },
             )
         }
 
@@ -1243,6 +1238,8 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
             error_at(tf.loc, "%s.%s: one session field per profile declaration", s.struct_name, label)
         case:
             s.profile_type = pt
+            s.profile_context = tf.type_ctx
+            s.profile_context.loc = tf.loc
             s.profile_ses = tf.names[0]
         }
 
@@ -1263,6 +1260,8 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
     entity_val := ""
     entity_stream_hz := 0
     entity_avatar := false
+    entity_variant := "Default"
+    entity_variant_set := false
 
     if entity_first {
         // Nested leading `entity=` is refused by the context gate above (the export
@@ -1301,6 +1300,23 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
                 }
 
                 switch sname {
+                case "variant":
+                    name := strings.trim_space(sval)
+                    keyword := false
+                    for kind in tokenizer.Token_Kind {
+                        if tokenizer.is_keyword(kind) && tokenizer.to_string(kind) == name {keyword = true; break}
+                    }
+                    if entity_variant_set || !is_odin_ident(name) || name == "_" || keyword {
+                        error_at(
+                            tf.loc,
+                            "%s.%s: declare one `variant=Name` using an Odin enum member name",
+                            s.struct_name,
+                            label,
+                        )
+                    } else {
+                        entity_variant = name
+                        entity_variant_set = true
+                    }
                 case "stream_hz":
                     v, ok := strconv.parse_int(strings.trim_space(sval))
 
@@ -1494,6 +1510,7 @@ walk_tagged_field :: proc(s: ^Script, tf: Tagged_Field) {
                     field = label,
                     target = strings.trim_space(target),
                     type_id = id,
+                    variant = entity_variant,
                     line = tf.loc.line,
                     stream_hz = entity_stream_hz,
                     avatar = entity_avatar,
@@ -2171,7 +2188,16 @@ scan_bound_procs :: proc(s: ^Script, path, src: string, file: ^ast.File) {
         }
 
         if is_gd_method {
-            m, _ := build_method_info(src, pt, Loc{path, name_ident.pos.line}, proc_name, s.struct_name, false, vd)
+            m, _ := build_method_info(
+                src,
+                pt,
+                Loc{path, name_ident.pos.line},
+                proc_name,
+                s.struct_name,
+                godot_import_alias(file),
+                false,
+                vd,
+            )
             append(&s.methods, m)
 
             // `@(gd_connect="signal")` — auto-connect owner.signal -> this method on READY.
@@ -2322,11 +2348,13 @@ validate_script :: proc(s: ^Script) {
 // a block ships the verb and the game keeps the consequence — no index keying.
 
 Half_Candidate :: struct {
+    name:    string,
     path:    string,
     line:    int,
     src:     string,
     pt:      ^ast.Proc_Type,
     vd:      ^ast.Value_Decl,
+    imports: map[string]string,
     claimed: bool, // some resolve_* pass wired it — an unclaimed survivor is a build error
 }
 
@@ -2405,11 +2433,13 @@ scan_half_procs :: proc(idx: ^map[string]Half_Candidate, path, src: string, file
         }
 
         idx[name_ident.name] = Half_Candidate {
-            path = path,
-            line = name_ident.pos.line,
-            src  = src,
-            pt   = pl.type,
-            vd   = vd,
+            name    = name_ident.name,
+            path    = path,
+            line    = name_ident.pos.line,
+            src     = src,
+            imports = collect_file_imports(file),
+            pt      = pl.type,
+            vd      = vd,
         }
     }
 }
@@ -2417,9 +2447,14 @@ scan_half_procs :: proc(idx: ^map[string]Half_Candidate, path, src: string, file
 // Pair `s`'s commands with their `<wrapper>_then` consequences and validate the
 // contract at build time — a mispaired consequence must be a build error here,
 // not a proc that silently never fires (the exact bug class the pairing kills).
-resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
+resolve_then :: proc(
+    s: ^Script,
+    idx: ^map[string]Half_Candidate,
+    procs: map[string]Proc_Site,
+    warn_missing: bool = true,
+) {
     for &cmd in s.commands {
-        wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", to_snake(s.struct_name), cmd.name) : cmd.proc_name
+        wrapper := len(cmd.path) > 0 ? fmt.tprintf("%s_%s", decl.snake_name(s.struct_name), cmd.name) : cmd.proc_name
         then_name := fmt.tprintf("%s_then", wrapper)
         cand, found := idx[then_name]
 
@@ -2437,7 +2472,7 @@ resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[str
 
             // A direct verb's payload has exactly one consumer — its consequence.
             // (A COMPOSED verb's payload is the block's offer; declining is fine.)
-            if cmd.payload_count > 0 && len(cmd.path) == 0 {
+            if warn_missing && cmd.payload_count > 0 && len(cmd.path) == 0 {
                 warn_at(
                     Loc{path = s.path},
                     "command %s returns a payload but no `%s` consequence proc consumes it",
@@ -2482,12 +2517,14 @@ resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[str
         at := 0
         game := ""
 
-        if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+        if len(types) > at &&
+           strings.has_prefix(types[at], "^") &&
+           !module_type_matches(cand.path, cand.imports, types[at], s) {
             game = types[at][1:] // the leading game param — generated code casts ctx.game_user to it
             at += 1
         }
 
-        if !(len(types) > at && types[at] == self_type) {
+        if !(len(types) > at && module_type_matches(cand.path, cand.imports, types[at], s)) {
             error_at(
                 loc,
                 "consequence %s: expected `self: %s` %s — the shapes are (self, by, args…, payload…) or (game, self, by, args…, payload…)",
@@ -2561,7 +2598,8 @@ resolve_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[str
         // Payload param TYPES are the compiler's to hold: the generated call
         // site passes the verb's returned values straight through.
 
-        cmd.then_proc = then_name
+        cmd.then_proc = cand.name
+        cmd.then_path = cand.path
         cmd.then_game = game
     }
 }
@@ -2588,7 +2626,7 @@ check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Scrip
     by_snake := make(map[string]^Script, context.temp_allocator)
 
     for s in scripts {
-        by_snake[to_snake(s.struct_name)] = s
+        by_snake[decl.snake_name(s.struct_name)] = s
     }
 
     for name, cand in idx {
@@ -2642,11 +2680,6 @@ check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Scrip
         // used to sit in front of it is gone. A declared half always speaks;
         // the params only decide what it is shown.
         targets := make([dynamic]^Script, context.temp_allocator)
-        // A ^Struct param naming a class that this package does not have, but the
-        // module's SUBPACKAGE census does: the class moved into a subfolder and left
-        // its half behind. Remembered so the no-targets branch can say so.
-        stranded_cls, stranded_sub: string
-
         if cand.pt.params != nil {
             for f in cand.pt.params.list {
                 t := strings.trim_space(node_text(cand.src, f.type))
@@ -2658,10 +2691,6 @@ check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Scrip
                 s, ok := by_struct[t[1:]]
 
                 if !ok {
-                    if sub, in_sub := g_subpkg_structs[t[1:]]; in_sub && stranded_cls == "" {
-                        stranded_cls, stranded_sub = t[1:], sub
-                    }
-
                     continue
                 }
 
@@ -2678,22 +2707,6 @@ check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Scrip
                     append(&targets, s)
                 }
             }
-        }
-
-        // Checked BEFORE the target listing: a half naming a subpackage class cannot
-        // pair no matter what its other params resolve to (halves pair inside ONE
-        // package), and the shell's thirty-odd session-event names are pure noise
-        // next to the one fact that explains it.
-        if stranded_cls != "" {
-            error_at(
-                loc,
-                "@(gd_half) %q pairs with nothing — it is written against %s, which is declared in the script subpackage %q. Halves pair inside ONE package, so either the half belongs beside its class in %s/, or the class belongs in the module root (a kit-wired class must be there anyway).",
-                name,
-                stranded_cls,
-                stranded_sub,
-                stranded_sub,
-            )
-            continue
         }
 
         if len(targets) == 0 {
@@ -2743,7 +2756,7 @@ check_unpaired_halves :: proc(idx: ^map[string]Half_Candidate, scripts: []^Scrip
 @(private = "file")
 pairing_surface :: proc(t: ^Script, scripts: []^Script) -> string {
     names := make([dynamic]string, context.temp_allocator)
-    snake := to_snake(t.struct_name)
+    snake := decl.snake_name(t.struct_name)
     ticks := t.tick.proc_name != "" || len(t.block_ticks) > 0
 
     for cmd in t.commands {
@@ -2827,7 +2840,13 @@ pairing_surface :: proc(t: ^Script, scripts: []^Script) -> string {
 //   <t>_spawned :: proc(game: ^Game, self: ^Target, id: knet.Net_Id, owner: knet.Player_Id)
 //   <t>_freed   :: proc(game: ^Game, self: ^Target, id: knet.Net_Id)
 @(private = "file")
-validate_entity_hook :: proc(cand: Half_Candidate, name, game_struct, target: string, want_owner: bool) -> bool {
+validate_entity_hook :: proc(
+    cand: Half_Candidate,
+    name: string,
+    game_script, target_script: ^Script,
+    want_owner: bool,
+) -> bool {
+    game_struct, target := game_script.struct_name, target_script.struct_name
     loc := Loc {
         path = cand.path,
         line = cand.line,
@@ -2862,8 +2881,8 @@ validate_entity_hook :: proc(cand: Half_Candidate, name, game_struct, target: st
     }
 
     if len(types) != want ||
-       types[0] != fmt.tprintf("^%s", game_struct) ||
-       types[1] != fmt.tprintf("^%s", target) ||
+       !module_type_matches(cand.path, cand.imports, types[0], game_script) ||
+       !module_type_matches(cand.path, cand.imports, types[1], target_script) ||
        type_base(types[2]) != "Net_Id" ||
        (want_owner && type_base(types[3]) != "Player_Id") {
         error_at(
@@ -2918,19 +2937,12 @@ resolve_onready_scripts :: proc(s: ^Script, by_struct: map[string]^Script) {
 resolve_entities :: proc(
     s: ^Script,
     by_struct: map[string]^Script,
-    seen_ids: ^map[int]string,
+    seen_ids: ^map[int]Entity_Claim,
     idx: ^map[string]Half_Candidate,
     procs: map[string]Proc_Site,
 ) {
-    // Every generated name on the entity side is keyed by the TARGET struct
-    // (`<t>_spawn`, `<t>_of`, `<t>_owned_by`, `<t>_mine`, `<t>_ids`, and the
-    // `<t>_spawned`/`<t>_freed` hooks it pairs). Two scene fields naming the
-    // same struct is therefore not a second entity — it is the same five procs
-    // generated twice, which surfaced as an Odin redeclaration error pointing at
-    // generated code the author never wrote. The wire-id check below can't catch
-    // it: the two declarations carry DIFFERENT ids, which is precisely why it
-    // looked legal.
-    seen_targets := make(map[string]int, context.temp_allocator)
+    // Scene declarations were grouped by resolved gameplay type before this
+    // pass. Resolve its schema, callbacks and census once for all variants.
 
     for &e in s.entities {
         loc := Loc {
@@ -2940,31 +2952,33 @@ resolve_entities :: proc(
         target, known := by_struct[e.target]
 
         if !known {
-            // "no such struct" is only ever true of THIS package: the entity table,
-            // its type ids and its census resolve package-wide. When the name is in
-            // the module's subpackage census the struct exists and is simply in the
-            // wrong place — say which place, and why the root is the right one.
-            if sub, in_sub := g_subpkg_structs[e.target]; in_sub {
-                error_at(
-                    loc,
-                    "entity %s: %q is declared in the script subpackage %q, not the module root — a wire entity IS the module's contract (its type id, descriptor and census are resolved package-wide in the root), so the struct the tag names lives in the module root too; move %s/%s's file up, or point the tag at a root struct",
-                    e.target,
-                    e.target,
-                    sub,
-                    sub,
-                    e.target,
-                )
-                continue
-            }
-
             error_at(
                 loc,
-                "entity %s: no script struct named %q in the module root — the tag names the struct the scene bodies (its //gd:class file)",
+                "entity %s: no script struct named %q in this import scope — import its package and qualify the entity type",
                 e.target,
                 e.target,
             )
             continue
         }
+
+        e.symbol = target
+        if target.entity_id != 0 && target.entity_id != e.type_id {
+            error_at(
+                loc,
+                "entity %s already uses wire id %d in this module; use that same stable id across owners (found %d)",
+                target.struct_name,
+                target.entity_id,
+                e.type_id,
+            )
+            continue
+        }
+        e.type_expr = target.struct_name
+        if dir_of(target.path) != dir_of(s.path) {
+            e.pkg_alias, e.pkg_path = module_package_ref(dir_of(s.path), dir_of(target.path))
+            e.type_expr = fmt.tprintf("%s.%s", e.pkg_alias, target.struct_name)
+        }
+        e.target = target.struct_name
+        if e.helper == "" {e.helper = decl.snake_name(target.struct_name)}
 
         if len(target.replicates) == 0 && len(target.commands) == 0 {
             error_at(
@@ -2975,33 +2989,20 @@ resolve_entities :: proc(
             continue
         }
 
-        if prev, dup := seen_ids[e.type_id]; dup {
+        if prev, dup := seen_ids[e.type_id];
+           dup && (prev.symbol != target || prev.stream_hz != e.stream_hz || prev.avatar != e.avatar) {
             error_at(
                 loc,
                 "entity %s: wire id %d is already claimed by %s — ids are the entity's wire identity and must be unique",
                 e.target,
                 e.type_id,
-                prev,
+                fmt.tprintf("%s (%s:%d)", prev.symbol.struct_name, prev.loc.path, prev.loc.line),
             )
             continue
         }
 
-        // After the id check, which is the more specific fact when both are true.
-        if prev, dup := seen_targets[e.target]; dup {
-            error_at(
-                loc,
-                "entity %s: %s is already declared at line %d — the generated census is named after the STRUCT (`%s_spawn`, `%s_of`, …), so a second scene for it would generate those procs twice; one entity= per struct",
-                e.target,
-                e.target,
-                prev,
-                to_snake(e.target),
-                to_snake(e.target),
-            )
-            continue
-        }
-
-        seen_targets[e.target] = e.line
-        seen_ids[e.type_id] = fmt.aprintf("%s (%s:%d)", e.target, s.path, e.line)
+        seen_ids[e.type_id] = Entity_Claim{target, Loc{s.path, e.line}, e.stream_hz, e.avatar}
+        target.entity_id = e.type_id
         e.has_tick = target.tick.proc_name != "" || len(target.block_ticks) > 0 // the kinds row carries the Sim_Set
         e.has_net_id = target.net_id_type != ""
 
@@ -3012,11 +3013,11 @@ resolve_entities :: proc(
             }
         }
 
-        tsnake := to_snake(e.target)
+        tsnake := entity_helper(e)
         sp_name := strings.concatenate({tsnake, "_spawned"})
 
         if cand, found := idx[sp_name]; found {
-            if validate_entity_hook(cand, sp_name, s.struct_name, e.target, want_owner = true) {
+            if validate_entity_hook(cand, sp_name, s, target, want_owner = true) {
                 e.spawned = sp_name
             }
 
@@ -3033,7 +3034,7 @@ resolve_entities :: proc(
         fr_name := strings.concatenate({tsnake, "_freed"})
 
         if cand, found := idx[fr_name]; found {
-            if validate_entity_hook(cand, fr_name, s.struct_name, e.target, want_owner = false) {
+            if validate_entity_hook(cand, fr_name, s, target, want_owner = false) {
                 e.freed = fr_name
             }
 
@@ -3056,7 +3057,7 @@ resolve_entities :: proc(
         bn_name := strings.concatenate({tsnake, "_born"})
 
         if cand, found := idx[bn_name]; found {
-            if validate_entity_hook(cand, bn_name, s.struct_name, e.target, want_owner = true) {
+            if validate_entity_hook(cand, bn_name, s, target, want_owner = true) {
                 e.born = bn_name
             }
 
@@ -3069,7 +3070,7 @@ resolve_entities :: proc(
                 fmt.tprintf(
                     "%s's born hook, dispatched typed from %s_events' Ev_Spawned arm",
                     e.target,
-                    to_snake(s.struct_name),
+                    decl.snake_name(s.struct_name),
                 ),
             )
         }
@@ -3079,7 +3080,7 @@ resolve_entities :: proc(
     // owned by ME was born (my spawn, my drop-in, my reconnect reclaiming its
     // standing body — each arrives as Ev_Spawned on my screen). The one latch
     // every game kept as `started`-plus-owner-checks in entity_spawned.
-    em_name := fmt.aprintf("%s_embodied", to_snake(s.struct_name))
+    em_name := fmt.aprintf("%s_embodied", decl.snake_name(s.struct_name))
 
     if cand, found := idx[em_name]; found {
         has_avatar := false
@@ -3457,12 +3458,13 @@ build_message_info :: proc(
     bool,
 ) {
     m := Message_Info {
+        type_context = Struct_Def{dir = dir_of(loc.path), imports = g_file_imports[norm_path(loc.path)], loc = loc},
         proc_name = proc_name,
-        name      = strip_struct_prefix(proc_name, struct_name),
-        game      = struct_name,
+        name = strip_struct_prefix(proc_name, struct_name),
+        game = struct_name,
         tag_ident = strings.trim_space(config),
-        line      = loc.line,
-        path      = loc.path,
+        line = loc.line,
+        path = loc.path,
     }
     ok := true
 
@@ -3657,6 +3659,11 @@ parse_tick :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^as
     }
 
     if ok {
+        tk.input_context = Struct_Def {
+            dir     = dir_of(loc.path),
+            imports = g_file_imports[norm_path(loc.path)],
+            loc     = loc,
+        }
         s.tick = tk
     }
 }
@@ -3722,20 +3729,16 @@ parse_sample :: proc(s: ^Script, src: string, loc: Loc, proc_name: string, pt: ^
 
     itype := types[1][1:]
 
-    for existing in s.samples {
-        if existing.input_type == itype {
-            error_at(
-                loc,
-                "%s: a second @(gd_sample) writes %s — %q already fills that input class; one sample per input TYPE",
-                s.struct_name,
-                itype,
-                existing.proc_name,
-            )
-            return
-        }
-    }
-
-    append(&s.samples, Sim_Proc_Info{proc_name = proc_name, line = loc.line, input_type = itype, validate = validate})
+    append(
+        &s.samples,
+        Sim_Proc_Info {
+            proc_name = proc_name,
+            line = loc.line,
+            input_type = itype,
+            validate = validate,
+            type_ctx = Struct_Def{dir = dir_of(loc.path), imports = g_file_imports[norm_path(loc.path)], loc = loc},
+        },
+    )
 }
 
 // @(gd_step) procs — the lane's world passes, run AFTER entity ticks. Two
@@ -3956,7 +3959,7 @@ resolve_census :: proc(s: ^Script, taken: map[string]Proc_Site) {
     }
 
     for &e in s.entities {
-        tsnake := to_snake(e.target)
+        tsnake := entity_helper(e)
         e.gen_ref = yield(taken, fmt.tprintf("%s_ref", tsnake))
         e.gen_of = yield(taken, fmt.tprintf("%s_of", tsnake))
         e.gen_owned = yield(taken, fmt.tprintf("%s_owned_by", tsnake))
@@ -4022,7 +4025,7 @@ resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[str
         }
 
         m := Method_Info {
-            proc_name = fmt.tprintf("_%s_%s", to_snake(s.struct_name), p.name),
+            proc_name = fmt.tprintf("_%s_%s", decl.snake_name(s.struct_name), p.name),
             gd_name   = p.name,
             ret       = p.form == .Field && p.float ? _probe_vi_float : _probe_vi_int,
         }
@@ -4045,7 +4048,7 @@ resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[str
     }
 
     for e in s.entities {
-        tsnake := to_snake(e.target)
+        tsnake := entity_helper(e)
         add(
             s,
             taken,
@@ -4053,17 +4056,22 @@ resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[str
                 form = .Count,
                 name = fmt.tprintf("probe_%s_count", tsnake),
                 tsnake = tsnake,
-                target = e.target,
+                target = entity_type(e),
             },
         )
         add(
             s,
             taken,
-            Probe_Info{form = .My, name = fmt.tprintf("probe_my_%s", tsnake), tsnake = tsnake, target = e.target},
+            Probe_Info {
+                form = .My,
+                name = fmt.tprintf("probe_my_%s", tsnake),
+                tsnake = tsnake,
+                target = entity_type(e),
+            },
         )
-        tgt, known := by_struct[e.target]
+        tgt := e.symbol
 
-        if !known {
+        if tgt == nil {
             continue
         }
 
@@ -4081,7 +4089,7 @@ resolve_probes :: proc(s: ^Script, by_struct: map[string]^Script, taken: map[str
                     form = .Field,
                     name = fmt.tprintf("probe_%s_%s", tsnake, strings.join(r.path, "_", context.temp_allocator)),
                     tsnake = tsnake,
-                    target = e.target,
+                    target = entity_type(e),
                     access = strings.join(r.path, ".", context.temp_allocator),
                     float = float,
                     boolish = boolish,
@@ -4119,7 +4127,7 @@ resolve_boot_forwards :: proc(s: ^Script) {
         return // unreachable: both are core Variant types
     }
 
-    snake := to_snake(s.struct_name)
+    snake := decl.snake_name(s.struct_name)
 
     add :: proc(s: ^Script, snake, name: string, args: ..Arg) {
         for m in s.methods {
@@ -4166,16 +4174,25 @@ resolve_boot_forwards :: proc(s: ^Script) {
 // just attach (custom ordering) while retaining the generated pump and detach.
 resolve_net_facade :: proc(s: ^Script, procs: map[string]Proc_Site) {
     if s.boot_fields != 1 || s.session_fields != 1 || s.comms_fields != 1 {
+        if s.kit_cleanup_manual {
+            error_at(Loc{s.path, 0}, "//gd:kit_cleanup manual requires one direct Boot, Session and Comms")
+        }
+
         return
     }
 
     has_lane := len(s.input_classes) > 0 || s.step.proc_name != "" || (s.step_auth.proc_name != "" && !s.step_boot)
 
     if has_lane && s.lane_fields != 1 {
+        if s.kit_cleanup_manual {
+            error_at(Loc{s.path, 0}, "//gd:kit_cleanup manual requires one direct Lane for a simulation stack")
+        }
+
         return
     }
 
-    snake := to_snake(s.struct_name)
+    s.kit_stack = true
+    snake := decl.snake_name(s.struct_name)
 
     add :: proc(flag: ^bool, procs: map[string]Proc_Site, name: string) {
         if _, hand := procs[name]; hand {
@@ -4190,28 +4207,6 @@ resolve_net_facade :: proc(s: ^Script, procs: map[string]Proc_Site) {
     add(&s.net_pump, procs, net_facade_name(snake, "pump"))
     add(&s.net_frame, procs, net_facade_name(snake, "frame"))
     add(&s.net_detach, procs, net_facade_name(snake, "detach"))
-}
-
-input_constraint_shape :: proc(type_text: string) -> (elem: string, count: int, fixed_array: bool) {
-    t := strings.trim_space(type_text)
-
-    if !strings.has_prefix(t, "[") {
-        return t, 0, false
-    }
-
-    rb := strings.index_byte(t, ']')
-
-    if rb <= 1 {
-        return t, 0, false
-    }
-
-    n, ok := strconv.parse_int(strings.trim_space(t[1:rb]))
-
-    if !ok || n <= 0 {
-        return t, 0, false
-    }
-
-    return strings.trim_space(t[rb + 1:]), n, true
 }
 
 input_integer_type :: proc(t: string) -> bool {
@@ -4232,7 +4227,7 @@ input_float_type :: proc(t: string) -> bool {
 // range clamps, unit clamps vector magnitude to one, while finite/mask/enum
 // reject bytes with no legal authored meaning. A sample validator may still
 // add cross-field and game-state predicates after these generated rules.
-parse_input_constraints :: proc(def: Struct_Def) -> []Input_Field_Constraint {
+parse_input_constraints :: proc(def: Struct_Def, bindings: ^Type_Bindings = nil) -> []Input_Field_Constraint {
     if !def.input_decl {
         return nil
     }
@@ -4258,7 +4253,11 @@ parse_input_constraints :: proc(def: Struct_Def) -> []Input_Field_Constraint {
             field     = f.name,
             type_text = f.type_text,
         }
-        elem, count, is_array := input_constraint_shape(f.type_text)
+        field_use := Type_Use{f.type_text, def, bindings}
+        elem_use := type_follow(field_use)
+        count, element, is_array := type_array(field_use)
+        if is_array {elem_use = element}
+        elem, enum_type := type_rule_kind(elem_use)
 
         if is_array {
             rule.array_len = count
@@ -4367,7 +4366,7 @@ parse_input_constraints :: proc(def: Struct_Def) -> []Input_Field_Constraint {
                 rule.unit = true
                 seen = true
             case tok == "enum":
-                if is_array || input_integer_type(elem) || input_float_type(elem) || elem == "bool" {
+                if is_array || !enum_type {
                     error_at(f.loc, "%s.%s: `enum` wants a scalar enum field (got %q)", def.name, f.name, f.type_text)
                     continue
                 }
@@ -4410,40 +4409,71 @@ parse_input_constraints :: proc(def: Struct_Def) -> []Input_Field_Constraint {
 //   - @(gd_sample)/@(gd_step) live on ONE class — the game whose gen file
 //     carries `<snake>_lane_init`.
 resolve_sim :: proc(scripts: []^Script) {
-    // The distinct input types across every tick in the package.
-    types: [dynamic]string
+    Input_Type :: struct {
+        identity, name: string,
+        definition:     Struct_Def,
+        bindings:       ^Type_Bindings,
+        ctx:            Struct_Def,
+        source_type:    string,
+        source:         ^Script,
+        binding:        int,
+    }
+    types := make([dynamic]Input_Type)
     defer delete(types)
-
     for s in scripts {
-        if s.tick.proc_name == "" || s.tick.input_type == "" {
-            continue
-        }
-
+        if s.tick.proc_name == "" || s.tick.input_type == "" {continue}
+        identity, name := module_type_identity(s.tick.input_context, s.tick.input_type)
+        s.tick.input_imports = make(map[string]string, context.temp_allocator)
+        expression, rendered := type_expression(
+            {s.tick.input_type, s.tick.input_context, nil},
+            dir_of(s.path),
+            &s.tick.input_imports,
+        )
+        if !rendered {error_at(s.tick.input_context.loc, "cannot express tick input %s in its entity package", s.tick.input_type)}
+        s.tick.input_code = expression
+        s.tick.input_identity, s.tick.input_name = identity, name
         seen := false
-
-        for e in types {
-            if e == s.tick.input_type {
+        for &t in types {
+            if t.identity == identity {
+                if s.path < t.source.path {t.source = s}
+                if s.entity_id != 0 && (t.binding == 0 || s.entity_id < t.binding) {t.binding = s.entity_id}
                 seen = true
                 break
             }
         }
-
         if !seen {
-            append(&types, s.tick.input_type)
+            def, bindings, _ := type_struct({s.tick.input_type, s.tick.input_context, nil})
+            append(
+                &types,
+                Input_Type{identity, name, def, bindings, s.tick.input_context, s.tick.input_type, s, s.entity_id},
+            )
         }
     }
-
-    slice.sort(types[:]) // stable ids: all peers rebuild together, so self-consistent is enough
-
-    // Annotate each input-driven tick with the wire class its input rides.
-    for s in scripts {
-        if s.tick.proc_name == "" || s.tick.input_type == "" {
-            continue
+    // Distinct declarations with the same local name stay separate. Numeric
+    // entity bindings provide the stable tie-breaker, independent of paths.
+    for &t, i in types {
+        for other, j in types {
+            if i != j && t.name == other.name && t.identity != other.identity && t.binding == 0 {
+                errorf(
+                    "input type %s is ambiguous across packages; declare stable entity= kind IDs for its consumers",
+                    t.name,
+                )
+            }
         }
-
-        for ty, i in types {
-            if ty == s.tick.input_type {
-                s.tick.input_class = i
+    }
+    slice.sort_by(types[:], proc(a, b: Input_Type) -> bool {
+        if a.name != b.name {return a.name < b.name}
+        return a.binding < b.binding
+    })
+    names := make(map[string]int, context.temp_allocator)
+    for t in types {names[t.name] += 1}
+    for &t in types {
+        if names[t.name] > 1 {t.name = fmt.tprintf("%s#%d", t.name, t.binding)}
+    }
+    for s in scripts {
+        for t, i in types {
+            if s.tick.input_identity == t.identity {
+                s.tick.input_class, s.tick.input_name = i, t.name
                 break
             }
         }
@@ -4478,7 +4508,7 @@ resolve_sim :: proc(scripts: []^Script) {
                 path = s.path,
                 line = s.step_auth.line,
             }
-            snake := to_snake(s.struct_name)
+            snake := decl.snake_name(s.struct_name)
 
             if s.boot_field == "" {
                 error_at(
@@ -4539,29 +4569,45 @@ resolve_sim :: proc(scripts: []^Script) {
     for t, i in types {
         info := Input_Class_Info {
             class_id  = i,
-            type_name = t,
+            type_name = t.source_type,
+            identity  = t.identity,
+            wire_name = t.name,
+            type_ctx  = t.ctx,
         }
-        // Input declarations are package types, like the field-by-field input
-        // fingerprint below. Unmarked structs keep the existing manual-validator
-        // path; marking one opts into generated constraints.
-        dir := dir_of(owner.path)
-        index_pkg_dir(dir)
-
-        if pkg, pok := g_pkgs[dir]; pok {
-            if def, dok := pkg[t]; dok && def.input_decl {
-                info.constraints = parse_input_constraints(def)
-            }
-        }
-
+        emission := Type_Use{t.source_type, t.ctx, nil}
         for sm in owner.samples {
-            if sm.input_type == t {
-                info.sample = sm.proc_name
-                info.validate = sm.validate
-                info.line = sm.line
-                break
+            identity, _ := module_type_identity(sm.type_ctx, sm.input_type)
+            if identity == t.identity {
+                if info.sample != "" {
+                    error_at(
+                        Loc{path = owner.path, line = sm.line},
+                        "%s: two samples write the same resolved input type %s",
+                        owner.struct_name,
+                        t.name,
+                    )
+                }
+                info.sample, info.validate, info.line = sm.proc_name, sm.validate, sm.line
+                emission = {sm.input_type, sm.type_ctx, nil}
             }
         }
 
+        info.imports = make(map[string]string, context.temp_allocator)
+        expression: string
+        ok := true
+        if info.sample == "" && dir_of(t.source.path) != dir_of(owner.path) {
+            t.source.kit_input_bridge = true
+            alias, path := composed_pkg_ref(dir_of(t.source.path), dir_of(owner.path))
+            info.imports[alias] = path
+            expression = fmt.tprintf("%s.%s", alias, kit_bridge(t.source, "Input"))
+        } else {
+            expression, ok = type_expression(emission, dir_of(owner.path), &info.imports)
+        }
+        if !ok {
+            error_at(Loc{path = owner.path}, "cannot express input type %s in the lane owner's package", t.source_type)
+            continue
+        }
+        info.type_name = expression
+        if t.definition.input_decl {info.constraints = parse_input_constraints(t.definition, t.bindings)}
         append(&owner.input_classes, info)
     }
 
@@ -4570,8 +4616,9 @@ resolve_sim :: proc(scripts: []^Script) {
     for sm in owner.samples {
         is_tick_input := false
 
+        identity, _ := module_type_identity(sm.type_ctx, sm.input_type)
         for t in types {
-            if t == sm.input_type {
+            if t.identity == identity {
                 is_tick_input = true
                 break
             }
@@ -4673,7 +4720,7 @@ resolve_session_events :: proc(s: ^Script, idx: ^map[string]Half_Candidate, proc
         return
     }
 
-    snake := to_snake(s.struct_name)
+    snake := decl.snake_name(s.struct_name)
 
     for ev, ei in SESSION_EVENTS {
         bare_name := fmt.tprintf("%s_%s", snake, ev.suffix)
@@ -4762,7 +4809,7 @@ check_event_half :: proc(s: ^Script, ev: Session_Ev, name: string, cand: Half_Ca
             loc,
             "%s must be a plain proc — the generated %s_events dispatch calls it, it is never registered",
             name,
-            to_snake(s.struct_name),
+            decl.snake_name(s.struct_name),
         )
         return false
     }
@@ -4833,7 +4880,7 @@ resolve_migration :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: ma
         return
     }
 
-    snake := to_snake(s.struct_name)
+    snake := decl.snake_name(s.struct_name)
     slots := [?]^string{&s.succ_backup, &s.succ_took_over, &s.succ_wiped, &s.succ_migrating}
 
     for spec, i in MIGRATION_HALVES {
@@ -4999,11 +5046,12 @@ resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate, pro
             }
         }
 
-        ok := len(types) == 1 + len(c.args) && types[0] == fmt.tprintf("^%s", s.struct_name)
+        ok := len(types) == 1 + len(c.args) && module_type_matches(cand.path, cand.imports, types[0], s)
 
         if ok {
             for a, i in c.args {
-                if types[1 + i] != a.type_text {
+                wire, _, valid := command_wire_type(types[1 + i])
+                if !valid || wire != a.wire {
                     ok = false
                     break
                 }
@@ -5021,7 +5069,8 @@ resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate, pro
             continue
         }
 
-        c.apply_proc = name
+        c.apply_proc = cand.name
+        c.apply_path = cand.path
     }
 }
 
@@ -5039,7 +5088,12 @@ resolve_command_applies :: proc(s: ^Script, idx: ^map[string]Half_Candidate, pro
 // Both optional, both also accept the game-less (self-first) shape. Payload
 // param TYPES are the compiler's to hold — the call site passes the tick's
 // returned values straight through.
-resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
+resolve_tick_then :: proc(
+    s: ^Script,
+    idx: ^map[string]Half_Candidate,
+    procs: map[string]Proc_Site,
+    warn_missing: bool = true,
+) {
     if s.tick.proc_name == "" {
         return
     }
@@ -5056,12 +5110,14 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: ma
     }
 
     if game, _, ok := claim_tick_half(s, idx, then_name, true); ok {
-        s.tick.then_proc = then_name
+        s.tick.then_proc = idx[then_name].name
+        s.tick.then_path = idx[then_name].path
         s.tick.then_game = game
     }
 
     if game, mine, ok := claim_tick_half(s, idx, fx_name, false); ok {
-        s.tick.fx_proc = fx_name
+        s.tick.fx_proc = idx[fx_name].name
+        s.tick.fx_path = idx[fx_name].path
         s.tick.fx_game = game
         s.tick.fx_mine = mine
 
@@ -5110,7 +5166,7 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: ma
     // `undeclared` stands the warning down: a half that exists and forgot to say
     // so is already an error naming the same proc, and "nothing consumes the
     // payload" would only argue for writing what is sitting right there.
-    if s.tick.payload_count > 0 && !undeclared && s.tick.then_proc == "" && s.tick.fx_proc == "" {
+    if warn_missing && s.tick.payload_count > 0 && !undeclared && s.tick.then_proc == "" && s.tick.fx_proc == "" {
         warn_at(
             Loc{path = s.path, line = s.tick.line},
             "tick %s returns a payload but neither `%s` nor `%s` consumes it",
@@ -5130,7 +5186,7 @@ resolve_tick_then :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: ma
 // owner-streamed state interpolates — each lane has its own presentation
 // answer, and an edge on either would misfire by construction.
 resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[string]Proc_Site) {
-    snake := to_snake(s.struct_name)
+    snake := decl.snake_name(s.struct_name)
 
     for &r in s.replicates {
         name := fmt.tprintf("%s_%s_edge", snake, strings.join(r.path, "_", context.temp_allocator))
@@ -5219,12 +5275,14 @@ resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[st
         at := 0
         game := ""
 
-        if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+        if len(types) > at &&
+           strings.has_prefix(types[at], "^") &&
+           !module_type_matches(cand.path, cand.imports, types[at], s) {
             game = types[at][1:]
             at += 1
         }
 
-        if !(len(types) > at && types[at] == self_type) {
+        if !(len(types) > at && module_type_matches(cand.path, cand.imports, types[at], s)) {
             error_at(
                 loc,
                 "%s: expected `self: %s` %s — the shapes are (self, old, new: %s) or (game, self, old, new: %s)",
@@ -5239,22 +5297,20 @@ resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[st
 
         at += 1
 
-        // Compare BASE type names: an imported block's field type is spelled
-        // bare at the block ("Gun_Mode") and qualified at the game
-        // ("play.Gun_Mode") — both are the same type, and the generated call
-        // site lets the compiler hold the exact match (the thunk derives the
-        // cast with type_of, so no spelling is ever spliced).
-        base_of :: proc(t: string) -> string {
-            b := t
-
-            if j := strings.last_index(b, "."); j >= 0 {
-                b = b[j + 1:]
+        field_key, _, field_ok := type_identity(
+            {r.type_text, Struct_Def{dir = r.type_dir, imports = r.type_imports}, nil},
+        )
+        old_key, new_key: string
+        old_ok, new_ok: bool
+        if len(types) - at == 2 {
+            half_context := Struct_Def {
+                dir     = dir_of(cand.path),
+                imports = cand.imports,
             }
-
-            return b
+            old_key, _, old_ok = type_identity({types[at], half_context, nil})
+            new_key, _, new_ok = type_identity({types[at + 1], half_context, nil})
         }
-
-        if len(types) - at != 2 || types[at] != types[at + 1] || base_of(types[at]) != base_of(r.type_text) {
+        if !field_ok || !old_ok || !new_ok || old_key != field_key || new_key != field_key {
             error_at(
                 loc,
                 "%s: expected exactly `old, new: %s` after `self` (the field's declared type) — found %d param(s)%s",
@@ -5266,7 +5322,8 @@ resolve_edges :: proc(s: ^Script, idx: ^map[string]Half_Candidate, procs: map[st
             continue
         }
 
-        r.edge_proc = name
+        r.edge_proc = cand.name
+        r.edge_path = cand.path
         r.edge_game = game
     }
 }
@@ -5328,12 +5385,14 @@ claim_tick_half :: proc(
     self_type := fmt.tprintf("^%s", s.struct_name)
     at := 0
 
-    if len(types) > at && strings.has_prefix(types[at], "^") && types[at] != self_type {
+    if len(types) > at &&
+       strings.has_prefix(types[at], "^") &&
+       !module_type_matches(cand.path, cand.imports, types[at], s) {
         game = types[at][1:]
         at += 1
     }
 
-    if !(len(types) > at && types[at] == self_type) {
+    if !(len(types) > at && module_type_matches(cand.path, cand.imports, types[at], s)) {
         error_at(
             loc,
             "%s: expected `self: %s` %s — the shapes are (self%s, payload…) or (game, self%s, payload…)",
@@ -5404,7 +5463,7 @@ build_method_info :: proc(
     src: string,
     pt: ^ast.Proc_Type,
     loc: Loc,
-    proc_name, struct_name: string,
+    proc_name, struct_name, godot_alias: string,
     allow_owner: bool,
     vd: ^ast.Value_Decl = nil,
 ) -> (
@@ -5437,8 +5496,17 @@ build_method_info :: proc(
 
     for fi in start ..< len(pt.params.list) {
         field := pt.params.list[fi]
-        atext := node_text(src, field.type)
+        atext := normalize_godot_qualifier(node_text(src, field.type), godot_alias)
         vi, vok := map_variant(atext)
+        variant := strings.trim_space(atext) == "gd.Variant" || strings.trim_space(atext) == "godot.Variant"
+
+        if variant {
+            vi, vok = Variant_Info {
+                    enum_name = ".Nil",
+                    native    = "gd.Variant",
+                    kind      = .Other,
+                }, true
+        }
 
         if !vok {
             error_at(loc, "method %s: unsupported arg type %q", proc_name, atext)
@@ -5453,12 +5521,12 @@ build_method_info :: proc(
                 continue
             }
 
-            append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi})
+            append(&m.args, Arg{name = ident.name, type_text = atext, vi = vi, variant = variant})
         }
     }
 
     if pt.results != nil && len(pt.results.list) > 0 {
-        rtext := node_text(src, pt.results.list[0].type)
+        rtext := normalize_godot_qualifier(node_text(src, pt.results.list[0].type), godot_alias)
         vi, vok := map_variant(rtext)
 
         if !vok {
@@ -5699,11 +5767,16 @@ compose_member_name :: proc(path: []string, verb: string) -> string {
 // entity's OWN package — no qualifier, no import. `def_dir` is the block's package dir;
 // `scripts_dir` the entity's. A `godot:kit/combat` block yields alias "kit_combat".
 composed_pkg_ref :: proc(def_dir, scripts_dir: string) -> (alias, path: string) {
-    if def_dir == scripts_dir || g_godot_root == "" {
+    if def_dir == scripts_dir {
         return "", ""
     }
 
-    if !strings.has_prefix(def_dir, g_godot_root) {
+    if module_contains_dir(def_dir) || under_shared(def_dir) {
+        return module_package_ref(scripts_dir, def_dir)
+    }
+
+    if g_godot_root == "" ||
+       !strings.has_prefix(def_dir, strings.concatenate({g_godot_root, "/"}, context.temp_allocator)) {
         return "", ""
     }
 
@@ -5784,46 +5857,6 @@ shelf_lint :: proc(s: ^Script, def: Struct_Def, path: []string) {
     }
 }
 
-// apply_subst rewrites whole-identifier generic parameters in a type text to their
-// concrete args. With {S = "Gun_State"}: "S" -> "Gun_State", "Edge(S)" -> "Edge(Gun_State)",
-// "[N]f32" -> "[4]f32" (with {N = "4"}). Only WHOLE identifiers are replaced, never a
-// substring of a longer name. Empty subst returns the input untouched.
-apply_subst :: proc(type_text: string, subst: map[string]string) -> string {
-    if len(subst) == 0 {
-        return type_text
-    }
-
-    b := strings.builder_make()
-    i := 0
-
-    for i < len(type_text) {
-        c := type_text[i]
-
-        if c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
-            j := i
-
-            for j < len(type_text) && is_ident_byte(type_text[j]) {
-                j += 1
-            }
-
-            word := type_text[i:j]
-
-            if repl, ok := subst[word]; ok {
-                strings.write_string(&b, repl)
-            } else {
-                strings.write_string(&b, word)
-            }
-
-            i = j
-        } else {
-            strings.write_byte(&b, c)
-            i += 1
-        }
-    }
-
-    return strings.to_string(b)
-}
-
 // Detect a typed signal field (gd.Signal0 … Signal4 / gd.SignalN) from its normalized
 // type text — used to reject signals inside nested structs (unsupported for now).
 is_signal_field_type :: proc(type_text: string) -> bool {
@@ -5857,15 +5890,25 @@ recurse_into :: proc(
     path: []string,
     visited: ^map[string]bool,
     name_prefix: string,
-    subst: map[string]string,
+    bindings: ^Type_Bindings,
     manual := false,
+    depth: int = 0,
 ) {
-    if visited[def.id] {
+    if depth >= 64 {
+        error_at(
+            Loc{path = s.path},
+            "%s: embedded component expansion exceeds the bounded depth limit",
+            join_path(path),
+        )
         return
-    } // a type reachable from itself — stop, don't loop
-
-    visited[def.id] = true
-    defer delete_key(visited, def.id) // allow the same type at independent sibling positions
+    }
+    key, _, ok := type_struct_identity(def, bindings)
+    if !ok || visited[key] {
+        error_at(Loc{path = s.path}, "%s: unresolved or recursive embedded component %s", join_path(path), def.name)
+        return
+    }
+    visited[key] = true
+    defer delete_key(visited, key)
 
     {
         // Record the embedded-block name (def.id is "<dir>|<name>"): method-
@@ -5957,11 +6000,31 @@ recurse_into :: proc(
 
     for fld in def.fields {
         fpath := extend_path(path, fld.name)
+        // These untagged containers do not expose inline component metadata.
+        // Their element/callback types remain entirely the compiler's concern.
+        _, tagged := tag_gd_value(fld.tag)
+        opaque := type_follow({fld.type_text, def, bindings}).text
+        if !tagged &&
+           (strings.has_prefix(opaque, "^") ||
+                   strings.has_prefix(opaque, "[") ||
+                   strings.has_prefix(opaque, "map[") ||
+                   strings.has_prefix(opaque, "proc(") ||
+                   strings.has_prefix(opaque, "proc ")) {
+            continue
+        }
         // If `def` is a generic instantiation, resolve this field's generic params to the
         // concrete args first (`cur: S` -> `cur: Gun_State`) — so interp classification,
         // POD checks, and deeper resolution all see the real type. The OFFSET itself is
         // path-based (type_of at the consumer compile), so it resolves generics regardless.
-        ftype := apply_subst(fld.type_text, subst)
+        field_use, code_imports, resolved := type_materialize({fld.type_text, def, bindings}, dir_of(s.path))
+        if !resolved {
+            error_at(fld.loc, "%s: cannot resolve generic component field %s", join_path(fpath), fld.type_text)
+            continue
+        }
+        for alias, path in code_imports {
+            if alias != "@engine" {s.code_imports[alias] = path}
+        }
+        ftype, field_context := field_use.text, field_use.from
 
         // Signals declare by TYPE (tag optional) — check before the tagged/skip branches.
         if is_signal_field_type(ftype) {
@@ -5997,7 +6060,7 @@ recurse_into :: proc(
                     lines     = {fld.loc.line},
                     path_base = path, // the embed's own access path; leaf appended by the arms
                     type_text = ftype,
-                    type_ctx  = def,
+                    type_ctx  = field_context,
                     specs     = specs,
                     tok0      = strings.trim_space(specs[0]),
                     loc       = fld.loc,
@@ -6006,15 +6069,23 @@ recurse_into :: proc(
             continue
         }
 
-        if sub, sub_subst, ok := resolve_type(def, ftype); ok {
+        if sub, sub_subst, ok := resolve_type(field_context, ftype); ok {
             // `using` keeps the current name prefix; a plain embed extends it by `<field>_`.
             sub_prefix := fld.is_using ? name_prefix : strings.concatenate({name_prefix, fld.name, "_"})
             // A manual embed owns its whole subtree: the wielder drives this
             // block's tick, which drives its children — so a nested block under
             // a manual one must not auto-hoist either.
-            recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst, manual)
+            recurse_into(s, sub, fpath, visited, sub_prefix, sub_subst, manual, depth + 1)
         } else {
-            unresolved_embed_check(fld.loc, s.struct_name, join_path(fpath), ftype, fld.is_using, def.imports, def.dir)
+            unresolved_embed_check(
+                fld.loc,
+                s.struct_name,
+                join_path(fpath),
+                ftype,
+                fld.is_using,
+                field_context.imports,
+                field_context.dir,
+            )
         }
     }
 }

@@ -14,7 +14,7 @@ PROJ="$ROOT/examples/claimball"
 
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.dylib"
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 ELOG="$(mktemp)"; trap 'rm -f "$ELOG"' EXIT
 set +e

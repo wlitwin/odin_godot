@@ -17,7 +17,7 @@ typedef struct {
 struct ogb3_recovery_catalog;
 ogb3_status ogb3_catalog_asset_lookup(const struct ogb3_recovery_catalog *,
                                     uint32_t, ogb3_catalog_asset_view *);
-ogb3_status ogb3_authoring_asset_validate(const ogb3_recovery_asset_v2 *, uint64_t *);
+ogb3_status ogb3_authoring_asset_validate(const ogb3_recovery_authored_asset *, uint64_t *);
 void *ogb3_snapshot_internal_alloc(size_t);
 void ogb3_snapshot_internal_free(void *);
 #endif

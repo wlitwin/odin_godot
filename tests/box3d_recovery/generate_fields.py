@@ -42,7 +42,7 @@ for n in order:
  if n in ['n_b3DistanceJoint','n_b3MotorJoint','n_b3PrismaticJoint','n_b3SphericalJoint','n_b3WheelJoint']:
   f=re.sub(r'F\(d, v->(max\w*(?:Force|Torque))\);',r'scalar(d,&v->\1,4,4);',f)
  if n=='n_b3RevoluteJoint':
-  f=f.replace('F(d, v->maxMotorTorque);','scalar(d,&v->maxMotorTorque,4,d->catalog->identity.recovery_format>=3?4:1);')
+  f=f.replace('F(d, v->maxMotorTorque);','scalar(d,&v->maxMotorTorque,4,4);')
  out+=f+'\n'
 out+='/* END CODEC SCALAR FIELDS */'
 p=root/'box3d/native/recovery_codec.c';text=p.read_text();a=text.index('/* BEGIN CODEC SCALAR FIELDS */');b=text.index('/* END CODEC SCALAR FIELDS */',a)+len('/* END CODEC SCALAR FIELDS */')

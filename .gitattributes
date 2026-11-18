@@ -1,0 +1,2 @@
+# Unified-diff context prefixes legitimately precede upstream tabs/blank lines.
+build/patches/*.patch -whitespace

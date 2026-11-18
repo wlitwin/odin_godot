@@ -57,15 +57,18 @@ func run_job(action:String):
 	if pid>0:return
 	var base:=ProjectSettings.globalize_path("res://.godot/replay_authoring/jobs/workbench-%s"%Time.get_ticks_usec())
 	DirAccess.make_dir_recursive_absolute(base);result_path=base+"/result.json"
-	var selection:=ProjectSettings.globalize_path("user://workbench.rplrec") if action=="verify" else selected.text
-	var args:=PackedStringArray([ProjectSettings.globalize_path("res://tools/authoring.py"),"--project",ProjectSettings.globalize_path("res://"),"--framework",toolchain.framework,"--godot",OS.get_executable_path(),"--result",result_path,action,"--selection",selection,"--latency",str(latency.get_selected_id())])
+	var inputs:Dictionary={"recording":ProjectSettings.globalize_path("user://workbench.rplrec")} if action=="verify" else {"definition":selected.text}
+	if action=="network":inputs["latency"]=latency.get_selected_id()
+	var request_path:=base+"/request.json"
+	var request:=FileAccess.open(request_path,FileAccess.WRITE)
+	request.store_string(JSON.stringify({"action":action,"inputs":inputs}));request.close()
+	var args:=PackedStringArray([str(toolchain.framework).path_join("replay/editor/worker.py"),"--project",ProjectSettings.globalize_path("res://"),"--framework",toolchain.framework,"--godot",OS.get_executable_path(),"--result",result_path,"--request",request_path])
 	pid=OS.create_process(toolchain.python,args);message.text="Starting "+action+"…"
 func _process(_dt:float):
 	if pid>0 and FileAccess.file_exists(result_path):
 		var report:Dictionary=JSON.parse_string(FileAccess.get_file_as_string(result_path))
 		message.text=str(report.get("message","Working…"))
-		if report.get("kind","")=="correction":message.text+="\nCasts %d → %d; health %d → %d"%[report.before_casts,report.after_casts,report.before_hp,report.after_hp]
-		if report.get("kind","")=="takeover":message.text+="\nCheckpoint %d → tick %d; casts %d"%[report.checkpoint_tick,report.final_tick,report.after_casts]
+		if report.has("details"):message.text+="\n"+str(report.details)
 		if not OS.is_process_running(pid):pid=-1
 	elif pid>0 and not OS.is_process_running(pid):pid=-1;message.text="Job stopped without a report. Inspect .godot/replay_authoring/jobs."
 func cancel_job():

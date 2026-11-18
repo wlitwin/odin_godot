@@ -20,20 +20,17 @@ Current content IDs are **C9 `0x4341564552504c39`** for server motion and
 admitted under the new content. Session/checkpoint schemas and gameplay world
 layout remain unchanged.
 
-The native save converters accept C1–C8 and O1–O2, respectively. C8 and O2
-conversion preserves the exact frame, controls, membership, action frontiers and
-pending payloads, then selects current content for future execution. C8's existing
-authority observation is preserved rather than reseeded. O1 actions retain their
-accepted-pose interpretation. The tools require a new destination and refuse
-coordinated/custom-policy archives; those need an application-owned upgrade.
-Browser records are not rewritten implicitly.
+Retained checkpoints were migrated with frames, controls, membership and pending
+actions preserved. The active fixtures use C9/O3 directly. [Original bytes and
+migration receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain separate evidence; old readers and the
+impact-suppression entry points have been removed.
 
-Historical recordings must retain their event rules. `upgrade.model8()` and
-`owner_upgrade.model_2()` provide explicit C8/O2 descriptors with dweller impacts
-disabled. Use their old content ID and recorded build identity with
-`net.recording_model` and the diagnostic verifier. Genuine pre-change recordings
-verify natively and in WASM; substituting today's model produces an event mismatch.
-This is explicit historical execution, not conversion of a recording to new rules.
+Old C8/O2 recordings lack these Hit events. They remain historical evidence.
+New current-model recordings start from the migrated checkpoints, restore under
+the next epoch and capture three ticks. Tests require one correctly keyed Hit,
+one settlement of the original pending Door, and no repeated impact. Native and
+executed WASM replay the same files. Changing only an expected Hit amount must
+produce event divergence with identical Worlds.
 
-[Projectile views](projectiles.md) preview bounded motion between ticks. This
-presentation path never generates these Hit occurrences or changes their timing.
+See [the acceptance runner](../../tests/replay_cave_impact/README.md) for current
+model, recording, fresh-process resume, campaign and rendering checks.

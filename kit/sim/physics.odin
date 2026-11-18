@@ -222,7 +222,7 @@ World_History :: struct {
     epoch:                                u64,
     work:                                 World_Work_Stats,
     status:                               World_Error,
-    busy, publishing, presenting, resync: bool,
+    busy, publishing, presenting, resync, detaching, closing: bool,
     field_bytes:                          int,
     bindings:                             []World_Binding,
     live_backup:                          []u8,
@@ -264,14 +264,13 @@ lane_world_needs_resync :: proc(l: ^Lane) -> bool {
 }
 
 lane_world_busy :: proc(l: ^Lane) -> bool {
-    return l.world != nil && (l.world.busy || l.world.presenting)
+    return world_cleanup_pending(l) || (l.world != nil && (l.world.busy || l.world.presenting || l.world.detaching || world_is_closing(l.world)))
 }
 
 // Unsupported operations call this BEFORE touching tracks, commands or scenes.
 lane_world_refuse :: proc(l: ^Lane) -> bool {
-    if l.world == nil {
-        return false
-    }
+    if world_cleanup_pending(l) { return true }
+    if l.world == nil { return false }
 
     l.world.status = .Unsupported
     l.world.resync = true
@@ -288,7 +287,7 @@ lane_world_fail :: proc(l: ^Lane, error: World_Error) {
 world_field_guard :: proc(user: rawptr) -> bool {
     w := cast(^World_History)user
 
-    if !w.publishing {
+    if world_is_closing(w) || !w.publishing {
         w.status = .Unsupported
         w.resync = true
         return false
@@ -489,7 +488,7 @@ lane_world_attach :: proc(
         return .Budget
     }
 
-    if l.world != nil ||
+    if l.world != nil || world_cleanup_pending(l) ||
        l.ses == nil ||
        provider.initial_execution == nil ||
        provider.asset_id == 0 ||
@@ -628,64 +627,14 @@ lane_world_attach :: proc(
         return status
     }
 
-    if e := world_owner_retain(provider.owner); e != .Ok {
-        return e
-    }
-
-    owner_transferred := false
-
-    defer {
-        if !owner_transferred {
-            _ = world_owner_drop(provider.owner)
-        }
-    }
-
-    if e := world_owner_retain(provider.detached_owner); e != .Ok {
-        return e
-    }
-
-    detached_transferred := false
-
-    defer {
-        if !detached_transferred {
-            _ = world_owner_drop(provider.detached_owner)
-        }
-    }
-
-    if e := world_owner_retain(provider.effect_owner); e != .Ok {
-        return e
-    }
-
-    effects_transferred := false
-
-    defer {
-        if !effects_transferred {
-            _ = world_owner_drop(provider.effect_owner)
-        }
-    }
-
-    if e := world_owner_retain(provider.user_owner); e != .Ok {
-        return e
-    }
-
-    user_transferred := false
-
-    defer {
-        if !user_transferred {
-            _ = world_owner_drop(provider.user_owner)
-        }
-    }
-
-    if e := world_owner_retain(provider.author_owner); e != .Ok {
-        return e
-    }
-
-    author_transferred := false
-
-    defer {
-        if !author_transferred {
-            _ = world_owner_drop(provider.author_owner)
-        }
+    owners_transferred := false
+    defer if !owners_transferred { _ = world_cleanup_drop(l) }
+    // User storage is dropped last. The Lane keeps every successful retain
+    // immediately, including failed-init rollback whose drop must be retried.
+    owners := [5]World_Owner{provider.effect_owner,provider.author_owner,provider.detached_owner,provider.owner,provider.user_owner}
+    for index in ([5]int{3,2,0,4,1}) {
+        if error := world_owner_retain(owners[index]); error != .Ok { return error }
+        l.world_cleanup[index] = owners[index]
     }
 
     w, err := new(World_History, l.allocator)
@@ -817,75 +766,115 @@ lane_world_attach :: proc(
     w.provider.initial_execution = nil
     l.anchored = true
     world_budget_register(l)
-    owner_transferred = true
-    detached_transferred = true
-    effects_transferred = true
-    user_transferred = true
-    author_transferred = true
+    l.world_cleanup = {}
+    owners_transferred = true
+    return .Ok
+}
+
+// The final owner callback may release the Lane's backing block. Keep the
+// reentry guard outside that block, so it spans the callback without a write
+// through a potentially freed Lane after the drop returns.
+@(private)
+Lane_Cleanup_Stack :: struct { lanes: [32]^Lane, count: int }
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+    @(private) lane_cleanup_stack: Lane_Cleanup_Stack
+} else {
+    @(private, thread_local) lane_cleanup_stack: Lane_Cleanup_Stack
+}
+
+@(private)
+lane_cleanup_entered :: proc(l: ^Lane) -> bool {
+    for lane in lane_cleanup_stack.lanes[:lane_cleanup_stack.count] { if lane==l { return true } }
+    return false
+}
+
+@(private)
+world_cleanup_pending :: proc(l: ^Lane) -> bool {
+    if l == nil { return false }
+    if lane_cleanup_entered(l) { return true }
+    if l.world_cleanup_active { return true }
+    for owner in l.world_cleanup { if !world_owner_is_empty(owner) { return true } }
+    return false
+}
+
+@(private)
+world_cleanup_drop :: proc(l: ^Lane) -> World_Error {
+    if lane_cleanup_entered(l) || lane_cleanup_stack.count == len(lane_cleanup_stack.lanes) { return .Busy }
+    if l.world_cleanup_active { return .Busy }
+    last := -1
+    for owner,i in l.world_cleanup { if !world_owner_is_empty(owner) { last=i } }
+    if last < 0 { return .Ok }
+    lane_cleanup_stack.lanes[lane_cleanup_stack.count]=l
+    lane_cleanup_stack.count+=1
+    defer {
+        lane_cleanup_stack.count-=1
+        lane_cleanup_stack.lanes[lane_cleanup_stack.count]=nil
+    }
+    l.world_cleanup_active = true
+    for i in 0..=last {
+        owner := l.world_cleanup[i]
+        l.world_cleanup[i] = {}
+        // The final drop may free a pending block containing this Lane.
+        // Publish the idle flag first and return without another access.
+        if i==last { l.world_cleanup_active=false }
+        if error := world_owner_drop(owner); error != .Ok {
+            l.world_cleanup[i]=owner
+            l.world_cleanup_active=false
+            return error
+        }
+        if i==last { return .Ok }
+    }
+    return .Ok
+}
+
+@(private)
+world_is_closing :: proc(w: ^World_History) -> bool {
+    return w.closing || (w.network != nil && w.network.closing)
+}
+
+// Retire resources while retaining the capabilities that keep their caller's
+// storage alive. Lane destruction releases those capabilities only after its
+// remaining containers have also been freed.
+@(private)
+world_detach_resources :: proc(l: ^Lane) -> World_Error {
+    if l == nil { return .Invalid }
+    if lane_cleanup_entered(l) { return .Busy }
+    if l.world_cleanup_active { return .Busy }
+    if l.world == nil { return .Ok }
+    w := l.world
+    if w.busy || w.presenting || w.detaching { return .Busy }
+    if error := world_owner_check(w.provider.owner); error != .Ok { return error }
+    w.detaching=true;w.closing=true
+    consumed := false
+    defer if !consumed { w.detaching=false }
+    if error := lane_world_network_detach(l); error != .Ok { return error }
+    world_budget_unregister(w)
+    for binding in w.bindings { binding.hist.write_guard=nil; binding.hist.guard_user=nil }
+    world_fields_free(w)
+    w.provider.close(w.published)
+    w.provider.bind(w.provider.user,nil)
+    w.provider.publish(w.provider.user,nil)
+    l.world_cleanup={w.provider.effect_owner,w.provider.author_owner,w.provider.detached_owner,w.provider.owner,w.provider.user_owner}
+    consumed=true
+    free(w,w.allocator)
+    l.world=nil
     return .Ok
 }
 
 lane_world_detach :: proc(l: ^Lane) -> World_Error {
-    if l.world == nil {
-        return .Ok
-    }
-
-    w := l.world
-
-    if w.busy || w.presenting {
-        return .Busy
-    }
-
-    if e := world_owner_check(w.provider.owner); e != .Ok {
-        return e
-    }
-
-    owner := w.provider.owner
-    detached_owner := w.provider.detached_owner
-    effect_owner := w.provider.effect_owner
-    user_owner, author_owner := w.provider.user_owner, w.provider.author_owner
-    world_budget_unregister(w)
-    _ = lane_world_network_detach(l)
-
-    for b in w.bindings {
-        b.hist.write_guard = nil
-        b.hist.guard_user = nil
-    }
-
-    world_fields_free(w)
-    w.provider.close(w.published)
-    w.provider.bind(w.provider.user, nil)
-    w.provider.publish(w.provider.user, nil)
-    free(w, w.allocator)
-    l.world = nil
-
-    if e := world_owner_drop(effect_owner); e != .Ok {
-        return e
-    }
-
-    if e := world_owner_drop(author_owner); e != .Ok {
-        return e
-    }
-
-    if e := world_owner_drop(user_owner); e != .Ok {
-        return e
-    }
-
-    if e := world_owner_drop(detached_owner); e != .Ok {
-        return e
-    }
-
-    return world_owner_drop(owner)
+    if error := world_detach_resources(l); error != .Ok { return error }
+    return world_cleanup_drop(l)
 }
 
 lane_world_checkpoint :: proc(l: ^Lane, tick: u64) -> (checkpoint: World_Checkpoint, error: World_Error) {
+    if lane_cleanup_entered(l) { return {},.Busy }
     if l.world == nil {
         return {}, .Unsupported
     }
 
     w := l.world
 
-    if w.busy || w.presenting {
+    if w.busy || w.presenting || world_is_closing(w) {
         return {}, .Busy
     }
 
@@ -1442,7 +1431,7 @@ World_Network :: struct {
     epoch, sequence, received_sequence, submitted_sequence: u64,
     // Obsolete ordinary transfers observed while unready, not validated receipts.
     ignored_correction_epoch, ignored_correction_sequence:  u64,
-    ready, applying:                                        bool,
+    ready, applying, detaching, closing:                    bool,
     authority:                                              bool,
     local_player:                                           knet.Player_Id,
     status:                                                 World_Error,

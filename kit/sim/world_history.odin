@@ -281,7 +281,7 @@ world_operation :: proc(
 
     context.allocator = w.allocator
 
-    if w.busy || w.presenting {
+    if w.busy || w.presenting || world_is_closing(w) {
         return {.Busy, w.head, 0}
     }
 
@@ -601,7 +601,7 @@ world_frame :: proc(l: ^Lane, dt: f64) -> int {
         return 0
     }
 
-    if w.busy || w.presenting {
+    if w.busy || w.presenting || world_is_closing(w) {
         w.status = .Busy
         return 0
     }
@@ -731,7 +731,7 @@ world_reconcile :: proc(
         return {.Incompatible, checkpoint.tick, 0}
     }
 
-    if w.busy || w.presenting {
+    if w.busy || w.presenting || world_is_closing(w) {
         return {.Busy, w.head, 0}
     }
 
@@ -947,7 +947,7 @@ lane_world_network_attach :: proc(l: ^Lane, cfg: World_Network_Config) -> World_
 
     w := l.world
 
-    if w.busy || w.presenting {
+    if w.busy || w.presenting || world_is_closing(w) {
         return .Busy
     }
 
@@ -1238,32 +1238,33 @@ lane_world_network_attach :: proc(l: ^Lane, cfg: World_Network_Config) -> World_
 }
 
 lane_world_network_detach :: proc(l: ^Lane) -> World_Error {
-    if l == nil || l.world == nil || l.world.network == nil {
-        return .Ok
-    }
-
+    if l == nil || l.world == nil || l.world.network == nil { return .Ok }
     w := l.world
-
-    if w.busy || w.presenting {
-        return .Busy
-    }
-
+    if w.busy || w.presenting { return .Busy }
     n := w.network
-
-    if n.applying {
-        return .Busy
-    }
-
+    if n.applying || n.detaching { return .Busy }
+    if error := world_owner_check(w.provider.owner); error != .Ok { return error }
+    if error := world_owner_check(n.config.codec.owner); error != .Ok { return error }
     context.allocator = w.allocator
-
-    if e := world_owner_check(w.provider.owner); e != .Ok {
-        return e
+    n.detaching = true
+    n.closing = true
+    n.ready = false
+    n.status = .Busy
+    consumed := false
+    defer if !consumed { n.detaching = false }
+    // Release fallible dependencies before freeing buffers. Record each success
+    // so a refused later release never repeats an earlier one on retry.
+    for n.owned_codec_count > 0 {
+        codec := n.owned_codecs[n.owned_codec_count-1]
+        error := codec.release != nil ? codec.release(codec.user) : world_owner_drop(codec.owner)
+        if error != .Ok { return error }
+        n.owned_codec_count -= 1
     }
-
-    if e := world_owner_check(n.config.codec.owner); e != .Ok {
-        return e
+    if n.wire_owned {
+        if error := world_owner_drop(n.config.codec.owner); error != .Ok { return error }
+        n.wire_owned = false
+        n.config.codec.owner = {}
     }
-
     delete(n.drivers)
     delete(n.effects)
     delete(n.accepted_data)
@@ -1271,35 +1272,12 @@ lane_world_network_detach :: proc(l: ^Lane) -> World_Error {
     delete(n.used_data)
     delete(n.backup_data)
     delete(n.staged_data)
-    world_network_clear_transfers(n, w.allocator)
-
-    for p in n.queue[:n.queue_count] {
-        delete(p.bytes)
-    }
-
+    world_network_clear_transfers(n,w.allocator)
+    for packet in n.queue[:n.queue_count] { delete(packet.bytes) }
     bd.trace_destroy(&n.trace)
-
-    for codec in n.owned_codecs[:n.owned_codec_count] {
-        if codec.release != nil {
-            if e := codec.release(codec.user); e != .Ok {
-                return e
-            }
-        } else {
-            if e := world_owner_drop(codec.owner); e != .Ok {
-                return e
-            }
-        }
-    }
-
-    wire_owner := n.config.codec.owner
-    wire_owned := n.wire_owned
-    free(n, w.allocator)
+    consumed = true
+    free(n,w.allocator)
     w.network = nil
-
-    if wire_owned {
-        return world_owner_drop(wire_owner)
-    }
-
     return .Ok
 }
 
@@ -1355,7 +1333,7 @@ world_network_receive :: proc(l: ^Lane, from: knet.Player_Id, peer: ksess.Peer_I
 
     n := l.world.network
 
-    if l.world.busy || l.world.presenting || n.applying {
+    if l.world.busy || l.world.presenting || world_is_closing(l.world) || n.applying {
         world_network_fail(l, .Busy)
         return
     }
@@ -2104,7 +2082,7 @@ lane_world_request_reset :: proc(l: ^Lane) -> World_Error {
 
     n := l.world.network
 
-    if l.world.busy || l.world.presenting || n.applying {
+    if l.world.busy || l.world.presenting || world_is_closing(l.world) || n.applying {
         return .Busy
     }
 
@@ -2564,7 +2542,7 @@ lane_world_begin_epoch :: proc(l: ^Lane, epoch: u64) -> World_Error {
         return .Settled
     }
 
-    if w.busy || w.presenting || n.applying {
+    if w.busy || w.presenting || world_is_closing(w) || n.applying {
         return .Busy
     }
 
@@ -2796,7 +2774,7 @@ lane_world_diagnostic_frame :: proc(
     w := l.world
     n := w.network
 
-    if w.busy || w.publishing || w.presenting {
+    if w.busy || w.publishing || w.presenting || world_is_closing(w) {
         return .Busy
     }
 
@@ -2840,7 +2818,10 @@ lane_world_diagnostic_frame :: proc(
         return .History_Missing
     }
 
-    if e := w.provider.admit_detached(world_external_bytes(l) + WORLD_NETWORK_BYTES, w.config.reservation_bytes);
+    // This read-only operation has its own allocation budget above. It never
+    // opens/steps a working world, so requesting the command reservation here
+    // would exceed that budget even for a tiny diagnostic frame.
+    if e := w.provider.admit_detached(world_external_bytes(l) + WORLD_NETWORK_BYTES, 0);
        e != .Ok {
         return e
     }

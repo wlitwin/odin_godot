@@ -9,4 +9,7 @@ set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
 "${ODIN:-odin}" test "$ROOT/tests/kitnet" -collection:godot="$ROOT"
+cache_test="$(mktemp -d)"
+trap 'rm -rf "$cache_test"' EXIT
+"${ODIN:-odin}" test "$ROOT/tests/kitnet/cache" -collection:godot="$ROOT" -out:"$cache_test/cache.test"
 echo "KITNET_OK"

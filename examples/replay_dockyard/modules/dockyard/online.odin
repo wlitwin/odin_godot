@@ -156,7 +156,7 @@ online_init :: proc(self: ^DockyardDuo) -> bool {
     return true
 }
 
-@(gd_method = "borrowed_args")
+@(gd_method)
 dockyard_duo_party :: proc(self: ^DockyardDuo, action, name, invite: string) -> bool {
     temp := runtime.default_temp_allocator_temp_begin()
     defer runtime.default_temp_allocator_temp_end(temp)

@@ -13,6 +13,7 @@ MethodValues :: struct {
     title:    gd.String `gd:"export,get=method_values_title"`,
     payload:  gd.Array `gd:"export,get=method_values_get_payload"`,
     incoming: gd.Array `gd:"export,set=method_values_set_incoming"`,
+    plain_incoming: gd.Array `gd:"export,set=method_values_set_plain_incoming"`,
 }
 
 // Explicit ownership is opt-in so existing borrowed returns remain valid.
@@ -56,17 +57,27 @@ method_values_last_id :: proc(self: ^MethodValues) -> gd.Int {
     return self.last
 }
 
-@(gd_method = "borrowed_args")
+@(gd_method)
 method_values_borrowed_input :: proc(self: ^MethodValues, value: gd.Array) -> gd.Int {
     value := value
     return gd.array_size(&value)
 }
 
+// Untyped signals preserve the engine value and release the trampoline's copy.
 @(gd_method)
-method_values_legacy_owned_input :: proc(self: ^MethodValues, value: gd.Array) -> gd.Int {
+method_values_variant_input :: proc(self: ^MethodValues, value: gd.Variant) -> gd.Int {
     value := value
-    defer gd.free_array(value)
-    return gd.array_size(&value)
+    if value.type == .Array {
+        array := gd.variant_to_array(&value)
+        defer gd.free_array(array)
+        return gd.array_size(&array)
+    }
+    return gd.Int(value.type)
+}
+
+@(gd_method)
+method_values_echo_array :: proc(self: ^MethodValues, value: gd.Array) -> gd.Array {
+    return value
 }
 
 new_payload :: proc(self: ^MethodValues) -> gd.Array {
@@ -104,11 +115,18 @@ method_values_get_payload :: proc(self: ^MethodValues) -> gd.Array {
     return new_payload(self)
 }
 
-@(gd_method = "borrowed_args")
+@(gd_method)
 method_values_set_incoming :: proc(self: ^MethodValues, value: gd.Array) {
     copy := gd.new_array_array(value)
     gd.free_array(self.incoming)
     self.incoming = copy
+}
+
+// A property-only setter has the same borrowed input lifetime as a method.
+method_values_set_plain_incoming :: proc(self: ^MethodValues, value: gd.Array) {
+    copy := gd.new_array_array(value)
+    gd.free_array(self.plain_incoming)
+    self.plain_incoming = copy
 }
 
 @(gd_method = "owned_return")
@@ -134,7 +152,7 @@ method_values_new_dictionary :: proc(self: ^MethodValues) -> gd.Dictionary {
     return data
 }
 
-@(gd_method = "borrowed_args,owned_return")
+@(gd_method = "owned_return")
 method_values_clone_text :: proc(self: ^MethodValues, value: gd.String) -> gd.String {
     return gd.new_string_string(value)
 }

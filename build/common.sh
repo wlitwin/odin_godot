@@ -12,6 +12,39 @@
 # on `odin` being on the editor's PATH when launched from Finder/Steam) can pass it
 # through as `ODIN=/abs/path/to/odin`.
 ODIN="${ODIN:-odin}"
+_ODIN_GD_BUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# A successful project build remembers local tools/backends under .godot so
+# later editor/CLI/export invocations need no inherited development-shell PATH.
+odin_gd_toolchain_resolve() {
+    local project="$1" target="$2" resolved value fields=()
+    _ODIN_GD_PYTHON="${ODIN_GODOT_PYTHON:-}"
+    if [[ -z "$_ODIN_GD_PYTHON" && -f "$project/.godot/odin_godot/toolchain/python3" ]]; then
+        IFS= read -r _ODIN_GD_PYTHON < "$project/.godot/odin_godot/toolchain/python3" || true
+        [[ -x "$_ODIN_GD_PYTHON" ]] || _ODIN_GD_PYTHON=""
+    fi
+    if [[ -z "$_ODIN_GD_PYTHON" ]]; then _ODIN_GD_PYTHON="$(command -v python3 || true)"; fi
+    if [[ -z "$_ODIN_GD_PYTHON" ]]; then
+        echo "Odin setup: Python 3 was not found. Build once from the toolchain shell or set ODIN_GODOT_PYTHON." >&2
+        return 1
+    fi
+    export PATH="$(dirname "$_ODIN_GD_PYTHON"):$PATH"
+    resolved="$(ODIN="$ODIN" EMCC="${EMCC:-}" "$_ODIN_GD_PYTHON" "$_ODIN_GD_BUILD_DIR/toolchain.py" "$project" --target "$target")" || return $?
+    while IFS= read -r value; do fields+=("$value"); done <<< "$resolved"
+    ODIN="${fields[0]}"
+    if [[ -n "${fields[1]:-}" ]]; then EMCC="${fields[1]}"; fi
+    if [[ "$target" == web ]]; then
+        BOX3D_WEB_ARCHIVE="${fields[2]:-}"
+    else
+        BOX3D_NATIVE_LIBRARY="${fields[2]:-}"
+    fi
+}
+
+odin_gd_toolchain_remember() {
+    ODIN="$ODIN" EMCC="${EMCC:-}" BOX3D_NATIVE_LIBRARY="${BOX3D_NATIVE_LIBRARY:-}" \
+        BOX3D_WEB_ARCHIVE="${BOX3D_WEB_ARCHIVE:-}" \
+        "$_ODIN_GD_PYTHON" "$_ODIN_GD_BUILD_DIR/toolchain.py" "$1" --target "$2" --remember --root "$ROOT"
+}
 
 # The custom-attribute flags EVERY scripts build (native dll, wasm object, cross object)
 # needs so authors can mark procs with @(gd_method) / @(gd_connect) / @(gd_rpc) /

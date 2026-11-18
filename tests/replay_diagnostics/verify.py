@@ -29,5 +29,5 @@ assert run('cross-tick',source,spray,['--allow-different-ticks'],1)['total']>0
 run('bad-limit',source,source,['--limit','0'],2)
 bad=work/'corrupt.replay';data=bytearray(source.read_bytes());data[-1]^=1;bad.write_bytes(data)
 run('corrupt',source,bad,expected=2)
-old=root/'tests/replay_scrapyard/fixtures/protocol6/plain.replay';run('old-version',source,old,expected=2)
+old=root/'docs/replay/results/usability-legacy-2026-11-16/scrapyard/originals/scrapyard/protocol6/plain.replay';run('old-version',source,old,expected=2)
 print('REPLAY_DIAGNOSTICS_OK')

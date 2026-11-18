@@ -37,16 +37,24 @@ one shared image beside the core. All gameplay modules in the process must use
 that image. The ordinary bridge and native-free framework packages can build
 without selecting Box3D.
 
-Launch the editor with this environment so save-time builds inherit the backend
-selection. If the build reports a changed runtime, stop Godot before rebuilding
+The successful build remembers this backend selection locally for its target.
+You can reopen from Project Manager: save-time builds reuse it without needing
+`BOX3D_NATIVE_LIBRARY` in the editor's environment. Existing deployments also
+record their source backend in `box3d-runtime.json`. Keep the source library and
+adjacent build evidence available; the builder still validates them on reuse.
+If they move or are deleted, rebuild the backend and select its new path once.
+
+If the build reports a changed runtime, stop Godot before rebuilding
 with `BOX3D_REPLACE_RUNTIME=1`. Reloading scripts does not replace a native
 backend that still owns worlds or snapshots.
 
 ## Export desktop builds
 
-Use the normal [Godot export workflow](../exporting.md). Keep
-`BOX3D_NATIVE_LIBRARY` and `ODIN_GODOT_ROOT` available to the export subprocess,
-and select a backend built for the target. The export plugin deploys the backend
+Use the normal [Godot export workflow](../exporting.md). The export subprocess
+reuses the remembered tools and backend for its target. When first building a
+different target, select a backend built for that target with
+`BOX3D_NATIVE_LIBRARY`; each target's selection is kept separately.
+The export plugin deploys the backend
 beside the exported core and modules; keep these files together.
 
 The authored Kit and Replay samples provide `macOS arm64` and `Linux x86_64`
@@ -61,7 +69,8 @@ nix develop --command bash examples/box3d_offline/export_web.sh
 nix develop --command bash build/serve.sh examples/box3d_offline/out/web
 ```
 
-The browser build links the WebAssembly backend into the game's module rather
+The first browser build selects `BOX3D_WEB_ARCHIVE`; successful builds remember
+it separately from the native backends. The browser build links that backend into the game's module rather
 than loading a desktop `.dylib` or `.so`. Use the example's export helper and
 presets. A threaded browser build requires cross-origin isolation; the local
 server supplies the headers.

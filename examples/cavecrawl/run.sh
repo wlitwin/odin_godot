@@ -37,7 +37,7 @@ FSLP_DRIVER="cave_test.gd"
 FSLP_PORT_BASE=$(((RANDOM % 12000) + 50000))
 source "$ROOT/build/template/test/harness.sh"
 
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 # THE ACID CONDITION: every packet on every peer arrives 120ms late (240ms
 # round trips). Casts must still bite instantly (prediction) while confirms

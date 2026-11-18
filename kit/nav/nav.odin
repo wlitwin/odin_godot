@@ -82,6 +82,7 @@ lane_check :: proc() {
 map_2d :: proc(node: gd.Node) -> gd.Rid {
     vp := gd.node_get_viewport(node)
     world := gd.viewport_find_world_2d(vp)
+    defer gd.release_ref(world)
     return gd.world2d_get_navigation_map(world)
 }
 
@@ -89,6 +90,7 @@ map_2d :: proc(node: gd.Node) -> gd.Rid {
 map_3d :: proc(node: gd.Node) -> gd.Rid {
     vp := gd.node_get_viewport(node)
     world := gd.viewport_find_world_3d(vp)
+    defer gd.release_ref(world)
     return gd.world3d_get_navigation_map(world)
 }
 
@@ -117,6 +119,7 @@ path_2d_on :: proc(nav_map: gd.Rid, from, to: [3]f32, allocator := context.alloc
     lane_check()
     server := gd.singleton_navigation_server2d()
     pts := gd.navigation_server2d_map_get_path(server, nav_map, {from.x, from.y}, {to.x, to.y}, true, 1)
+    defer gd.free_packed_vector2_array(pts)
     n := int(gd.packed_vector2_array_size(&pts))
     out := make([][3]f32, n, allocator)
 
@@ -133,6 +136,7 @@ path_3d_on :: proc(nav_map: gd.Rid, from, to: [3]f32, allocator := context.alloc
     lane_check()
     server := gd.singleton_navigation_server3d()
     pts := gd.navigation_server3d_map_get_path(server, nav_map, {from.x, from.y, from.z}, {to.x, to.y, to.z}, true, 1)
+    defer gd.free_packed_vector3_array(pts)
     n := int(gd.packed_vector3_array_size(&pts))
     out := make([][3]f32, n, allocator)
 

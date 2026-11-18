@@ -5,9 +5,8 @@ nix develop --command bash tests/replay_comparison/run.sh
 nix develop --command bash tests/replay_comparison/firing_run.sh
 ```
 
-The harness prepares isolated original/Replay projects, applies the explicitly
-recorded baseline ownership overlay, and instruments each game's real process
-callback. It does not replace gameplay. Three paired repetitions alternate
+The harness prepares isolated Kit/Replay projects using their current lifecycle
+code and instruments each game's real process callback. It does not replace gameplay. Three paired repetitions alternate
 Kit→Replay / Replay→Kit ordering. `REPLAY_COMPARISON_DIR` chooses a fresh output
 directory; `REPLAY_COMPARISON_REPETITIONS` controls the number of pairs.
 The original sibling project is required. If it is absent, the ordinary repository

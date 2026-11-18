@@ -37,7 +37,7 @@ package kit_sim
 //
 //   history.odin    predict-subset capture/restore + the tick-indexed History
 //                   ring (client predicted states, server truth for lag comp —
-//                   play.Trail's contract, descriptor-driven)
+//                   kit/combat.Trail's contract, descriptor-driven)
 //   input.odin      the input pipeline: client ring + redundant unreliable
 //                   packets (loss story is redundancy, not retransmit) +
 //                   server per-player de-jitter buffer with hold-last

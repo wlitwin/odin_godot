@@ -43,9 +43,6 @@ Rtc_Config :: struct {
     ice_user:           rawptr,
     ice_source:         proc(user: rawptr) -> (json: string, valid: bool),
     native_extension:   bool,
-    // Retain ordered-channel credit delivery when interoperating with a relay
-    // that strips optional SDP metadata. Normal peers negotiate a separate stream.
-    legacy_control:     bool,
     resume_signaling:   bool,
     require_identity:   bool,
     // A newly provisioned guest can finish enrollment before the creator opens
@@ -95,7 +92,6 @@ Rtc_Peer :: struct {
     callbacks:                                     [2]^Rtc_Callback,
     watching:                                      [2]bool,
     local_offer, remote_set, remote_ready, failed: bool,
-    control_separate:                              bool,
     started:                                       u64,
     tx, acked, received, ack_sent:                 [2]u64,
     last_ack, last_probe:                          [2]u64,
@@ -336,11 +332,7 @@ rtc_peer_connected :: proc(peer: ^Rtc_Peer) -> bool {
         return false
     }
 
-    for channel, i in peer.channels {
-        if i == 2 && !peer.control_separate {
-            continue
-        }
-
+    for channel in peer.channels {
         if channel == nil || gd.web_rtc_data_channel_get_ready_state(channel) != .State_Open {
             return false
         }
@@ -411,10 +403,6 @@ rtc_raw_receive :: proc(user: rawptr, dst: []u8) -> tr.Received {
                     continue
                 }
 
-                if physical == 2 && !peer.control_separate {
-                    continue
-                }
-
                 dc := peer.channels[physical]
 
                 if gd.packet_peer_get_available_packet_count(dc) == 0 {
@@ -454,7 +442,7 @@ rtc_raw_receive :: proc(user: rawptr, dst: []u8) -> tr.Received {
                     break
                 }
 
-                control_path := physical == 0 || (physical == 2 && peer.control_separate)
+                control_path := physical == 2
 
                 if kind == 1 {     // Cumulative acknowledgments may arrive out of order.
                     if !control_path || len(bytes) != 16 || sequence > peer.tx[channel] {
@@ -666,7 +654,7 @@ rtc_peer_try_close :: proc(peer: ^Rtc_Peer) -> bg.Status {
 // receiver has its own finite ring; SCTP reliability alone does not protect it.
 @(private)
 rtc_packet_send :: proc(peer: ^Rtc_Peer, channel: tr.Channel, kind: u8, sequence: u64, bytes: []u8) -> bool {
-    physical := kind == 0 ? int(channel) : peer.control_separate ? 2 : 0
+    physical := kind == 0 ? int(channel) : 2
     dc := peer.channels[physical]
 
     if int(gd.web_rtc_data_channel_get_buffered_amount(dc)) + len(bytes) + 16 > 32 * 1024 {

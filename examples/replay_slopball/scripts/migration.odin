@@ -180,7 +180,6 @@ observe_physics_seed :: proc(self: ^ReplaySlopball, state: own.State(own.Pose2),
 
 @(gd_method)
 replay_slopball_set_bot :: proc(self: ^ReplaySlopball, value: gd.String) {
-    defer gd.free_string(value)
     text := gd.gd_string_to_odin(value)
     delete(self.bot)
     self.bot = strings.clone(text)
@@ -212,7 +211,6 @@ replay_slopball_solver_seed :: proc(self: ^ReplaySlopball) -> gd.String {
 
 @(gd_method)
 replay_slopball_probe :: proc(self: ^ReplaySlopball, name: gd.String) -> gd.Int {
-    defer gd.free_string(name)
     key := gd.gd_string_to_odin(name)
 
     if self.session == nil {

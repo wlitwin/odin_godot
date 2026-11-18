@@ -6,8 +6,6 @@ import net "godot:replay/net"
 import d "godot:replay/diagnostic"
 import base "godot:examples/replay_cavecrawl/shared/cave"
 import owner "godot:examples/replay_cavecrawl/shared/owner_cave"
-import upgrade "godot:examples/replay_cavecrawl/shared/upgrade"
-import owned_upgrade "godot:examples/replay_cavecrawl/shared/owner_upgrade"
 
 verify :: proc(bytes: []u8, model: net.Model($W, $C, $A, base.Event, base.SEATS), content: u64) {
     model := model
@@ -18,19 +16,25 @@ verify :: proc(bytes: []u8, model: net.Model($W, $C, $A, base.Event, base.SEATS)
     audit: r.Audit_Capture(W, net.Batch(C, A, base.SEATS), net.Net_Event(base.Event))
     defer r.audit_capture_destroy(&audit)
     assert(d.recording_verify(&archive, identity, net.recording_model(&model), &audit).error == .None)
+    r.audit_capture_destroy(&audit)
+    changed := false
+    for &event in archive.events {
+        if event.value.kind == .Gameplay && event.value.value.kind == .Hit && event.value.value.seat == 0 {
+            event.value.value.amount += 1
+            changed = true
+            break
+        }
+    }
+    assert(changed)
+    result := d.recording_verify(&archive, identity, net.recording_model(&model), &audit)
+    assert(result.error == .Replay && result.replay.error == .Diverged_Event && result.replay.tick == 2)
 }
 
 @(require) instantiate :: proc() {
-    bytes, error := upgrade.convert_archive(transmute([]u8)#load("../fixtures/c8.checkpoint"))
-    assert(error == .None)
-    resume(bytes, base.model(), base.CONTENT)
-    delete(bytes)
-    bytes, error = owned_upgrade.convert_archive(transmute([]u8)#load("../fixtures/o2.checkpoint"))
-    assert(error == .None)
-    resume(bytes, owner.model(), owner.CONTENT)
-    delete(bytes)
-    verify(transmute([]u8)#load("../fixtures/c8.rplrec"), upgrade.model8(), upgrade.CONTENT_8)
-    verify(transmute([]u8)#load("../fixtures/o2.rplrec"), owned_upgrade.model_2(), owned_upgrade.CONTENT_2)
+    resume(#load("../fixtures/current/server.checkpoint", []u8), base.model(), base.CONTENT)
+    resume(#load("../fixtures/current/owner.checkpoint", []u8), owner.model(), owner.CONTENT)
+    verify(#load("../fixtures/current/server.rplrec", []u8), base.model(), base.CONTENT)
+    verify(#load("../fixtures/current/owner.rplrec", []u8), owner.model(), owner.CONTENT)
 }
 
 resume :: proc(bytes: []u8, model: net.Model($W, $C, $A, base.Event, base.SEATS), content: u64) {

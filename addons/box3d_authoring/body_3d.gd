@@ -2,7 +2,7 @@
 class_name Box3DBody3D
 extends Node3D
 
-@export var stable_key: String = ""
+@export_storage var stable_key: String = Box3DIdentityKey.initial("body")
 @export_enum("Static","Kinematic","Dynamic") var body_type: int = 0
 @export var linear_velocity: Vector3 = Vector3.ZERO
 @export var angular_velocity: Vector3 = Vector3.ZERO
@@ -30,7 +30,7 @@ extends Node3D
 func _sensor_body() -> bool:
 	return sensor
 
-func box3d_body_definition(world: Node3D, path: String, errors: Array) -> Dictionary:
+func box3d_body_header(world: Node3D, path: String, errors: Array) -> Dictionary:
 	var d:=Box3DAuthoringData
 	d.key(stable_key,path+".stable_key",errors)
 	if body_type<0 or body_type>2:
@@ -42,6 +42,16 @@ func box3d_body_definition(world: Node3D, path: String, errors: Array) -> Dictio
 	d.scalar(safety_factor,path+".safety_factor",errors,true)
 	if motion_locks<0 or motion_locks>63:
 		d.issue(errors,path+".motion_locks","Dimension","Motion locks are six axis flags.")
+	return {"stable_key":stable_key,"body_type":kind,"pose":d.relative_pose(self,world,path,errors),
+		"linear_velocity":d.vector(linear_velocity,path+".linear_velocity",errors),"angular_velocity":d.vector(angular_velocity,path+".angular_velocity",errors),
+		"linear_damping":linear_damping,"angular_damping":angular_damping,"gravity_scale":gravity_scale,"sleep_threshold":sleep_threshold,
+		"enable_sleep":enable_sleep,"is_awake":is_awake,"is_bullet":is_bullet,"is_enabled":is_enabled,"allow_fast_rotation":allow_fast_rotation,"motion_locks":motion_locks,"safety_factor":safety_factor,
+		"disable_contact_recycling":disable_contact_recycling,"sensor":_sensor_body(),"shapes":[]}
+
+func box3d_body_definition(world: Node3D, path: String, errors: Array) -> Dictionary:
+	var definition := box3d_body_header(world, path, errors)
+	var d := Box3DAuthoringData
+	var kind: String = definition.body_type
 	var shape_data: Array = []
 	var keys: Dictionary = {}
 	if shapes.size()>d.MAX_SHAPES:
@@ -57,11 +67,8 @@ func box3d_body_definition(world: Node3D, path: String, errors: Array) -> Dictio
 		keys[shape.stable_key]=true
 		shape_data.append(shape.box3d_shape_definition(shape_path,errors,kind,_sensor_body()))
 	shape_data.sort_custom(func(a,b):return a.stable_key<b.stable_key)
-	return {"stable_key":stable_key,"body_type":kind,"pose":d.relative_pose(self,world,path,errors),
-		"linear_velocity":d.vector(linear_velocity,path+".linear_velocity",errors),"angular_velocity":d.vector(angular_velocity,path+".angular_velocity",errors),
-		"linear_damping":linear_damping,"angular_damping":angular_damping,"gravity_scale":gravity_scale,"sleep_threshold":sleep_threshold,
-		"enable_sleep":enable_sleep,"is_awake":is_awake,"is_bullet":is_bullet,"is_enabled":is_enabled,"allow_fast_rotation":allow_fast_rotation,"motion_locks":motion_locks,"safety_factor":safety_factor,
-		"disable_contact_recycling":disable_contact_recycling,"sensor":_sensor_body(),"shapes":shape_data}
+	definition.shapes = shape_data
+	return definition
 
 func _get_configuration_warnings() -> PackedStringArray:
 	var current:=get_parent()

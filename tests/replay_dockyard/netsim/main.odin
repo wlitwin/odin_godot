@@ -29,6 +29,7 @@ import "core:strconv"
 import "core:strings"
 import "core:time"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bp "godot:box3d/presentation"
 import game "godot:examples/replay_dockyard/modules/dockyard"
 import r "godot:replay"
@@ -208,7 +209,7 @@ main :: proc() {
         os.exit(1)
     }
 
-    built, problem := a.build(&baked, game.PROFILE)
+    built, problem := ar.build(&baked, game.PROFILE)
 
     if problem.error != .None {
         fmt.eprintln("definition build failed", problem.error)
@@ -680,6 +681,6 @@ main :: proc() {
     net.client_destroy(client)
     net.server_destroy(server)
     ph.network_codec_destroy(codec)
-    a.built_destroy(&built)
+    ar.built_destroy(&built)
     a.destroy(&baked)
 }

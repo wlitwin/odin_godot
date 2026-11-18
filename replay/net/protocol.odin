@@ -1,5 +1,7 @@
 package replay_net
 
+import "core:fmt"
+
 import "core:mem"
 import r "godot:replay"
 import sc "godot:replay/schema"
@@ -172,11 +174,13 @@ codecs_init :: proc(
     $Seats: int,
     allocator: mem.Allocator,
     replication: bool = false,
-) -> bool {
+) -> Setup_Report {
     public := sc.DEFAULT_OPTIONS
     public.projection = .Public
     types := [?]typeid{Hello_Packet, Reject_Packet, Request_Packet, Control, Action, Event, State}
     schemas := [?]^sc.Schema{&c.hello, &c.reject, &c.request, &c.controls, &c.action_value, &c.event_value, &c.state}
+
+    names := [?]string{"protocol.Hello", "protocol.Reject", "protocol.Request", "Control", "Action", "Event", "State"}
 
     for schema, i in schemas {
         options := sc.DEFAULT_OPTIONS
@@ -185,94 +189,172 @@ codecs_init :: proc(
             options = public
         }
 
-        if sc.init(schema, types[i], options, allocator).error != .None {
-            return false
+        if report := schema_setup(schema, types[i], names[i], options, allocator); report.error != .None {
+            return report
         }
 
         if schema.wire_size + sc.HEADER_BYTES > 65536 {
-            return false
+            return setup_problem(
+                .Invalid_Schema,
+                names[i],
+                fmt.tprintf(
+                    "wire size %d plus header %d exceeds packet limit 65536",
+                    schema.wire_size,
+                    sc.HEADER_BYTES,
+                ),
+            )
         }
     }
 
     // Pass instantiated generic types directly. This Odin toolchain emits a nil
     // typeid for a generic type expression inside a typeid array literal.
-    if replication && sc.init(&c.replica, Replica(State, Control, Seats), public, allocator).error != .None {
-        return false
+    if replication {
+        if report := schema_setup(&c.replica, Replica(State, Control, Seats), "protocol.replica", public, allocator);
+           report.error != .None {
+            return report
+        }
     }
 
-    if sc.init(&c.inputs, Inputs_Packet(Control), allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.inputs, Inputs_Packet(Control), "protocol.inputs", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.action, Action_Packet(Action), allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.action, Action_Packet(Action), "protocol.action", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.welcome, Welcome_Packet(State, Control, Seats), public, allocator).error != .None {
-        return false
+    if report := schema_setup(
+        &c.welcome,
+        Welcome_Packet(State, Control, Seats),
+        "protocol.welcome",
+        public,
+        allocator,
+    ); report.error != .None {
+        return report
     }
 
-    if sc.init(&c.snapshot, Snapshot_Packet(State, Control, Seats), public, allocator).error != .None {
-        return false
+    if report := schema_setup(
+        &c.snapshot,
+        Snapshot_Packet(State, Control, Seats),
+        "protocol.snapshot",
+        public,
+        allocator,
+    ); report.error != .None {
+        return report
     }
 
-    if sc.init(&c.facts, Facts_Packet(Event), allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.facts, Facts_Packet(Event), "protocol.facts", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.snapshot_ack, Snapshot_Ack, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.snapshot_ack, Snapshot_Ack, "protocol.snapshot_ack", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.fact_header, Facts_Header, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.fact_header, Facts_Header, "protocol.fact_header", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.occurrence, r.Occurrence(Net_Event(Event)), allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(
+        &c.occurrence,
+        r.Occurrence(Net_Event(Event)),
+        "protocol.occurrence",
+        sc.DEFAULT_OPTIONS,
+        allocator,
+    ); report.error != .None {
+        return report
     }
 
-    if sc.init(&c.removed, Removed_Packet, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.removed, Removed_Packet, "protocol.removed", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.observation, Observation_Packet(Control), allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(
+        &c.observation,
+        Observation_Packet(Control),
+        "protocol.observation",
+        sc.DEFAULT_OPTIONS,
+        allocator,
+    ); report.error != .None {
+        return report
     }
 
-    if sc.init(&c.view_stamp, View_Stamp, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.view_stamp, View_Stamp, "protocol.view_stamp", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.features, Features_Packet, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.features, Features_Packet, "protocol.features", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.snapshot_part, Snapshot_Part_Header, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(
+        &c.snapshot_part,
+        Snapshot_Part_Header,
+        "protocol.snapshot_part",
+        sc.DEFAULT_OPTIONS,
+        allocator,
+    ); report.error != .None {
+        return report
     }
 
-    if sc.init(&c.recent_facts, Recent_Facts_Header, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(
+        &c.recent_facts,
+        Recent_Facts_Header,
+        "protocol.recent_facts",
+        sc.DEFAULT_OPTIONS,
+        allocator,
+    ); report.error != .None {
+        return report
     }
 
-    if sc.init(&c.epoch_query, Epoch_Query, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(&c.epoch_query, Epoch_Query, "protocol.epoch_query", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return report
     }
 
-    if sc.init(&c.facts_request, Facts_Request, allocator = allocator).error != .None {
-        return false
+    if report := schema_setup(
+        &c.facts_request,
+        Facts_Request,
+        "protocol.facts_request",
+        sc.DEFAULT_OPTIONS,
+        allocator,
+    ); report.error != .None {
+        return report
     }
 
     packets := [?]^sc.Schema{&c.inputs, &c.action, &c.welcome, &c.snapshot, &c.facts}
 
-    for packet in packets {
+    packet_names := [?]string {
+        "protocol.inputs",
+        "protocol.action",
+        "protocol.welcome",
+        "protocol.snapshot",
+        "protocol.facts",
+    }
+
+    for packet, i in packets {
         if packet.wire_size + sc.HEADER_BYTES > 65536 {
-            return false
+            return setup_problem(
+                .Invalid_Schema,
+                packet_names[i],
+                fmt.tprintf(
+                    "wire size %d plus header %d exceeds packet limit 65536",
+                    packet.wire_size,
+                    sc.HEADER_BYTES,
+                ),
+            )
         }
     }
 
-    return true
+    return {}
 }
 
 @(private)
@@ -321,14 +403,13 @@ contract_hash :: proc(
     cfg: Config,
     seats: int,
     timing: Control_Timing = .Scheduled,
-    protocol: u64 = PROTOCOL_VERSION,
     replication: u64 = 0,
     action_timing: Action_Timing = .Scheduled,
     action_schedule: u64 = 0,
     authority_policy: u64 = 0,
 ) -> u64 {
     values := [?]u64 {
-        protocol,
+        PROTOCOL_VERSION,
         u64(seats),
         u64(cfg.hz),
         u64(cfg.require_permit),

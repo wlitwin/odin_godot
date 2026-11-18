@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:testing"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import b "godot:box3d"
 import f "godot:tests/box3d_motion/pure"
 
@@ -124,10 +125,10 @@ joint_case :: proc(t: ^testing.T, kind: string) {
         return
     }
 
-    built, pb := a.build(&baked, PROFILE)
+    built, pb := ar.build(&baked, PROFILE)
 
     defer {
-        ok(t, a.built_destroy(&built), "built drop")
+        ok(t, ar.built_destroy(&built), "built drop")
         cleanup0(t)
     }
 
@@ -253,10 +254,10 @@ complete_sorted_actual_queries_filter_self_exclusion_and_capacity :: proc(t: ^te
         return
     }
 
-    built, pb := a.build(&baked, PROFILE)
+    built, pb := ar.build(&baked, PROFILE)
 
     defer {
-        ok(t, a.built_destroy(&built), "built drop")
+        ok(t, ar.built_destroy(&built), "built drop")
         cleanup0(t)
     }
 
@@ -342,10 +343,10 @@ actual_capsule_mover_floor_wall_slide_explicit_pod_and_zero_invalid_dt :: proc(t
         return
     }
 
-    built, pb := a.build(&baked, PROFILE)
+    built, pb := ar.build(&baked, PROFILE)
 
     defer {
-        ok(t, a.built_destroy(&built), "built drop")
+        ok(t, ar.built_destroy(&built), "built drop")
         cleanup0(t)
     }
 

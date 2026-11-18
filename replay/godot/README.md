@@ -51,7 +51,7 @@ the storage package for I/O.
 Start with a zero-initialized owner and copy `SESSION_OPTIONS` for its settings;
 an empty `Session_Options{}` does not contain the network defaults. Keep the live
 owner at a stable address, usually a field on the game's Godot script. Call
-`session_close` from that script's exit lifecycle. Do not copy an open Session or
+`session_close` from its `finalize` hook or an explicit run shutdown. Do not copy an open Session or
 defer its close in `_ready`, which would close it as soon as `_ready` returns.
 
 | Task | Normal API |
@@ -59,12 +59,49 @@ defer its close in `_ready`, which would close it as soon as `_ready` returns.
 | Direct local or authoritative game | `session_open`, `session_frame`, `session_close` |
 | Submit a discrete action | `session_issue`; add [input intents](input/intents.md) when retaining and tracking a pending action |
 | Read presentation | Drain `session_changes`, then read the copied `session_state` |
+| Read presentation identity | `session_presentation` returns seat, admitted epoch/reset, roles and correction serial without copying World frames |
+| Read the latest correction | `session_correction` copies before/after frames for an exact nonzero presentation context; reads do not consume it |
 | Invitations and durable enrollment | `party_open`, `party_begin`, `party_frame`, `party_room_options`, `party_close` |
 | Coordinator-owned recovery | `room_open`, `room_frame`, `room_issue`, `room_close`; read changes/state through `room.session` |
 
 Use one Session or Room owner for a game. Room owns its Session and drives it;
 do not call `session_frame` separately on `room.session`. Party remains alive
 while Room borrows its authorization. Close Room before Party and its storage.
+
+`Presentation_Context` describes an admitted world, including a retained world
+during recovery. It does not expose an unadmitted client's epoch hint and is not
+permission to act while fenced. Compare scopes with `presentation_same_scope`;
+compare the complete context to track an unseen correction. Keep tracking per
+Session and clear it on close/reopen. Corrections are latest-only, not queued,
+and complete-physics sessions do not synthesize value-prediction corrections.
+Choose display time, smoothing discontinuities and effect-retirement policy in
+game code. See the [presentation guide](../../docs/replay/presentation.md).
+
+### Setup diagnostics
+
+When `session_open`, `session_open_complete`, or `session_resume` fails, read
+`session_setup_message(&session)` for an actionable description, or copy
+`session_setup_report(&session)` for structured handling. Schema failures keep
+their exact field path and `schema_error`; missing callbacks and configuration
+constraints identify the relevant field. Initial-state predicate failures name
+`initial.state` and the game's `state_valid` callback.
+
+The report owns bounded inline path/message buffers and needs no destruction.
+It survives partial-startup cleanup. A new attempt clears the old report,
+including on success; explicit close also clears it. `cleanup_error` indicates
+that the owner still needs its normal cleanup/retry contract. The text helper
+uses the temporary allocator by default; pass an allocator if retaining its
+formatted string. `truncated` explicitly marks an overlong diagnostic.
+
+The same report is available on `room.session` if Room's delegated Session
+startup fails. It describes local initialization, not a later remote admission
+rejection or runtime correction failure.
+
+Pure `session_options_check`, `net.config_check`, and `net.model_check` are
+available before opening a transport. Raw `net.server_init`,
+`net.server_init_complete`, `net.client_init`, `net.server_restore`, and
+`net.model_contract` accept `setup = &report` while returning their normal error
+enum. Report data is copied before temporary schema metadata is destroyed.
 
 [Editor-first authoring](scene/editor-first.md) connects ordinary scene-local scripts to
 typed display values. Replay Scrapyard demonstrates this integration with

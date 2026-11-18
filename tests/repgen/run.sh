@@ -185,7 +185,7 @@ echo "  ok  sim-command thunks, table, lane wrappers generated; knet loop skippe
 # wiring at attach, forwards declared events during pump, and delegates ordered,
 # idempotent teardown to kit/boot. The lower-level helpers above still exist.
 for needle in \
-	'board_net_attach :: proc(self: ^Board, opts: kboot.Options, net_cfg := kboot.Network_Config{})' \
+	'board_net_attach :: proc(self: ^Board, opts: kboot.Options, net_cfg := kboot.Network_Config{}) -> bool' \
 	'cfg := kboot.network_configure(&self.ses, net_cfg, kboot.Network_Capabilities{has_lane = true, all_inputs_validated = true})' \
 	'kboot.boot_attach(&self.boot, cast(gd.Node)self.owner, &self.ses, &self.comms, opts)' \
 	'board_entities(self, &self.boot)' \
@@ -211,15 +211,18 @@ CGEN="$GEN" # chest.odin rides the same consolidated artifact
 for needle in \
 	'chest_open_cmd :: proc(b: ^kboot.Boot, self: ^Chest, amount: i32) -> knet.Action_Outcome' \
 	'ctx := &b.ses.ctx' \
-	'if _ok {return knet.action_outcome(.Applied)}' \
-	'_issue := knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_OPEN)' \
+	'if _reason == .None {return knet.action_outcome(.Applied)}' \
+	'_set = _entry.set' \
+	'if _entry.entity != rawptr(self) {return knet.action_outcome(.Rejected, .Stale)}' \
+	'_reason := knet.command_execute(self, _set, u16(CHEST_CMD_OPEN), &_reader, &_env)' \
+	'_issue := knet.command_issue(ctx, self, _set, CHEST_CMD_OPEN)' \
 	'if !_issue.sent {return knet.action_outcome(.Rejected, _issue.reason)}' \
 	'if _issue.prediction_attempted && !_issue.prediction_applied {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}' \
 	'return knet.action_outcome(.Predicted, seq = u32(_issue.seq))' \
 	'chest_seal_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
-	'_issue := knet.command_issue(ctx, self, &chest_command_set, CHEST_CMD_SEAL)' \
+	'_issue := knet.command_issue(ctx, self, _set, CHEST_CMD_SEAL)' \
 	'chest_lockdown_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
-	'session_action_rejection(b.ses, self.net_id, CHEST_POLICY_LOCKDOWN)' \
+	'session_action_rejection(b.ses, _id, _command.policy)' \
 	'CHEST_POLICY_LOCKDOWN :: knet.ACTION_AUTHORITY' \
 	'action = {name = "lockdown", id = CHEST_CMD_LOCKDOWN, model = .Immediate, policy = CHEST_POLICY_LOCKDOWN' \
 	'CHEST_CMD_OPEN :: knet.Cmd_Id(0x' \
@@ -230,8 +233,8 @@ for needle in \
 	'_ok := chest_claim(self, env.by)' \
 	'chest_claim_then(self, env.by)' \
 	'chest_claim_cmd :: proc(b: ^kboot.Boot, self: ^Chest) -> knet.Action_Outcome' \
-	'_ok := chest_claim(self, ctx.me)' \
-	'chest_claim_then(self, ctx.me)' \
+	'_env := knet.Command_Env{authority = true, user = ctx.game_user, by = ctx.me}' \
+	'_reason := knet.command_execute(self, _set, u16(CHEST_CMD_CLAIM), &_reader, &_env)' \
 ; do
 	if ! grep -qF "$needle" "$CGEN"; then
 		echo "REPGEN_FAIL: coop command wrapper missing Action_Outcome artifact: $needle"
@@ -359,7 +362,8 @@ for needle in \
 	'pawn_backup_read :: proc(self: ^Pawn, r: ^knet.Reader) -> bool' \
 	'if knet.read_u32(r) != PAWN_BACKUP_VERSION {return false}' \
 	'self.save_seed = knet.read_pod(r, type_of(self.save_seed))' \
-	'k := knet.read_pod(r, knet.Net_Id)' \
+	'k := knet.read_pod(r, type_of(_pawn_backup_map_types(type_of(Pawn{}.save_seen)).key))' \
+	'e := knet.read_pod(r, intrinsics.type_elem_type(type_of(Pawn{}.save_log)))' \
 	'append(&self.save_log, e)' \
 	'return !r.err' \
 	'gd:\"backup\" fields must be POD' \
@@ -435,7 +439,7 @@ for needle in \
 	'_board_lane_validate_0 :: proc(user: rawptr, input: rawptr) -> bool' \
 	'value := cast(^Pawn_Input)input' \
 	'for &component in value.move {component = clamp(component, -1, 1)}' \
-	'if value.buttons & ~u8(0x0f) != 0 {return false}' \
+	'if value.buttons & ~type_of(value.buttons)(0x0f) != 0 {return false}' \
 	'if !ksim.input_unit(&value.look) {return false}' \
 	'if !ksim.input_finite(value.trigger) {return false}' \
 	'value.trigger = clamp(value.trigger, 0, 1)' \
@@ -705,8 +709,8 @@ for want in \
 	fi
 done
 
-# The unresolved-embed trap's import half: a struct behind a RELATIVE import
-# (scriptgen can't see inside it) must refuse, not silently drop its tags.
+# A struct behind a relative import must contribute its replicated fields.
+# Subpackage support replaces the old refusal without silently dropping tags.
 SB="$TMP/silentgear"
 mkdir -p "$SB/gear"
 cat > "$SB/gear/gear.odin" <<'EOF'
@@ -726,19 +730,17 @@ import sg "gear"
 
 SilentRobot :: struct {
 	owner: gd.Node,
-	gun:   sg.Gear, // the gun that never replicated — now a loud refusal
+	gun:   sg.Gear,
 }
 EOF
-set +e
-SB_OUT="$(run_scriptgen "$SB" 2>&1)"
-SB_RC=$?
-set -e
-if [ "$SB_RC" -eq 0 ] || ! echo "$SB_OUT" | grep -qF "cannot see inside"; then
-	echo "REPGEN_FAIL: a relative-import embed must refuse loudly (the gun that never replicated)"
-	echo "$SB_OUT" | tail -10
+run_scriptgen "$SB"
+if ! grep -qF 'offset_of(SilentRobot, gun) + offset_of(type_of(SilentRobot{}.gun), ammo)' "$SB/odin_godot_scripts.gen.odin"; then
+	echo "REPGEN_FAIL: relative-import embed lost its replicated field"
 	exit 1
 fi
-echo "  ok  silent paths closed: bare gd_connect, orphan receiver, nested profile=, unresolved using, relative-import embed"
+"$ODIN" check "$SB" -collection:godot="$ROOT" -no-entry-point \
+	${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"}
+echo "  ok  silent paths closed: invalid declarations refused; relative-import embed replicates and compiles"
 
 # The second entity's Sim_Set carries its wire class (input_class = 1); the
 # primary pawn's omits it (class 0). Both Sim_Sets ride the one artifact.
@@ -1944,7 +1946,7 @@ if [ "$DUP_RC" -eq 0 ]; then
 	echo "REPGEN_FAIL: two @(gd_sample) filling the same input class was accepted by scriptgen"
 	exit 1
 fi
-if ! echo "$DUP_OUT" | grep -q "one sample per input TYPE"; then
+if ! echo "$DUP_OUT" | grep -qF "two samples write the same resolved input type Dally_Input"; then
 	echo "REPGEN_FAIL: scriptgen error doesn't name the duplicate-sample-per-class violation:"
 	echo "$DUP_OUT" | tail -3
 	exit 1
@@ -2602,7 +2604,8 @@ Gremlin :: struct {
 gremlin_ready :: proc(self: ^Gremlin) {
 }
 EOF
-cat > "$ENT/den.odin" <<'EOF'
+sed 's/Gremlin/Imp/g; s/gremlin/imp/g' "$ENT/gremlin.odin" > "$ENT/imp.odin"
+cat > "$TMP/den.source" <<'EOF'
 //gd:extends Node2D
 //gd:class Den
 package repgen_ent
@@ -2613,31 +2616,36 @@ import knet "godot:kit/net"
 Den :: struct {
 	owner:   gd.Node2d,
 	a_scene: ^gd.Resource `gd:"entity=Gremlin:5"`,
-	b_scene: ^gd.Resource `gd:"entity=Gremlin:5"`, // duplicate wire id
-	c_scene: ^gd.Resource `gd:"entity=Ghost:9"`,   // no such struct
+	b_scene: ^gd.Resource `gd:"entity=Imp:6"`,
 }
 
 @(gd_half)
-gremlin_spawned :: proc(game: ^Den, self: ^Gremlin, id: knet.Net_Id) { // missing the owner param
+gremlin_spawned :: proc(game: ^Den, self: ^Gremlin, id: knet.Net_Id, owner: knet.Player_Id) {
 }
 
 den_ready :: proc(self: ^Den) {
 }
 EOF
-set +e
-ENT_OUT="$(run_scriptgen "$ENT" 2>&1)"
-ENT_RC=$?
-set -e
-if [ "$ENT_RC" -eq 0 ]; then
-	echo "REPGEN_FAIL: entity-table contract violations were accepted by scriptgen"
-	exit 1
-fi
-echo "$ENT_OUT" | grep -q "already claimed" \
-	|| { echo "REPGEN_FAIL: missing the duplicate-wire-id error"; echo "$ENT_OUT" | tail -4; exit 1; }
-echo "$ENT_OUT" | grep -q "no script struct named" \
-	|| { echo "REPGEN_FAIL: missing the unknown-entity-struct error"; echo "$ENT_OUT" | tail -4; exit 1; }
-echo "$ENT_OUT" | grep -q "entity hook gremlin_spawned: expected" \
-	|| { echo "REPGEN_FAIL: missing the census-hook-shape error"; echo "$ENT_OUT" | tail -4; exit 1; }
+# Resolve one invalid contract per fixture: an unknown type prevents the later
+# module binding pass, so combining failures can conceal the ID/hook checks.
+entity_reject() {
+	local output
+	if output="$(run_scriptgen "$ENT" 2>&1)"; then
+		echo "REPGEN_FAIL: entity-table contract violation accepted: $1"
+		exit 1
+	fi
+	if ! echo "$output" | grep -qF "$1"; then
+		echo "REPGEN_FAIL: missing entity-table diagnostic: $1"
+		echo "$output" | tail -6
+		exit 1
+	fi
+}
+sed 's/entity=Imp:6/entity=Imp:5/' "$TMP/den.source" > "$ENT/den.odin"
+entity_reject 'already claimed'
+sed 's/entity=Imp:6/entity=Ghost:9/' "$TMP/den.source" > "$ENT/den.odin"
+entity_reject 'no script struct named'
+sed 's/, owner: knet.Player_Id//' "$TMP/den.source" > "$ENT/den.odin"
+entity_reject 'entity hook gremlin_spawned: expected'
 echo "  ok  entity-table violations rejected: duplicate id, unknown struct, hook shape"
 
 # ---- (5e): a typo'd method NAME in boot_attach/wire_listen is a scriptgen error ----

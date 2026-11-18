@@ -11,6 +11,7 @@ import kboot "godot:kit/boot"
 import kcombat "godot:kit/combat"
 import kcomms "godot:kit/comms"
 import knet "godot:kit/net"
+import netgd "godot:kit/netgd"
 import ksave "godot:kit/save"
 import ksess "godot:kit/session"
 import kui "godot:kit/ui"
@@ -131,6 +132,16 @@ cave_lobby_on_resume :: proc(self: ^CaveLobby) {
         gd.print_str("CAVE_HOST_FAIL")
         return
     }
+
+    // The restored Session must survive this socket install. Hand its peer
+    // to Kit explicitly so finalization can close it without starting over.
+    if !netgd.transport_adopt_peer(&self.boot.wire, &netgd.ENET) {
+        gd.multiplayer_clear_peer(self.owner)
+        gd.print_str("CAVE_HOST_FAIL ownership")
+        return
+    }
+
+    kboot.boot_succ_config(&self.boot, .Native_Addr, port(), "", my_token(), my_name(self))
 
     self.cols = kcombat.combat_columns(&self.ses) // find, not redeclare
     self.slain_col = ksess.session_stat_column(&self.ses, "slain")

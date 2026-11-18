@@ -1,8 +1,31 @@
 # Getting started
 
-Install the toolchain, build the extension, add it to a Godot project, then
-write and attach an Odin script. The resulting `Node2D` prints on `_ready` and
-moves every frame.
+For a new game, install the addon in an ordinary Godot project and use the
+editor's setup and build commands. The addon supplies the extension manifest
+and prebuilt core; your game supplies the scripts.
+
+## Start with the installed addon
+
+1. [Install `addons/odin_godot/`](distribution.md#install-into-a-godot-project)
+   and the Odin compiler required by that addon. Open the project in Godot 4.7.x.
+2. Choose **Project → Tools → Set Up Odin Scripts**. This creates
+   `res://scripts/hello.odin`; an existing scripts directory is left untouched.
+3. Choose **Project → Tools → Build Odin Scripts**. If the compiler cannot be
+   found, set `odin_godot/odin_bin` to its absolute path or launch Godot from
+   your toolchain shell. See [editor settings](workflow.md#editor-settings-reference).
+4. Attach `hello.odin` to a Node and run the scene. Continue with
+   [Your first Odin scene](scripting/first-scene.md) for a moving square with an
+   Inspector-editable speed.
+
+Saving an Odin script rebuilds it automatically. **Project → Tools → Generate
+ols.json (IDE Completion)** configures supported external editors. Generated
+registration and boot files need no hand-written replacements. A standard
+installed addon resolves its own collection root without an override.
+
+## Working from a source checkout
+
+The remaining sections explain the checkout toolchain and project wiring. Use
+this path when developing the SDK or building a game against a source checkout.
 
 > **Run an existing project:** `examples/survivors/` and `tests/showcase/` are complete, working
 > projects. To run one before creating a project:
@@ -26,7 +49,7 @@ nix develop                    # drops you in the toolchain shell
 
 ```
 odin_godot dev shell  (target: Godot 4.7.1 stable)
-  odin:  /nix/store/.../odin  dev-2025-...
+  odin:  /nix/store/.../odin  dev-2026-04
   emcc:  /nix/store/.../emcc
   godot: /Applications/Godot.app/Contents/MacOS/Godot
 ```
@@ -113,8 +136,8 @@ odin_scripts_boot :: proc "c" (
 ```
 
 To customize initialization, define `odin_scripts_boot` in an authored file.
-scriptgen detects it and skips generating its own. The repository's
-`tests/`/`examples/` projects use this option with a hand-written `boot.odin`.
+scriptgen detects it and skips generating its own. Some low-level test fixtures
+use this override; ordinary games and examples use the generated boot procedure.
 
 ### 2c. Tell the editor where odin_godot lives
 

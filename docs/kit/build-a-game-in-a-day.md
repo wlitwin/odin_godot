@@ -43,14 +43,12 @@ need a separate save blob, described below.
 In `ready()`:
 
 ```odin
-my_game_net_attach(self, kboot.Options{
+if !my_game_net_attach(self, kboot.Options{
 	title    = "MY GAME",
 	status   = "Host a cave, or join one at localhost",
 	msg_kind = MSG_SESSION, // MSG_SESSION :: u8(0) — all kit/session traffic under one game byte
 	env      = "MY", // MY_PORT/_NAME/_TOKEN identity + the MY_LATENCY shim
-	methods  = {"on_host", "on_join", "on_start", "on_chat",
-	            "on_packet", "on_peer_left", "on_net_up", "on_net_down"},
-}, kboot.network_profile(.Friends_Coop))
+}, kboot.network_profile(.Friends_Coop)) {return}
 ```
 
 The attach call creates the lobby title, status, player list, Host/Join/Start

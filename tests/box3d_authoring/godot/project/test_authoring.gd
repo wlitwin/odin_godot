@@ -62,6 +62,7 @@ func detached_transforms() -> bool:
 	var box:=Box3DBoxShape3D.new();box.stable_key="shape";body.shapes.append(box)
 	var definition: Dictionary = offline.box3d_definition()
 	var good: bool = not definition.is_empty() and definition.bodies[0].pose.position==[1.0,2.0,0.0]
+	good=good and definition.schema_version==2 and definition.joints.is_empty() and definition.characters.is_empty()
 	parent.scale=Vector3(2,1,1);body.scale=Vector3(0.5,1,1)
 	good=good and not offline.box3d_diagnostics().is_empty() and offline.box3d_definition_json().is_empty()
 	parent.scale=Vector3.ONE;body.scale=Vector3.ONE;body.top_level=true
@@ -73,16 +74,17 @@ func detached_transforms() -> bool:
 func asset_geometry_boundary() -> bool:
 	var offline:=Box3DWorld3D.new();offline.stable_key="asset.boundary"
 	var body:=Box3DBody3D.new();body.stable_key="body";offline.add_child(body)
-	for i in range(9):
+	var count: int=Box3DAuthoringData.MAX_ASSETS+1
+	for i in range(count):
 		var shape:=Box3DBoxShape3D.new();shape.stable_key="resource.%d"%i;body.shapes.append(shape)
 	var frontend_ok: bool = offline.box3d_diagnostics().is_empty() and not offline.box3d_definition_json().is_empty()
 	var aliases: Dictionary = extract(offline)
-	var aliases_ok: bool = frontend_ok and aliases.get("ok",false) and aliases.get("assets",0)==1 and aliases.get("shapes",0)==9 and aliases.get("bodies",0)==1
+	var aliases_ok: bool = frontend_ok and aliases.get("ok",false) and aliases.get("assets",0)==1 and aliases.get("shapes",0)==count and aliases.get("bodies",0)==1
 	var aliases_closed: bool = bool(probe.call("close"))
 	var aliases_clean: bool = bool(probe.call("clean"))
 	if not aliases_ok or not aliases_closed or not aliases_clean:
-		offline.free();fail("nine logical aliases must share one baked geometry with checked cleanup: "+JSON.stringify(aliases));return false
-	for i in range(9):
+		offline.free();fail("logical aliases must share one baked geometry with checked cleanup: "+JSON.stringify(aliases));return false
+	for i in range(count):
 		body.shapes[i].set("half_extents",Vector3(0.5+float(i)*0.125,0.5,0.5))
 	frontend_ok=offline.box3d_diagnostics().is_empty() and not offline.box3d_definition_json().is_empty()
 	var distinct: Dictionary = extract(offline)
@@ -93,7 +95,7 @@ func asset_geometry_boundary() -> bool:
 	var distinct_clean: bool = bool(probe.call("clean"))
 	offline.free()
 	if not distinct_ok or not distinct_closed or not distinct_clean:
-		fail("nine distinct geometries must reach shared assets.count Capacity with checked cleanup: "+JSON.stringify(distinct));return false
+		fail("distinct geometries above the selected capacity must reach shared assets.count with checked cleanup: "+JSON.stringify(distinct));return false
 	print("BOX3D_AUTHORING_ASSET_BOUNDARY aliases=",JSON.stringify(aliases)," distinct=",JSON.stringify(distinct)," frontend_resourcecount_not_catalog=true cleanup=0")
 	return true
 

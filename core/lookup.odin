@@ -84,7 +84,7 @@ ensure_class_set :: proc() {
 
     g_class_set = make(map[string]bool)
     g_snake_to_pascal = make(map[string]string)
-    root := godot_collection_root()
+    root := odin_collection_root()
     defer delete(root)
     dir := strings.concatenate({root, "/godot"})
     defer delete(dir)
@@ -118,7 +118,7 @@ pascal_for :: proc(snake: string) -> (string, bool) {
         return p, p != ""
     }
 
-    root := godot_collection_root()
+    root := odin_collection_root()
     defer delete(root)
     path := strings.concatenate({root, "/godot/", snake, ".gen.odin"})
     defer delete(path)
@@ -302,7 +302,7 @@ try_definition :: proc(d: ^godot.Dictionary, args: [^]gdext.TypePtr) -> bool {
     }
 
     defer delete(ols_bin)
-    root := godot_collection_root()
+    root := odin_collection_root()
     defer delete(root)
     share := resolve_odin_share()
     defer delete(share)

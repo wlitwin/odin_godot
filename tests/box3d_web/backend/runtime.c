@@ -44,8 +44,8 @@ int main(void) {
   assert(domain.pointer_bits == 32 && domain.logical_version == 4 && domain.cookie);
   uint32_t size = 0, alignment = 0, offset = 0;
   OK(ogb3_authoring_asset_layout(3, &size, &alignment, &offset));
-  assert(size == sizeof(ogb3_recovery_asset_v2));
-  assert(alignment == _Alignof(ogb3_recovery_asset_v2));
+  assert(size == sizeof(ogb3_recovery_authored_asset));
+  assert(alignment == _Alignof(ogb3_recovery_authored_asset));
   double resolution = 1e9;
   for (unsigned i = 0; i < 4096; ++i) {
     double before = emscripten_get_now(), after = emscripten_get_now();

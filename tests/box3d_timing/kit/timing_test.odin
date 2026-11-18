@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:testing"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import limits "godot:box3d/limits"
 import d "godot:box3d/diagnostics"
 import n "godot:kit/net"
@@ -63,7 +64,7 @@ setup :: proc(
     large_input := false,
 ) -> k.World_Error {
     box := &fixture.box
-    built, problem := a.build(scene, f.PROFILE)
+    built, problem := ar.build(scene, f.PROFILE)
     testing.expect_value(t, problem.error, a.Error.None)
 
     if problem.error != .None {

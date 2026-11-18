@@ -4,6 +4,7 @@ import "core:testing"
 import "core:reflect"
 import b "godot:box3d"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import ks "godot:kit/session"
 import k "godot:kit/sim"
 import kp "godot:kit/physics"
@@ -12,7 +13,7 @@ Kit :: struct {
     session:   ks.Session,
     lane:      k.Lane,
     physics:   kp.Instance(State),
-    built:     ba.Built_Scene,
+    built:     ar.Built_Scene,
     config:    b.Character_Config,
     turn_tick: u64,
     invalid:   bool,
@@ -64,7 +65,7 @@ kit_step :: proc(user: rawptr, tick: u64) {
 }
 
 kit_setup :: proc(t: ^testing.T, box: ^Kit, scene: ^ba.Baked_Scene, turn: u64, live_session := false) -> bool {
-    built, diagnostic := ba.build(scene, PROFILE)
+    built, diagnostic := ar.build(scene, PROFILE)
     testing.expect_value(t, diagnostic.error, ba.Error.None)
 
     if diagnostic.error != .None {
@@ -92,7 +93,7 @@ kit_destroy :: proc(t: ^testing.T, box: ^Kit) {
     k.lane_destroy(&box.lane)
     testing.expect_value(t, kp.detach(&box.physics), k.World_Error.Ok)
     ks.session_destroy(&box.session)
-    testing.expect_value(t, ba.built_destroy(&box.built), b.Status.Ok)
+    testing.expect_value(t, ar.built_destroy(&box.built), b.Status.Ok)
 }
 
 kit_advance :: proc(t: ^testing.T, box: ^Kit, count: int) {

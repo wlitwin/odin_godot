@@ -41,9 +41,10 @@ audio_pool_init :: proc(
     if parent == nil ||
        len(pool.world) != 0 ||
        len(pool.screen) != 0 ||
-       world_voices < 1 ||
-       screen_voices < 1 ||
-       world_voices + screen_voices > 128 {
+       world_voices < 0 ||
+       screen_voices < 0 ||
+       world_voices > 128 || screen_voices > 128 ||
+       world_voices + screen_voices < 1 || world_voices + screen_voices > 128 {
         return false
     }
 

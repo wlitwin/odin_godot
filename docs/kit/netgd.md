@@ -122,6 +122,15 @@ select a transport and call `transport_host` or `transport_join`. Use those
 generic procedures when a setting or retry policy chooses the provider at runtime;
 see [Swapping transports](#swapping-transports).
 
+When restoring a Session before opening its socket, keep that ordering: install
+the peer with `gd.host`, then call
+`transport_adopt_peer(&wire, &netgd.ENET)`. Check its boolean result. Adoption
+does not reset the Session; it gives the wire responsibility for closing that
+specific peer on detach. Close a previous owned transport before installing a
+replacement. This operation requires a synchronous peer; WebRTC uses its
+normal asynchronous transport lifecycle. A raw `wire_attach` continues to
+borrow its peer.
+
 ### Native ENet join codes
 
 Native join codes use the signaling relay as an endpoint directory. The host

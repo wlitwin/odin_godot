@@ -20,18 +20,14 @@ avatar/seat. Its authority role and possession of the relic are distinct.
 
 ## Compatibility
 
-Current content is `0x4341564552504c39`, with authority policy revision 1. C8 adds
-`authority_known` and `authority_seat` to World. The old C3–C7 world descriptor is
-frozen in the converter; C1/C2 retain their earlier descriptors.
+Current content is C9 with authority policy revision 1. World stores
+`authority_known` and `authority_seat`; adoption uses the recorded observation,
+not lobby leadership. A new host's first committed tick applies adoption.
 
-For C1–C7 imports, `tools/upgrade_save` preserves previous world/peer fields and
-seeds the new observation from the validated checkpoint header's `local_seat`.
-C8 imports already contain that observation and retain it unchanged. See the
-[current conversion guide](authoring.md#existing-replay-saves) for accepted
-formats and the command. Conversion requires a new destination; it neither
-infers authority from the party leader nor edits the old file. A new host's first resumed tick applies adoption. Network protocol
-7 and checkpoint envelope version 4 remain unchanged; the world schema and
-negotiated policy contract change explicitly.
+The retained host-carrier checkpoint uses the current schema. Its migrated frame
+and peer ledger are pinned by [the receipt](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) and exact-resume checks.
+Old source readers were retired after migration. Network protocol 7 and checkpoint
+envelope version 4 remain unchanged.
 
 ## Evidence and boundaries
 

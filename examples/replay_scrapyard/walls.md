@@ -25,13 +25,9 @@ cosmetic contacts. Scratch `wall_dropped` reports that omission to model callers
 it is not a replicated statistic. Gameplay damage and later actions retain their
 capacity. Future action event kinds must update this explicit reservation.
 
-The Wall-event addition introduced Scrapyard content `0x5253435241503045`.
-World, control, and action schemas, gameplay protocol 7, and checkpoint layout 4
-were unchanged by that transition. The explicit
-[run converter](saves.md#converting-older-replay-runs) includes content
-42/43/44/45 paths; the save guide records the current content identity.
-The content-44 fixture was captured with the actual old converter before adding
-Wall; its state and assets survive conversion and fresh-process resume.
+The retained pre-Wall capture was migrated with its state and image assets
+preserved. [Saved-fixture acceptance](saves.md#current-saved-fixtures) now resumes
+the current-format data directly, while original bytes remain historical evidence.
 
 ```sh
 nix develop --command bash examples/replay_scrapyard/walls_run.sh

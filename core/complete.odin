@@ -32,7 +32,7 @@ import "core:strings"
 OK :: i64(0)
 FAILED :: i64(1)
 
-// The godot_collection_root / resolve_bin resolvers this file used to own now live in
+// The odin_collection_root / resolve_bin resolvers this file used to own now live in
 // core/resolve.odin (shared with validate/lookup/reload/export_plugin).
 
 // Derive the Odin distribution `share` dir (holding the base/core/vendor/shared collections)
@@ -234,7 +234,7 @@ lv_complete_code :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
             godot.gd_push_warning(godot.variant_from_string(&msg))
         }
     } else if abs_path != "" {
-        root := godot_collection_root()
+        root := odin_collection_root()
         defer delete(root)
         share := resolve_odin_share()
         defer delete(share)

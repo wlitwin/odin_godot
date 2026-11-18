@@ -49,7 +49,7 @@ editor_result :: proc(
     return gd.new_string_odin(string(bytes))
 }
 
-editor_inspect_definition :: proc(definition_json: gd.String) -> gd.String {
+editor_inspect_definition :: proc(definition_json: gd.String, include_preview := true) -> gd.String {
     bytes, ok := editor_copy(definition_json, a.MAX_DEFINITION_BYTES)
 
     if !ok {
@@ -64,7 +64,26 @@ editor_inspect_definition :: proc(definition_json: gd.String) -> gd.String {
         return editor_result(nil, problem, false, false)
     }
 
-    return editor_result(&artifact, {}, false, true)
+    return editor_result(&artifact, {}, false, include_preview)
+}
+
+// A useful partial preview is not a validation/bake result.
+editor_preview_shapes :: proc(request_json: gd.String) -> gd.String {
+    bytes, ok := editor_copy(request_json, a.MAX_DEFINITION_BYTES)
+
+    if !ok {
+        return gd.new_string_odin("{\"version\":1,\"ok\":false,\"error\":\"Capacity\"}")
+    }
+
+    defer delete(bytes)
+    result := a.editor_preview_json(bytes)
+    defer delete(result)
+
+    if result == nil {
+        return gd.new_string_odin("{\"version\":1,\"ok\":false,\"error\":\"Allocation\"}")
+    }
+
+    return gd.new_string_odin(string(result))
 }
 
 editor_bake_definition :: proc(definition_json, source_uri, source_revision: gd.String) -> gd.String {

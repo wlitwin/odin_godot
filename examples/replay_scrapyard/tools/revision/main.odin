@@ -4,8 +4,8 @@ import "core:fmt"
 import "core:os"
 import e "godot:replay/evolution"
 import d "godot:replay/definitions"
-import frozen50 "../../shared/revisions/content50"
-import upgrade "../../shared/upgrade"
+import game "../../shared/game"
+import content "../../shared/content"
 
 main :: proc() {
     if len(os.args) != 2 {
@@ -15,46 +15,19 @@ main :: proc() {
 
     directory := os.args[1]
 
-    for t, i in ([2]typeid{upgrade.Catalog_49, frozen50.Catalog_50}) {
-        name := fmt.tprintf("Catalog_%d", 49 + i)
-        source, report := e.freeze(t, "scrapyard_revision_fixture", name)
-
-        if report.error != .None {
-            fail(report)
-        }
-
+    names := [4]string{"Catalog", "World", "Control", "Action"}
+    stems := [4]string{"catalog", "world", "control", "action"}
+    for t, i in ([4]typeid{content.Catalog, game.World, game.Control, game.Action}) {
+        source, report := e.freeze(t, "scrapyard_current_contract", names[i])
+        if report.error != .None {fail(report)}
         defer delete(source)
-        manifest: []u8
-        manifest, report = e.contract(t, upgrade.CONTENT_49 + u64(i))
-
-        if report.error != .None {
-            fail(report)
-        }
-
+        manifest, result := e.contract(t, i == 0 ? content.SEMANTIC : game.CONTENT)
+        if result.error != .None {fail(result)}
         defer delete(manifest)
-
-        if os.write_entire_file(fmt.tprintf("%s/catalog%d.odin", directory, 49 + i), transmute([]u8)source) != nil ||
-           os.write_entire_file(fmt.tprintf("%s/catalog%d.json", directory, 49 + i), manifest) != nil {
-            panic("write revision output")
+        if os.write_entire_file(fmt.tprintf("%s/%s.odin", directory, stems[i]), transmute([]u8)source) != nil ||
+           os.write_entire_file(fmt.tprintf("%s/%s.json", directory, stems[i]), manifest) != nil {
+            panic("write current contract")
         }
-    }
-
-    source, report := e.scaffold(
-        upgrade.Catalog_49,
-        frozen50.Catalog_50,
-        "scrapyard_revision_fixture",
-        "Catalog_49",
-        "Catalog_50",
-    )
-
-    if report.error != .None {
-        fail(report)
-    }
-
-    defer delete(source)
-
-    if os.write_entire_file(fmt.tprintf("%s/conversion.odin", directory), transmute([]u8)source) != nil {
-        panic("write conversion scaffold")
     }
 
     fmt.println("SCRAPYARD_REVISIONS_OK")

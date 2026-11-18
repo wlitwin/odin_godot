@@ -92,6 +92,7 @@ if [[ -z "$CC" || ! -x "$(command -v "$CC" 2>/dev/null || echo /nonexistent)" ]]
     exit 3   # SKIP sentinel: toolchain unavailable (gate on this, like the web tests).
 fi
 echo "build_cross.sh: $TARGET cross CC = $CC"
+if [[ "${CORE_ONLY:-0}" != 1 ]]; then odin_gd_toolchain_resolve "$PROJ" "$TARGET"; fi
 
 # ----------------------------------------------------------------------------
 # odin_obj_link <pkg_dir> <out_lib> [extra odin flags...]
@@ -178,3 +179,4 @@ echo "build_cross.sh: built"
 echo "  $CORE_OUT"
 echo "  $SCRIPTS_OUT"
 file "$CORE_OUT" "$SCRIPTS_OUT" || true
+odin_gd_toolchain_remember "$PROJ" "$TARGET"

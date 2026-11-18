@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[node name="PickupFlash" type="Node2D"]
+z_index = 5
+
+[node name="Spark" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(0,-18,5,-5,18,0,5,5,0,18,-5,5,-18,0,-5,-5)
+color = Color(1,1,1,1)

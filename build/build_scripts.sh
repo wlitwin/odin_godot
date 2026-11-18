@@ -38,6 +38,7 @@ if [[ "$ROOT" == */addons/odin_godot ]]; then
     CORE_DLL="$ROOT/bin/$CORE_PLAT/libodin_godot.$DLL_EXT"
 fi
 BOX3D_RUNTIME_DIR="$(dirname "$CORE_DLL")"
+case "$DLL_EXT" in dylib) BUILD_TARGET=macos ;; so) BUILD_TARGET=linux ;; dll) BUILD_TARGET=windows ;; esac
 
 # Actionable failure when there are no scripts to compile (the #1 first-run snag): odin_godot
 # ships the engine CORE prebuilt — your .odin gameplay scripts are YOURS and live in a
@@ -46,11 +47,20 @@ BOX3D_RUNTIME_DIR="$(dirname "$CORE_DLL")"
 if [ ! -d "$SCRIPTS" ] || [ -z "$(ls "$SCRIPTS"/*.odin 2>/dev/null)" ]; then
     echo "build_scripts: no Odin scripts found at '$SCRIPTS'." >&2
     echo "  odin_godot ships the engine core; your .odin scripts are yours and go in a" >&2
-    echo "  scripts/ folder. A scripts package also needs a boot.odin (required boilerplate)." >&2
+    echo "  scripts/ folder. Registration and boot code are generated automatically." >&2
     echo "  Quick start: copy the bundled template into place, then re-run:" >&2
-    echo "    cp -r \"$ROOT/template/scripts\" \"$PROJ/scripts\"   # boot.odin + a Hello example" >&2
+    TEMPLATE="$ROOT/template/scripts"
+    [[ -d "$TEMPLATE" ]] || TEMPLATE="$ROOT/build/template/scripts"
+    echo "    cp -r \"$TEMPLATE\" \"$PROJ/scripts\"   # Hello example" >&2
     echo "  (in the addon, the template is at addons/odin_godot/template/ — see its README.md)" >&2
     exit 1
+fi
+odin_gd_toolchain_resolve "$PROJ" "$BUILD_TARGET"
+
+# Install authoring support before compilation so a broken first script does not
+# prevent the editor from discovering its validation actions and toolchain.
+if [[ -f "$PROJ/replay_authoring.json" ]]; then
+    python3 "$ROOT/replay/editor/install.py" "$PROJ"
 fi
 
 # 1. Build the codegen preprocessor itself — to a writable TEMP dir, NOT into the addon
@@ -149,9 +159,8 @@ if [[ "$IS_MODULE_DIR" == "0" && "${BUILD_MODULES:-1}" != "0" && -d "$PROJ/modul
 fi
 
 if [[ "${SKIP_CORE:-0}" == "1" ]]; then
-    if [[ -n "${BOX3D_NATIVE_LIBRARY:-}" ]]; then
-        python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
-    fi
+    python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
+    odin_gd_toolchain_remember "$PROJ" "$BUILD_TARGET"
     echo "Built (scripts only):"
     for d in "${BUILT_DLLS[@]}"; do echo "  $d"; done
     exit 0
@@ -164,13 +173,10 @@ fi
 # dead weight there (a fixed core "didn't take" for a full debugging hour).
 # Publish the core where the manifest actually points.
 atomic_odin_dll "$ROOT/core" "$CORE_DLL" -debug
-if [[ -n "${BOX3D_NATIVE_LIBRARY:-}" ]]; then
-    python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
-fi
+python3 "$ROOT/build/box3d_profile.py" --prepare-import "$PROJ"
 
 echo "Built:"
 echo "  $CORE_DLL"
 for d in "${BUILT_DLLS[@]}"; do echo "  $d"; done
 
-# Optional Replay authoring UI; projects opt in with replay_authoring.json.
-if [[ -f "$PROJ/replay_authoring.json" ]];then python3 "$ROOT/replay/editor/install.py" "$PROJ";fi
+odin_gd_toolchain_remember "$PROJ" "$BUILD_TARGET"

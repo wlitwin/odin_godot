@@ -21,6 +21,7 @@ package hello_sim
 // ----------------------------------------------------------------------------
 
 import "core:fmt"
+import actors "actors"
 import gd "godot:godot"
 import kboot "godot:kit/boot"
 import kcomms "godot:kit/comms"
@@ -31,13 +32,13 @@ import ksim "godot:kit/sim"
 DEFAULT_PORT :: 4243
 
 HelloSim :: struct {
-    owner:        gd.Node2d,
-    ses:          ksess.Session,
-    comms:        kcomms.Comms,
-    boot:         kboot.Boot,
-    lane:         ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
-    player_scene: ^gd.Resource `gd:"entity=Player:1"`,
-    me:           ^Player,
+    owner:         gd.Node2d,
+    ses:           ksess.Session,
+    comms:         kcomms.Comms,
+    boot:          kboot.Boot,
+    lane:          ksim.Lane, // the sim lane: tick scheduling, prediction, reconcile
+    player_scene:  ^gd.Resource `gd:"entity=actors.Player:1"`,
+    diamond_scene: ^gd.Resource `gd:"entity=actors.Player:1,variant=Diamond"`,
 }
 
 now_s :: knet.now_s
@@ -56,7 +57,7 @@ hello_sim_ready :: proc(self: ^HelloSim) {
     // One generated attach owns the routine stack: boot + entity factory +
     // simulation lane. The named profile installs a coherent session+lane pair,
     // and scriptgen verifies the dedicated form has the validator below.
-    hello_sim_net_attach(
+    if !hello_sim_net_attach(
         self,
         kboot.Options {
             title       = "HELLO, SERVER AUTHORITY",
@@ -68,7 +69,9 @@ hello_sim_ready :: proc(self: ^HelloSim) {
             // were the list every game wrote anyway
         },
         kboot.network_profile(profile),
-    )
+    ) {
+        return
+    }
 
     switch role {
     case "host":
@@ -80,10 +83,6 @@ hello_sim_ready :: proc(self: ^HelloSim) {
     }
 }
 
-hello_sim_exit_tree :: proc(self: ^HelloSim) {
-    hello_sim_net_detach(self)
-    ksess.session_destroy(&self.ses)
-}
 
 hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
     was := kboot.boot_phase(&self.boot)
@@ -92,7 +91,7 @@ hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
         return
     }
 
-    // The coop hello drove `me` right here, at frame rate. Promoted, the
+    // The coop hello drove its player right here, at frame rate. Promoted, the
     // device read lives in the @(gd_sample) below and the movement in
     // player_tick — the frame loop only pumps. Declared event halves are
     // forwarded inside this generated call too.
@@ -107,7 +106,7 @@ hello_sim_process :: proc(self: ^HelloSim, delta: f64) {
 // input for tick T. The lane ships it, the server simulates it, my own
 // screen predicts it this frame.
 @(gd_sample)
-hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
+hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^actors.Player_Input) {
     _ = tick
     input^ = {}
 
@@ -205,7 +204,8 @@ spawn_player :: proc(self: ^HelloSim, pid: knet.Player_Id) {
         return
     }
 
-    p, id := player_spawn(&self.boot, owner = pid)
+    variant: Player_Variant = u64(pid) % 2 == 0 ? .Diamond : .Default
+    p, id := player_spawn(&self.boot, owner = pid, variant = variant)
     p.pid = u8(pid)
     p.x = 120 + f32(u64(pid) % 8) * 56
     p.y = 180
@@ -224,19 +224,4 @@ hello_sim_player_joined_then :: proc(self: ^HelloSim, id: knet.Player_Id, rejoin
     if self.ses.replicating && !rejoin {
         spawn_player(self, id)
     }
-}
-
-@(gd_half)
-hello_sim_entity_spawned :: proc(self: ^HelloSim, id: knet.Net_Id, type: ksess.Entity_Type, owner: knet.Player_Id) {
-    _ = type
-    _ = owner
-
-    // BORN = the fields are set: the node's FIRST placement is here — the
-    // entity's _process carries it from the next frame on (Godot runs no
-    // _process on a node added mid-_process, which every host-step spawn is).
-    if p, ok := player_of(&self.boot, id); ok {
-        gd.node2d_set_position(cast(gd.Node2d)p.owner, {p.x, p.y})
-    }
-
-    gd.set_bool(cast(gd.Object)self.boot.ui.root, "visible", false)
 }

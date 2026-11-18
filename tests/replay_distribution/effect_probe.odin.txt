@@ -1,0 +1,124 @@
+// Test-only methods copied beside the unmodified packaged starter.
+package scripts
+
+import gd "godot:godot"
+import net "godot:replay/net"
+import v "godot:replay/view"
+import scene "godot:replay/godot/scene"
+import game "../shared/game"
+
+@(gd_method)
+replay_starter_effect_probe :: proc(self: ^ReplayStarter, key: string) -> gd.Int {
+    fx := &self.effects
+    switch key {
+    case "begun":
+        return gd.Int(fx.flash.route.cues.stats.begun)
+    case "dropped":
+        return gd.Int(fx.flash.route.cues.stats.dropped)
+    case "live":
+        return gd.Int(fx.flash.views.nodes.count)
+    case "played":
+        return gd.Int(fx.sound.pool.played)
+    case "retired":
+        return gd.Int(fx.retired)
+    }
+    return -1
+}
+
+@(gd_method)
+replay_starter_effect_contract :: proc(self: ^ReplayStarter) -> bool {
+    // A separate owner exercises the starter adapter without changing gameplay
+    // or injecting fabricated notifications into its live Session.
+    test := new(ReplayStarter)
+    defer free(test)
+    fx := &test.effects
+    assert(effects_open(fx, self.owner, 1))
+    defer effects_close(fx)
+    assert(len(fx.sound.pool.world) == 0 && len(fx.sound.pool.screen) == 2)
+    world_only: scene.Audio_Pool
+    assert(!scene.audio_pool_init(&world_only, self.owner, 0, 0))
+    assert(!scene.audio_pool_init(&world_only, self.owner, -1, 2))
+    assert(scene.audio_pool_init(&world_only, self.owner, 1, 0))
+    assert(!scene.audio_play(&world_only, {stream = fx.pickup, pitch = 1}))
+    assert(scene.audio_play(&world_only, {stream = fx.pickup, pitch = 1, spatial = true}))
+    scene.audio_pool_destroy(&world_only)
+    change := v.Change(net.Net_Event(game.Event)) {
+        kind = .Begin,
+        occurrence = {id = {1, 1, 1, 1}, value = {kind = .Gameplay, value = {seat = 1}}},
+    }
+    effects_change(fx, change)
+    assert(effects_frame(fx, 0))
+    assert(fx.flash.views.nodes.count == 1 && fx.sound.pool.played == 0)
+    first := fx.flash.views.entries[0].node
+    assert(gd.node2d_get_position(first) == [2]f32{320, 180})
+    assert(effects_frame(fx, 0.1))
+    assert(gd.node2d_get_position(first).y < 180 && gd.node2d_get_scale(first).x > 1)
+    change.kind = .Cancel
+    effects_change(fx, change)
+    assert(effects_frame(fx, 0))
+    assert(fx.flash.views.nodes.count == 0 && fx.sound.pool.played == 0)
+    change.kind = .Begin
+    effects_change(fx, change)
+    assert(fx.flash.route.cues.stats.begun == 1)
+
+    change.occurrence.id.key = 2
+    effects_change(fx, change)
+    assert(effects_frame(fx, 0.1))
+    second := fx.flash.views.entries[0].node
+    age := fx.flash.route.cues.slots[0].age
+    change.kind = .Confirm
+    change.confirmed = true
+    effects_change(fx, change)
+    effects_change(fx, change)
+    assert(effects_frame(fx, 0))
+    assert(fx.flash.views.entries[0].node == second && fx.flash.route.cues.slots[0].age == age)
+    assert(fx.sound.pool.played == 1)
+    assert(effects_frame(fx, 1) && fx.flash.views.nodes.count == 0)
+    change.kind = .Begin
+    effects_change(fx, change)
+    assert(fx.flash.route.cues.stats.begun == 2 && fx.sound.pool.played == 1)
+
+    // Delayed notifications must stay eligible until every delivery queue is
+    // drained. The client's frontier is the lower of confirmed and watched.
+    s := &test.session
+    s.client.has_world = true
+    s.client.phase = .Running
+    s.client.cfg.epoch = 1
+    s.client.journal.confirmed = 2
+    s.client.journal.watch_tick = 1
+    s.change_count = 1
+    effects_retire(test)
+    assert(fx.retired == 0)
+    s.change_count = 0
+    pending := [1]v.Change(net.Net_Event(game.Event)){change}
+    s.reset_changes = pending[:]
+    effects_retire(test)
+    assert(fx.retired == 0)
+    s.reset_index = 1
+    s.client.journal.queue_count = 1
+    effects_retire(test)
+    assert(fx.retired == 0)
+    s.client.journal.queue_count = 0
+    effects_retire(test)
+    assert(fx.retired == 1)
+    assert(fx.flash.route.cues.ledger.floor == 1 && fx.sound.ledger.floor == 1)
+    change.occurrence.id.tick = 513 // reuses tick 1's bounded ledger bucket
+    effects_change(fx, change)
+    assert(fx.flash.route.cues.stats.begun == 3 && fx.sound.pool.played == 2)
+    assert(fx.flash.route.cues.stats.dropped == 0)
+    s.authority = true
+    s.server.cfg.epoch = 1
+    s.server.timeline.head = 513
+    effects_retire(test)
+    assert(fx.retired == 513)
+
+    // New epochs clear prior effects; stale events cannot reset presentation.
+    change.occurrence.id = {2, 1, 1, 1}
+    effects_change(fx, change)
+    assert(fx.epoch == 2 && fx.retired == 0 && fx.sound.pool.played == 3)
+    change.occurrence.id.epoch = 1
+    effects_change(fx, change)
+    assert(fx.epoch == 2 && fx.sound.pool.played == 3)
+    gd.print_str("REPLAY_STARTER_EFFECT_CONTRACT_OK cancel=true confirm_once=true retirement=true epoch=true")
+    return true
+}

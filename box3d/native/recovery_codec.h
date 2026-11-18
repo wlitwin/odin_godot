@@ -8,10 +8,7 @@ extern "C" {
 /* Solver-only canonical recovery. Game/Side/proxy
  * fields/observations/epoch/tick are composed by the sibling codecs. Exact
  * build/target/profile only. */
-#define OGB3_RECOVERY_FORMAT 1u
-/* Current motion catalogs are constructed explicitly with create_v3 from
- * authoring_catalog.h; original catalog APIs/identity1/2 remain supported. */
-#define OGB3_RECOVERY_MOTION_FORMAT 3u
+#define OGB3_RECOVERY_FORMAT 3u
 #define OGB3_RECOVERY_MAX_ASSETS OGB3_MAX_ASSETS
 #define OGB3_RECOVERY_MAX_BYTES OGB3_RECOVERY_BYTES
 #define OGB3_RECOVERY_MAX_DTO_BYTES OGB3_DTO_BYTES
@@ -25,7 +22,9 @@ enum {
 };
 /* Sorted unique nonzero IDs. Box: a=half extents,b=0,radius=0. Sphere:
  * a=center,b=0,radius>0. Capsule: a/b=endpoints,radius>0. reserved=0.
- * Catalog owns copied immutable definitions. No arbitrary geometry wire import.
+ * Catalog owns copied immutable definitions. Equivalent geometry must share one
+ * ID; aliases are rejected. Both constructors use the current recovery format
+ * and identical identities for equivalent definitions. No arbitrary geometry wire import.
  */
 typedef struct {
   uint32_t id, kind;

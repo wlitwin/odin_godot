@@ -2,7 +2,6 @@ package replay_godot_storage
 
 import a "godot:replay/assets"
 import net "godot:replay/net"
-import sc "godot:replay/schema"
 
 // The caller supplies all dependencies of the captured root, not merely visible
 // assets. The bundle is encoded completely before the staged file write begins.
@@ -66,8 +65,7 @@ checkpoint_bundle_encode :: proc(
 }
 
 // Returns owned file bytes; view borrows them. Validate application dependency
-// completeness and identity before bundle_install / session_resume. Raw legacy
-// checkpoints produce a view with no assets and must pass those same checks.
+// completeness and identity before bundle_install / session_resume.
 checkpoint_bundle_read :: proc(
     cp: ^net.Checkpoint($S, $C, $A, $N),
     model: net.Model(S, C, A, $E, N),
@@ -121,21 +119,9 @@ checkpoint_bundle_decode :: proc(
         return {}, {.Codec, .Wrong_Phase}
     }
 
-    view: a.Bundle_View
-    // Bundle headers describe an appended body; inspect only a raw checkpoint
-    // here. The bundle decoder independently validates its own header and body.
-    meta, _, inspected := sc.inspect(bytes)
-
-    if inspected.error == .None && meta.kind == net.CHECKPOINT_KIND {
-        view.meta, view.root = meta, bytes
-    } else {
-        var_view, err := a.bundle_decode(bytes, content)
-
-        if err != .None {
-            return {}, {.Codec, .Invalid_Checkpoint}
-        }
-
-        view = var_view
+    view, decoded := a.bundle_decode(bytes, content)
+    if decoded != .None {
+        return {}, {.Codec, .Invalid_Checkpoint}
     }
 
     if err := net.checkpoint_decode(cp, view.root, model, content); err != .None {

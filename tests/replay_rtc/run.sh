@@ -36,4 +36,7 @@ for _ in {1..60}; do
 done
 node "$PROJ/drive.mjs" "http://127.0.0.1:$PORT/index.html" "ws://127.0.0.1:$SIGPORT/rtc" | tee "$REPLAY_RTC_LOGS/driver.log"
 REPLAY_RTC_LOGS="$REPLAY_RTC_LOGS/game" node "$PROJ/drive.mjs" "http://127.0.0.1:$PORT/index.html" "ws://127.0.0.1:$SIGPORT/rtc" game | tee "$REPLAY_RTC_LOGS/game-driver.log"
+for mode in no_control_offer no_control_answer; do
+ REPLAY_RTC_LOGS="$REPLAY_RTC_LOGS/$mode" node "$PROJ/drive.mjs" "http://127.0.0.1:$PORT/index.html" "ws://127.0.0.1:$SIGPORT/rtc" "$mode" | tee "$REPLAY_RTC_LOGS/$mode-driver.log"
+done
 echo REPLAY_RTC_OK

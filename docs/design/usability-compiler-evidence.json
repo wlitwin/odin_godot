@@ -1,0 +1,30 @@
+{
+  "issue": "https://github.com/odin-lang/Odin/issues/6526",
+  "fix": "https://github.com/odin-lang/Odin/pull/7052",
+  "patch_commit": "ca878a1de7e90ba62d146fd091ff918b8d65e334",
+  "patch_sha256": "d1bc3d7c834d5994f8b0d8b18d29018279962f1481a4218181c1473f3abb5eaf",
+  "source_version": "dev-2026-04",
+  "final_version": "dev-2026-04-checker-fix",
+  "diagnosis": "Two actual SDK/WASM compiler failures share a semantic-checker stack through mp_get_i64 and polymorphic_assign_index. An unchanged Quickdraw input reproduced SIGSEGV under default threading. Upstream explains mutation of shared specialization state during read-only overload probes.",
+  "baseline": {
+    "default_attempts": 10,
+    "default_failures": 1,
+    "serial_checker_attempts": 10,
+    "serial_checker_failures": 0
+  },
+  "patched_normal_threading": {
+    "attempts": 28,
+    "failures": 0
+  },
+  "validation": [
+    "Same owner DLL and Quickdraw WASM inputs; four and 24 normal-threading attempts passed.",
+    "Dedicated generic-overload corpus verifies selected dimensions across 64 concrete functions; native builds/runs and WASM checks pass in four iterations.",
+    "Full scriptgen regression, current Cave/owner model tests, impact native/WASM execution and fresh owner impact resume pass.",
+    "Nix addon builds with the patched compiler. Version banner is pinned to the source plus backport label instead of build date."
+  ],
+  "local_evidence": "/tmp/odin-usability-checker-investigation-hf6kffnk",
+  "final_compiler": "/nix/store/598qs7hiyb7hcsl3dj0fyd4jn4ppi95z-odin-dev-2026-04-checker-fix/bin/odin",
+  "final_gate_log": "/tmp/odin-usability-final-compiler-validation.log",
+  "integration_log": "/tmp/odin-usability-patched-compiler-integration.log",
+  "owner_runtime_log": "/tmp/odin-usability-cave-owner-patched-compiler.log"
+}

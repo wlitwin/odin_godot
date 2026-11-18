@@ -17,7 +17,7 @@ package kit_sim
 //     server runs a transit behind, so that is the projectile's whole first
 //     round trip) from re-flying it from stale head state.
 //   * When the authority's spawn arrives (the reliable Ev_Spawned), the client
-//     MATCHES it to the oldest unmatched provisional of that (owner, type) and
+//     MATCHES it to the oldest unmatched provisional of that (owner, type, variant) and
 //     REKEYS — the same node/struct, now under the real id, its predicted
 //     flight ledger intact, a received-truth ledger opened so snapshots
 //     reconcile it from here. No second projectile, no pop.
@@ -26,7 +26,7 @@ package kit_sim
 //     keyed by the firing command's seq); one that is simply never matched —
 //     a lost fire — times out (lane_spawn_sweep). Both self-heal.
 //
-// V1 matching is FIFO per (owner, type): the authority spawns in command order,
+// Matching is FIFO per (owner, type, variant): the authority spawns in command order,
 // so its Nth projectile is the client's Nth — and a rejected fire is pruned by
 // its verdict before the match consumes it. A burst whose reject races its
 // spawns past the FIFO is the documented edge (stamp the spawn with the fire
@@ -86,6 +86,7 @@ lane_spawn_predicted :: proc(
     set: ^Sim_Set,
     owner: knet.Player_Id,
     type: ksess.Entity_Type,
+    variant := ksess.DEFAULT_SCENE_VARIANT,
     allocator := mem.Allocator{},
 ) -> knet.Net_Id {
     if lane_world_refuse(l) {
@@ -111,7 +112,7 @@ lane_spawn_predicted :: proc(
         // second one is a ghost the FIFO match can never pair: the caller must
         // hand back the existing spawn instead (lane_spawn_of_exec — the
         // boot's spawn door does).
-        _, _, exists := lane_spawn_of_exec(l)
+        _, exists := lane_spawn_of_exec(l)
         assert(
             !exists,
             "this fire already has its projectile (a reject-chain re-execution) — reuse it via lane_spawn_of_exec instead of spawning a ghost (boot_spawn_predicted does)",
@@ -140,6 +141,7 @@ lane_spawn_predicted :: proc(
             provisional = true,
             spawn_seq = l.cmd_exec_seq,
             spawn_type = type,
+            spawn_variant = variant,
         },
     )
     append(&l.entries, Entry{id = id, entity = entity, hist = hist, born = born})
@@ -156,6 +158,7 @@ lane_spawn_match :: proc(
     auth_id: knet.Net_Id,
     owner: knet.Player_Id,
     type: ksess.Entity_Type,
+    variant := ksess.DEFAULT_SCENE_VARIANT,
     allocator := mem.Allocator{},
 ) -> (
     entity: rawptr,
@@ -167,13 +170,13 @@ lane_spawn_match :: proc(
     }
 
     allocator := allocator.procedure != nil ? allocator : l.allocator // zero = the lane's (see lane_class_add)
-    // Oldest unmatched of this (owner, type) — lowest provisional id, FIFO with
+    // Oldest unmatched of this (owner, type, variant) — lowest provisional id, FIFO with
     // the authority's in-order spawns.
     best := -1
     best_id := max(u32)
 
     for &tr, i in l.tracked {
-        if !tr.provisional || tr.owner != owner || tr.spawn_type != type {
+        if !tr.provisional || tr.owner != owner || tr.spawn_type != type || tr.spawn_variant != variant {
             continue
         }
 
@@ -212,18 +215,25 @@ lane_spawn_match :: proc(
 // bodies whose projectile still flies: a caller about to spawn asks here
 // first and reuses the existing one — minting a second would be a ghost the
 // FIFO match can never pair (and the ghost would coast until the sweep).
-lane_spawn_of_exec :: proc(l: ^Lane) -> (entity: rawptr, id: knet.Net_Id, ok: bool) {
+Spawn_Ref :: struct {
+    entity:  rawptr,
+    id:      knet.Net_Id,
+    type:    ksess.Entity_Type,
+    variant: ksess.Scene_Variant,
+}
+
+lane_spawn_of_exec :: proc(l: ^Lane) -> (spawn: Spawn_Ref, ok: bool) {
     if l.cmd_exec_seq == 0 || l.ses.is_host {
-        return nil, 0, false
+        return {}, false
     }
 
     for &tr in l.tracked {
         if tr.spawn_seq == l.cmd_exec_seq {
-            return tr.entity, tr.id, true
+            return {tr.entity, tr.id, tr.spawn_type, tr.spawn_variant}, true
         }
     }
 
-    return nil, 0, false
+    return {}, false
 }
 
 // The fire the server refused: despawn the provisional it spawned (keyed by the

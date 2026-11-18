@@ -1,0 +1,39 @@
+package hello_net
+
+import gd "godot:godot"
+import kboot "godot:kit/boot"
+import ksess "godot:kit/session"
+
+// Added only to the isolated HelloNet lifecycle fixture. Observe the actual
+// generated factory and authored born hook without adding test API to the game.
+@(gd_method)
+hello_net_test_spawn_transaction :: proc(self: ^HelloNet) -> bool {
+    original, found := player_mine(&self.boot)
+    if !found {return false}
+    count := len(player_all(&self.boot))
+
+    draft, draft_id := player_spawn(&self.boot)
+    if !ksess.session_spawn_pending(&self.ses, draft_id) {return false}
+    // Creation leaves the scene defaults intact; born has not dressed it.
+    if gd.node2d_get_position(draft.owner) != (gd.Vector2{}) {return false}
+    draft.pid, draft.x, draft.y = 3, 196, 140
+    if !kboot.boot_spawn_cancel(&self.boot, draft_id) {return false}
+    if _, exists := player_of(&self.boot, draft_id); exists {return false}
+    if _, exists := kboot.boot_node(&self.boot, draft_id); exists {return false}
+    if len(player_all(&self.boot)) != count {return false}
+    if kboot.boot_spawn_cancel(&self.boot, draft_id) {return false}
+
+    player, id := player_spawn(&self.boot)
+    player.pid, player.x, player.y = 3, 196, 140
+    kboot.boot_spawn_send(&self.boot, id)
+    // No frame/process call has run: these writes must come from typed born.
+    if gd.node2d_get_position(player.owner) != (gd.Vector2{196, 140}) {return false}
+    if gd.polygon2d_get_color(player.skin) != (gd.Color{0.9, 0.4, 0.7, 1}) {return false}
+    if ksess.session_spawn_pending(&self.ses, id) {return false}
+    if kboot.boot_spawn_cancel(&self.boot, id) {return false}
+    if !player_despawn(&self.boot, id) {return false}
+    if _, exists := player_of(&self.boot, id); exists {return false}
+    if len(player_all(&self.boot)) != count {return false}
+    current, ok := player_mine(&self.boot)
+    return ok && current == original
+}

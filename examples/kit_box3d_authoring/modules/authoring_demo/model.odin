@@ -2,6 +2,7 @@ package kit_authoring_demo
 
 import b "godot:box3d"
 import p "godot:kit/physics"
+import owned "godot:kit/godot/physics"
 import k "godot:kit/sim"
 import n "godot:kit/net"
 
@@ -185,8 +186,7 @@ model_create :: proc(rt: ^Demo) -> bool {
         return false
     }
 
-    k.lane_init(&rt.lane, &rt.ses, size_of(Control), cfg = k.world_lane_config_default(), allocator = rt.allocator)
-    rt.lane_ready = true
+    if error := owned.authored_lane_init(rt); error != .Ok { fail(rt,"lane.init",error); return false }
     k.lane_set_sim(&rt.lane, rt, sample_control, model_step)
     k.lane_class_set_type(&rt.lane, 0, Control)
     k.lane_class_set_validate(&rt.lane, 0, validate_control)
@@ -227,23 +227,8 @@ model_create :: proc(rt: ^Demo) -> bool {
         return false
     }
 
-    cfg := p.sdk_context_config(rt.sdk, 0, provider = rt.owners[1], author = rt.owners[0], effects = rt.owners[0])
-    error := p.authoring_attach(&rt.physics, &rt.lane, &rt.built, initial, types[:rt.body_count], cfg, model_settle)
-
-    if error != .Ok {
-        fail(rt, "authoring_attach", error)
-        return false
-    }
-
-    if error = p.codec_init(&rt.controls, allocator = rt.allocator, ownership = rt.owners[3]); error != .Ok {
-        fail(rt, "control.codec", error)
-        return false
-    }
-
-    if error = p.codec_init(&rt.proxy_codec, &rt.descriptor, rt.allocator, ownership = rt.owners[4]); error != .Ok {
-        fail(rt, "proxy.codec", error)
-        return false
-    }
+    error := owned.authored_attach(rt,initial,types[:rt.body_count],&rt.descriptor,model_settle)
+    if error != .Ok { fail(rt,"physics.attach",error); return false }
 
     wire_fields: [35]k.World_Wire_Field
 
@@ -254,17 +239,7 @@ model_create :: proc(rt: ^Demo) -> bool {
     // Neutral prevents a missing control from turning one pulse into a new pulse.
     inputs := []k.World_Wire_Input{{0, rt.controls.value, .Neutral}}
     drivers := [2]k.World_Driver{{rt.players[0], 0}, {rt.players[1], 0}}
-    error = p.network_attach(
-        &rt.network,
-        &rt.physics,
-        &rt.built.catalog,
-        wire_fields[:rt.body_count],
-        inputs,
-        drivers[:],
-        nil,
-        rt.rules,
-        ownership = rt.owners[2],
-    )
+    error = owned.authored_network_attach(rt,wire_fields[:rt.body_count],inputs,drivers[:],nil,rt.rules)
 
     if error != .Ok {
         fail(rt, "network_attach", error)

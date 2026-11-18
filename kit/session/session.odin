@@ -192,9 +192,10 @@ Ev_Spawned :: struct {
     // are set. Clients hear it after the snapshot applies; the host at
     // session_spawn_send / session_spawn (never at spawn_make, whose entity
     // is still an empty shell awaiting the caller's fields).
-    id:    knet.Net_Id,
-    type:  Entity_Type,
-    owner: knet.Player_Id,
+    id:      knet.Net_Id,
+    type:    Entity_Type,
+    owner:   knet.Player_Id,
+    variant: Scene_Variant,
 }
 
 Ev_Resynced :: struct {
@@ -202,9 +203,10 @@ Ev_Resynced :: struct {
     // tuple applied over it (interest re-entry, a world snapshot over live
     // state, a redundant spawn). The jump is not gameplay: re-seed any
     // seen_* edge scratch here, or old wounds present as fresh hits.
-    id:    knet.Net_Id,
-    type:  Entity_Type,
-    owner: knet.Player_Id,
+    id:      knet.Net_Id,
+    type:    Entity_Type,
+    owner:   knet.Player_Id,
+    variant: Scene_Variant,
 }
 
 Ev_Despawned :: struct {
@@ -346,8 +348,13 @@ Action_Result_Cache_Entry :: struct {
 // remote peers know WHAT to create (the values come in the same message).
 Entity_Type :: distinct u16
 
+// Immutable scene choice within an entity type. Zero is the ordinary scene;
+// generated named variants have stable IDs independent of scene paths/order.
+Scene_Variant :: distinct u32
+DEFAULT_SCENE_VARIANT :: Scene_Variant(0)
+
 // Client-side: create the local counterpart of a spawned entity — instantiate
-// the node/scene for `type`, return its struct + command set. Returning nil
+// the node/scene for (type, variant), return its struct + command set. Returning nil
 // skips the entity safely (unknown type: the wire carries its length). This is
 // the one place the session CALLS INTO the game synchronously — the registry
 // needs the pointer before the snapshot can apply; react to the spawn itself
@@ -357,6 +364,7 @@ Make_Entity_Proc :: proc(
     type: Entity_Type,
     id: knet.Net_Id,
     owner: knet.Player_Id,
+    variant: Scene_Variant,
 ) -> (
     entity: rawptr,
     set: ^knet.Command_Set,
@@ -375,8 +383,8 @@ Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 // frame with the node undressed. The client path (apply_spawn_tuple) stays
 // queued on purpose: a joiner's world arrives in one packet behind its
 // WELCOME, and hearing spawns before Ev_Welcomed / mid-snapshot would be a
-// worse ordering than a same-frame batch. kboot installs this from
-// boot_entities when it holds the game's generated dispatcher.
+// worse ordering than a same-frame batch. kboot uses this to synchronize final
+// spawn ownership, then dispatch immediately or preserve the game's queue.
 Born_Proc :: proc(user: rawptr, ev: Ev_Spawned)
 
 // Host-side: called SYNCHRONOUSLY right after a client command executes (ok
@@ -421,7 +429,7 @@ SES_PING :: u8(9) // any -> any      [local_send f64]
 @(private)
 SES_PONG :: u8(10) // reply           [echoed_send][remote_time]
 @(private)
-SES_SPAWN :: u8(11) // host -> all    [type u16][id][owner][len u16][full fields]
+SES_SPAWN :: u8(11) // host -> all    [type u16][variant u32][id][owner][len u16][full fields][blob]
 @(private)
 SES_DESPAWN :: u8(12) // host -> all  [id]
 @(private)
@@ -984,6 +992,7 @@ Session_Run :: struct {
 
     // entity types
     types:                 map[knet.Net_Id]Entity_Type, // host: for (re-)announcing spawns
+    variants:              map[knet.Net_Id]Scene_Variant, // immutable scene choice, on every peer
     unsent:                map[knet.Net_Id]u64, // host: spawn_make'd, spawn_send still owed (tick-stamped)
 
     // The per-player PROFILE table (profile.odin): one POD row per seat,
@@ -1097,6 +1106,7 @@ run_destroy :: proc(run: ^Session_Run) {
     delete(run.denied)
     delete(run.clocks)
     delete(run.types)
+    delete(run.variants)
     delete(run.unsent)
 
     for n in run.stat_names {
@@ -1798,11 +1808,13 @@ session_spawn :: proc(
     entity: rawptr,
     set: ^knet.Command_Set,
     owner := knet.PLAYER_ID_INVALID,
+    variant := DEFAULT_SCENE_VARIANT,
 ) -> knet.Net_Id {
     assert(s.is_host, "only the authority spawns; clients create via the factory")
     context.allocator = ses_allocator(s) // the registry's per-entity shadows free in run_destroy — allocate them there too (a spawn from a lane tick runs under l.allocator otherwise)
     id := knet.registry_spawn(&s.reg, entity, set, owner)
     s.types[id] = type
+    s.variants[id] = variant
     apply_type_stream_hz(s, id, type)
 
     if s.replicating {
@@ -1813,7 +1825,7 @@ session_spawn :: proc(
         broadcast(s, knet.writer_bytes(&w), .Reliable)
     }
 
-    born_or_queued(s, Ev_Spawned{id = id, type = type, owner = owner}) // pre-filled entity: born now
+    born_or_queued(s, Ev_Spawned{id = id, type = type, owner = owner, variant = variant}) // pre-filled entity: born now
     return id
 }
 
@@ -1828,6 +1840,7 @@ session_spawn_make :: proc(
     s: ^Session,
     type: Entity_Type,
     owner := knet.PLAYER_ID_INVALID,
+    variant := DEFAULT_SCENE_VARIANT,
 ) -> (
     entity: rawptr,
     id: knet.Net_Id,
@@ -1837,23 +1850,32 @@ session_spawn_make :: proc(
     context.allocator = ses_allocator(s) // registry_insert's shadow/edge_shadow ride the stored allocator (see session_spawn)
     id = knet.registry_alloc_id(&s.reg)
     set: ^knet.Command_Set
-    entity, set = s.factory_make(s.factory_user, type, id, owner)
-    assert(entity != nil, "the factory returned nil for a host-side spawn")
+    entity, set = s.factory_make(s.factory_user, type, id, owner, variant)
+    if entity == nil || set == nil {
+        assert(false, fmt.tprintf("the factory rejected entity type %d scene variant %d", u16(type), u32(variant)))
+        return nil, 0
+    }
     knet.registry_insert(&s.reg, id, entity, set, owner)
     s.types[id] = type
+    s.variants[id] = variant
     apply_type_stream_hz(s, id, type)
-    // The send is OWED: a make whose send never comes is a half-spawn that
-    // exists on the host and on late joiners (SES_WORLD walks the registry)
-    // but never on already-seated peers — per-join-order worlds. net_tick
-    // asserts if this entry survives a tick boundary.
+    // The send is OWED: drafts stay local until committed. World snapshots
+    // omit them, and the network tick requires the transaction to finish
+    // before it can publish deltas, streams, or interest changes.
     s.unsent[id] = s.ticker.tick
     return
 }
 
 // Second half of session_spawn_make: announce the spawn (with the fields as
-// they stand NOW) to every seated peer.
+// they stand NOW) to every seated peer. A canceled or already committed id
+// is a no-op: a draft can be born and announced only once.
 session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
     assert(s.is_host)
+
+    if !session_spawn_pending(s, id) {
+        return
+    }
+
     context.allocator = ses_allocator(s) // the spawn pair's second half rebinds like the first
     delete_key(&s.unsent, id) // the owed send arrived
 
@@ -1870,7 +1892,7 @@ session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
         // born hook installed this fires the game's dress before this call
         // returns (no engine callback can see the authority's node undressed);
         // without one it queues for the poll like any peer's.
-        born_or_queued(s, Ev_Spawned{id = id, type = s.types[id], owner = e.owner})
+        born_or_queued(s, Ev_Spawned{id = id, type = s.types[id], owner = e.owner, variant = s.variants[id]})
     }
 }
 
@@ -1879,6 +1901,12 @@ session_spawn_send :: proc(s: ^Session, id: knet.Net_Id) {
 session_spawn_pending :: proc(s: ^Session, id: knet.Net_Id) -> bool {
     _, pending := s.unsent[id]
     return pending
+}
+
+// Read the immutable scene selection without maintaining a game-side mirror.
+session_scene_variant :: proc(s: ^Session, id: knet.Net_Id) -> (Scene_Variant, bool) {
+    _, exists := s.types[id]
+    return s.variants[id], exists
 }
 
 // TELEPORT: the OWNER of `id` declares a discontinuity in its streamed
@@ -2006,6 +2034,10 @@ session_set_owner :: proc(s: ^Session, id: knet.Net_Id, owner: knet.Player_Id) {
         return
     }
 
+    if session_spawn_pending(s, id) {
+        return // initial ownership travels with the committed spawn
+    }
+
     append(&s.events, Ev_Owner_Changed{id = id, owner = owner, prev = prev})
 
     if s.replicating {
@@ -2064,6 +2096,10 @@ session_set_blob :: proc(s: ^Session, id: knet.Net_Id, data: []u8) {
         return
     }
 
+    if session_spawn_pending(s, id) {
+        return // initial blob travels with the committed spawn
+    }
+
     append(&s.events, Ev_Blob_Changed{id = id, size = len(data)})
 
     if s.replicating {
@@ -2095,6 +2131,7 @@ session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
     assert(s.is_host)
     context.allocator = ses_allocator(s) // registry_remove frees the entry's shadow/blob/edge/ring — under the allocator that made them (see session_spawn)
     entity: rawptr
+    pending := session_spawn_pending(s, id)
 
     if e, ok := knet.registry_get(&s.reg, id); ok {
         entity = e.entity
@@ -2105,11 +2142,18 @@ session_despawn :: proc(s: ^Session, id: knet.Net_Id) {
     }
 
     delete_key(&s.types, id)
+    delete_key(&s.variants, id)
     delete_key(&s.unsent, id) // a make despawned before its send owes nothing
     interest_forget_entity(s, id)
 
     if s.factory_free != nil {
         s.factory_free(s.factory_user, id, entity)
+    }
+
+    // An unannounced draft was never born. Its factory/census still owns
+    // local cleanup, but no peer or session observer saw an entity to remove.
+    if pending {
+        return
     }
 
     append(&s.events, Ev_Despawned{id = id})
@@ -2142,7 +2186,7 @@ session_start_replicating :: proc(s: ^Session) {
     }
 }
 
-// [type][id][owner][len u16][full fields][blob_ver u32][blob_len u32][blob]
+// [type u16][variant u32][id][owner][len u16][full fields][blob_ver u32][blob_len u32][blob]
 // — both lengths make unknown types skippable whole. The blob section is why
 // entity blobs need no separate catch-up path: joins, backups, and saves all
 // serialize entities through this one tuple.
@@ -2150,6 +2194,7 @@ session_start_replicating :: proc(s: ^Session) {
 write_spawn_tuple :: proc(s: ^Session, w: ^knet.Writer, id: knet.Net_Id) {
     e, _ := knet.registry_get(&s.reg, id)
     knet.write_u16(w, u16(s.types[id]))
+    knet.write_u32(w, u32(s.variants[id]))
     knet.write_net_id(w, id)
     knet.write_player_id(w, e.owner)
     n := knet.desc_wire_size(e.set.entity_desc)
@@ -2162,25 +2207,41 @@ write_spawn_tuple :: proc(s: ^Session, w: ^knet.Writer, id: knet.Net_Id) {
     append(&w.buf, ..e.blob)
 }
 
+// World catch-up, saves and takeover snapshots share the same publication
+// boundary. A local draft is not part of the world until spawn_send commits it.
+@(private)
+write_committed_entities :: proc(s: ^Session, w: ^knet.Writer) {
+    count := 0
+
+    for id in s.types {
+        if !session_spawn_pending(s, id) {
+            count += 1
+        }
+    }
+
+    assert(count <= int(max(u16)) && count <= knet.MAX_CONTAINER_ITEMS)
+    knet.write_u16(w, u16(count))
+
+    for id in s.types {
+        if !session_spawn_pending(s, id) {
+            write_spawn_tuple(s, w, id)
+        }
+    }
+}
+
 @(private = "file")
 send_world :: proc(s: ^Session, peer: Peer_Id) {
     w := knet.writer_make()
     defer knet.writer_destroy(&w)
     knet.write_u8(&w, SES_WORLD)
-    assert(knet.registry_count(&s.reg) <= int(max(u16)))
-    assert(knet.registry_count(&s.reg) <= knet.MAX_CONTAINER_ITEMS)
-    knet.write_u16(&w, u16(knet.registry_count(&s.reg)))
-
-    for id in s.types {
-        write_spawn_tuple(s, &w, id)
-    }
-
+    write_committed_entities(s, &w)
     session_send_packet(s, peer, knet.writer_bytes(&w), .Reliable)
 }
 
 @(private)
 spawn_tuple_probe :: proc(r: ^knet.Reader) -> bool {
     _ = knet.read_u16(r) // type
+    _ = knet.read_u32(r) // scene variant
     _ = knet.read_net_id(r)
     _ = knet.read_player_id(r)
     n := int(knet.read_u16(r))
@@ -2209,6 +2270,7 @@ spawn_tuple_probe :: proc(r: ^knet.Reader) -> bool {
 @(private) // backup.odin's session_host_resume replays these too
 apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
     type := Entity_Type(knet.read_u16(r))
+    variant := Scene_Variant(knet.read_u32(r))
     id := knet.read_net_id(r)
     owner := knet.read_player_id(r)
     n := int(knet.read_u16(r))
@@ -2234,7 +2296,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
     blob := knet.reader_view(r, blob_n)
 
     if e, exists := knet.registry_get(&s.reg, id); exists {
-        if n != knet.desc_wire_size(e.set.entity_desc) {
+        if s.types[id] != type || s.variants[id] != variant || n != knet.desc_wire_size(e.set.entity_desc) {
             r.err = true
             return
         }
@@ -2247,7 +2309,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
         // not gameplay: the edge mirrors re-seed SILENTLY (no `<field>_edge`
         // fires), and any hand-rolled seen_* scratch re-seeds off this event.
         knet.registry_edges_commit(&s.reg, id)
-        append(&s.events, Ev_Resynced{id = id, type = type, owner = owner})
+        append(&s.events, Ev_Resynced{id = id, type = type, owner = owner, variant = variant})
 
         if knet.registry_apply_blob(&s.reg, id, blob_ver, blob) {
             append(&s.events, Ev_Blob_Changed{id = id, size = blob_n})
@@ -2260,7 +2322,7 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
         return
     }
 
-    entity, set := s.factory_make(s.factory_user, type, id, owner)
+    entity, set := s.factory_make(s.factory_user, type, id, owner, variant)
 
     if entity == nil || set == nil {
         return // unknown type: skipped whole, by length
@@ -2277,10 +2339,11 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 
     knet.registry_insert(&s.reg, id, entity, set, owner)
     s.types[id] = type
+    s.variants[id] = variant
     apply_type_stream_hz(s, id, type)
     knet.apply_full(&body, entity, set.entity_desc)
     knet.registry_bless(&s.reg, id) // spawn dress baseline (write guard)
-    append(&s.events, Ev_Spawned{id = id, type = type, owner = owner})
+    append(&s.events, Ev_Spawned{id = id, type = type, owner = owner, variant = variant})
 
     // Blob event AFTER Ev_Spawned: by the time the game hears about the blob,
     // the entity it decorates exists on this peer.
@@ -2293,6 +2356,22 @@ apply_spawn_tuple :: proc(s: ^Session, r: ^knet.Reader) {
 // (any base — it stamps stream rings and clock pings). Returns how many net
 // ticks fired and how many remote entities were stream-sampled this frame.
 session_tick :: proc(s: ^Session, dt: f64, now: f64) -> (ticks: int, sampled: int) {
+    // Complete local spawn transactions before pumping. A draft must not
+    // enter state/stream/interest walkers or presentation/edge callbacks.
+    // Return also protects this boundary in builds with assertions disabled.
+    for id, made in s.unsent {
+        assert(
+            false,
+            fmt.tprintf(
+                "entity %d (type %d, made at tick %d) is an unfinished spawn — send or cancel it before pumping the session",
+                u32(id),
+                u16(s.types[id]),
+                made,
+            ),
+        )
+        return 0, 0
+    }
+
     context.allocator = ses_allocator(s) // net_tick, prof/stats/backup, the registry walks, later_drain, edges — all one allocator
     s.now = now
     ticks = knet.ticker_advance(&s.ticker, dt)
@@ -2402,23 +2481,6 @@ session_run_edges :: proc(s: ^Session) {
 net_tick :: proc(s: ^Session) {
     t := s.ticker.tick
     s.ctx.now_tick = t
-
-    // The spawn pair's contract: make, set fields, SEND — same frame. An
-    // entry that survives a tick boundary is a forgotten session_spawn_send,
-    // which reads as an entity that exists for late joiners (SES_WORLD walks
-    // the registry) but never for already-seated peers. Loud beats haunted.
-    for id, made in s.unsent {
-        if t > made + 1 {
-            assert(
-                false,
-                fmt.tprintf(
-                    "entity %d (type %d) was session_spawn_make'd but never session_spawn_send'd — the pair is make, set fields, send (same frame)",
-                    u32(id),
-                    u16(s.types[id]),
-                ),
-            )
-        }
-    }
 
     if !s.is_host && !s.joined && s.join_waited >= 0 {
         s.join_waited += 1
@@ -2827,6 +2889,10 @@ session_state_hash :: proc(s: ^Session) -> u64 {
 // which is also the cheapest desync-forensics answer both games hand-rolled
 // checksums for. Record from RIGHT AFTER *_start so the welcome that seeds the
 // world is in the capture.
+RECORDING_MAGIC :: u32(0x5254494b) // "KITR"
+RECORDING_FORMAT :: u16(1)
+RECORDING_HEADER_BYTES :: 4 + 2 + 8 + 8
+
 session_record_start :: proc(s: ^Session) {
     if s.record.buf == nil {
         s.record = knet.writer_make(allocator = ses_allocator(s))
@@ -2834,6 +2900,12 @@ session_record_start :: proc(s: ^Session) {
         knet.writer_reset(&s.record)
     }
 
+    // Replay bypasses JOIN, so the recording must carry its own compatibility
+    // gate. The protocol stamp remains mandatory even with FINGERPRINT_NONE.
+    knet.write_u32(&s.record, RECORDING_MAGIC)
+    knet.write_u16(&s.record, RECORDING_FORMAT)
+    knet.write_u64(&s.record, fp_salt())
+    knet.write_u64(&s.record, wire_fingerprint(s.cfg.fingerprint))
     s.recording = true
 }
 
@@ -2856,6 +2928,13 @@ session_recording :: proc(s: ^Session) -> []u8 {
 // feeds them as fast as possible (a deterministic rebuild, not a live watch).
 session_replay :: proc(s: ^Session, recording: []u8) -> int {
     r := knet.reader_make(recording)
+    if knet.read_u32(&r) != RECORDING_MAGIC ||
+       knet.read_u16(&r) != RECORDING_FORMAT ||
+       knet.read_u64(&r) != fp_salt() ||
+       knet.read_u64(&r) != wire_fingerprint(s.cfg.fingerprint) ||
+       r.err {
+        return 0 // refuse before a historical WELCOME can seat this client
+    }
     n := 0
 
     for r.off < len(r.data) {
@@ -3407,7 +3486,7 @@ session_client_join :: proc(s: ^Session) {
 // same commit. (This log used to register the whole kit's changes: its rev 3
 // and 8 were netgd's, rev 4 was kit/sim's — a convention that held only by
 // engineers remembering a constant in a package they weren't editing.)
-PROTOCOL_REV :: u64(13) // 13: leave/bye/kick carry structured disconnect reasons
+PROTOCOL_REV :: u64(15) // 15: spawn tuples carry immutable scene variants
 
 // Wire revisions of the packages ABOVE the session (kit/sim's lane wire,
 // netgd's frame) — the session cannot import upward, so they register at
@@ -3513,8 +3592,10 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
         _ = knet.read_bool(&probe)
     }
 
-    // AOI is the one backwards-compatible optional trailing byte.
-    if probe.err || len(knet.reader_remaining(&probe)) > 1 {
+    // Check the required routing flag before committing any roster entries.
+    _ = knet.read_bool(&probe)
+
+    if probe.err || len(knet.reader_remaining(&probe)) != 0 {
         r.err = true
         return
     }
@@ -3535,13 +3616,7 @@ client_handle_welcome :: proc(s: ^Session, r: ^knet.Reader) {
 
     s.me = me
     s.ctx.me = me
-    // Interest routing (older hosts simply end the payload here: read_bool
-    // on an exhausted reader yields false — broadcast, the old behavior).
-    s.aoi_client = false
-
-    if len(knet.reader_remaining(r)) == 1 {
-        s.aoi_client = knet.read_bool(r)
-    }
+    s.aoi_client = knet.read_bool(r)
 
     s.joined = true
     s.join_waited = -1 // the join-timeout clock disarms
@@ -3765,7 +3840,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 
         count := int(knet.read_u16(r))
 
-        if !knet.reader_admit_count(r, count, 24) {
+        if !knet.reader_admit_count(r, count, 28) {
             return
         }
 
@@ -3875,6 +3950,7 @@ handle_packet_inner :: proc(s: ^Session, from_peer: Peer_Id, r: ^knet.Reader) {
 
         knet.registry_remove(&s.reg, id)
         delete_key(&s.types, id)
+        delete_key(&s.variants, id)
 
         if s.factory_free != nil {
             s.factory_free(s.factory_user, id, e.entity)

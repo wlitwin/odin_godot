@@ -6,6 +6,20 @@ import "godot:godot"
 import "core:os"
 import "core:strings"
 
+// The successful CLI/editor build records tools in ignored project-local
+// editor data. This survives reopening through Project Manager without a shell.
+@(private)
+remembered_toolchain_path :: proc(key: string, allocator := context.allocator) -> string {
+    project := reload_project_dir()
+    defer delete(project)
+    path := strings.concatenate({project, "/.godot/odin_godot/toolchain/", key}, context.temp_allocator)
+    bytes, err := os.read_entire_file(path, context.temp_allocator)
+    if err != nil {return ""}
+    value := strings.trim_suffix(string(bytes), "\n")
+    if value == "" || !os.exists(value) {return ""}
+    return strings.clone(value, allocator)
+}
+
 // ----------------------------------------------------------------------------
 // Toolchain / addon-root resolution — the ONE shared implementation used by validate,
 // complete, lookup, reload and the export plugin (they previously carried near-identical
@@ -41,9 +55,6 @@ odin_collection_root :: proc(allocator := context.allocator) -> string {
     return derive_collection_root(allocator)
 }
 
-// Historical name used by the completion/lookup glue — same resolver.
-godot_collection_root :: odin_collection_root
-
 // One-shot "couldn't find the addon root" warning guard.
 @(private = "file")
 warned_no_root: bool
@@ -72,6 +83,12 @@ derive_collection_root :: proc(allocator := context.allocator) -> string {
                 return strings.clone(up, allocator)
             }
         }
+    }
+
+    if remembered := remembered_toolchain_path("root", allocator); remembered != "" {
+        marker := strings.concatenate({remembered, "/godot"}, context.temp_allocator)
+        if os.exists(marker) {return remembered}
+        delete(remembered, allocator)
     }
 
     if !warned_no_root {
@@ -177,6 +194,9 @@ resolve_bin :: proc(setting: cstring, envvar: string, name: string, allocator :=
         }
     }
 
+    if remembered := remembered_toolchain_path(name, allocator); remembered != "" {
+        return remembered, true
+    }
     return "", false
 }
 

@@ -19,6 +19,11 @@ Range/cone checks and damage arithmetic are pure and replay-safe. The
 `Cooldowns` and ability bundles lack simulation-descriptor test coverage;
 do not put them on the simulation lane without adding that coverage.
 
+For local authority-side position history, use `kcombat.Trail(N)` with
+`trail_note(&history, tick, x, y)` and `trail_read(&history, tick)`. The read returns
+a position and whether that tick is still retained. This is derived local state;
+for lag compensation against streamed entities, use `ksess.session_rewound`.
+
 <a id="mental-model"></a>
 
 ## Replicated combat state and local projectiles

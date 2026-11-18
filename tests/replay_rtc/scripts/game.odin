@@ -20,7 +20,7 @@ ReplayRtcGame :: struct {
     started:                                    u64,
 }
 
-@(gd_method = "borrowed_args")
+@(gd_method)
 replay_rtc_game_start :: proc(self: ^ReplayRtcGame, role, url, room: gd.String) {
     a, b, c := probe_string(role), probe_string(url), probe_string(room)
     defer delete(a)

@@ -1,9 +1,9 @@
 # Starting a Replay game
 
-For the current Godot Session build, follow
-[the checkout setup](../docs/replay/godot.md) first. It includes the native
-backend required by the Session package's Box3D presentation import, even for a
-value-only model. The local Timeline remains engine-free.
+For a Godot Session, follow [the setup tutorial](../docs/replay/godot.md).
+The value-only Session starter needs no Box3D backend. Add the native backend
+only when your game uses the [Box3D physics integration](../docs/box3d/multiplayer.md).
+The local Timeline remains engine-free.
 
 Store all mutable simulation state in an Odin `World` value. Replay retains its
 history and runs the game's rules offline or under a selected multiplayer

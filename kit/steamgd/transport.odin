@@ -19,7 +19,7 @@ package kit_steamgd
 //     ksteam.invite_overlay(u64(lobby_id))
 //
 //     // on_lobby_joined(lobby_id, ...):       guest
-//     kboot.boot_open_join(&self.boot, &ksteam.TRANSPORT, endpoint_of(u64(lobby_id)), token, name)
+//     kboot.boot_open_join(&self.boot, &ksteam.TRANSPORT, endpoint_of(u64(lobby_id)), name, token)
 //
 // From there everything above the wire is the ENet path verbatim.
 
@@ -31,7 +31,7 @@ import netgd "godot:kit/netgd"
 //
 //   pump   — nothing to service. GodotSteam's peer is polled inside the
 //            engine's own multiplayer step, exactly like ENet's.
-//   close  — the peer is replaced by the next install, same as ENet; the part
+//   close  — the wire closes its owned peer, same as ENet; the part
 //            that outlives it is LOBBY MEMBERSHIP, and the lobby id belongs to
 //            the game (a signal handed it over). Call leave_lobby with it on
 //            the way back to the menu.

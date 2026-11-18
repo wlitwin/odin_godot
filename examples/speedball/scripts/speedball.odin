@@ -64,9 +64,10 @@ speedball_ready :: proc(self: ^Speedball) {
     net_cfg.lane.smooth_cut = 60
     net_cfg.lane.echo_inputs = true
     net_cfg.lane.tolerance = 0.5
+
     // (The wire-contract version gate is on by default — the generated guard
     // file registers NET_FINGERPRINT as the session default at load.)
-    speedball_net_attach(
+    if !speedball_net_attach(
         self,
         kboot.Options {
             title       = "S P E E D B A L L",
@@ -87,7 +88,9 @@ speedball_ready :: proc(self: ^Speedball) {
             },
         },
         net_cfg,
-    )
+    ) {
+        return
+    }
 
     // PREDICT-WORLD: batches echo every player's held input, every peer ticks
     // every kicker AND the ball — one timeline for the whole pitch (the
@@ -96,7 +99,7 @@ speedball_ready :: proc(self: ^Speedball) {
     // tolerance: sub-half-pixel held-input drift rides uncorrected — the
     // reconcile fires on real divergence, not float noise.
     install_controls()
-    self.bot = gd.env_string("SPB_BOT", "")
+    self.bot = gd.env_string("SPB_BOT", "", context.allocator)
     self.goals_to = u8(gd.env_int("SPB_GOALS", 3))
 
     role := gd.env_string("SPB_ROLE", "")
@@ -585,4 +588,9 @@ ball_tick_then :: proc(g: ^Speedball, self: ^Ball, by: knet.Player_Id, scored: u
     if self.score.l >= g.goals_to || self.score.r >= g.goals_to {
         self.score.won = scored
     }
+}
+
+// Game-owned state; the generated finalizer releases the standard Kit stack afterward.
+speedball_finalize :: proc(self: ^Speedball) {
+    delete(self.bot)
 }

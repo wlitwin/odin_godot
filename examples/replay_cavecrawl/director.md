@@ -35,25 +35,14 @@ unchanged by the director timing change.
 
 ## Existing saves
 
-C4 introduced the corrected director simulation. The server-motion profile uses
-content C9 (`0x4341564552504c39`), retaining the [avatar transition rules](floor-state.md)
-and [relic lifetime](relic.md). C8 introduced authority observation fields;
-network/checkpoint protocol versions are unchanged. Update both the game and
-coordinated service before opening a room. Ordinary loads require matching content.
+Current content is C9. Retained director checkpoints use the current contract,
+with live dwellers, wave/den progress and scheduled spawn/rest deadlines preserved.
+Tests verify the pending spawns at ticks 20/21 and the rest transition at 41/42.
+The current rules govern later execution; loading does not reset saved deadlines.
 
-The C1–C7 paths in `tools/upgrade_save` use frozen source descriptors and require
-a new destination. See the [current conversion guide](authoring.md#existing-replay-saves)
-for the complete accepted format list. C3 conversion retains every frame and
-session value, including live dwellers,
-current wave, den cursor, and pending spawn/rest deadlines. Once those deadlines
-are reached, subsequent spawns use the corrected cadence; a later floor starts
-from the corrected fresh-floor state. A waiting lobby starts fresh when Start is
-accepted. This does not reproduce the old timing indefinitely, convert original
-Kit saves, publish a Room save or grant a new authority lease.
-
-Tests retain real pre-change C3 waiting/pending/spawning/rest archives plus their
-producer/model hashes. All six C1/C2/C3 fixture conversions resume in fresh native
-Godot processes with exact converted-frame hashes and a newer local epoch.
+Fifteen ordinary-profile fixtures resume in fresh native Godot processes with
+exact frame hashes and a newer epoch. The [migration receipt](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) preserves
+provenance; no old schema decoder is needed by those checks.
 
 ## Comparison scope
 

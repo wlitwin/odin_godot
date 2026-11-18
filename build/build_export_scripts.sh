@@ -58,6 +58,7 @@ case "$TARGET" in
     windows) EXTRA+=(-target:windows_amd64) ;;
     *) echo "build_export_scripts.sh: unsupported target '$TARGET'" >&2; exit 2 ;;
 esac
+odin_gd_toolchain_resolve "$PROJ" "$TARGET"
 
 # HARD RULE: no imports between script modules — enforced by check_module_isolation,
 # which lives in build/common.sh (one canonical implementation, shared with the dev-loop
@@ -102,3 +103,4 @@ if [[ "${BUILD_MODULES:-1}" != "0" && -d "$PROJ/modules" ]]; then
         build_one_export_dir "$mdir" "$OUTDIR/libodinscripts_$(basename "$mdir").$TARGET_EXT"
     done
 fi
+odin_gd_toolchain_remember "$PROJ" "$TARGET"

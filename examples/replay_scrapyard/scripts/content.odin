@@ -1,10 +1,10 @@
 package replay_scrapyard
 
 import "core:fmt"
+import a "godot:authoring"
 import gd "godot:godot"
 import "defs"
 import content "../shared/content"
-import game "../shared/game"
 import d "godot:replay/definitions"
 import scenegd "godot:replay/godot/scene"
 
@@ -20,7 +20,7 @@ content_load :: proc() -> (content.Catalog, bool) {
     }
 
     ref: d.Ref
-    ref, report = scenegd.bake(&store, u8(0), game.CONTENT, content_extract)
+    ref, report = scenegd.bake(&store, u8(0), content.SEMANTIC, content_extract)
 
     if report.error != .None {
         return {}, content_report(&report)
@@ -39,104 +39,49 @@ content_error :: proc(ctx: ^scenegd.Bake_Context, path, message: string) -> cont
     return {}
 }
 
+// Each destination is part of a local candidate; no table becomes live until the
+// complete catalog passes its cross-reference/semantic validator.
+content_table :: proc(
+    $Script: typeid,
+    destination: []$Row,
+    directory: string,
+    ctx: ^scenegd.Bake_Context,
+    extract: proc(_: gd.Resource, _: ^scenegd.Bake_Context, _: string) -> (u8, Row),
+    minimum_id := 0,
+) -> u8 {
+    if ctx.report.error != .None {return 0}
+    catalog: a.Catalog(Script)
+    defer a.catalog_destroy(&catalog)
+    ctx.report = scenegd.authoring_report(a.catalog_load(&catalog, directory, len(destination), minimum_id))
+    if ctx.report.error != .None {return 0}
+    for entry in catalog.entries {
+        _, row := extract(entry.resource, ctx, entry.path)
+        if ctx.report.error != .None {return 0}
+        destination[entry.id] = row
+    }
+    return u8(catalog.high_water)
+}
+
 content_extract :: proc(_: u8, ctx: ^scenegd.Bake_Context) -> content.Catalog {
     c: content.Catalog
+    c.gun_count = content_table(defs.GunDef, c.guns[:], "res://data/guns", ctx, defs.bake_gun)
+    c.mob_count = content_table(defs.MobDef, c.mobs[:], "res://data/mobs", ctx, defs.bake_mob)
+    c.status_count = content_table(defs.StatusDef, c.statuses[:], "res://data/status", ctx, defs.bake_status, 1)
+    c.ability_count = content_table(defs.AbilityDef, c.abilities[:], "res://data/abilities", ctx, defs.bake_ability, 1)
+    if ctx.report.error != .None {return {}}
 
-    for category in ([5]string{"guns", "mobs", "status", "combos", "abilities"}) {
-        seen: [256]bool
-        batch: scenegd.Resource_Batch
-        report := scenegd.resource_batch_load(&batch, fmt.tprintf("res://data/%s", category), 256)
-
-        if report.error != .None {
-            return content_error(ctx, d.report_path(&report), d.report_message(&report))
-        }
-
-        defer scenegd.resource_batch_destroy(&batch)
-
-        for resource in batch.resources[:batch.count] {
-            resource_path := gd.resource_get_path(resource)
-            defer gd.free_string(resource_path)
-            path := gd.gd_string_to_odin(resource_path)
-
-            switch category {
-            case "guns":
-                id, value := defs.bake_gun(resource, ctx, path)
-
-                if ctx.report.error != .None {
-                    return {}
-                }
-
-                if seen[id] {
-                    return content_error(ctx, path, "duplicate gun ID")
-                }
-
-                seen[id] = true
-                c.guns[id] = value
-                c.gun_count = max(c.gun_count, id + 1)
-            case "mobs":
-                id, value := defs.bake_mob(resource, ctx, path)
-
-                if ctx.report.error != .None {
-                    return {}
-                }
-
-                if seen[id] {
-                    return content_error(ctx, path, "duplicate mob ID")
-                }
-
-                seen[id] = true
-                c.mobs[id] = value
-                c.mob_count = max(c.mob_count, id + 1)
-            case "status":
-                id, value := defs.bake_status(resource, ctx, path)
-
-                if ctx.report.error != .None {
-                    return {}
-                }
-
-                if seen[id] {
-                    return content_error(ctx, path, "duplicate status ID")
-                }
-
-                seen[id] = true
-                c.statuses[id] = value
-                c.status_count = max(c.status_count, id + 1)
-            case "combos":
-                value := defs.bake_combo(resource, ctx, path)
-
-                if ctx.report.error != .None {
-                    return {}
-                }
-
-                if c.combo_count >= content.MAX_COMBOS {
-                    return content_error(ctx, path, "too many combo definitions")
-                }
-
-                c.combos[c.combo_count] = value
-                c.combo_count += 1
-            case "abilities":
-                id, value := defs.bake_ability(resource, ctx, path)
-
-                if ctx.report.error != .None {
-                    return {}
-                }
-
-                if seen[id] {
-                    return content_error(ctx, path, "duplicate ability ID")
-                }
-
-                seen[id] = true
-                c.abilities[id] = value
-                c.ability_count = max(c.ability_count, id + 1)
-            }
-
-        }
+    combos: a.Catalog(defs.ComboDef)
+    defer a.catalog_destroy(&combos)
+    ctx.report = scenegd.authoring_report(a.catalog_load(&combos, "res://data/combos", len(c.combos), id_field = ""))
+    if ctx.report.error != .None {return {}}
+    for entry in combos.entries {
+        c.combos[entry.id] = defs.bake_combo(entry.resource, ctx, entry.path)
+        if ctx.report.error != .None {return {}}
     }
-
+    c.combo_count = u8(combos.high_water)
     if !content.valid(c) {
         return content_error(ctx, "$.catalog", "invalid catalog ranges, cross-references or combinations")
     }
-
     return c
 }
 

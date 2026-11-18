@@ -187,6 +187,7 @@ kit_init :: proc(f: ^Kit_Fixture, impulse_tick: u64 = 0, impulse: f32 = 0) -> k.
     f.impulse_tick = impulse_tick
     f.impulse = impulse
     k.lane_init(&f.lane, &f.ses, size_of(Input))
+    k.lane_class_set_type(&f.lane, 0, typeid_of(Input))
     k.lane_set_sim(&f.lane, f, kit_sample, kit_step)
     @(static) fields := [1]kn.Field_Desc {
         {offset = offset_of(Kit_Actor, pose), size = size_of(b.Pose), flags = {.Predicted}},

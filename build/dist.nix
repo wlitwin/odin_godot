@@ -65,6 +65,9 @@ stdenvNoCC.mkDerivation ({
     runHook preInstall
     A=$out/addons/odin_godot
     mkdir -p $A
+    # One active copy at the canonical resource path. The optional plugin is
+    # enabled in Project Settings; its Odin source template stays unscanned.
+    cp -r addons/box3d_authoring $out/addons/box3d_authoring
 
     # Prebuilt core dll(s).
     cp -r out/bin $A/bin
@@ -83,7 +86,7 @@ stdenvNoCC.mkDerivation ({
     # compile at the consumer's first build.
     # Kit/Replay's native-free diagnostics and capacity types also belong to the
     # Box3D collection; consumers need these sources even without a backend.
-    cp -r core godot gdext libgd runtime decl flow flowgd events kit play replay box3d $A/
+    cp -r core godot gdext libgd runtime decl flow flowgd events kit play replay box3d authoring $A/
     cp -r scriptgen $A/scriptgen
     # Only the CONSUMER-facing build scripts — not the repo's dev/test builders
     # (build_phase*.sh) or the nix package def (dist.nix), which a consumer never runs.
@@ -91,12 +94,31 @@ stdenvNoCC.mkDerivation ({
     mkdir -p $A/build
     cp build/common.sh \
        build/build_scripts.sh build/build_scripts.ps1 build/build_export_scripts.sh \
-       build/build_web.sh build/build_cross.sh build/serve.sh $A/build/
+       build/build_web.sh build/build_cross.sh build/serve.sh build/import_project.sh $A/build/
     # The editor's Project > Tools debugger items shell out to debug_game.sh, which
     # auto-imports the godot_lldb.py pretty-printers from beside itself. The .py is not
     # a `source`d .sh, so the self-guard below can't catch a miss — keep the pair here.
     cp build/debug_game.sh build/godot_lldb.py $A/build/
-    cp build/box3d_profile.py build/box3d_capacity.py build/box3d_web_link.py $A/build/
+    cp build/box3d_profile.py build/box3d_capacity.py build/box3d_web_link.py build/toolchain.py build/web_memory.py $A/build/
+    mkdir -p $A/build/patches
+    cp build/patches/odin-polymorphic-probes.patch $A/build/patches/
+
+    # A selected backend's receipt verifies these exact native producer/test
+    # inputs against the SDK. Keep the checks intact in installed projects.
+    cp build/box3d_source.py build/build_box3d.sh build/build_box3d_web.py $A/build/
+    for directory in tests/box3d_capacity/native tests/box3d_native tests/box3d_recovery \
+                     tests/box3d_modules/native tests/box3d_authoring/native \
+                     tests/box3d_motion/native tests/box3d_upgrade tests/box3d_soak/native_observe; do
+      while IFS= read -r -d "" input; do
+        mkdir -p "$A/$(dirname "$input")"
+        cp "$input" "$A/$input"
+      done < <(find "$directory" -type f '(' -name '*.c' -o -name '*.h' -o -name '*.py' -o -name 'fields.json' ')' -print0)
+    done
+    # Canonical generated default for backend-source checks. The active sibling
+    # frontend can carry a project's selected capacity profile independently.
+    mkdir -p $A/addons/box3d_authoring
+    cp addons/box3d_authoring/capacity_defaults.gd $A/addons/box3d_authoring/
+    touch $A/addons/.gdignore $A/tests/.gdignore
 
     # Self-guard: every `source .../<file>` in a shipped script must resolve inside the
     # addon — a helper added to build/ but forgotten here should fail THIS build, not a
@@ -116,6 +138,15 @@ stdenvNoCC.mkDerivation ({
     # a user can't be expected to write from scratch) + a minimal Hello example + a README.
     # A fresh addon otherwise ships no scripts, so there is nothing to build or learn from.
     cp -r build/template $A/template
+    # The first editor open precedes gameplay compilation. Include the declared
+    # dock immediately so Godot does not remove a missing plugin from settings.
+    mkdir -p $A/template/replay/addons/replay_authoring
+    cp replay/editor/plugin.cfg replay/editor/plugin.gd replay/editor/preview_controls.gd \
+       replay/editor/saved_data.gd $A/template/replay/addons/replay_authoring/
+    mkdir -p $A/template/box3d
+    cp examples/box3d_starter/README.md examples/box3d_starter/project.godot \
+       examples/box3d_starter/main.tscn examples/box3d_starter/export_presets.cfg $A/template/box3d/
+    cp -r examples/box3d_starter/scripts examples/box3d_starter/content $A/template/box3d/
 
     # Onboarding docs for someone who DOWNLOADED the addon (vs. cloned the repo): the
     # addon-root README is their entry point, and a curated docs/ set gives the full
@@ -176,7 +207,7 @@ stdenvNoCC.mkDerivation ({
     # destabilizes the editor. A `.gdignore` makes Godot skip a dir (odin's path-based
     # collection resolution is unaffected). The addon root stays scannable so Godot still
     # discovers odin_godot.gdextension.
-    for d in core godot gdext libgd runtime decl flow flowgd events kit play replay box3d scriptgen template build docs; do
+    for d in core godot gdext libgd runtime decl flow flowgd events kit play replay box3d authoring scriptgen template build docs; do
       touch "$A/$d/.gdignore"
     done
     # The raw engine inputs are gitignored (regenerated from the pinned Godot) and are NOT

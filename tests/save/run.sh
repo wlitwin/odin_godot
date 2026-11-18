@@ -7,7 +7,7 @@ source "$ROOT/tests/platform.sh"
 PROJ="$ROOT/tests/showcase"
 bash "$ROOT/build/build_scripts.sh" "$PROJ"
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 # Assert the format-on-save path only where odinfmt exists (it ships with ols; the nix
 # dev shell has it). Elsewhere the save test still covers the raw write path.
 if command -v odinfmt >/dev/null 2>&1; then

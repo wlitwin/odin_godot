@@ -4,6 +4,7 @@ import "core:mem"
 import "core:testing"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bd "godot:box3d/diagnostics"
 import ph "godot:replay/physics"
 import net "godot:replay/net"
@@ -31,8 +32,8 @@ legacy_native_producer_rejects_current_commands_before_private_table_access :: p
         return
     }
 
-    built, problem := a.build(&baked, game.PROFILE)
-    defer a.built_destroy(&built)
+    built, problem := ar.build(&baked, game.PROFILE)
+    defer ar.built_destroy(&built)
 
     if !check(t, problem.error == .None, "actual legacy producer Native world") {
         return

@@ -9,7 +9,6 @@ old=out/'kit'/'project';new=out/'replay'/'project'
 if 'kit' in implementations():
  subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/prepare_baseline.py'),str(root.parent/'scrapyard'),str(old),str(root)],check=True)
  p=old/'project.godot';s=p.read_text().replace('config/name="replay_baseline_stress_kit"','config/name="replay_baseline_stress_'+out.name+'_kit"');p.write_text(s)
- subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/baseline_cleanup.py'),str(old)],check=True)
 shutil.copytree(root/'examples/replay_scrapyard',new,ignore=shutil.ignore_patterns('.godot','bin','out','node_modules','*.gen.odin','*.uid','*.import','__pycache__'))
 p=new/'project.godot';s=p.read_text().replace('config/custom_user_dir_name="replay_scrapyard"','config/custom_user_dir_name="replay_compare_'+out.name+'"');p.write_text(s)
 if scenario in ('firing','combat'):
@@ -36,7 +35,7 @@ for project,package,typ,prefix in [(old,'scrapyard_scripts','Scrapyard','scrapya
  if key=="tick" {return gd.Int(ks.session_tick_no(&self.ses))}
  if key=="projectiles" {return self.ses.is_host ? gd.Int(len(self.flying)) : -1}
  if key=="declared" {claim:=seat_claim(self,kn.Player_Id(seat));return claim.look==0 && claim.iron==0 ? 1 : 0}
- r,ok:=runner_of(self,kn.Player_Id(seat));if !ok {return -1}
+ r,ok:=runner_owned_by(&self.boot,kn.Player_Id(seat));if !ok {return -1}
  switch key {case "spent":return gd.Int(r.weapon.spent);case "ammo":return gd.Int(r.weapon.ammo);case "mode":return gd.Int(r.weapon.mode);
  case "mag":return gd.Int(r.weapon.def.mag);case "jam":return gd.Int(r.weapon.def.jam_per_mille);case "reload":return gd.Int(r.weapon.def.reload_ticks);case "cooldown":return gd.Int(gun_row(r.gun).cooldown)}
  switch key {case "x":return gd.Int(r.x);case "y":return gd.Int(r.y);case "hp":return gd.Int(r.health.hp);case "iron":return gd.Int(r.gun);case "look":return gd.Int(r.look)}
@@ -128,7 +127,7 @@ if scenario in ('firing','combat'):
   completion={'shots_per_seat':9,'trigger_release':'at nine locally observed spent rounds; no later than sample end','minimum_reload_entries_per_seat':2,'maximum_authoritative_projectiles':4,'drain_timeout_ms':4000},
   trace_scope='per-process observations; host values authoritative, Kit client owner weapon may be predicted, Replay client uses received authority frames; projectile counts sampled on host only',
   input_barrier='both peers complete warmup before arming; local starts may differ by one process frame; ingress delay is retained',
-  baseline_overlay='ownership/lifecycle repairs plus read-only timing/probes; bolter magazine=3 and jam probability=0 in both isolated content copies')
+  baseline_overlay='read-only timing/probes; bolter magazine=3 and jam probability=0 in both isolated content copies')
 (out/'contract.json').write_text(json.dumps(contract,indent=2)+'\n')
 
 if scenario=='combat':

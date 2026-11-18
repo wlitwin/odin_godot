@@ -1,0 +1,17 @@
+{
+  "browser.rplrec.gz": {
+    "sha256": "b0f0a70f92d7a52d949cfce3ccc9ec8394499ed4aef3ef2a0c64e8d1ca3dfeb0",
+    "bytes": 5152616,
+    "source_sha256": "92fc79b4a054440c9c9b9f0c731174210dca6a74ef497ce33ea5d9aa99cbf750"
+  },
+  "client.rplrec.gz": {
+    "sha256": "ce88c70246465bb9ac071229fdba7f0b617ec5818e544bb28718259729f6f8d1",
+    "bytes": 1301033,
+    "source_sha256": "ef1a8cf605da1ead2fbf31640eec369d74592b3eea6055502a230bfb24ef526a"
+  },
+  "host.rplrec.gz": {
+    "sha256": "9a3930143f00d199b10362950fc423ec8e72ca05012647e82623ea1e500801a1",
+    "bytes": 6562999,
+    "source_sha256": "b6828b3d73952ae9b37ecbef041a017c51e87ae0c156a70e814009e57eea5d07"
+  }
+}

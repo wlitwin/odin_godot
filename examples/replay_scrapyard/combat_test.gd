@@ -39,7 +39,7 @@ func iron_for(player: int) -> int:
 	return 2 if player == 1 else 1
 
 func p(field: String, player: int = 1) -> int:
-	return game.probe(field, player) if game!=null else 0
+	return game.probe(field, player) if is_instance_valid(game) else 0
 
 func write(name: String, value: Dictionary) -> void:
 	if name.begins_with("stopped-"): value["after"] = p("head")
@@ -58,8 +58,8 @@ func read(name: String) -> Dictionary:
 func fail(message: String) -> bool:
 	print("RSY_COMBAT_FAIL role=", mode, " phase=", phase, " ", message, " mobs=", p("mobs"), " kills=", p("kills", 1), "/", p("kills", 2), " hp=", p("hp", 1), "/", p("hp", 2), " scrap=", p("scrap", 1), "/", p("scrap", 2))
 	print("RSY_NETWORK phase=", p("phase"), " resyncs=", p("resyncs"), " reason=", p("resync_reason"), " large=", p("large_snapshots"), " deferred=", p("egress_deferred"), " tx=", p("tx_bytes"), " rx=", p("rx_bytes"))
-	quit(1)
-	return true
+	finish_game(1)
+	return false
 
 func capture_scene(path: String) -> void:
 	await RenderingServer.frame_post_draw
@@ -75,7 +75,8 @@ func living_enemy_on_screen() -> bool:
 func finish_game(code:int):
 	if closing:return
 	closing=true
-	if game!=null:game.queue_free();game=null
+	if is_instance_valid(game):game.queue_free()
+	game=null
 	await process_frame;await process_frame
 	var deadline:=Time.get_ticks_msec()+2000
 	while int(Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT))>resource_floor and Time.get_ticks_msec()<deadline:await process_frame

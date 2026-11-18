@@ -112,13 +112,14 @@ def query_domain(path):
     require(ctypes.sizeof(Domain) == 104 and domain.size == 104,
             "native domain contract layout differs from the SDK")
     require(domain.cookie != 0 and (domain.version, domain.abi_version,
-            domain.logical_version, domain.resource_version, domain.recovery_version) == (1, 2, 4, 2, 1),
+            domain.logical_version, domain.resource_version, domain.recovery_version) == (1, 2, 4, 2, 3),
             "native domain/API/logical/resource/recovery versions differ from the SDK")
     require(domain.pointer_bits == ctypes.sizeof(ctypes.c_void_p) * 8 and domain.endian == 1,
             "native pointer width or byte order differs from the SDK process")
     # The cookie is process-local. Never persist it as build or network identity.
     return {"build": bytes(domain.build).hex(), "target": bytes(domain.target).hex(),
-            "versions": [1, 1, 4, 2, 1], "pointer_bits": domain.pointer_bits, "endian": domain.endian}
+            "versions": [domain.version, domain.abi_version, domain.logical_version,
+                         domain.resource_version, domain.recovery_version], "pointer_bits": domain.pointer_bits, "endian": domain.endian}
 
 
 def native_test_evidence(source, manifest):
@@ -212,7 +213,7 @@ def native_input(source, repo, target):
     require(len(fields) > 6 and fields[0] == "ogb3-native-target-v1" and fields[4] == expected_system,
             "native input target does not match the requested SDK target")
     info = {"build": build, "target": target_hash,
-            "versions": [1, 1, 4, 2, 1], "pointer_bits": int(fields[6]) * 8, "endian": 1}
+            "versions": [1, 2, 4, 2, 3], "pointer_bits": int(fields[6]) * 8, "endian": 1}
     native_query = target == current_target() and fields[5].lower() in {
         platform.machine().lower(), "amd64" if platform.machine().lower() == "x86_64" else platform.machine().lower()
     }
@@ -292,7 +293,7 @@ def web_input(source, repo):
                 source_archive=str(source), source_archive_sha256=sha(source),
                 native_manifest=str(manifest_path), native_manifest_sha256=sha(manifest_path),
                 build=expected_build, backend_target=expected_target, variant=manifest['variant'],
-                versions=[1, 1, 4, 2, 1], pointer_bits=32, endian=1,
+                versions=[1, 2, 4, 2, 3], pointer_bits=32, endian=1,
                 link_flags=manifest['link_flags'],
                 scope='Verified one-AOT static link input; no service/runtime/test verdict inferred')
 
@@ -396,4 +397,8 @@ if __name__ == "__main__":
         main()
     except (ProfileError, OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f"Box3D SDK profile: {error}", file=sys.stderr)
+        if isinstance(error, subprocess.CalledProcessError):
+            detail = error.stderr or error.stdout
+            if isinstance(detail, bytes): detail = detail.decode(errors="replace")
+            if detail: print(detail.strip(), file=sys.stderr)
         raise SystemExit(1)

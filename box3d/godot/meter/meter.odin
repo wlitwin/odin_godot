@@ -629,6 +629,14 @@ block_drop :: proc "c" (user: rawptr) -> bg.Status {
         return bg.INVALID_HANDLE
     }
 
+    // The final context drop must not fail after retiring this alias. An
+    // outstanding unrelated allocation (or an unfreed pinned block) requires
+    // the caller to free it first and retry the same still-live capability.
+    if ctx.values.references == 1 &&
+       (entry.pins != 1 || !entry.pending_free || ctx.values.allocation_count != 1) {
+        return bg.INVALID_HANDLE
+    }
+
     alias.references -= 1
     entry.pins -= 1
 

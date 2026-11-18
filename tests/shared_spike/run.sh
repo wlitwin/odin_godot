@@ -81,11 +81,19 @@ echo "  ok  layout: both dlls built with shared imports, no artifacts under shar
 # ---- phase 2: headless main ----
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 # First pass: write .godot/extension_list.cfg so the runtime loads the extension.
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+if ! "$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$work/editor.log" 2>&1; then
+    cat "$work/editor.log"; fail "editor import failed"
+fi
+if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$work/editor.log"; then
+    cat "$work/editor.log"; fail "editor import errors"
+fi
 
 "$GODOT" --headless --path "$PROJ" --script test_shared.gd 2>&1 | tee "$LOG"
 RC=${PIPESTATUS[0]}
 [ "$RC" -eq 0 ] || fail "main phase exited non-zero ($RC)"
+if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$LOG"; then
+    fail "runtime errors or retained resources in the shared main fixture"
+fi
 grep -q "SHARED_SPIKE_MAIN_OK" "$LOG" || fail "main phase did not print SHARED_SPIKE_MAIN_OK"
 echo "  ok  one vocabulary across two dlls: constant, enum, payload struct and pure proc agree; cross-module call still engine-mediated"
 
@@ -94,12 +102,13 @@ echo "  ok  one vocabulary across two dlls: constant, enum, payload struct and p
 # timeout kills the whole test (`timeout` ships in the nix dev shell; degrade without it).
 TIMEOUT_BIN="$(command -v timeout || true)"
 if [[ -n "$TIMEOUT_BIN" ]]; then
-    "$TIMEOUT_BIN" 300 "$GODOT" --editor --headless --path "$PROJ" --script test_shared_reload.gd >"$RLOG" 2>&1
+    SHARED_SPIKE_RELOAD=1 "$TIMEOUT_BIN" 300 "$GODOT" --editor --headless --path "$PROJ" >"$RLOG" 2>&1
 else
-    "$GODOT" --editor --headless --path "$PROJ" --script test_shared_reload.gd >"$RLOG" 2>&1
+    SHARED_SPIKE_RELOAD=1 "$GODOT" --editor --headless --path "$PROJ" >"$RLOG" 2>&1
 fi
+RELOAD_RC=$?
 echo "----- reload driver output -----"; grep -vE "^warning: |could not find symbol" "$RLOG" | tail -25; echo "--------------------------------"
-if grep -qE "signal 11|Segmentation|must be overridden|Required virtual" "$RLOG"; then
+if [[ "$RELOAD_RC" != 0 ]] || grep -qE "signal 11|Segmentation|must be overridden|Required virtual|SCRIPT ERROR|ERROR:|leaked at exit|resources still in use|SHARED_RELOAD_FAIL" "$RLOG"; then
     fail "crash / missing-virtual error during the editor reload phase"
 fi
 grep -q "SHARED_RELOAD_OK" "$RLOG" || fail "one shared edit did not rebuild+swap BOTH modules in-process (see the driver output above)"

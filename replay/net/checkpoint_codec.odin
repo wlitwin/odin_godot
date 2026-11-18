@@ -61,7 +61,7 @@ checkpoint_codec_init_owned :: proc(
         return .Invalid_Schema
     }
 
-    if network && !codecs_init(&c.network, S, C, A, E, N, allocator) {
+    if network && codecs_init(&c.network, S, C, A, E, N, allocator).error != .None {
         checkpoint_codec_destroy(c)
         return .Invalid_Schema
     }
@@ -279,24 +279,15 @@ checkpoint_decode :: proc(
         return checkpoint_decode_physics(cp, bytes, model, content, allocator, codec, ownership)
     }
 
-    return checkpoint_decode_protocol(
-        cp,
-        bytes,
-        model,
-        content,
-        PROTOCOL_VERSION,
-        allocator,
-        codec,
-        ownership = ownership,
-    )
+    return checkpoint_decode_values(cp, bytes, model, content, allocator, codec, ownership = ownership)
 }
 
 @(private)
-checkpoint_decode_protocol :: proc(
+checkpoint_decode_values :: proc(
     cp: ^Checkpoint($S, $C, $A, $N),
     bytes: []u8,
     model: Model(S, C, A, $E, N),
-    content, protocol: u64,
+    content: u64,
     allocator: mem.Allocator,
     codec: ^Checkpoint_Codec,
     complete_identity: ^bd.Identity = nil,
@@ -348,7 +339,7 @@ checkpoint_decode_protocol :: proc(
     }
 
     if !active.network_ready {
-        if !codecs_init(&active.network, S, C, A, E, N, active.archive.parts[.Header].allocator) {
+        if codecs_init(&active.network, S, C, A, E, N, active.archive.parts[.Header].allocator).error != .None {
             codecs_destroy(&active.network)
             return .Invalid_Schema
         }
@@ -397,7 +388,7 @@ checkpoint_decode_protocol :: proc(
         return .Invalid_Checkpoint
     }
 
-    size, ok := checkpoint_body_size(codecs, tmp.header, tmp.settings, protocol)
+    size, ok := checkpoint_body_size(codecs, tmp.header, tmp.settings)
 
     if !ok ||
        size != len(body) ||
@@ -450,7 +441,7 @@ checkpoint_decode_protocol :: proc(
     copy(tmp.policy_data, body[cursor.offset:])
     tmp.ready = true
 
-    if !checkpoint_valid_protocol(&tmp, model, protocol) {
+    if !checkpoint_valid(&tmp, model) {
         return .Invalid_Checkpoint
     }
 
@@ -468,7 +459,6 @@ checkpoint_decode_protocol :: proc(
         checkpoint_config(tmp.header, tmp.settings),
         N,
         model.control_timing,
-        protocol,
         model.replication.id,
         model.action_timing,
         model.action_schedule.id,
@@ -565,17 +555,9 @@ checkpoint_codecs_destroy :: proc(c: ^Checkpoint_Codecs) {
 }
 
 @(private)
-checkpoint_body_size :: proc(
-    c: ^Checkpoint_Codecs,
-    h: Checkpoint_Header,
-    s: Checkpoint_Settings,
-    protocol: u64 = PROTOCOL_VERSION,
-) -> (
-    int,
-    bool,
-) {
+checkpoint_body_size :: proc(c: ^Checkpoint_Codecs, h: Checkpoint_Header, s: Checkpoint_Settings) -> (int, bool) {
     if h.version != CHECKPOINT_VERSION ||
-       h.protocol != protocol ||
+       h.protocol != PROTOCOL_VERSION ||
        !config_valid(checkpoint_config(h, s)) ||
        h.peers > MAX_PEERS ||
        h.actions > MAX_PEERS * ACTION_CAPACITY ||

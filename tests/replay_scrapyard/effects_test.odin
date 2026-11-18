@@ -181,10 +181,10 @@ runner_modifiers_and_remaining_clock_pulses_match_the_rulebook :: proc(t: ^testi
     ctx.tick = 1
     game.step(&w, controls, 0, 0, &ctx)
     testing.expect_value(t, w.players[0].position, before)
-    controls[0].dash = true
+    testing.expect(t, game.action(&w, 1, game.Action{kind = .Dash, aim = {1, 0}}, &ctx))
     ctx.tick, ctx.count = 2, 0
     game.step(&w, controls, 0, 0, &ctx)
-    testing.expect(t, w.players[0].position[0] > before[0]) // original dash bypasses move modifiers
+    testing.expect(t, w.players[0].position[0] > before[0]) // the action-started dash bypasses move modifiers
     w = yard()
     w.players[0].hp = 8
     feedback = {}

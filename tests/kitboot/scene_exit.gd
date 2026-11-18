@@ -13,6 +13,12 @@ func check_scenes() -> void:
 		get_root().add_child(game)
 		await process_frame
 		if iteration == 0:
+			if game.has_method("test_spawn_transaction"):
+				if not game.test_spawn_transaction():
+					push_error("SCENE_EXIT_FAIL: typed birth or spawn cancellation failed")
+					quit(1)
+					return
+				print("KIT_SPAWN_TRANSACTION_OK")
 			if not game.test_code_lifecycle():
 				push_error("SCENE_EXIT_FAIL: code rendezvous retained its socket")
 				quit(1)
@@ -36,6 +42,18 @@ func check_scenes() -> void:
 				push_error("SCENE_EXIT_FAIL: rehost did not rebuild its entity")
 				quit(1)
 				return
+		var before_peer := multiplayer_api.multiplayer_peer
+		var before_ui := game.get_node("BootUi").get_instance_id()
+		var parking := Node.new()
+		get_root().add_child(parking)
+		game.reparent(parking)
+		game.reparent(get_root())
+		parking.free()
+		if multiplayer_api.multiplayer_peer != before_peer or game.get_node("BootUi").get_instance_id() != before_ui or game.probe_player_count() != 1:
+			push_error("SCENE_EXIT_FAIL: reparent reset the live stack")
+			quit(1)
+			return
+		print("KIT_REPARENT_PRESERVED_OK")
 		var installed_id := multiplayer_api.multiplayer_peer.get_instance_id()
 		var replacement: MultiplayerPeer = null
 		var reassigned_api: SceneMultiplayer = null

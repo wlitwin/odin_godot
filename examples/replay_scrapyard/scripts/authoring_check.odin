@@ -3,6 +3,7 @@
 package replay_scrapyard
 
 import "core:fmt"
+import a "godot:authoring"
 import "core:strings"
 import "core:encoding/json"
 import gd "godot:godot"
@@ -53,53 +54,55 @@ authoring_issue :: proc(result: ^Authoring_Report, source: string, report: d.Rep
     )
 }
 
+// The same typed discovery and duplicate policy used by runtime admission.
+// Semantic extraction continues across rows so the editor can show all issues.
+authoring_category :: proc(
+    result: ^Authoring_Report,
+    $Script: typeid,
+    category: string,
+    capacity: int,
+    extract: proc(_: gd.Resource, _: ^scenegd.Bake_Context, _: string) -> (u8, $Row),
+    minimum_id := 0,
+    id_field := "id",
+) {
+    directory := fmt.tprintf("res://data/%s", category)
+    catalog: a.Catalog(Script)
+    defer a.catalog_destroy(&catalog)
+    report := a.catalog_load(&catalog, directory, capacity, minimum_id, id_field)
+    if report.error != .None {
+        source := a.report_path(&report)
+        if id_field != "" {source = strings.trim_suffix(source, fmt.tprintf(".%s", id_field))}
+        authoring_issue(result, source, scenegd.authoring_report(report))
+        return
+    }
+    for entry in catalog.entries {
+        ctx: scenegd.Bake_Context
+        extract(entry.resource, &ctx, entry.path)
+        authoring_issue(result, entry.path, ctx.report)
+        append(
+            &result.definitions,
+            Authoring_Definition{strings.clone(entry.path), strings.clone(category), u32(entry.id)},
+        )
+    }
+}
+
 authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
     result: Authoring_Report
 
-    for category in ([5]string{"guns", "mobs", "status", "combos", "abilities"}) {
-        batch: scenegd.Resource_Batch
-        defer scenegd.resource_batch_destroy(&batch)
-        report := scenegd.resource_batch_load(&batch, fmt.tprintf("res://data/%s", category), 256)
-
-        if report.error != .None {
-            authoring_issue(&result, fmt.tprintf("res://data/%s", category), report)
-            continue
-        }
-
-        seen: [256]bool
-
-        for resource in batch.resources[:batch.count] {
-            text := gd.resource_get_path(resource)
-            defer gd.free_string(text)
-            path := gd.gd_string_to_odin(text)
-            ctx: scenegd.Bake_Context
-            id: u8
-
-            switch category {
-            case "guns":
-                id, _ = defs.bake_gun(resource, &ctx, path)
-            case "mobs":
-                id, _ = defs.bake_mob(resource, &ctx, path)
-            case "status":
-                id, _ = defs.bake_status(resource, &ctx, path)
-            case "combos":
-                defs.bake_combo(resource, &ctx, path)
-            case "abilities":
-                id, _ = defs.bake_ability(resource, &ctx, path)
-            }
-
-            if ctx.report.error == .None && category != "combos" {
-                if seen[id] {
-                    ctx.report = d.problem(.Invalid, path, "duplicate stable definition ID")
-                }
-
-                seen[id] = true
-            }
-
-            authoring_issue(&result, path, ctx.report)
-            append(&result.definitions, Authoring_Definition{strings.clone(path), strings.clone(category), u32(id)})
-        }
-    }
+    authoring_category(&result, defs.GunDef, "guns", content.MAX_GUNS, defs.bake_gun)
+    authoring_category(&result, defs.MobDef, "mobs", content.MAX_MOBS, defs.bake_mob)
+    authoring_category(&result, defs.StatusDef, "status", content.MAX_STATUS, defs.bake_status, 1)
+    authoring_category(&result, defs.AbilityDef, "abilities", content.MAX_ABILITIES, defs.bake_ability, 1)
+    authoring_category(
+        &result,
+        defs.ComboDef,
+        "combos",
+        content.MAX_COMBOS,
+        proc(resource: gd.Resource, ctx: ^scenegd.Bake_Context, path: string) -> (u8, content.Combo) {
+            return 0, defs.bake_combo(resource, ctx, path)
+        },
+        id_field = "",
+    )
 
     if len(result.issues) == 0 {
         store: d.Store(content.Catalog)
@@ -108,7 +111,7 @@ authoring_check :: proc(parent: gd.Node) -> Authoring_Report {
         ref: d.Ref
 
         if report.error == .None {
-            ref, report = scenegd.bake(&store, u8(0), game.CONTENT, content_extract)
+            ref, report = scenegd.bake(&store, u8(0), content.SEMANTIC, content_extract)
         }
 
         authoring_issue(&result, "res://data", report)
@@ -207,7 +210,7 @@ scrap_authoring_check_ready :: proc(self: ^ScrapAuthoringCheck) {
 
     if error != nil ||
        storagegd.storage_write(
-           scrap_param("RSY_AUTHORING_REPORT", "user://authoring-report.json"),
+           scrap_param("REPLAY_AUTHORING_REPORT", "user://authoring-report.json"),
            bytes,
            1024 * 1024,
        ) !=

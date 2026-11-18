@@ -33,7 +33,7 @@ My_Game :: struct {
 }
 
 // _ready
-my_game_net_attach(
+if !my_game_net_attach(
 	self,
 	kboot.Options{
 		title = "P U T T P U T T",
@@ -42,7 +42,7 @@ my_game_net_attach(
 		env = "GOLF",
 	},
 	kboot.network_profile(.Friends_Coop),
-)
+) {return}
 
 // _process
 if kboot.boot_phase(&self.boot) != .Menu {
@@ -180,20 +180,24 @@ live run and registry. Pre-start session wiring and configuration survive, so a
 fresh `<game>_net_attach` plus Host/Join starts from a clean run without losing
 the game's settings. The operation is idempotent.
 
-The generated detach is not called automatically on scene exit. Godot frees
-its node tree, but Odin maps, slices, and other allocations still need their
-matching teardown when the process stays alive. On final scene removal, detach
-the stack and destroy the retained Session wiring:
+Standard Boot/Session/Comms stacks now receive automatic final cleanup. Freeing
+the Node or removing/replacing its script releases the lane, comms, Boot state
+and retained Session wiring. HelloNet and HelloSim need no teardown callback.
 
-```odin
-my_game_exit_tree :: proc(self: ^My_Game) {
-	my_game_net_detach(self)
-	ksess.session_destroy(&self.ses)
-}
-```
+Ordinary tree removal or reparenting preserves the same stack and does not
+repeat `_ready`. It is not a network pause: reliable transport ingress may still
+arrive. Use explicit detach when intentionally ending the run.
 
-Use detach alone when the same script instance will attach again; use both
-calls when that instance is finished. HelloNet and HelloSim include this exit callback.
+For game-owned riders, define `<game>_finalize(self)`. It runs before the
+standard cleanup, with exported Resources and child nodes still alive; its
+owner may already be outside the tree. You can call generated detach within
+that hook when your own cleanup needs a particular order. The automatic tail
+is idempotent. Do not free or reassign the owner from its finalizer.
+
+A custom owner can opt out with `//gd:kit_cleanup manual` in the script header.
+This suppresses automatic Kit cleanup, not an authored finalizer. The marker
+requires a recognized standard stack and does not change `gd:"manual"` tick
+behavior. Manual owners must close every owner explicitly.
 
 At the lower level, `boot_net_detach(b)` performs the same full ordered
 teardown using the session/comms/lane pointers retained by `Boot`.
@@ -202,8 +206,8 @@ connection helpers. The caller must destroy its lane, comms, and session with
 their corresponding procedures. All three forms are idempotent.
 
 Boot lives as long as its node. Each lower layer destroys the resources it
-initializes, while the scene owns node trees. `boot_detach` queues Boot's
-container nodes (`ui_layer` / `stage` / `world`) for deletion. Their widget,
+initializes, while the scene owns node trees. `boot_detach` removes Boot's
+container nodes from live scene paths immediately, then queues them (`ui_layer` / `stage` / `world`) for deletion. Their widget,
 legend, and entity children are freed with the subtree. The
 [kui `*_destroy`](ui.md) calls release only Odin tracking arrays;
 `netgd.wire_detach` releases the wire's gauge and shim containers. Connection
@@ -376,7 +380,7 @@ The tag generates the factory table, entity type constant, typed spawn and query
 procedures, node map, and hook dispatch. The numeric ID (`3` above) is part of
 the wire and save formats. Keep it stable across compatible builds. Script
 generation rejects duplicate IDs, unknown structs, and invalid hook signatures.
-IDs remain explicit rather than path/name-hashed: a scene or type rename must
+Gameplay type IDs remain explicit rather than path/name-hashed: a scene or type rename must
 not silently change save identity, and a visible small number keeps protocol
 migrations deliberate.
 
@@ -392,6 +396,48 @@ runner_scene: ^gd.Resource `gd:"entity=Runner:2,avatar"`,    // marks the player
 - `avatar` marks a player's body. During host succession, an absent host's NPCs
   may move to the successor, while its avatar remains assigned to the absent
   player's reclaimable seat.
+
+### Scene variants
+
+Several authored scenes can use the same gameplay script and wire type. Keep
+one default scene and give each additional scene a stable variant name:
+
+```odin
+mob_scene:         gd.Packed_Scene `gd:"entity=actors.Mob:3,stream_hz=30"`,
+armored_scene:     gd.Packed_Scene `gd:"entity=actors.Mob:3,variant=Armored"`,
+```
+
+Both scenes must have `actors.Mob` on their root. They share its replicated
+fields, commands, callbacks and typed census. The generator emits one entity
+kind plus `Mob_Variant`, and adds an optional argument to its spawn helper:
+
+```odin
+mob, id := mob_spawn(&self.boot, owner = player, variant = .Armored)
+mob.hp = 100
+kboot.boot_spawn_send(&self.boot, id)
+```
+
+Omit `variant` for `.Default`. A one-scene game keeps its existing declaration
+and calls. Declare type options such as `avatar` and `stream_hz` only on the
+default scene; every variant inherits them.
+
+Variant names produce stable 32-bit IDs, with collisions rejected during
+generation. Reordering or renaming Inspector fields, moving scene files, and
+renaming import aliases do not change those IDs. Keep variant names stable
+across compatible builds. The chosen variant travels with the spawn through
+late joins, interest resyncs, saves, host recovery and prediction matching.
+It is immutable for that entity's lifetime; despawn and spawn again to select
+a different authored scene. If command correction changes the choice of an
+unmatched predicted spawn, Boot cancels that prediction and creates its
+replacement. An entity already matched to the authority keeps its identity.
+
+`kboot.boot_entity_variant(&self.boot, id)` reads the choice for committed or
+predicted entities, including rekeyed references. `ksess.session_scene_variant`
+provides the same query for committed Session entities. Unknown variants never
+fall back to the default scene.
+
+See `examples/hello_sim`: alternate players use `player.tscn` and
+`player_diamond.tscn` with the same `actors.Player` script.
 
 ### Spawn timing and initial presentation
 
@@ -424,7 +470,7 @@ Inspector wiring and hot reload. Use `session_set_factory` for custom creation.
 
 ## Entity queries
 
-Each `entity=` tag generates typed queries that read the registry's entity and
+Each gameplay entity type generates typed queries that read the registry's entity and
 owner records and Boot's per-type index. Use them instead of maintaining a
 parallel `map[Net_Id]^T`, owner map, or `avatar_of` lookup:
 

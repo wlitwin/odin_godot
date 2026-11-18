@@ -27,6 +27,7 @@ Virtual_Entry :: struct {
 string_name_to_odin :: proc(name: gdext.StringNamePtr, allocator := context.allocator) -> string {
     sn := (cast(^godot.String_Name)name)^
     s := godot.new_string_string_name(sn)
+    defer godot.free_string(s)
     return string_to_odin(s, allocator)
 }
 
@@ -91,8 +92,13 @@ ret_psa :: proc "contextless" (ret: gdext.TypePtr, v: godot.Packed_String_Array)
     (cast(^godot.Packed_String_Array)ret)^ = v
 }
 
+// Consume an owned Variant and construct into the engine's native-size slot.
+// The SDK storage wrapper accommodates double precision (40 bytes on 64-bit);
+// standard Godot uses only 24. Never assign the wrapper to borrowed memory.
 ret_variant :: proc "contextless" (ret: gdext.TypePtr, v: godot.Variant) {
-    (cast(^godot.Variant)ret)^ = v
+    owned := v
+    gdext.variant_new_copy(ret, &owned)
+    godot.variant_destroy(&owned)
 }
 
 // Build a fresh Packed_String_Array from a set of latin1/utf8 literals. The caller

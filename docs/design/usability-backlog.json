@@ -1,0 +1,1613 @@
+{
+  "goal": "Game-developer usability remediation",
+  "board_id": "b_a3ab2822fab146b9",
+  "policy": "Implement the complete game-developer usability audit in three phases. This board is authorized for implementation by the user and tracked by the active Codex goal. Projects are unlaunched and internally used: migrate owned callers, content and fixtures, then remove obsolete APIs/schema compatibility rather than accumulating shims. Do not remove useful current low-level/custom-composition APIs merely because examples now use a convenience API. Preserve unrelated work and historical raw evidence. For each failing check decide whether code or test contradicts the intended behavior; update stale assertions/fixtures with meaningful replacement coverage instead of preserving obsolete behavior or deleting valid guarantees. Follow odin_godot/AGENTS.md. Claim one task at a time with worker/token and record concrete changes and validation. Repository backlog: docs/design/usability-backlog.json. Board operations do not authorize parallel editing agents. Complete dependency work before architecture tasks; reassess designs when narrow fixes accumulate.",
+  "tasks": [
+    {
+      "id": "P1-01",
+      "phase": 1,
+      "title": "Migrate Scrapyard to current Kit APIs",
+      "status": "complete",
+      "acceptance": "Replace redundant transport/setup wiring, adopt standard generated lifecycle where ordering permits, inspect census usage and remove stale API guidance. Preserve intentional game ordering; validate solo, host/join, recovery and teardown.",
+      "files": [
+        "../scrapyard/scripts",
+        "../scrapyard/run.sh",
+        "../scrapyard/Makefile"
+      ],
+      "task_id": "t_e89786fdd2c745e7",
+      "progress": "Migrated Scrapyard to generated attach/transport callbacks and typed runner_owned_by, retaining deliberate post-presentation event dispatch and measured-gameplay indexes. Added ordered scene teardown and repaired owned resource/directory/image/string lifetimes. Upgraded local installed SDK from current Nix addon; prior addon retained in a temporary backup. Test profiles isolated; targeted acts supported and first failure stops by default.",
+      "validation": [
+        "Fresh installed-addon build passes.",
+        "Three successive game scenes each start solo, contain one runner and are removed; exact audio resource weak references retire; no final leaks/errors.",
+        "SY_ACTS=0,1,5,7,9: solo, duo, vault persistence, dedicated server and host succession passed first attempts under 120ms injected latency.",
+        "Independent read-only review found retained temporary SY_SHOT allocation; corrected to owned allocator and rebuilt.",
+        "git diff --check, bash -n run.sh and Python compile passed."
+      ],
+      "test_diagnosis": [
+        "First lifecycle test had an inferred GDScript Variant treated as error; fixed test type annotation.",
+        "Runtime exposed genuine leaked Resource, DirAccess, image and cache ownership; fixed game code.",
+        "One remaining MP3/playback reference was asynchronous engine audio retirement; updated lifecycle test to await those exact WeakRefs with a bounded deadline, not accept leaks.",
+        "Immediate-quit legacy network harness still logs deferred MP3 cleanup warnings; scene-reentry test separately proves proper retirement. No full-suite or browser-runtime claim for this focused migration."
+      ]
+    },
+    {
+      "id": "P1-02",
+      "phase": 1,
+      "title": "Consolidate onboarding and current examples",
+      "status": "complete",
+      "acceptance": "Lead with installed-addon editor setup, correct Replay backend contradictions and Box3D plugin installation order, remove redundant settings and update examples that teach superseded APIs. Clean-start documented commands must work.",
+      "files": [
+        "docs",
+        "build/template",
+        "build/addon-docs",
+        "examples"
+      ],
+      "task_id": "t_ff81cf9dbfdd40ab",
+      "progress": "Primary onboarding now uses installed-addon editor setup/build commands and a scene-editor tutorial. Removed redundant collection-root settings, stale Replay Box3D requirements, incorrect Box3D install ordering, and outdated Kit factory/transport examples.",
+      "validation": [
+        "npm run check passed all documentation links and anchors.",
+        "npm run build passed the complete documentation site (existing bundle-size advisory only).",
+        "Clean installed-addon Mover project built/imported/ran without ODIN_GODOT_ROOT or BOX3D_*; verified default Speed, movement and property editing.",
+        "Clean installed-addon Replay starter built/imported/ran existing solo driver without ODIN_GODOT_ROOT or BOX3D_*.",
+        "git diff --check passed."
+      ],
+      "evidence": {
+        "docs_log": "/tmp/odin-usability-docs-check.log",
+        "onboarding_logs": "/tmp/nix-shell.VATj0O/odin-onboarding-hw7wa61n"
+      }
+    },
+    {
+      "id": "P1-03",
+      "phase": 1,
+      "title": "Make toolchain and backend setup persistent and actionable",
+      "status": "complete",
+      "acceptance": "One consistent editor/CLI/export resolution path for project backend/profile and local compiler/tool paths. Missing tools must produce persistent actionable status; Project Manager reopen must work.",
+      "files": [
+        "core",
+        "build",
+        "docs/workflow.md",
+        "docs/box3d",
+        "tests"
+      ],
+      "task_id": "t_a23325dd05804432",
+      "progress": "Successful builds remember compiler, language tools, interpreter, SDK root and target-specific Box3D inputs in ignored local path entries. Native/web/cross builders and the editor use this setup on reopen; native Windows compiler setup uses the same cache without adding Python. Preserved native profile checks and removed the internal obsolete godot_collection_root alias. Missing-compiler saves produce persistent status and block stale Play; repair reconciles every module. Shipped the helper in the Nix addon and refreshed Scrapyard to the current package.",
+      "validation": [
+        "Six toolchain unit tests pass: cached reopen, invalid compiler, corrupt/stale entries, target separation, existing native deployment discovery and concurrent independent updates.",
+        "Core compiles; Bash build-helper cache/failure/staging/concurrent-publish regression passes.",
+        "Actual headless editor with stripped shell tools rejects Play after failed saves in two modules, restores local paths, rebuilds both through a root-only reload and exposes both new exports.",
+        "Fresh isolated Box3D backend passed all 14 native tests. Native initial build, cached rebuild, cached desktop export, editor import and game run passed; backend domain retained across export.",
+        "Complete docs link check and site build pass; Python compilation, shell syntax and git diff --check pass.",
+        "Final Nix addon builds and contains toolchain helper; Scrapyard builds through that installed package and passes the three-scene lifecycle regression."
+      ],
+      "limitations": [
+        "PowerShell parity tests were skipped because pwsh/powershell is not installed on this host; native Windows runtime remains unverified.",
+        "No browser-runtime or cross-platform claim was added for this change; those remain in final journey qualification."
+      ],
+      "test_diagnosis": [
+        "Initial Odin check used unsupported -build-mode; corrected invocation to -no-entry-point.",
+        "Unit fixture compared /var paths against canonical /private/var output; corrected fixture normalization.",
+        "Editor fixture attempted to call the engine-only _build virtual as a script method; corrected it to invoke the actual Play action and assert its rejection diagnostic.",
+        "GUI export emulation removed Nix PATH but retained DEVELOPER_DIR/SDKROOT; confirmed real Apple tools work without those shell-only overrides and corrected the fixture.",
+        "Independent review found multi-module lost-save scope during compiler repair; fixed implementation to scan all modules on recovery and expanded the live editor regression."
+      ],
+      "evidence": {
+        "editor_log": "/tmp/odin-usability-toolchain-multimodule.log",
+        "helper_docs_log": "/tmp/odin-usability-toolchain-final.log",
+        "native_build_log": "/tmp/odin-usability-native-build.log",
+        "physics_project": "/private/tmp/nix-shell.VstwLi/odin-toolchain-physics-_omupfu7",
+        "addon_result": "/tmp/odin-usability-addon-current.json",
+        "scrapyard_log": "/tmp/odin-usability-scrapyard-current-sdk.log"
+      }
+    },
+    {
+      "id": "P1-04",
+      "phase": 1,
+      "title": "Fix script templates and complete editor signal/navigation hooks",
+      "status": "complete",
+      "acceptance": "Generate owner handles matching the selected base, valid Resource templates and signal callbacks; locate functions from editor navigation. Check generated code and actual Godot integration.",
+      "files": [
+        "core/language.odin",
+        "core/editor_authoring.odin",
+        "core/editor_source",
+        "core/validate.odin",
+        "core/format.odin",
+        "core/devtools_web.odin",
+        "core/script.odin",
+        "decl/decl.odin",
+        "scriptgen",
+        "tests/editor_authoring",
+        "tests/method_values",
+        "tests/run_all.sh",
+        "docs/authoring-guide.md",
+        "docs/workflow.md"
+      ],
+      "task_id": "t_89c19a2ba3984a3b",
+      "progress": "Created valid typed Node/Resource/RefCounted templates and initialized the returned engine Script reference correctly. Shared script naming with scriptgen, including acronyms and keyword filenames. Added AST-backed callback discovery and method outline/navigation; exact target unsaved buffers and alternate import aliases are supported. Plain helpers cannot suppress callbacks or steal their connection gutters. Added copied/automatically released Variant input arguments for untyped signals; retained unsupported raw Variant returns. Fixed format-on-save retaining its current Script resource. Registered the actual editor workflow regression in the native suite.",
+      "validation": [
+        "Three parallel Odin tests pass for source parsing, helper/callback disambiguation, generated parameters, source lines, shared naming and collision diagnostics.",
+        "Actual self-contained Godot editor creates Node2D, CharacterBody3D, Resource, RefCounted, HTTPRequest and keyword-filename templates through ScriptCreateDialog; saved sources adopt the existing package and compile.",
+        "Actual editor callback requests use renamed unsaved receiver/import alias, another active Resource tab, scalar/Node/Variant arguments and a same-named plain helper; repeated requests navigate without duplication.",
+        "Serialized scene runtime emits five real signal connections and checks exported state; Resource script attachment works; editor/runtime finish without errors or resource-leak diagnostics.",
+        "Full scriptgen regression passes after shared-name and method-type alias changes.",
+        "Method value ownership regression passes natively and in an actual browser, including temporary Resource arrays and arbitrary Variant payload types; browser reports zero measured growth.",
+        "Documentation link check and complete site build pass; Nix addon build includes the new editor support files; git diff --check and runner Python/shell syntax checks pass."
+      ],
+      "test_diagnosis": [
+        "Parallel parser tests exposed the pinned tokenizer first-initialization race; initialized the parser before worker threads instead of serializing tests.",
+        "Real ScriptCreateDialog creation exposed an actual Ref<Script> return lifetime bug; fixed the engine reference initialization.",
+        "Other import aliases exposed missing method argument/return normalization in scriptgen; fixed both direct and composed method parsing.",
+        "Actual editor saves retained the current Script through format_sync_editor_buffer; released the owned reference and temporary engine strings.",
+        "The first UI harness replaced the editor main loop and inherited external-editor settings; moved it to an EditorPlugin in an isolated self-contained editor.",
+        "macOS rejected a raw copied app executable due to its missing signed Info.plist; preserved the complete signed app bundle in the test fixture. System log/codesign evidence retained.",
+        "A direct standalone wasm core check omitted the supported export composition/defines; used the normal browser build/export and actual browser ownership gate instead.",
+        "Independent review found helper-name false callback matches; added exposed receiver matching, clear collision diagnostics and both pure/live regression cases."
+      ],
+      "evidence": {
+        "editor": "/tmp/odin-usability-editor-ui-final.log",
+        "editor_project": "/private/tmp/nix-shell.RNZYKa/odin-editor-authoring-rmb3xbl_",
+        "scriptgen": "/tmp/odin-usability-editor-generator-webcheck.log",
+        "native_values": "/tmp/odin-usability-method-variants.log",
+        "browser_values": "/tmp/odin-usability-method-variants-web.log",
+        "docs": "/tmp/odin-usability-editor-docs.log",
+        "addon": "/tmp/odin-usability-authoring-addon.json",
+        "launch_diagnostic": "/tmp/odin-usability-editor-launch-diagnostic.log",
+        "engine_contracts": "https://github.com/godotengine/godot/blob/4.7.1-stable/editor/script/script_text_editor.cpp"
+      },
+      "limitations": [
+        "Native UI/runtime qualification was performed on macOS; no Windows UI/runtime claim is made."
+      ]
+    },
+    {
+      "id": "P1-05",
+      "phase": 1,
+      "title": "Preserve Replay configuration/model/schema diagnostics",
+      "status": "complete",
+      "acceptance": "Expose field-specific setup reports through Session and network initialization instead of collapsing causes into Invalid_Config/Model/Schema. Test representative bad callbacks, bounds, initial state and schemas.",
+      "files": [
+        "replay/net/setup.odin",
+        "replay/net/model.odin",
+        "replay/net/model_contract.odin",
+        "replay/net/server.odin",
+        "replay/net/client.odin",
+        "replay/net/protocol.odin",
+        "replay/net/complete_codec.odin",
+        "replay/net/physics_runtime.odin",
+        "replay/net/checkpoint.odin",
+        "replay/net/checkpoint_codec.odin",
+        "replay/godot/session.odin",
+        "replay/godot/session_setup.odin",
+        "replay/godot/physics.odin",
+        "replay/godot/README.md",
+        "build/template/replay",
+        "examples/replay_scrapyard/scripts/session_start.odin",
+        "tests/replay_setup",
+        "tests/replay_net/authority_observation_test.odin",
+        "tests/run_all.sh",
+        "docs/replay/godot.md"
+      ],
+      "task_id": "t_ed5790e799944bed",
+      "progress": "Added bounded copied Setup_Report with schema/frame/cleanup causes, field path/message and explicit truncation. Raw server/client/complete init, restore and model_contract accept optional setup reports. Session stores diagnostics after open/complete/resume cleanup, offers structured and text accessors, and exposes pure option preflight. Config validation shares one kernel with a cheap boolean path. Starter displays detailed setup failures within the viewport; Replay Scrapyard logs them. Existing schema/protocol validation and game callback ownership ordering are preserved.",
+      "validation": [
+        "Nine focused tests pass: config bounds/actual values, required callbacks, invalid neutral/initial state, schema path lifetime after cleanup/copy, client identity, Session success/retry clearing, complete startup, pure transport preflight, truncation/cleanup retention and checkpoint restore diagnostics.",
+        "Actual Godot starter fixture with a missing model callback shows its precise path/message in the Status label, stays within viewport width and shuts down cleanly.",
+        "All 186 Replay network tests pass; the existing freestanding wasm network check passes.",
+        "Box3D framework Release gate passes all four ownership/provider tests and the pending-end native C probe against the coherent backend.",
+        "Replay Scrapyard scripts build with the new Session layout/accessors.",
+        "Complete documentation link check and site build pass; Python/shell syntax and git diff --check pass.",
+        "Current Nix addon builds and contains exact new diagnostic sources and wrapped starter status scene."
+      ],
+      "test_diagnosis": [
+        "Initial network suite found one old Invalid_Config expectation for a malformed model authority callback. Updated it to the intended Invalid_Model classification and asserted model.authority.apply in the report; kept all validation strict.",
+        "A targeted compile caught invalid cstring indexing in the new address preflight. Fixed the implementation with a guarded string conversion.",
+        "Independent review found cleanup results omitted during early Session ownership setup and model/policy restore failures hidden by generic checkpoint errors. Preserved those cleanup results, added structural model checks after ownership validation, and added a resume regression.",
+        "Reports own inline buffers because Schema.Report paths are destroyed during failed initialization; tests copy and retain reports across repeated schema teardown and explicit Session close."
+      ],
+      "evidence": {
+        "targeted": "/tmp/odin-usability-replay-setup-final.log",
+        "godot_ui": "/tmp/odin-usability-replay-setup-ui-final.log",
+        "network": "/tmp/odin-usability-replay-net-final.log",
+        "physics": "/tmp/odin-usability-replay-setup-physics.log",
+        "physics_directory": "/tmp/odin-usability-setup-physics.L7xBwq",
+        "game_docs": "/tmp/odin-usability-replay-setup-integration.log",
+        "addon": "/tmp/odin-usability-setup-addon.json"
+      },
+      "limitations": [
+        "Reports describe local open/resume initialization; later remote admission and runtime correction failures retain their existing status/event surfaces.",
+        "Native runtime verification is on macOS; the network wasm check is a compile check, not a new browser multiplayer qualification."
+      ]
+    },
+    {
+      "id": "P1-06",
+      "phase": 1,
+      "title": "Make Save and Bake include or identify unsaved dependencies",
+      "status": "complete",
+      "acceptance": "Save relevant dirty resources where possible; otherwise surface unsaved dependencies and prevent misleading publication. Test two edited Resources, scenes and failure results.",
+      "files": [
+        "replay/editor",
+        "examples/replay_scrapyard/editor-workflow.md",
+        "tests/replay_editor_workflow",
+        "tests/run_all.sh"
+      ],
+      "task_id": "t_0e42c11fba9e4f68",
+      "progress": "Save actions discover edited project Resources, embedded/shared data, open and closed scenes, retained scene subresources and script buffers before starting a worker. Checked Resource writes and native scene-history saves preserve dirty state on failure. Owner recovery reuses edited objects and verifies exact serialized membership, using Godot scene packing for live scenes. Unassigned/stale inputs block with clickable issues; new edits during jobs remain visibly unsaved. Import queues and cancellation are handled. The installer and docs include the new save helper.",
+      "validation": [
+        "Thirteen focused scenarios pass in an isolated real Godot editor: multiple Resources/scenes with tab restoration; shared containers; live script buffers; closed scene edits; closed-scene write failure/recovery; stale open/closed scene references and copy recovery; released-owner recovery; Resource write failure/recovery; open-scene Resource-only failure/recovery; unnamed draft assignment; transient-node ownership; new edits during jobs; import queue/cancellation.",
+        "Fresh Replay Scrapyard native build/import and wasm check pass. Its actual editor plugin reports an invalid Odin Resource field, opens it from the issue, validates after correction, and publishes a successful canonical bake.",
+        "Documentation link check passes all 196 pages and 19,923 references; complete site build passes (existing chunk-size advisory only). Python compilation, shell syntax and git diff --check pass.",
+        "Current Nix addon builds. Packaged plugin, saved-data helper, installer and README byte-match current production sources.",
+        "Independent read-only reviews identified scene-save signal semantics, shared-container traversal, status ambiguity, stale SceneState ownership and transient child ownership; each was corrected and covered by the live editor regression."
+      ],
+      "test_diagnosis": [
+        "The earlier editor probe assigned an Odin Resource field directly and relied on force-saving the selected object. Updated it to native EditorUndoRedoManager property actions and asserted dirty tracking, matching actual Inspector edits.",
+        "A custom failing ResourceFormatSaver did not simulate a failed write because Godot falls back to another saver. Replaced that fixture with real blocked file paths; require the exact expected engine errors in bounded intervals and reject all other errors.",
+        "The headless Node2D save fixture hit the engine dummy-renderer thumbnail error. Used a plain Node with stored properties, retaining real scene saving/ownership assertions without requiring a renderer.",
+        "Real Scrapyard exposed retained edited StyleBoxes after their closed PackedScene owners had been released. Fixed production owner discovery with CACHE_MODE_REUSE and exact object membership checks, rather than bypassing the failure assertion or discarding the edits.",
+        "Godot scene_saved and save_scene do not report successful persistence. Native unsaved history is explicitly marked before save_all_scenes, then checked afterward; actual Resource-only scene write failure/recovery proves that stale content cannot launch a worker.",
+        "Scene reachability alone included nonpersistent tool children. Ownership proof now uses Godot PackedScene packing; transient previews are excluded from authored discovery, while inspected drafts remain actionable."
+      ],
+      "evidence": {
+        "focused_editor": "/tmp/odin-usability-replay-save-inputs-final3.log",
+        "focused_project": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/replay-save-inputs-r2eb7831",
+        "game_build": "/tmp/odin-usability-replay-save-game.log",
+        "game_editor": "/tmp/odin-usability-replay-save-game-final.log",
+        "game_project": "/tmp/odin-usability-replay-save-game.HZ2URb/editor/project",
+        "game_editor_results": "/tmp/odin-usability-replay-save-game.HZ2URb/editor-ui-final/editor.log",
+        "docs_build": "/tmp/odin-usability-replay-save-docs-build.log",
+        "addon": "/tmp/odin-usability-save-addon-final.json"
+      },
+      "limitations": [
+        "Runtime editor checks were performed on macOS with Godot 4.7.1. This change adds no Windows/Linux editor-runtime or browser qualification claim.",
+        "Custom tools must use native edited flags/UndoRedo and assign data to stored owners (or inspect standalone drafts); arbitrary unmarked programmatic mutations are not editor save inputs.",
+        "A job validates its saved snapshot. New edits remain unsaved and visibly require another action; they are not silently included in an already-running worker."
+      ]
+    },
+    {
+      "id": "P1-07",
+      "phase": 1,
+      "title": "Inventory and retire obsolete APIs and schemas",
+      "status": "complete",
+      "acceptance": "Inventory live callers, old aliases, schema decoders and fixtures. Migrate owned content/fixtures/saves to the selected current contracts, delete unnecessary backwards compatibility and stale tests. Preserve reusable explicit evolution features and historical evidence where still meaningful; document removals.",
+      "files": [
+        "kit",
+        "replay",
+        "box3d",
+        "scriptgen",
+        "tests",
+        "examples",
+        "../scrapyard",
+        "play",
+        "core/editor_source",
+        "addons/box3d_authoring",
+        "build/box3d_capacity.py",
+        "docs"
+      ],
+      "task_id": "t_7b9deae265354bae",
+      "progress": "All sixteen cleanup areas are implemented and validated. Owned saves, fixtures and callers use current contracts; obsolete readers and version-selecting APIs are removed, while useful low-level composition and historical evidence remain. Both Kit and Replay physics paths, native/WASM/browser recovery, current game save resumes, and final packaged Scrapyard lifecycle/join/persistence/succession pass. The pinned compiler includes the verified upstream checker fix and a native/WASM regression guard.",
+      "inventory": "docs/design/usability-legacy-inventory.json",
+      "validation": [
+        "Detailed results, diagnoses, migration receipts and limitations are in docs/design/usability-legacy-inventory.json, usability-compiler-evidence.json and usability-recovery-evidence.json.",
+        "Final addon replaces the installed Scrapyard SDK; deleted files are absent and selected current sources byte-match. Original game build/import and all focused acceptance checks pass without retry."
+      ],
+      "limitations": [
+        "Final P3 journey qualification still includes orderly Replay Scrapyard negative-failure shutdown, current browser save journeys and platform coverage. This task does not claim those future checks complete."
+      ]
+    },
+    {
+      "id": "P2-01",
+      "phase": 2,
+      "title": "Validate editable Kit UI scene bindings",
+      "status": "complete",
+      "acceptance": "Provide editable templates and editor/runtime validation for required bindings, ambiguity and types. Prefer explicit or unique references; renaming Host or replacing it with Label must fail clearly before gameplay.",
+      "files": [
+        "kit/ui",
+        "core",
+        "examples",
+        "tests",
+        "docs/kit/ui.md",
+        "kit/boot",
+        "scriptgen",
+        "../scrapyard/ui",
+        "../scrapyard/scripts/scrapyard.odin",
+        "docs/kit"
+      ],
+      "task_id": "t_6ca151b24e78420c",
+      "progress": "Shipped OdinKitUIBindings as a native scene-local Node, shared editor/runtime validation, typed Inspector pickers and three editable templates available from Project > Tools. Preflight checks every custom widget before publication; checked generated attach stops setup and disables periodic processing on failure. Migrated all eight Kit examples and Scrapyard; its authored scenes use explicit references. Fixed native Variant return-size/ownership defects exposed by the new property integration.",
+      "validation": [
+        "Isolated real-editor suite passes template creation and non-overwrite, typed property hints, live rename/Undo/unique-name warnings, nested-placement detection, native scene save/reopen and retained-callable invalidation.",
+        "Runtime suite passes missing/wrong-type/ambiguous/duplicate/outside references, optional Code, compatible root roles, inherited scenes, custom root scripts, complete multi-widget diagnostics, atomic startup refusal and subsequent disabled frames. Same checks pass with assertions disabled.",
+        "Actual native-sized Variant slots with adjacent canaries verify NIL/int/String/Dictionary returns and UI getters; 20,000 real property queries pass.",
+        "Ordinary Web export executes in Chrome: native component, typed rejection, root binding, standard attach/cleanup and onExit(0). This UI-only fixture explicitly uses Dummy audio.",
+        "Repgen, Kit surface/docs/WASM and Kit lifecycle tests pass; HelloNet and HelloSim scene lifecycle gates pass.",
+        "Final Nix addon builds, byte-matches changed production sources/templates and replaces the installed Scrapyard SDK. Original game lifecycle, solo, duo and spray checks pass; final package rebuild/lifecycle passes.",
+        "Documentation check resolves 197 pages and 19,958 references; site build passes. Formatting and git diff --check pass."
+      ],
+      "test_diagnosis": [
+        "New native PropertyInfo required a valid empty class_name pointer. Fixed the implementation after actual editor import crashed.",
+        "Native property getters copied the SDK 40-byte Variant wrapper into Godot 24-byte storage. Replaced writes with engine constructors, fixed the same pre-existing Core return helpers, and added native canary checks. Owned StringName metadata now uses non-static constructors before explicit teardown.",
+        "Review found raw callback userdata could outlive its node, nested placement could disagree with runtime validation, and unique-name toggles did not trigger tree_changed. Used callable-owned ObjectIDs, scene-owner-aware warnings and configuration-warning notifications, then covered each in the editor.",
+        "A ready return alone left subsequent gameplay processing enabled. Failed Boot setup now disables owner processing and requires a fresh Play after repair; no UI/comms/transport is published.",
+        "Valid custom Methods with an empty chat slot still attempted a null Callable. Fixed Boot to honor the existing intentional empty-slot contract.",
+        "Template creation treated an existing ui directory as an error; fixed directory handling while preserving existing files. Generator output needed escaped format braces; corrected it and reran the full repgen gate.",
+        "Test fixture errors used an unsupported OdinScript.new call and the wrong tool-menu signal. Corrected them to Node.set_script and the real index_pressed path. Native canary fixture syntax was also corrected.",
+        "Headless editor thumbnails produce a dummy-renderer error for Controls. The fixture now uses native save_scene_as with previews disabled, retaining actual editor persistence. Custom SceneTree tests default to 64x64, so viewport checks explicitly select 640x480 and retain strict button bounds.",
+        "Web fixture initially omitted its Web library entry and copied a threaded Box3D preset into a native-free build. Corrected those fixture inputs; broader preset/memory-mode validation is queued in P3-06. Rapid default-audio shutdown exposed an engine AudioWorklet race; UI tests select Dummy audio, while real game audio qualification remains in P3-06."
+      ],
+      "limitations": [
+        "Editor warnings and runtime refusal precede gameplay; no F5/F6 launch veto is claimed. Godot exposes the selected run target only after its boolean build hook.",
+        "Failed setup recovery is fix-and-Play-again; it does not promise retrying the same disabled game instance or suppressing arbitrary external method calls.",
+        "Native/editor runtime evidence is macOS arm64; the browser is Chrome with the current official non-threaded extension template. Audio and broader export-mode journeys remain queued."
+      ],
+      "evidence": {
+        "editor_runtime": "/tmp/odin-usability-kit-ui-current-final.log",
+        "editor_runtime_directory": "/private/tmp/nix-shell.PeA8Ip/odin-kit-ui-rz0o6t8b",
+        "browser": "/tmp/odin-usability-kit-ui-web-final.log",
+        "browser_report": "/private/tmp/nix-shell.k7eD0C/odin-kit-ui-web-vrvemm3i/report.json",
+        "repgen": "/tmp/odin-usability-kit-ui-repgen2.log",
+        "surface": "/tmp/odin-usability-kit-ui-surface.log",
+        "starters": "/tmp/odin-usability-kit-ui-starters.log",
+        "addon": "/tmp/odin-usability-kit-ui-addon-final.json",
+        "installed_sdk": "/tmp/odin-usability-kit-ui-sdk-final.json",
+        "scrapyard_selected": "/tmp/odin-usability-kit-ui-scrapyard.log",
+        "scrapyard_final": "/tmp/odin-usability-kit-ui-scrapyard-final.log",
+        "docs": "/tmp/odin-usability-kit-ui-docs-final.log",
+        "docs_build": "/tmp/odin-usability-kit-ui-docs.log"
+      }
+    },
+    {
+      "id": "P2-02",
+      "phase": 2,
+      "title": "Complete standard Kit stack lifecycle ownership",
+      "status": "complete",
+      "acceptance": "Provide standard final cleanup with deliberate custom ownership escape hatch; scaffold teardown and validate repeated attach/detach and scene enter/exit without stale callbacks or retained allocation.",
+      "files": [
+        "kit/boot",
+        "scriptgen",
+        "examples/hello_net",
+        "examples/hello_sim",
+        "tests",
+        "docs/kit",
+        "runtime",
+        "core",
+        "examples",
+        "../scrapyard/scripts",
+        "docs/authoring-guide.md",
+        "kit/nav",
+        "kit/netgd",
+        "kit/steamgd",
+        "play",
+        "../scrapyard/scripts/spray.odin",
+        ".github/workflows/box3d-desktop.yml"
+      ],
+      "review_notes": [
+        "Prefer script-instance lifetime ownership: ordinary EXIT_TREE must preserve the attached stack across temporary remove/reparent/reenter, without replaying user ready. Keep explicit net_detach for reset.",
+        "Add a generic descriptor finalizer in Core and generated standard Kit cleanup with an explicit manual-ownership opt-out. Cover predelete while children live and script-instance retirement fallback before context invalidation and export/struct release.",
+        "Preserve authored final-cleanup ordering, including Scrapyard riders before detach. Do not finalize state retained by same-layout reload; changed-layout migration needs explicit ownership handling.",
+        "Remove Boot-owned container subtrees synchronously before queue_free during explicit detach so same-frame reattach retains exact names and paths.",
+        "Extend existing lifecycle tests for automatic cleanup without authored hooks, reparent preservation, immediate detach/attach, script removal/replacement, failed/unused setup, manual ownership and authored cleanup order."
+      ],
+      "task_id": "t_9db6ca4bf1384dbb",
+      "progress": "Implemented script-instance finalization with automatic standard Kit ownership, ordered authored riders, explicit manual ownership, reparent preservation, owned signal retirement, full private-layout reload protection, and immediate weak-execution revocation for unsupported retirement. Migrated all standard examples and Scrapyard to final cleanup. Closed real transport, transform Variant, navigation world/path, material/image and game-owned node leaks. Cave uses current transport doors and explicitly adopts the peer when restoring before socket creation. Shipped and installed the checked current addon into Scrapyard; previous addon retained in a temporary backup.",
+      "evidence": {
+        "generic_fixture": "/tmp/odin-usability-instance-life.C0A8MC",
+        "reflection_and_generator": "/tmp/odin-usability-lifecycle-generation.log",
+        "fingerprint_named": "/tmp/odin-usability-lifecycle-fingerprint-final.log",
+        "hello_initial": "/tmp/odin-usability-auto-kit-initial.log",
+        "hello_reparent": "/tmp/odin-usability-auto-kit-reparent2.log",
+        "examples": "/tmp/odin-usability-lifecycle-examples.log",
+        "runtime": "/tmp/odin-usability-lifecycle-runtime-final.log",
+        "runtime_directory": "/private/tmp/nix-shell.45bmjN/odin-instance-lifecycle-tuwhdyb3",
+        "physics": "/tmp/odin-usability-lifecycle-physics-gates.log",
+        "physics_directory": "/private/tmp/nix-shell.lmlAdo/odin-lifetime-physics-6pf96e46",
+        "atomic_liveness": "/tmp/odin-usability-lifecycle-tombstone3.log",
+        "reload": "/tmp/odin-usability-lifecycle-reload3.log",
+        "reload_native_veto": "/private/tmp/nix-shell.8Q9m2j/odin-instance-reload-noyvdl4m/reload.log",
+        "abi": "/tmp/odin-usability-lifecycle-abi.log",
+        "web": "/tmp/odin-usability-lifecycle-web.log",
+        "docs": "/tmp/odin-usability-lifecycle-docs-current.log",
+        "scrapyard": "/tmp/odin-usability-lifecycle-scrapyard.log",
+        "scrapyard_script_removal": "/tmp/odin-usability-lifecycle-scrapyard-removal.log",
+        "scrapyard_script_removal_detail": "/Users/walter/data/code/odin/scrapyard/.runlogs/lifecycle-dqusztj_/game.log",
+        "six_game_attempt": "/tmp/odin-usability-lifecycle-games-runtime.log",
+        "fresh_import_disassembly": "/tmp/odin-usability-lifecycle-slopball-disassembly.log",
+        "slopball_runtime": "/tmp/odin-usability-lifecycle-games-00ot7h2p/slopball-runtime-current.log",
+        "slopball_release_scene": "/tmp/odin-usability-lifecycle-games-00ot7h2p/slopball-runtime-release-scene.log",
+        "final_package": "/tmp/odin-usability-lifecycle-addon-current.json",
+        "puppet_fix": "/tmp/odin-usability-lifecycle-games-00ot7h2p/slopball-runtime-variants-fixed.log",
+        "six_game_regression": "/tmp/odin-usability-lifecycle-six-games.log",
+        "six_game_first_five": "/tmp/odin-usability-lifecycle-six-games2.log",
+        "six_game_first_five_directory": "/private/tmp/nix-shell.0RdtiK/odin-kit-game-lifecycle-9ut876d2",
+        "cave_final_lifecycle": "/tmp/odin-usability-lifecycle-cave-nav-fixed.log",
+        "cave_final_lifecycle_directory": "/private/tmp/nix-shell.sFjm1i/odin-kit-game-lifecycle-cm4h492l",
+        "cave_network": "/tmp/odin-usability-lifecycle-cave-network.log",
+        "cave_network_single_attempt_harness": "/tmp/odin-usability-cave-network-once.sh",
+        "material_fix": "/tmp/odin-usability-lifecycle-slopball3d-ref-runtime.log",
+        "nav_leak_diagnosis": "/tmp/odin-usability-lifecycle-cave-verbose.log",
+        "installed_sdk": "/tmp/odin-usability-lifecycle-sdk-current.json",
+        "final_scrapyard_build": "/tmp/odin-usability-lifecycle-scrapyard-current.log",
+        "final_scrapyard_editor": "/tmp/odin-usability-lifecycle-scrapyard-isolated-editor.log",
+        "final_scrapyard_runtime": "/Users/walter/data/code/odin/scrapyard/.runlogs/lifecycle-gs1e_z56/game.log"
+      },
+      "test_diagnosis": [
+        "Initial reflection invocation omitted its required single-thread flag and raced global registry pools; the existing single-thread runner passes all 31 tests.",
+        "Reparent test retained an ENet peer while another installer replaced it. The old close path only closed the currently installed peer, leaving our retained displaced socket live. Transport close now closes the original owned peer by identity while preserving the replacement; both Hello gates pass.",
+        "Review found same-shaped named union members were omitted from the fingerprint and getter/setter callbacks lacked pins. Named identities and property pins were added; the fingerprint and runtime accessor regressions pass.",
+        "A real detached-Node test showed cancel_free does not stop later native PREDELETE child destruction. Revised the policy: native vetoes remain untouched; other denied retirement quarantines immediately and never retries against dead children/owners.",
+        "Raw host fixture World_Def had stale ABI-1 storage. Replaced its duplicate with current b.World_Def while retaining the budget/weak-context assertions; both host tests pass.",
+        "A custom SceneTree replacing the editor tree caused editor RIDs to leak in the reload fixture. Moved the driver into a normal isolated EditorPlugin; reload and native edited-root veto checks pass.",
+        "The original Scrapyard finalizer released streams but left its two players/netgraph under a surviving script owner. Retired those nodes and added actual set_script(null) verification.",
+        "Fresh Slopball fast-import crash disassembly matches DocTools::generate with null this; exact engine commit queues deferred extension-doc generation and clears its static doc during shutdown. This is separate from the remaining Transform2D/AABB BucketSmall report.",
+        "Slopball loads/instantiates/opens its menu cleanly, but gameplay retained VariantPools BucketSmall pages. play.Puppet body_impose created an owned Transform2D Variant without destroying it; the 3D sibling had the same defect. Added scoped destruction for transform and velocity temporaries. The original two-cycle gameplay test now exits cleanly; independent review found no additional unmatched temporaries in play or the six games.",
+        "The first permanent six-game run exposed an incorrect new material release in Slopball3D: raw RefCounted construction had not acquired a local reference. Added init_ref before defer release_ref. Review found and fixed the same newly introduced pairing error in Scrapyard spray image creation. Actual game and spray-input lifecycle checks pass; documented the constructor ownership rule.",
+        "Cave raw gd.host left its peer outside the borrowing wire ownership contract, keeping the listening port open after the first scene. Migrated normal ENet/Steam/rejoin paths to Boot transport doors. Save resume deliberately restores Session first, then adopts its synchronous installed peer without resetting that state. Same-process save/resume and exact-port rebinding pass.",
+        "Cave verbose shutdown identified World2D with 17 retained references. kit/nav map helpers failed to release the owned world result, and path helpers failed to release their copied packed arrays. Both 2D/3D helpers now release temporary holdings; Cave exits without Canvas, navigation-map or ObjectDB leak diagnostics.",
+        "Final Scrapyard editor check inherited the developer external-editor setting and could not launch that editor. Kept user settings intact and corrected the test environment to a separate complete self-contained app bundle; isolated editor and normal runtime pass."
+      ],
+      "denied_finalization_design": "Known native vetoes are left untouched. Other denied PREDELETE or inst_free operations synchronously revoke weak execution through the source-pinned atomic cell and permanently quarantine instance storage/code. Do not retry authored cleanup later. Real Godot testing showed cancel_free alone does not prevent Node child destruction, so Core does not offer detached-node cancellation/retry.",
+      "engine_investigation": {
+        "source": "https://raw.githubusercontent.com/godotengine/godot/a13da4feb8d8aefc283c3763d33a2f170a18d541/editor/doc/editor_help.cpp",
+        "finding": "_load_doc_thread queues _gen_extensions_docs; the latter calls doc->generate without a null guard, while cleanup_doc clears doc. Fresh import reproduces; cached import and runtime reach gameplay. No Odin frame in crash stack."
+      },
+      "limitations": [
+        "Godot 4.7.1 fast --import shutdown can crash in deferred extension documentation generation with a null DocTools receiver; this is tracked in P3-06. Lifecycle qualification uses ordinary editor startup and actual runtime and does not claim fast-import success.",
+        "Unsupported owning-script removal from a worker thread revokes weak execution and retains quarantined storage until restart; it does not run authored Godot cleanup against a dead or inaccessible owner.",
+        "Native/editor checks are macOS arm64; no Windows runtime or real Steam-client integration claim is made."
+      ],
+      "validation": [
+        "All 31 reflection tests and the full generator gates pass, including named private-layout identity, generic and generated finalizers, manual ownership, and malformed declarations.",
+        "Actual Godot lifecycle tests pass for destruction with live children/resources, reparenting, script removal/replacement, child-exit reentrancy, accessors removing their script, never-entered instances, declarative signal ownership, authored-before-automatic cleanup, and stale UI/mock Steam subscriptions.",
+        "Native host and actual Box3D lifecycle checks pass: normal cleanup closes world/snapshot; retained detached checkpoint data stays readable; unsupported worker retirement synchronously revokes weak execution, retains quarantined storage, and reports unsuccessful native shutdown explicitly.",
+        "Live editor reload preserves same-layout owned state, pins old private-layout instances rather than copying invalid ownership, and respects the native edited-root deletion veto. ABI skew is rejected before manifest publication and recovery passes.",
+        "HelloNet and HelloSim preserve gameplay on reparent, reset/reattach in the same frame with exact node names, reuse ports, and close their original retained/displaced peer without touching a replacement.",
+        "All six larger Kit games pass gameplay, same-world reparent, destruction and script-removal cleanup without error/leak reports. First five pass in six-games2; Cave passes the final focused run, including save/resume and immediate port reuse after each retirement.",
+        "Cave multiplayer story, resume/rejoin, moderation/match flow and host migration pass first attempts under the existing 120ms injected latency. The retained harness copy forces one attempt and checks ordinary editor startup; fast --import is tracked separately.",
+        "Native-free Web UI export runs in Chrome with onExit=0; the wasm Kit compile check passes. This validates the lifecycle thread bootstrap, without claiming real audio or Steam-client qualification.",
+        "Final Nix addon builds; 167 handwritten source files across core/runtime/scriptgen/Kit/play match the checkout byte-for-byte. Scrapyard builds through that installed addon and passes isolated editor startup plus three actual scene cycles, spray decode/transfer, borrowed method inputs and script removal with owned child/audio retirement.",
+        "Documentation links and complete site build pass. Python compilation, shell syntax and git diff --check pass. Native CI registrations include the generic/reload/game lifecycle checks and the desktop physics lifecycle gate; remote CI was not executed locally."
+      ]
+    },
+    {
+      "id": "P2-03",
+      "phase": 2,
+      "title": "Simplify initialized entity spawning and first tutorial",
+      "status": "complete",
+      "acceptance": "Teach typed born hooks and current typed queries instead of raw cached mirrors; provide checked initialized-spawn convenience if warranted while retaining explicit transaction behavior. Verify birth ordering/cancellation.",
+      "files": [
+        "kit/boot",
+        "scriptgen",
+        "examples/hello_net",
+        "docs/kit/quickstart.md",
+        "tests",
+        "kit/session",
+        "examples/hello_sim",
+        "docs/kit/quickstart-sim.md",
+        "docs/kit/session.md"
+      ],
+      "task_id": "t_298801b229ae4e1d",
+      "progress": "Simplified both Hello examples to typed born presentation without cached me/mine/tint mirrors; HelloNet reads player_mine for input. Kept explicit make/configure/send after usability review found a callback initializer would add ceremony to the actual caller. Authoritative drafts now stay local across initial world publication, late join, snapshots, ownership/blob initialization and cancellation. Commit is idempotent, unfinished drafts cannot be pumped even with assertions disabled, and Boot synchronizes final lane ownership before immediate or queued birth. Current addon is source-checked, installed in Scrapyard, and validated there.",
+      "review_notes": [
+        "Typed born runs after fields arrive; ready/spawned still run against scene defaults. Use player_mine each input frame and avoid an owned-player pointer mirror.",
+        "An initialized-spawn callback with generic data adds boilerplate to HelloNet three-field initialization. No new convenience API is warranted by this caller. Keep explicit make/configure/send with documented cancellation. Prediction can reuse/rekey existing projectiles, so cancellation must not be hidden inside a naive callback wrapper.",
+        "Cancellation of an unpublished authoritative draft must free local factory/census ownership without emitting public birth/despawn effects; test with replication and a connected peer, rather than only before replication."
+      ],
+      "test_diagnosis": [
+        "Initial new tests used an unsupported assertion-helper message argument and two invalid Odin expression forms. Corrected the fixture syntax while preserving every intended assertion.",
+        "Review found snapshots could publish pending drafts before cancellation, leaving remote ghosts. Shared committed-only world/snapshot serialization now excludes drafts; initial owner/blob updates stay local and the session pump refuses unfinished transactions. Added initial-world, late-join, snapshot restore and assertions-disabled checks.",
+        "Suppressing draft ownership events exposed a real integration dependency: the simulation lane retained its make-time owner. Boot now always uses its internal birth hook to synchronize final ownership, then either dispatches or preserves the normal game event queue. Actual ticking-entity tests cover both dispatch modes and direct Session commit.",
+        "An existing field-edge test used session_spawn_send as a general resync shortcut. The commit now deliberately announces a draft only once, so the test uses world catch-up instead; its Ev_Resynced and host/client edge assertions remain unchanged and pass.",
+        "HelloSim runtime and wasm checks passed but temporary-directory removal failed with an empty bin directory remaining; no matching Godot process remained. The lifecycle fixture now retains evidence on success and failure, keeping filesystem cleanup outside the native lifecycle verdict.",
+        "Review found the HelloNet spawn method could silently skip because the shared driver conditionally invoked it. Both Hello fixtures now require KIT_SPAWN_TRANSACTION_OK, including the ticking owner/cancellation probe."
+      ],
+      "evidence": {
+        "session": "/tmp/odin-usability-spawn-session-qualified.log",
+        "sim_core": "/tmp/odin-usability-spawn-sim-core.log",
+        "hello_net": "/tmp/odin-usability-spawn-hello_net-final.log",
+        "hello_sim": "/tmp/odin-usability-spawn-hello_sim-qualified.log",
+        "docs": "/tmp/odin-usability-spawn-docs-qualified.log",
+        "addon": "/tmp/odin-usability-spawn-addon.json",
+        "installed_sdk": "/tmp/odin-usability-spawn-sdk.json",
+        "scrapyard_build": "/tmp/odin-usability-spawn-scrapyard-build.log",
+        "scrapyard_lifecycle": "/tmp/odin-usability-spawn-scrapyard-runtime.log",
+        "scrapyard_lifecycle_detail": "/Users/walter/data/code/odin/scrapyard/.runlogs/lifecycle-l2oojmkc/game.log"
+      },
+      "validation": [
+        "All 77 Kit Session tests pass with assertions enabled and disabled, with memory tracking. New coverage checks unpublished cancellation, one-shot commit, initial owner/blob delivery, initial-world and late-join publication during a draft window, snapshot/restore omission, later successful commit, normal committed despawn, and the assertion-disabled pump boundary.",
+        "All 58 Kit simulation tests pass with memory tracking.",
+        "Actual HelloNet lifecycle probe verifies scene defaults before commit, immediate initialized position/color after typed born, canceled census/node ownership, rejection of cancellation after commit, and current player lookup. Normal two-window replication and relay join-code scenarios pass first attempts under 120ms injected latency, with matching initialized player colors on both peers and no error/leak diagnostics.",
+        "Actual HelloSim ticking-entity probe verifies final lane ownership before raw Session commit returns, before immediate game hooks, and with no game dispatcher while preserving the queued birth event. Canceled drafts and committed despawns both leave the lane. Two real predicted windows pass the existing input/prediction/remote-motion checks on the first attempt.",
+        "Both Hello lifecycle runs also verify reparent preservation, same-frame reset/reattach, external peer/API protection and native-free wasm compilation. Both runners require the spawn transaction marker and now stop on importer/runtime errors or a failed first attempt.",
+        "Documentation link check and full site build pass. The final Nix addon builds; 167 handwritten core/runtime/scriptgen/Kit/play files match the checkout byte-for-byte. Scrapyard builds through the installed package and passes three scene cycles, script removal, borrowed method inputs, spray transfer and resource retirement.",
+        "Shell syntax and git diff --check pass in both framework and Scrapyard worktrees. Previous installed addon is retained in the SDK backup receipt."
+      ],
+      "limitations": [
+        "Native/editor runtime evidence is macOS arm64. Both examples compile for wasm, but this card does not claim new browser or Windows runtime qualification.",
+        "Predicted spawning retains its explicit existing path; command replay may reuse a provisional/rekeyed projectile, so no automatic callback-based cancellation wrapper was introduced."
+      ]
+    },
+    {
+      "id": "P2-04",
+      "phase": 2,
+      "title": "Make Box3D creation and duplication identity-aware",
+      "status": "complete",
+      "acceptance": "Persist stable identities on creation; support duplicate/rekey and update references without disturbing intentionally shared geometry. Cover undo/redo and scene persistence.",
+      "files": [
+        "addons/box3d_authoring",
+        "tests/box3d_editor",
+        "docs/box3d"
+      ],
+      "review_notes": [
+        "Read-only preparation: body/joint/character identities are unique within a World, while matching shape/resource keys can be shared across bodies. Preserve shared geometry resources when duplicating bodies.",
+        "For duplicate selection, mint clone identities once and rewrite cloned joint body references and character exclusion only when their targets are also cloned. External references remain unchanged. Explicit rekey of an existing body must update incoming references throughout its World in one UndoRedo action. Root will verify this against current source before implementation."
+      ],
+      "task_id": "t_d787fb7926d94869",
+      "progress": "Added automatic saved editor IDs for Worlds, bodies/sensors, joints, characters and shapes without changing the existing key/hash contract. Added planned duplicate/rekey/shape-slot operations through native undo history, Inspector controls and a Scene tree context action. Copies preserve shared geometry, maintain private local-to-scene shapes, and retarget only cloned internal references. Rekeys update incoming references atomically. Saved instances/inheritance, standalone components, external Resources and plugin-independent undo history are qualified.",
+      "test_diagnosis": [
+        "The first new editor fixture treated EditorInterface.save_scene_as as returning Error, but this engine API returns void. Corrected the test to call it and verify the saved file plus a fresh-process reload.",
+        "A base _init ID assignment was skipped by derived classes with their own constructors. Moved assignment into the exported-storage property initializer so subclasses need no super-call convention; all concrete joint constructors and mesh/heightfield shapes are tested.",
+        "Review identified local-to-scene shapes being forced back to shared originals and unowned whole-World descendants disappearing on save. Private shape copies now retain isolation and internal sharing; unsavable unowned authoring graphs are refused before publication.",
+        "The editor fixture initially passed an untyped Array through a dynamic EditorPlugin call. The public duplicate entry now accepts and validates ordinary node arrays instead of requiring caller-side element-type ceremony.",
+        "Programmatically saved prefab roots initially had empty names, causing Godot errors during instantiation despite successful graph checks. Corrected the fixture to name roots before saving.",
+        "Native bound property controls expose reset/paste paths that can bypass compound reference updates. IDs now use export_storage plus a dedicated control, preserving serialization while excluding them from native parameter copy/reset.",
+        "Wrapped method edits did not participate in native Resource edited tracking. Property changes now use native add_do_property/add_undo_property, with a retained helper only for nodes and refresh.",
+        "The external-resource test assumed EditorInterface.save_all_scenes flushes standalone resources when all scenes are clean. Exact engine source shows it skips clean scenes. The test now uses a normal explicit editor scene save and retains strict disk/fresh-load assertions for external edit/undo/redo.",
+        "The new Odin bake probe initially used an outdated os.read_entire_file signature. Updated it to the pinned compiler allocator/error form; shared-bake verification passes."
+      ],
+      "evidence": {
+        "initial": "/tmp/odin-usability-box3d-identity-initial.log",
+        "editor": "/tmp/odin-usability-box3d-identity2.log",
+        "editor_and_bake": "/tmp/odin-usability-box3d-identity-persistence2.log",
+        "directory": "/private/tmp/nix-shell.VwpWYT/odin-box3d-identity-p3swblbk",
+        "native_free_compile": "/tmp/odin-usability-box3d-identity-no-backend.log",
+        "docs": "/tmp/odin-usability-box3d-identity-docs.log",
+        "pure_bake_initial": "/tmp/odin-usability-box3d-identity-bake.log"
+      },
+      "validation": [
+        "The new real-editor gate runs with no installed/compiled Odin tool bridge. New and derived authoring classes receive IDs; initial save/reopen and a separate runtime process preserve them. Rename/reorder/reparent leaves IDs unchanged.",
+        "Duplicating two bodies, two joints and a character assigns new object keys, remaps internal endpoints/exclusions, preserves external endpoints and original references, and retains actual shared shape Resources. Whole-World duplicates change namespace while preserving local keys.",
+        "Repeated undo/redo restores exact keys, references, Resource assignments and parents; redo reuses the same clone objects and IDs. History still works while the plugin is disabled, and re-enabling does not rekey content.",
+        "Rekey tests cover both joint endpoints, character exclusion, nested World isolation, collision refusal, ambiguous existing IDs and unowned authoring children without partial publication. Shape-slot copies get a new Resource/key while original sharing remains intact.",
+        "Body and whole-World instances, editable non-World instance children, inherited scene overrides, and standalone component source editing survive fresh-process reload. Local-to-scene shape copies remain private while sharing within their copied graph is preserved.",
+        "Actual Inspector controls perform atomic rekeys; stored IDs are excluded from native parameter reset/copy. External Resource changes use native UndoRedo properties, and normal editor scene saves persist their edit/undo/redo to the external file.",
+        "The actual shared Odin baker accepts the editor before/after definitions, resolves all joint/character references and shape body IDs, and preserves unchanged original body IDs. Eleven bodies and twelve shape bindings still use one geometry asset across six Resource identities.",
+        "The bake probe compiles with an explicitly absent native solver archive; the default archive is absent too. Identity/persistence and this shared-bake gate need no native Box3D solver library.",
+        "Documentation links and full site build, Python compilation, shell syntax and git diff --check pass. The combined editor/reload/bake runner is registered in the native suite; remote CI was not executed locally."
+      ],
+      "limitations": [
+        "Use Duplicate Box3D selection for authoring graphs. Generic Godot Ctrl+D copies stored IDs unchanged; automatic scene-wide repair is intentionally not used because original references and loaded content must remain unambiguous.",
+        "Closed instance children require Editable Children or source-scene editing. Duplicating the current scene root is refused, as in Godot; whole-World instances beneath a parent scene are supported.",
+        "Native/editor runtime qualification is macOS arm64. Frontend packaging/setup integration is tracked in P2-07; this card changes and qualifies the canonical addon source."
+      ]
+    },
+    {
+      "id": "P2-05",
+      "phase": 2,
+      "title": "Keep valid Box3D previews visible during invalid edits",
+      "status": "complete",
+      "acceptance": "Render valid authored geometry while marking offending objects; retain strict bake/runtime validation. Verify one duplicate/missing key does not blank unrelated geometry.",
+      "files": [
+        "addons/box3d_authoring/editor",
+        "tests/box3d_editor",
+        "box3d/authoring",
+        "box3d/godot/authoring",
+        "addons/box3d_authoring/body_3d.gd",
+        "addons/box3d_authoring/plugin.gd",
+        "addons/box3d_authoring/tool_module"
+      ],
+      "task_id": "t_32eb23d3e2554c2d",
+      "progress": "Implemented a separate editor-only batched shape preview using the shared shape baker and outline conversion. Complete valid fragments remain visible beside invalid objects; red/amber markers distinguish authoring errors from preview/tool limits. Full validation stays separate and strict. Unique endpoint lookup, finite coordinate conversion, bounded output, per-slot diagnostics, and edit/undo/scene-close cache lifecycle are qualified through the actual compiled tool module and editor.",
+      "review_notes": [
+        "Keep partial preview separate from strict inspection, artifact baking/loading and runtime construction. Never turn an invalid pose fallback into visible valid geometry.",
+        "Use shared per-shape bake_asset and debugdraw.preview_geometry; return request-local fragment indexes, never durable IDs or a purported valid Baked_Scene.",
+        "Missing/duplicate keys must not gate drawable geometry. Bad joint endpoint lookup must reject ambiguity, not select the last body. Capacity omissions are whole fragments and do not erase earlier valid output."
+      ],
+      "evidence": {
+        "pure": "/tmp/odin-usability-preview-pure-final.log",
+        "frontend_identity_regression": "/tmp/odin-usability-preview-parse2.log",
+        "editor": "/tmp/odin-usability-preview-editor-lifecycle.log",
+        "strict_artifacts": "/tmp/odin-usability-preview-strict.log",
+        "strict_debugdraw": "/tmp/odin-usability-preview-debugdraw-final.log",
+        "editor_directory": "/private/tmp/nix-shell.XX5TTk/odin-box3d-preview-lt7l0s3z",
+        "identity_regression": "/tmp/odin-usability-preview-identity-final.log",
+        "docs": "/tmp/odin-usability-preview-docs.log",
+        "addon": "/tmp/odin-usability-preview-addon.json"
+      },
+      "test_diagnosis": [
+        "Initial new Odin fixtures had invalid compound-literal loop/slice syntax; corrected the tests without changing their assertions.",
+        "The new GDScript collector needed a preload for its constant helper and explicit Transform3D types for variant-derived joint frames; corrected the implementation.",
+        "Read-only review found nonfinite output could escape after inversion of an enormous finite transform. Added finite determinant/inverse/final-point checks and live regression cases.",
+        "Duplicate-shape diagnostics reused one path while changing the slot, which discarded a marker. Each offending slot now gets its own path; the actual editor checks all three duplicate slots.",
+        "Shared-only joint/character errors were associated only with World. Mapped body/shape and element indices back to actual source objects; added shared hinge-limit and Resource-conflict checks.",
+        "A finite GDScript float can exceed float32 range and poison batch parsing. Such a shape is filtered and marked before JSON construction, leaving other shapes visible. Empty joint references also cannot resolve to an unkeyed body.",
+        "Same-frame direct scene-history undo did not emit the manager signal used by the cache. The plugin now observes the active scene history too. Review then identified scene-history deletion as a freed-handle risk; guarded/disconnected it and tested close/reopen/disable.",
+        "An older debug-draw test assumed a single 4096-triangle mesh exceeded the global line budget. The selected profile now allows 32768 lines. The test now checks the exact selected-profile requirement and separately reaches the global limit with valid bindings, retaining no-partial-output canaries.",
+        "The prior full-editor fixture expected every preview to disappear after one invalid transform. Updated that obsolete assertion to require retained unrelated geometry, an error marker and strict validation refusal."
+      ],
+      "validation": [
+        "Four pure preview tests pass with memory tracking: invalid neighbors/missing keys, later small fragments after capacity omission, exact parity with strict geometry, strict atomic output, bad pose rejection and malformed/deep requests. Preview output contains no artifact, content hash or durable ID fields.",
+        "Five existing strict authoring artifact tests and eight existing debug-draw tests pass with memory tracking; strict bake/artifact validation and atomic runtime drawing remain intact.",
+        "Actual ordinary core/module build, editor import and live editor gate pass against the coherent native backend. Cases cover missing/duplicate body IDs, duplicate shape slots, conflicting Resource geometry, invalid sibling shape/placement/solver settings, bad and ambiguous joint references, shared-only hinge validation, character errors, unavailable tools, bounded fragments, float32 overflow and overflowing coordinate inverses.",
+        "Every live preview query compares authored properties/Resources and real Box3D engine/wrapper allocation counters before and after; none change. Repair restores the exact original valid points/colors.",
+        "Actual body gizmo redraws in the same frame verify edit and undo invalidate cached validation. Closing/reopening the watched scene and disabling the plugin exit cleanly without stale history callbacks.",
+        "The editor identity regression still passes import, actual editor operations and fresh-process reload with the new collector/body-header extraction.",
+        "Documentation link check and complete site build, Python compilation, shell syntax and git diff --check pass. The Nix addon builds and its three changed preview implementation files match source byte-for-byte. Pure checks are registered in the suite; the real editor gate is wired to the native desktop workflow. Remote CI was not executed locally."
+      ],
+      "limitations": [
+        "Shape outlines require the ordinary compiled authoring tool module; unavailable tools produce diagnostics and markers, not replacement geometry.",
+        "An invalid World coordinate frame refuses geometry rather than inventing placement. Capacity can omit complete fragments/markers, with explicit incompleteness.",
+        "Native/editor runtime evidence is macOS arm64. Canonical frontend packaging/setup is tracked in P2-07. No new Windows, Linux or browser runtime claim is made."
+      ]
+    },
+    {
+      "id": "P2-06",
+      "phase": 2,
+      "title": "Add body pickers and editable joint anchors",
+      "status": "complete",
+      "acceptance": "Author joints by selecting bodies and placing a viewport anchor; derive body-local frames and preserve advanced explicit editing. Validate transformed parents and undo/redo.",
+      "files": [
+        "addons/box3d_authoring",
+        "tests/box3d_editor",
+        "docs/box3d"
+      ],
+      "task_id": "t_8ea0561ebf174f3e",
+      "progress": "Implemented named body pickers, default viewport anchors with an independent full B transform, advanced body-local editing, lossless mode conversion and native undoable gizmo handles. Extraction and preview share frame resolution, including transformed parents and plain Node transform breaks. Owned scenes and constructors explicitly use body-local mode to preserve their prior physics; the detached schema remains unchanged.",
+      "review_notes": [
+        "Keep the native/detached schema unchanged: viewport authoring resolves to the same body-local frames.",
+        "A full Transform3D B offset preserves independently rotated endpoint frames during mode conversion; do not silently discard B orientation.",
+        "Use local ancestry to World so detached extraction and transformed-parent cases agree. Body lookup is scoped, unique, and refuses missing/ambiguous references.",
+        "Shared Distance settings are not changed when anchors move; target/rest length remains an explicit independent authored value."
+      ],
+      "evidence": {
+        "migration": "/tmp/odin-usability-joint-mode-migration.json",
+        "editor_reload_legacy_bake": "/tmp/odin-usability-joint-legacy-full.log",
+        "editor_directory": "/private/tmp/nix-shell.UFyDge/odin-box3d-joints-3g2nsel2",
+        "preview_regression": "/tmp/odin-usability-joint-preview-regression.log",
+        "identity_regression": "/tmp/odin-usability-joint-identity-regression.log",
+        "native_motion": "/tmp/odin-usability-joint-native-motion-final/report.json",
+        "docs": "/tmp/odin-usability-joint-docs.log"
+      },
+      "test_diagnosis": [
+        "The initial reload fixture compared parsed floating-point dictionaries and encountered round-trip numeric discrepancies. It now compares canonical full-precision definition JSON bytes across fresh-process reload, which passes.",
+        "A new refusal fixture needed an explicit bool type for a Variant-derived expression; corrected the test.",
+        "Review exposed a transform inheritance mismatch around plain Node parents. Shared extraction, preview and anchor conversion now follow native Node3D inheritance, with actual editor comparisons against native globals and detached extraction.",
+        "Finite input coordinates could overflow during body-origin placement. Validate the final frames before applying the atomic plan; the overflow fixture verifies no mutation.",
+        "Moving an anchor marker can move a referenced descendant body. Conversion and body-origin placement now refuse such plans with an actionable message; explicit frames remain available.",
+        "Existing scenes and constructors relied on body-local identity defaults. Migrated them explicitly to BODY_LOCAL and verified their extracted local frames rather than retaining a compatibility heuristic."
+      ],
+      "validation": [
+        "Actual isolated editor import, body picker, frame-mode dropdown, transformed parents, independent endpoint orientations, gizmo drag/cancel/commit and native undo/redo pass. Missing/ambiguous references, nested World scope, rekey/rename, invalid transforms, overflow and descendant-body cases are covered.",
+        "Fresh-process detached reload preserves canonical definition bytes. Shared and Dockyard migrated scenes preserve explicit endpoint frames; canonical shared content remains identical in Kit, Replay and Web copies.",
+        "The resulting definition builds through the shared Odin baker with four bodies, two joints and preserved frames and valid distinct body references.",
+        "The actual compiled partial-preview gate and identity editor/reload regressions pass after the shared transform changes.",
+        "Final ordinary SDK build/import/native motion gate passes all eight separate joint families and character motion. Source, native library and engine fences are unchanged; import and runtime logs contain no script errors, resource leaks or remaining-resource warnings.",
+        "Documentation link check and complete site build, Python compilation, shell syntax and git diff --check pass. The joint gate is registered in tests/run_all.sh; remote CI was not run."
+      ],
+      "limitations": [
+        "Editor/native runtime evidence is macOS arm64; no new Linux, Windows or browser runtime qualification is claimed.",
+        "Moving anchors does not change the independent target/rest length in shared joint settings.",
+        "Mode conversion that would move a referenced descendant body is refused. Move the marker outside that body hierarchy or retain explicit frames.",
+        "Canonical frontend packaging/setup remains the next task, P2-07."
+      ]
+    },
+    {
+      "id": "P2-07",
+      "phase": 2,
+      "title": "Unify Box3D setup/update status and simplify UI language",
+      "status": "complete",
+      "acceptance": "Offer actionable install/build/update status for the tool bridge while protecting modified user sources. Present validate/bake tasks in game-author language and keep detailed contract JSON expandable.",
+      "files": [
+        "addons/box3d_authoring",
+        "build",
+        "tests/box3d_editor",
+        "docs/box3d/editor.md",
+        "core",
+        "box3d/types",
+        "box3d/authoring",
+        "kit/physics",
+        "replay/physics",
+        "examples",
+        "tests/instance_lifecycle"
+      ],
+      "discovered_work": [
+        "The downloaded SDK currently omits the Box3D authoring frontend (build/dist.nix). Include or supply its source through the canonical setup flow while preventing duplicate global GDScript classes in the installed source template and active addon."
+      ],
+      "task_id": "t_c022efab42724e4f",
+      "progress": "SDK now includes one canonical Box3D frontend beside odin_godot. Its Inspector/menu panel installs or updates tracked tool sources, preserves local edits, invokes the ordinary asynchronous build, and verifies the loaded source fingerprint. Concise validation/bake results retain expandable technical details. Pure data/baking no longer imports native domain registration; native construction and runtime draw ownership live in authoring/runtime, with 29 owned consumers migrated. Newly built modules load without an editor restart through the existing admission gates, and unresolved admission errors remain visible across unrelated builds.",
+      "evidence": {
+        "package": "/tmp/odin-usability-setup-addon-final.json",
+        "source_migration": "/tmp/odin-usability-authoring-runtime-migration.json",
+        "pure_preview": "/tmp/odin-usability-setup-pure-split.log",
+        "native_artifact": "/tmp/odin-usability-setup-native-artifacts2.log",
+        "frameworks": "/tmp/odin-usability-setup-frameworks-serial.log",
+        "docs": "/tmp/odin-usability-setup-docs-final.log",
+        "package_source_parity": "/tmp/odin-usability-setup-package-parity.json",
+        "packaged_acceptance": "/tmp/odin-usability-setup-editor6.log",
+        "suite": "/tmp/odin-usability-setup-suite.log",
+        "suite_report": "/tmp/odin-usability-setup-suite-report.json",
+        "suite_editor_directory": "/private/tmp/nix-shell.27triR/odin-box3d-setup-x3absnow",
+        "identity_regression": "/tmp/odin-usability-setup-identity.log",
+        "native_motion": "/tmp/odin-usability-setup-native-motion/report.json",
+        "reload_lifecycle": "/tmp/odin-usability-setup-lifecycle.log",
+        "authoring_pure": "/tmp/odin-usability-setup-box3d_authoring-pure.log",
+        "motion_pure": "/tmp/odin-usability-setup-box3d_motion-pure.log",
+        "strict_artifact_pure": "/tmp/odin-usability-setup-box3d_editor-pure.log"
+      },
+      "test_diagnosis": [
+        "Fixed missing-directory enumeration error spam and preservation of hidden auxiliary files in staged source updates.",
+        "A new source fingerprint method passed a String where the Godot binding needs a pointer; corrected the implementation.",
+        "Malformed installation records now return a setup diagnostic without JSON parser error spam.",
+        "Review found accepted manual merges left an old baseline. Update the receipt even when installed bytes already equal the incoming version; test a subsequent clean update.",
+        "Build-status errors must remain visible for locally customized sources. Separate source conflict information from coordinator progress/failure.",
+        "Native root import triggered domain registration in ordinary script DLLs, making pure editor tooling require a solver library. Moved shared PODs to box3d/types and native construction/runtime draw ownership to box3d/authoring/runtime; kept domain enforcement intact.",
+        "Empty-main handling must remember a previously observed package independently of last_hashes, which is cleared after failures. Test two failed builds after removing the entire main source package, then restoration.",
+        "First-time script modules were rejected as unknown until editor restart. Route their canonical DLL path through the same admission, ABI, collision and generation-publication path as reloads.",
+        "The native framework test was initially invoked with four concurrent test threads, conflicting with native owner-thread requirements. The correct single-thread invocation passes all four tests; no assertions were weakened.",
+        "Review found concise frontend diagnostics used path while the result summary only read field. Added the path fallback and tested two distinct offending object locations.",
+        "Partial module admission initially printed a full-success message, and a later unrelated build could hide the earlier rejected module. Track unresolved admission failures by module, preserve existing working instances, and qualify collision, unrelated targeted rebuild, repair and first-time admission in the real editor.",
+        "Three pure test invocations initially shared the default pure.test output path. Distinct per-suite output binaries pass all 14 tests; no production change or weakened assertion was needed.",
+        "An unavailable tool bridge was previously reported as a corrupt artifact. It now returns an unavailable error, queues the source, and retries the real importer when loaded tools are ready. The editor gate verifies successful Resource loading after the retry."
+      ],
+      "validation": [
+        "The registered box3dsetup suite gate passes from the built SDK: both sibling addons, no duplicate AuthoringTools class, actual setup button, missing compiler and recovery, ordinary module-only compilation, loaded-source fingerprint, clean source update, custom source preservation/build, and plugin disable/re-enable.",
+        "The gate deliberately selects a nonexistent native archive while retaining ordinary DLL domain admission. Pure validation, preview-bearing inspection, artifact bake and actual import succeed. The resulting tool DLL has no undefined ogb3 symbols.",
+        "Source update cases cover idempotence, added/removed managed files, hidden/user/generated file preservation, modified/deleted sources, invalid installation records, identical untracked adoption, and a second clean update after an explicit manual merge.",
+        "Actual editor checks pass for failed builds after removing a previously compiled main package twice, restoration, module-only periodic reconciliation, collision rejection with existing instances intact, an unrelated targeted rebuild that cannot clear the rejection, and repaired admission without restart. Only exact expected diagnostics inside marked negative checks are accepted.",
+        "The real artifact importer distinguishes unavailable tools, queues the existing source, automatically reimports after build, and yields a strictly valid Box3DBakeArtifact Resource. Concise Inspector output includes counts and offending object paths; technical JSON is initially collapsed and can be expanded.",
+        "Five pure authoring tests, four pure motion tests, five strict artifact tests, four partial-preview tests, one source-free native artifact test, and four serial native framework/presentation tests pass with memory tracking.",
+        "Ordinary SDK native motion qualification passes all eight joint families plus character movement with unchanged selected-source, native-library and engine fences. Import/runtime logs have no script errors or leaked-resource warnings.",
+        "Existing real editor identity operations/fresh reload and instance reload/finalization regressions pass. The new module loader retains the same ABI/domain/collision/generation gates and was reviewed independently.",
+        "Documentation link check and complete site build, Python compilation, shell syntax and git diff --check pass. The final Nix SDK builds with the frontend and new packages; all 743 files across the checked implementation directories match the SDK used by the passing suite. The last package rebuild updates documentation; its separately built core binary is not byte-identical to the tested build."
+      ],
+      "limitations": [
+        "Actual editor/native runtime qualification is macOS arm64. Remote CI and new Linux/Windows/browser runtime qualification were not executed.",
+        "Native gameplay still requires a matching Box3D backend. Only pure authoring/preview/baking is backend-free.",
+        "Unknown differing or locally deleted tool sources require a deliberate merge; the updater has no force-overwrite action.",
+        "The authoring runtime API moved directly to godot:box3d/authoring/runtime. Owned consumers were migrated; no obsolete forwarding API remains. Full final game/export/network journeys remain P3-06."
+      ]
+    },
+    {
+      "id": "P2-08",
+      "phase": 2,
+      "title": "Ship a minimal offline editor-authored Box3D starter",
+      "status": "complete",
+      "acceptance": "One authored world, bodies and visual binding with standard build/play/export and correct cleanup. Keep framework ownership qualification instrumentation in separate advanced examples.",
+      "files": [
+        "examples",
+        "box3d/godot",
+        "docs/box3d",
+        "tests",
+        "build/dist.nix",
+        "docs/examples",
+        "docs/.vitepress"
+      ],
+      "task_id": "t_bd61cb6eb2e343e3",
+      "progress": "Shipped examples/box3d_starter and SDK template/box3d: one authored crate/floor world, automatic visual bindings, jump/reset controls and standard desktop presets. Added a small offline scene owner that captures immutable initial data, steps explicitly, resets from the capture and performs checked finalize cleanup. The prior procedural tower remains separate and now also finalizes its native owner correctly.",
+      "evidence": {
+        "sdk": "/tmp/odin-usability-offline-sdk-final.json",
+        "packaged_runtime": "/tmp/odin-usability-offline-play6.log",
+        "suite": "/tmp/odin-usability-offline-suite.log",
+        "suite_report": "/tmp/odin-usability-offline-suite-report.json",
+        "visual_and_initial_export": "/tmp/odin-usability-offline-export.log",
+        "export": "/tmp/odin-usability-offline-export-repaired.log",
+        "export_report": "/private/tmp/nix-shell.jKIl33/odin-box3d-starter-z0k34tl6/export-report.json",
+        "screenshot": "docs/img/box3d-starter.png",
+        "procedural_lifecycle": "/tmp/odin-usability-tower-lifecycle.log",
+        "docs": "/tmp/odin-usability-offline-docs-final.log",
+        "fixture_abort_diagnosis": "/tmp/odin-usability-offline-abort-phases.log"
+      },
+      "review_notes": [
+        "Retain a captured immutable Baked_Scene for reset; do not re-extract body nodes after physics has moved them. Keep the owner across temporary tree exit and release it in finalize.",
+        "Capture body bindings in parent-before-child order, independently of stable-key bake order; publish world-relative native poses as global node transforms and preserve Mesh-local transforms.",
+        "Keep bindings weak, exclude nested Worlds, reject changed body ancestry/timing before stepping, and preserve any native owner retained by failed construction/destruction.",
+        "Synchronous engine transform notifications can remove the owning script. Open must not publish before the caller stores the returned owner; later publication detects reset/destruction immediately and returns Interrupted."
+      ],
+      "test_diagnosis": [
+        "Initial helper compilation identified pointer-addressing and Godot binding parameter mismatches; corrected the implementation against the actual generated bindings.",
+        "The first Nix fixture copy inherited a read-only project directory. The runner now makes the copied root writable before installing addons; the source convenience installer also makes addon roots writable.",
+        "Installed SDK native builds failed because backend receipts validate producer/test sources that the package omitted. Bundle those exact inputs and an ignored canonical capacity default; all 52 source hashes match the selected backend, without relaxing receipt checks.",
+        "The test Quaternion return needed an explicit transmute to Godot's quaternion representation, and a Variant-derived GDScript transform needed an explicit type. Corrected the probe.",
+        "The allocation probe reused Tracking_Allocator after destroy. The actual compiler library frees its map/array without clearing the struct; init does not reset dangling storage. Phase markers and a second review isolated the second-open failure. Zero the tracker after destroy; all allocation assertions remain and pass.",
+        "Review found stale onready pointers could be dereferenced during body lookup, and synchronous pose notifications could finalize the owner mid-publication. Resolve stored IDs before pointer comparison and detect owner revision/world changes after each engine setter; the real runtime tests both cases.",
+        "The macOS arm64 preset requires the project's ETC2 ASTC import setting even for this simple scene. Added it to the template, then exported successfully through the ordinary exporter with explicit tool/backend selections removed.",
+        "The new procedural guide needed a site-map entry. Added the page and updated the tutorial/sidebar/API entries; the full documentation check now passes."
+      ],
+      "validation": [
+        "The registered box3dstarter suite gate passes from the final packaged SDK using normal build/import/play. Starter source/presets match the package, and all 52 selected native backend receipt inputs match byte-for-byte.",
+        "Gameplay checks cover falling/contact, Space impulse, repeated reset to initial positions, temporary tree exit/re-entry, script removal outside the tree, fresh scene creation and node deletion. Native engine/wrapper allocation totals return to zero after cleanup.",
+        "The separate test probe covers rotated/translated World and parents, plain Node inheritance breaks, nested bodies with reverse key order, nested World exclusion, Mesh offsets/scales, moving the presentation frame, timing and ancestry refusal before stepping, invalid-authoring cleanup, stale raw node pointers and freed source nodes. Tracked helper allocations return to zero.",
+        "A body transform notification synchronously removes the owning Odin script during pose publication. The helper returns Interrupted, stops touching released storage and leaves native allocations at zero.",
+        "The actual graphical game passes the same runtime checks; its viewport capture was inspected and is included in the guide. No telemetry or qualification logic was added to the shipped game script.",
+        "Normal macOS arm64 release export, strict deep codesign verification and exported gameplay/helper acceptance pass. Export and the exported app use a minimal system PATH with explicit compiler/backend variables removed; export recovers remembered tools and the game runs without a compiler.",
+        "The existing procedural tower passes ordinary build/import/play, temporary exit/re-entry and outside-tree script-removal cleanup after moving its cleanup hook to finalize.",
+        "Documentation link validation and full site build, Python compilation, shell syntax and git diff --check pass. Runtime instrumentation remains under tests; the product loop only owns gameplay and checked physics lifecycle."
+      ],
+      "limitations": [
+        "Runtime and export evidence is macOS arm64. The Linux preset is supplied without a new Linux runtime claim; Windows/browser starter export was not qualified. The procedural tower retains its separate browser path.",
+        "The local scene owner intentionally does not discover runtime-spawned bodies or manage framework checkpoints/networking. Changed body ancestry is reported; custom composition remains available through the lower-level APIs.",
+        "Godot physics ticks must match the selected Box3D timing profile. Owned-state changes recreate the gameplay instance instead of adding an unsafe empty reload hook."
+      ]
+    },
+    {
+      "id": "P2-09",
+      "phase": 2,
+      "title": "Encapsulate standard complete-physics runtime ownership",
+      "status": "complete",
+      "acceptance": "Provide a small safe standard owner for catalogs/codecs/checkpoints/allocation and callback leases, with checked ordered shutdown; simplify Kit/Replay authored samples while retaining ownership guarantees.",
+      "files": [
+        "box3d",
+        "kit/physics",
+        "replay/physics",
+        "examples/kit_box3d_authoring",
+        "examples/replay_box3d_authoring",
+        "tests",
+        "kit/godot/physics",
+        "kit/sim",
+        "kit/netgd",
+        "kit/boot",
+        "replay/godot/physics",
+        "docs/box3d",
+        "docs/kit/sim.md"
+      ],
+      "review_notes": [
+        "Independent Kit and Replay reviews recommend a small shared metered-allocation/exact-block-lease substrate, with framework-specific attachment and ordered cleanup; preserve explicit game models, drivers, rules, input and network policy.",
+        "Kit needs stable storage for exact codec/provider/network user aliases. Shutdown order is not reverse construction: stop wire ingress before network/checkpoint users, codecs/provider, lane/session/content, then capabilities/storage/context. Preserve late-drop retry state after payload teardown.",
+        "Replay can compose its existing Session with a complete-physics owner. Its codec already clones the catalog, so the sample's additional catalog clone is redundant. Keep initial checkpoints and partial build owners as tracked fields until checked cleanup succeeds.",
+        "Inspect replay/physics/network_codec.odin: current destroy clears codec state then ignores final owner_drop results; init rollback and codec_drop also need review. A wrapper cannot promise retryable checked teardown until failed drops retain their handles.",
+        "Qualify partial setup failures, Busy/in-flight close followed by retry, repeated close, detached checkpoint independence, two concurrent owners and source/script removal. Keep offline scene ownership separate from framework policy."
+      ],
+      "task_id": "t_af56dd70e9dc4c15",
+      "progress": "Added stable metered Storage(T), standard authored Kit and Replay owners, guarded borrowed access and managed temporary checkpoints. Migrated both authored samples away from manual allocator/context/numbered-owner setup and ordered teardown. Corrected the lower-level rollback and release paths needed to preserve retry ownership. Final ordinary Host/Client pairs and lifecycle/regression gates pass.",
+      "evidence": {
+        "storage": "/tmp/odin-usability-owner-storage-final.log",
+        "kit_cleanup": "/tmp/odin-usability-owned-kit-cleanup6.log",
+        "replay_codec": "/tmp/odin-usability-owner-replay-regression.log",
+        "kit_pair": "/tmp/odin-usability-owned-kit-final-runtime/report.json",
+        "replay_pair": "/tmp/odin-usability-owned-replay-final-runtime/report.json",
+        "core_lifecycle": "/tmp/odin-usability-complete-owner-final.log",
+        "suite": "/tmp/odin-usability-complete-owner-suite.log",
+        "suite_report": "/tmp/odin-usability-complete-owner-suite-report.json",
+        "kitsim": "/tmp/odin-usability-owner-kitsim.log",
+        "wire": "/tmp/odin-usability-owner-wire-qualified3.log",
+        "docs": "/tmp/odin-usability-owner-docs.log",
+        "sdk": "/tmp/odin-usability-owner-sdk.json",
+        "package_parity": "/tmp/odin-usability-owner-package-parity.json"
+      },
+      "test_diagnosis": [
+        "Replay codec initialization/destruction discarded refused owner drops. Acquired capabilities are now recorded immediately, failed void releases are queued, and cleanup-only state retains failed final drops for retry.",
+        "Kit codec, network and provider cleanup had analogous discarded releases. Nested codec creation references and provider temporary retains now remain owned; accounting is debited once, after fallible teardown dependencies.",
+        "Kit Lane destroyed its World_History before checked owner drops, losing failures. Lane now retains a fixed cleanup group, attach rollback uses that same group, and lane_destroy returns a checked World_Error. Network teardown counts completed releases before freeing buffers.",
+        "Review exposed cleanup callback reentry into retired history and a final-drop write through potentially freed Lane storage. Persistent closing guards protect operations during resource teardown; a bounded thread-local retirement guard spans the final callback without touching released Lane storage. Native tests exercise both cases.",
+        "The first Kit pair reached tick120 but its diagnostic view requested the 64MiB command reservation within a dedicated 4MiB read budget. The read-only diagnostic no longer requests unrelated physics-command workspace; its existing budget, reconciliation and allocation checks remain. The pair now passes.",
+        "Replay startup originally used the checkpoint default epoch1. It now passes the requested network epoch, qualified with epoch7. Finalization closes the actual owner even when initialization has not published its borrowed state alias.",
+        "Storage release needed to preserve its last block alias when another allocation prevented final context destruction. Added a preflight before alias mutation and a successful retry test. Allocator capabilities pin the stable payload, preventing address reuse while detached checkpoints retain the context.",
+        "New test fixtures initially omitted matching allocator-data metadata, used a nonexistent Kit realm getter, expected Budget where the public owner API normalizes rejection, and omitted a C-callback context. Corrected the fixtures against the intended contracts, retaining all release/count assertions.",
+        "The optional generic cleanup callback default hit a compiler typing limitation; explicit overloads now provide the value-only default. Other new probe compile errors were untyped string transmute, a raw field named owner in a script file, and a Variant-derived GDScript variable needing an explicit type.",
+        "A supplementary managed wire invocation omitted its required compiled native identity. Rerunning with the selected backend's verified sha256-prefixed build/target defines passes; no validation bypass or assertion change was used."
+      ],
+      "validation": [
+        "Eleven metered-storage tests pass: exact and first-field/root aliases, separate live-instance capabilities, detached allocator retention, another source while the prior context lives, partial creation/binding failure, late-drop retry, nil service rejection and final context refusal without retiring its retry alias.",
+        "All twenty Replay native codec/network tests pass, including refused final drops, init rollback and void runtime-release retention, with real native catalogs/schemas and memory tracking.",
+        "All sixteen Kit native tests pass, including existing physics/history/correction/failure cases and new codec/provider/Lane/network retained-cleanup and callback-reentry tests. Native, wrapper, provider and checkpoint teardown counters return to zero.",
+        "The real Core lifecycle gate passes unsupported role and rejected initializer rollback, epoch7 startup, concurrent Replay sources, detached checkpoints surviving source shutdown, reopening while an old checkpoint remains, managed temporary checkpoints, Kit busy-close retry, and synchronous script removal during initialization. All meter categories and native allocations return to baseline.",
+        "Fresh standard builds and ordinary real Host/Client pairs for both migrated authored samples reach tick120, preserve matching complete diagnostic views, and report checked zero cleanup with project/binary fences intact. The samples retain explicit game, input, roster, driver, rules and presentation policy.",
+        "The registered completephysicsowner gate passes. Fifty-eight existing Kit simulation tests and the managed reliable-wire/lifetime test also pass.",
+        "Documentation links and the complete site build, Python compilation, shell syntax and git diff --check pass. The Nix addon builds; all 38 checked implementation files across the new owners and affected libraries match the packaged SDK."
+      ],
+      "limitations": [
+        "Actual SDK/network runtime evidence is macOS arm64. No new Linux, Windows, browser, export or remote-CI qualification is claimed for this card; final developer journeys remain P3-06.",
+        "Replay managed complete physics still requires a network role with Enet or Rtc. Unsupported Solo/Steam configurations are rejected before allocation rather than silently substituted.",
+        "Application callback contexts and application-owned data remain explicit. Failed close preserves its control record for retry; callers must keep it until close succeeds. Detached clones remain independently owned.",
+        "The allocator capability retains the stable payload until the last relevant detached owner drops; retained bytes stay metered. Raw low-level meter leases are not substitutes for the storage capability."
+      ]
+    },
+    {
+      "id": "P2-10",
+      "phase": 2,
+      "title": "Surface existing Replay presentation/effect helpers",
+      "status": "complete",
+      "acceptance": "Add one sound and visual effect to the small starter using typed routes and identity/cancellation semantics. Teach task-oriented recipes and update existing game glue to current accessors.",
+      "files": [
+        "build/template/replay",
+        "docs/replay",
+        "replay/godot/scene",
+        "examples/replay_scrapyard",
+        "tests"
+      ],
+      "task_id": "t_11be36b8c7754b6e",
+      "progress": "The packaged Replay starter now includes a typed pickup flash and confirmed sound using the existing gameplay occurrence and routes. It handles updates/cancellation/epochs, retires consumed IDs only after delivery queues drain, and releases effects in finalize. Updated the task-oriented guide and Replay Scrapyard seat/link/RTC accessors. Final isolated SDK solo/network/browser distribution acceptance passes.",
+      "test_diagnosis": [
+        "The initial isolated consumer copy inherited read-only Nix directory permissions; made the temporary consumer writable, as the distribution runner already does. Normal packaged script build then passes.",
+        "Direct odin check correctly rejected stale generated Scrapyard hashes after accessor edits. The normal build helper regenerated metadata and compiled all 26 script declarations successfully.",
+        "The existing distribution driver quit after two unthrottled frames immediately after pickup, before AudioServer retired its stopped playback. Verbose output identified AudioStreamWAV and AudioStreamPlaybackWAV as the remaining references. A 250 ms engine-loop drain after node deletion removes both warnings with unchanged product cleanup; updated the runner accordingly. The zero-leak assertion must remain in the full distribution gate.",
+        "The distribution source snapshot predated packaged Box3D authoring/starter and native receipt inputs, and omitted WAV files. Updated its explicit input set to match the current package rather than bypassing package validation.",
+        "A test-local ReplayStarter initially produced a large-stack warning. Moved that isolated test owner to checked heap lifetime; the final native build is warning-free.",
+        "The Nix Emscripten wrapper resolves its cache through command -v emcc even when invoked by absolute path. The first export succeeded with a dirname warning; the final qualification includes the selected tool directory on PATH and completes cleanly."
+      ],
+      "partial_evidence": {
+        "sdk": "/tmp/odin-usability-effects-sdk.json",
+        "consumer_compile": "/tmp/odin-usability-effects-compile.log",
+        "consumer_import": "/tmp/odin-usability-effects-import.log",
+        "solo_before_drain": "/tmp/odin-usability-effects-solo-verbose.log",
+        "solo_after_drain": "/tmp/odin-usability-effects-solo-drained.log",
+        "scrapyard_build": "/tmp/odin-usability-effects-scrapyard-build.log",
+        "docs": "/tmp/odin-usability-effects-docs.log"
+      },
+      "validation": [
+        "The final distribution runner builds a fresh SDK from a frozen source snapshot, copies it into an isolated consumer, compiles/imports the normal starter, and passes solo plus Host/Client/Observer gameplay. All roles wait beyond tick600 before pickup, display exactly one flash, play exactly one sound, capture nonzero Dummy mixer PCM, expire the flash, and exit without resource/instance warnings.",
+        "A test-only adapter probe exercises speculative Begin then Cancel without sound; repeat suppression after cancellation and expiry; confirmation without visual restart and exactly one sound; all three pending-delivery queue guards; minimum confirmed/watched retirement; reuse of a bounded ledger bucket after 512 ticks; authority retirement; newer/stale epoch handling; screen-only and world-only audio pools, empty/negative pool refusal, and unavailable voice-kind refusal.",
+        "The ordinary Web build/export and Chromium run pass after a real click. The browser observes one visual, one sound dispatch, expiry and successful gameplay, with no script/runtime errors. The browser viewport was inspected.",
+        "All 15 checked starter assets/sources and affected library/docs files match the final packaged SDK byte-for-byte; all 294 Replay Odin sources match its source snapshot. The consumer contains no original checkout references.",
+        "The migrated Replay Scrapyard example compiles through the normal build helper with all 26 declarations. Documentation links and the full site build pass. Shell/Python/JavaScript syntax checks and git diff --check pass."
+      ],
+      "evidence": {
+        "distribution": "/tmp/odin-usability-effects-final.log",
+        "result": "/tmp/odin-usability-effects-final/result.json",
+        "source_parity": "/tmp/odin-usability-effects-final/source-parity.json",
+        "solo": "/tmp/odin-usability-effects-final/solo.log",
+        "host": "/tmp/odin-usability-effects-final/host.log",
+        "client": "/tmp/odin-usability-effects-final/client.log",
+        "observer": "/tmp/odin-usability-effects-final/observer.log",
+        "browser": "/tmp/odin-usability-effects-final/browser.log",
+        "scrapyard_build": "/tmp/odin-usability-effects-scrapyard-build.log",
+        "docs": "/tmp/odin-usability-effects-final-docs.log"
+      },
+      "limitations": [
+        "Native runtime evidence is macOS arm64 with Godot 4.7.1 and its Dummy mixer. Browser evidence verifies exported gameplay, visual lifetime and audio routing after a gesture; it does not claim physical-device audibility or browser mixer capture.",
+        "The safe gameplay-event frontier remains a small starter-local helper. General Session presentation/reset/correction access is P3-04; final sibling Scrapyard SDK installation and complete developer journeys remain P3-06."
+      ]
+    },
+    {
+      "id": "P3-01",
+      "phase": 3,
+      "title": "Support Kit declarations across script subpackages",
+      "status": "complete",
+      "acceptance": "Resolve module-wide Kit metadata with stable qualified identities/import direction. Move an entity into a subpackage without changing its wire contract; migrate fixtures and remove root-only restriction.",
+      "files": [
+        "scriptgen",
+        "runtime",
+        "kit",
+        "tests",
+        "docs/modules.md"
+      ],
+      "task_id": "t_b355367d95e643b1",
+      "progress": "Complete: Kit entities, inputs, callbacks, profiles, messages, codecs, events and backups resolve across module subpackages. Shipped HelloNet/HelloSim use entity packages with owner-side birth callbacks. Native peer journeys, schema/version relocation invariants and a real linked browser runtime pass.",
+      "review_notes": [
+        "Independent read-only Kit review confirms a module-wide parse/resolve/emission design is necessary: root-only metadata, package-local input/entity IDs and game-aware callbacks cannot be fixed by deleting refusal checks.",
+        "Resolve code identity by normalized declaring package and symbol through each defining file import map. Import aliases and file location must not become wire identity. Existing explicit numeric entity IDs can anchor tagged-entity schemas, including same-named types in separate packages.",
+        "Input/profile/message wire roots require stable binding identities beyond numeric entity IDs; sort/deduplicate resolved input types by stable binding uses rather than textual import-qualified names. A deliberate ABI schema migration may replace the old frozen shipped-flat fingerprint assertion with relocation/alias invariance.",
+        "Keep one root boot/guard/import manifest and the real subpackage-to-root import-cycle prohibition. Move game-aware consequence/edge/tick/presentation adapters into the owning game package, using per-Session descriptor bindings rather than mutable package-global current-game callbacks.",
+        "Compare two callback designs before extending runtime: typed per-entity callback tables carried by bound command/sim descriptors versus owner-specific generated Command_Set/Sim_Set thunks through existing Entity_Kind bindings. Both must cover the generated local-authority command fast path and client prediction, not only received commands.",
+        "Acceptance needs moved HelloNet/HelloSim entities and inputs, actual peer gameplay, relocation/import-alias invariance, same-named type disambiguation and duplicate numeric-ID errors, two game instances with different callbacks, imported constraints/codecs/profiles/messages, local composed blocks, and native/Web generation. Replace obsolete root-only refusals with positive cases while retaining true import/alias isolation failures.",
+        "Selected the smaller design after second review: reuse existing Entity_Kind.set/sim_set and immutable owner-scoped Command_Set/Sim_Set/Edge_Desc thunks. The registry and tracked simulation already carry the binding; no new mutable global callback slots or runtime callback-context ABI fields are needed. Leaf-private implementation procedures may need narrow generated bridges."
+      ],
+      "partial_evidence": {
+        "compiler": "/tmp/odin-usability-scriptgen-p3-build.log",
+        "generator_regression": "/tmp/odin-usability-scriptgen-module-fixed-regression.log",
+        "differential_report": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-usability-p3-parse-iuibxi9y/report.json",
+        "subpackage_generator_checks": "/tmp/odin-usability-subpkg-p3.log",
+        "baseline_subpackage_checks": "/tmp/odin-usability-subpkg-before-p3.log",
+        "command_binding_suite": "/tmp/odin-usability-kitbindings-retire-suite/report.json",
+        "command_binding_log": "/tmp/odin-usability-kitbindings-retire-suite.log",
+        "composition_invariance": "/tmp/odin-usability-kitbindings-retire/composition.json",
+        "hello_net_baseline": "/tmp/odin-usability-p3-hello-net-baseline.log",
+        "hello_sim_baseline": "/tmp/odin-usability-p3-hello-sim-baseline.log",
+        "core_manifest": "/tmp/odin-usability-kitbindings-core-manifest-final.log",
+        "current_compile": "/tmp/odin-usability-scriptgen-p3-current-check.log",
+        "entity_suite": "/tmp/odin-usability-entity-suites/report.json",
+        "entity_suite_log": "/tmp/odin-usability-entity-suites.log",
+        "moved_starters": "/tmp/odin-usability-kitentities-final/report.json",
+        "input_identities": "/tmp/odin-usability-kitentities-final/identities/report.json",
+        "subpackage_runtime": "/tmp/odin-usability-subpkg-current.log",
+        "generator_current": "/tmp/odin-usability-scriptgen-entity-final-build.log",
+        "context_suite": "/tmp/odin-usability-context-qualified-suite/report.json",
+        "context_suite_log": "/tmp/odin-usability-context-qualified-suite.log",
+        "generic_contexts": "/tmp/odin-usability-context-qualified/generics/report.json",
+        "shared_editor": "/tmp/odin-usability-context-shared-spike-final.log",
+        "replay_distribution": "/tmp/odin-usability-type-context-replay/result.json",
+        "replay_scrapyard_compile": "/tmp/odin-usability-context-scrapyard-build.log",
+        "fingerprint_migration": "/tmp/odin-usability-wire-fingerprint-migration.json",
+        "owner_suite": "/tmp/odin-usability-owner-qualified-suite/report.json",
+        "owner_suite_log": "/tmp/odin-usability-owner-qualified-suite.log",
+        "owner_callbacks": "/tmp/odin-usability-owner-qualified/callbacks/report.json",
+        "owner_peers": "/tmp/odin-usability-owner-qualified/report.json",
+        "owner_host": "/tmp/odin-usability-owner-qualified/hello_net/host.log",
+        "owner_guest": "/tmp/odin-usability-owner-qualified/hello_net/guest.log",
+        "bridge_compiler_opinion": "/tmp/odin-private-bridge-check-73hc3g8l/results.json",
+        "qualified_names": "/tmp/odin-usability-qualified-names-collision/report.json",
+        "qualified_names_log": "/tmp/odin-usability-qualified-names-collision.log",
+        "qualified_names_suite": "/tmp/odin-usability-qualified-names-suite/report.json",
+        "schema_suite": "/tmp/odin-usability-schema-qualified-suite/report.json",
+        "schema_suite_log": "/tmp/odin-usability-schema-qualified-suite.log",
+        "schema_references": "/tmp/odin-usability-schema-qualified/schemas/report.json",
+        "schema_fingerprint_migration": "/tmp/odin-usability-schema-fingerprint-migration.json"
+      },
+      "test_diagnosis": [
+        "The first generator regression invocation supplied SGEN_BIN but omitted Odin from PATH; a later compiler check correctly failed to launch odin. With the pinned compiler directory on PATH, the entire existing SCRIPTGEN_OK corpus passes. Baseline/new generator-only subpackage refusal and fingerprint checks both pass, and ten generated artifacts across three representative projects are byte-identical.",
+        "The new native test initially named a nonexistent Action_State enum; corrected its assertion to the actual outcome state. The WASM check initially included core:testing, whose OS/thread support is native-only; separated fixture gameplay helpers from the !freestanding test file so the actual generated adapters still compile for WASM.",
+        "A bare-import fixture exposed an existing generator bug: collect_file_imports bound a bare import to the target package clause. A minimal compiler experiment showed Odin binds the final path component. Corrected both generator lookup and the fixture spelling, deleted the redundant package-name filesystem scan, and verified alias/bare/flat contract invariance.",
+        "Adding the new check to the deliberately fixed twenty-check core selection was unnecessary and failed its metadata contract. Kept kitbindings as a separate registered check; the original core selection and all five selector tests pass unchanged.",
+        "A scripted edit stopped at an initializer-spacing assertion after saving main. Completed the dependent parse/generation edits before building or running consumers; the resulting generator compiles cleanly.",
+        "The initial resolved-input record used context as a field name, which Odin reserves. Renamed it ctx; no contract change.",
+        "Review found parse_sample still deduplicated raw parameter spellings before import resolution. Removed that obsolete early check and made resolved identity the authority; added positive different-file/same-spelling and negative same-declaration/different-alias coverage.",
+        "Review found redundant raw replicated/input type spelling in net_fingerprint changed on alias-only edits despite identical canonical ABI. Those entries now use their normalized ABI representation while the recursive canonical schema continues to distinguish real type/layout changes; targeted invariance and mutation tests pass.",
+        "Generic parameter kinds cannot be recovered from source spans alone: Odin parser Typeid_Type nodes have an empty span. Read the AST kind explicitly; real generic composition regressions then pass.",
+        "A remaining shallow fingerprint walk discarded generic bindings, and emitted tick thunks retained authored import aliases absent from generated files. Passed Type_Use through both walks and separated tick input code spelling/imports from semantic identity.",
+        "Review exposed nonwire generic caches/backups/signals being forced through a wire-only renderer. Added a bounded AST-based code-type renderer, kept wire admissibility separate, and left irrelevant untagged opaque containers to the compiler. Context-preserving composition now also handles the real Replay Session graph.",
+        "Ordinary aliases introduced an artificial ::<base> schema layer. Removed that layer for transparent aliases while retaining enum/distinct representation, so public/private and numeric aliases preserve the same contract.",
+        "HelloNet exposed named unions being indexed as aliases and consequently rejected in an ordinary App_Queue. Added nominal union identity for code resolution; unions remain inadmissible raw wire fields.",
+        "The wire fixture pinned old network fingerprints containing raw type spellings. Kept the unchanged ABI/layout fingerprint and exact vector assertions, regenerated base/wide network values, and migrated the assertion, runner and real Session mismatch test together. Current base is 0xbb30630045379ec0; wide is 0xb1c8ea52cdf83fb5.",
+        "The legacy shared editor runner swallowed import failures and accepted shutdown resource errors after a success marker. Converted its replacement SceneTree driver to a normal EditorPlugin, checked import/runtime exits and resource errors, and delayed the success marker until cleanup. The strict run passes without hiding errors.",
+        "Plain procedure aliases inherit the original private procedure visibility. A rodata procedure-variable attempt is not a valid constant initializer on the pinned compiler and does not support unspecialized generic procedures. Used the independently compiled public `proc {private_proc}` group form instead.",
+        "The leaf default tick has no owner callback after extraction, exposing a preexisting invalid generated `_, _ := ...` declaration for discarded results. It now uses assignment when every result is discarded. Owner binding emission also explicitly requests its required intrinsics import.",
+        "A private composed procedure in another helper package cannot be bridged from the entity package. Added bridge-only package output in the actual module-local declaring package, then routed both the leaf default thunk and owner binding through that public group. Shared/SDK directories are not written by consumer generation.",
+        "Multiple owners could assign different numeric wire IDs to one source symbol, overwriting its identity in metadata. Enforced one stable ID per resolved source across owners; identical declarations may reuse the same ID. Conflicting policies/IDs remain errors.",
+        "Field-edge type checks compared only base spellings. They now compare resolved declaration identity, so a genuine alias such as Score=i32 works while an unrelated same-named type cannot pass by spelling.",
+        "Generated message routes used package-global Typed_Route storage despite needing per-instance user context. Replaced the generated global with Session-local route registration and an exact-size typed decoder; two game instances now deliver only to their own handlers. The low-level caller-owned Typed_Route API remains available.",
+        "The initial schema fixture used app tag9, outside the Session table range0..7. Corrected the fixture to supported free tags4/5 and added a generated compile-time MAX_APP_TAGS assertion.",
+        "Codec/blend tags lost their defining scope when a generic field type was rebased. Added a separate tag context and declaration-resolved value references. Module-local private codec getters are contextless so generated descriptor globals can initialize safely; procedure bridges expose private blends.",
+        "Old generator tests required global Typed_Route storage and raw tag identifiers. Updated them to require instance-bound routes and resolved numeric tags, retaining typed send wrappers, schema validation and mutation coverage.",
+        "Canonical messages no longer serialize tag-name spelling, and redundant root-only profile/message type-spelling walks were removed. Migrated fixed ABI/network test fingerprints together while preserving all exact byte/offset assertions and incompatible-join checks. Current base ABI=0x948638687f891ca8, network=0xe3f298604ea6f896; wide network=0xb961f027c4dd84fb.",
+        "The repgen gate still expected direct command callbacks, a hard-coded mask cast, refusal of relative-import composition and the old sample diagnostic. Updated these assertions to bound dispatch, type_of masks, actual replicated imported-field offsets plus compilation, and resolved input identity. Split duplicate-ID, unknown-entity and hook-shape fixtures so an early unresolved symbol does not suppress later binding checks; duplicate IDs now use distinct resolved entity types. The full gate passes.",
+        "The event fixture initially used the removed owner,interp spelling; corrected it to owner, which interpolates automatically. Handler-context resolution, both runtime event tables, strict payload bounds, wrong-kind/stale references and manual sim references then pass.",
+        "Imported nongeneric backup containers emitted bare private Key/Payload names into the owner package. Keep their declaration context for stable version labels, and infer actual map/dynamic element types from the owner field in generated code. This preserves private types without public bridges. Native cross-read of original saved bytes survives alias, directory and root moves; WASM compilation passes.",
+        "Read-only review found a module-wide event-route collision scan using a package-local procedure map. Restricted it to the owning package and added both a legal same-name helper procedure and an illegal owner-package collision.",
+        "The first browser fixture placed an added state field before owner, then used a contextful init procedure. Corrected the fixture to the established first-owner and contextless-init contracts.",
+        "The browser runtime exposed a real platform defect: knet.subset_view forced the unavailable freestanding heap. A debug WASM stack identified the allocation. The Web host now installs persistent engine storage before authored init procedures and destroys cached views only at final quiescent shutdown. Native keeps the heap default. Focused allocator lifecycle and native Kit net/sim/session suites pass; the ordinary optimized browser export now passes with no console errors."
+      ],
+      "remaining_implementation": [],
+      "wire_fingerprint_migration": {
+        "reason": "Raw source type spellings were replaced by normalized ABI representations; native field sizes and expected 12-byte vector remain unchanged.",
+        "old_base": "0xfc3f66e9fcd2414b",
+        "old_wide": "0x72a0945e37810e4e",
+        "current": {
+          "base": {
+            "NET_ABI_FINGERPRINT": "0x6bf5e741849bef4a",
+            "NET_FINGERPRINT": "0xbb30630045379ec0"
+          },
+          "wide": {
+            "NET_ABI_FINGERPRINT": "0x039395f596c31953",
+            "NET_FINGERPRINT": "0xb1c8ea52cdf83fb5"
+          }
+        },
+        "source": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-wire-hash-migration-d1b49a33"
+      },
+      "schema_fingerprint_migration": {
+        "reason": "Schema references now resolve through declaration contexts; message tags are canonical numeric bytes and redundant source-spelling contributions were removed. Byte layout assertions are preserved.",
+        "changes": {
+          "0xbb30630045379ec0": "0xe3f298604ea6f896",
+          "0xb1c8ea52cdf83fb5": "0xb961f027c4dd84fb",
+          "0x6bf5e741849bef4a": "0x948638687f891ca8"
+        },
+        "current": {
+          "base": {
+            "NET_ABI_FINGERPRINT": "0x948638687f891ca8",
+            "NET_FINGERPRINT": "0xe3f298604ea6f896"
+          },
+          "wide": {
+            "NET_ABI_FINGERPRINT": "0xc6a957eb881fa231",
+            "NET_FINGERPRINT": "0xb961f027c4dd84fb"
+          }
+        },
+        "source": "/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/odin-schema-fingerprint-migration-g3nq9yyr"
+      },
+      "evidence": {
+        "event_repgen_regression": "/tmp/odin-usability-events-repgen-current.log",
+        "event_command_binding_regression": "/tmp/odin-usability-events-bindings.log",
+        "final_suite": "/tmp/odin-usability-p3-events-backups-suite/report.json",
+        "final_suite_log": "/tmp/odin-usability-p3-events-backups-suite.log",
+        "qualified_events": "/tmp/odin-usability-qualified-events-final/report.json",
+        "qualified_backups": "/tmp/odin-usability-p3-events-backups/backups/report.json",
+        "docs": "/tmp/odin-usability-p3-docs-check.log",
+        "web": "/tmp/odin-usability-p3-web4/report.json",
+        "web_console": "/tmp/odin-usability-p3-web4/console.json",
+        "cache_regression": "/tmp/odin-usability-kit-cache-suite/report.json",
+        "backup_compiler_opinion": "/tmp/odin-backup-inference-final-vsuk2w1l/results.json"
+      },
+      "validation_history": [
+        "The registered kitbindings gate passes. Generated-code native tests cover two independent bound descriptors, rollback on rejected writes, nested authority invocation and ID reassignment, stale-body rejection, quiet authority consequences during prediction, local block commands, and a successful command that unregisters and frees its heap target before the outer hook. All tracked allocations are released.",
+        "Renamed explicit import, bare import and flattened block variants execute the same native tests and compile for freestanding WASM. Full canonical schema text, ABI fingerprint and network fingerprint are identical across variants.",
+        "The existing scriptgen regression corpus passes. HelloNet passes checked editor startup, scene lifecycle, a latency-injected pair and join by code. HelloSim passes checked startup, scene lifecycle and predicted/watched peer gameplay. These are unchanged flat-game regression baselines; moved full entities are not yet claimed.",
+        "Suite metadata checks pass with the existing fixed core selection unchanged. New kitbindings coverage is registered separately. Independent read-only review found no substantive issue in binding dispatch or module-local composition.",
+        "The registered scriptgen, kitbindings and new kitentities gates pass together (3/3). kitentities creates isolated copies of HelloNet and HelloSim, moves each Player script into a package and HelloSim Player_Input with it, leaves birth hooks in the owner, and uses different aliases in the tag/sampler versus hook files. Each exact canonical schema plus both fingerprints matches its flat form; native checked build/import and Host/Guest gameplay pass, along with WASM compilation.",
+        "The file-context fixture accepts two samplers spelling controls.Input in different helper files when they import distinct declarations. It assigns separate stable input classes by entity binding; alias-only edits inside nested replicated/input types preserve the entire contract, a real field-width change changes it, and two aliases targeting one sampled declaration are rejected before artifacts are emitted.",
+        "The legacy subpackage fixture now tests actual import cycles and duplicate package/global alias errors, replacing obsolete Kit-root refusal expectations with the new positive gate. Its checked editor startup, real attachment/method/signal/hot-reload journey, structural refusals and existing flat fingerprint invariant all pass.",
+        "Contextual generics pass native execution and WASM compilation: caller and generic declaration have different Local_Type definitions; nested forwarding preserves both contexts; generic embedded replicated fields, nonwire caches, signals and dynamic/map backup round-trips work. Instantiated range/mask/enum/unit rules execute, including numeric and array aliases. Distinct instantiations stay separate, constant aliases/trailing commas normalize, and malformed arity, recursive expansion and invalid enum rules fail before artifacts are emitted.",
+        "Private tick input types render through the matching sampler public alias. Verified shared vocabulary outside the SDK tree renders correctly. Canonical schemas and both fingerprints remain equal under import/literal/public-alias changes.",
+        "The latest registered scriptgen, kitentities, wireabi and kitsession gates pass (4/4). Wire ABI preserves the exact 12-byte native vector and layout fingerprint, checks Web/Linux/Windows targets, and rejects an incompatible schema at the Session join gate.",
+        "The shared-source editor fixture now runs through an ordinary EditorPlugin, cleans up its probe nodes, waits for build completion, and checks exit status/errors/resources. Both modules rebuild from one shared edit; restoration, isolation checks and clean shutdown pass.",
+        "Packaged Replay starter native/network/browser distribution passes through the new type resolver. After the final named-union fix, the larger Replay Scrapyard example also compiles all 26 declarations with the ordinary build helper.",
+        "The latest registered scriptgen, kitbindings, kitentities and wireabi gates pass (4/4). Owner callback fixtures execute natively and compile for WASM in flat, moved-entity, and separate private-helper-package forms, with identical canonical schema and fingerprints.",
+        "Tests cover independent game owners, owner-prefixed overrides, inherited self-only defaults, private generic composed commands returning private payloads, rejected-write rollback, field edges through an alias, tick consequences, owner-only presentation, live/watched presentation and malformed delayed-fact rejection. Prediction and resimulation do not duplicate authority effects or presentation.",
+        "A private tick input with no sampler registers through a generated leaf type alias and keeps its generated received-input validator. Wrong owner contexts, incompatible game-aware defaults and conflicting wire IDs for one source symbol fail before generated artifacts are written.",
+        "The moved HelloNet fixture issues a predicted command from the real guest through the ordinary Session transport. The host game-side consequence runs exactly once (points=3), the predicting guest runs no authority consequence (points=0), and the entity score agrees. HelloSim moved-input peer behavior still passes.",
+        "A read-only compiler microfixture established that public one-member procedure groups export package-private concrete and polymorphic procedures, preserving inferred private return payloads and named arguments. This avoids mutable callback globals and unnecessary typed wrappers.",
+        "Two distinct Actor declarations in separate packages, using kind IDs 11 and 22 and different scalar widths, execute the correct owner-field callbacks natively and compile for WASM. Canonical schema retains Actor#11 and Actor#22 independently. Import renaming, directory relocation and moving one Actor into the root preserve both fingerprints and the full schema.",
+        "Duplicate IDs, ambiguous unbound wire declarations and final wire-label collisions fail before artifacts are emitted. Callback selection verifies the actual receiver declaration, so equal local names cannot select the other type\u2019s handler.",
+        "Registered scriptgen, kitentities and wireabi gates pass (3/3); the final additional label-collision check also passes its focused native/WASM fixture.",
+        "Registered scriptgen, kitentities, wireabi and kitsession gates pass (4/4). The schema fixture executes imported profile installation through the generated ready callback, two independently bound message recipients, and strict short/trailing payload rejection; native execution and WASM compilation pass.",
+        "A generic embedded block resolves its private codec and private blend in the original field declaration package, even when the owner has conflicting aliases/names. Codec encode/decode and blend behavior execute correctly. Import renames and codec directory moves preserve the full schema and fingerprints; same-size profile/payload type changes, tag byte changes and codec width changes alter them.",
+        "Duplicate message tags and ambiguous codec format names fail before generated artifacts are emitted. Wire-layout byte vectors and cross-target checks remain intact, and the real Session mismatch test uses the migrated fingerprints.",
+        "The current gd_event generator passes the complete repgen regression, including compilation of existing session/sim event fixtures and policy/refusal/fingerprint checks. The current generator also passes native command-binding execution, freestanding WASM checks and local composition contract invariance. Imported/same-named gd_event runtime coverage is still pending; this result does not close P3-01.",
+        "Final registered scriptgen, kitentities, wireabi and kitsession gates pass together (4/4), including native HelloNet/HelloSim host/guest journeys after the owned examples were migrated. Full docs-check passes.",
+        "The final qualified-events fixture passes native execution and freestanding WASM compilation for original, renamed and root-moved types, with identical canonical schema and fingerprints; owner-package route collisions are refused while unrelated package procedures remain legal.",
+        "Real Godot Web release export builds, imports, links and runs the same event and private-backup assertions, including descriptor cache access during authored init. Chrome reports exit 0, the success marker and no errors; native cache ownership/cleanup, kitnet, kitsim and kitsession also pass."
+      ],
+      "validation": [
+        "Final registered scriptgen, kitentities, wireabi and kitsession gates pass together (4/4), including current HelloNet/HelloSim host/guest journeys after the owned entities and inputs moved into subpackages.",
+        "Contextual types, private generic defaults/codecs/blends, profiles/messages, owner-bound field/command/event hooks and backup inference execute natively and compile for WASM. Alias and directory moves preserve canonical schemas/fingerprints; real field/type/ID conflicts are rejected before emission.",
+        "The final qualified-events fixture passes original, renamed and root-moved forms; package-local route collisions fail while unrelated procedures remain legal.",
+        "Real Web export executes event/private-backup assertions in Chrome, including authored-init descriptor cache access, with exit0 and no errors. Native cache ownership/cleanup, kitnet, kitsim and kitsession regressions pass.",
+        "Full docs-check passes. Earlier intermediate statements remain in validation_history and are superseded by these final results."
+      ]
+    },
+    {
+      "id": "P3-02",
+      "phase": 3,
+      "title": "Support multiple scene variants per Kit entity type",
+      "status": "complete",
+      "acceptance": "Separate gameplay schema identity from stable scene/variant identity; provide declarative resolver and spawn API without duplicated script structs. Migrate owned protocol/fixtures directly if needed.",
+      "files": [
+        "decl",
+        "scriptgen",
+        "kit/boot",
+        "kit/session",
+        "kit/sim",
+        "kit/net/schema.odin",
+        "kit/save",
+        "examples/hello_sim",
+        "tests",
+        "docs/kit"
+      ],
+      "task_id": "t_c026222b18b9455d",
+      "progress": "Complete: named scene variants share one gameplay kind, descriptor, callback/census family and typed spawn API. Default scene declarations/calls remain unchanged. Variants survive live spawn, catch-up, resync, recording, save/resume and prediction; incompatible identities and invalid scene roots are refused without publishing partial entities.",
+      "implementation_scope": [
+        "Keep the existing one-scene declaration and spawn calls as the default variant with no new user configuration.",
+        "Add stable declarative scene variants without duplicating gameplay structs or replicated schema.",
+        "Carry variant selection through authority/client factories, join/interest snapshots, host backup/resume and predicted-spawn reconciliation.",
+        "Generate discoverable typed spawn selection and census behavior; migrate owned protocol fixtures directly, test native peers and document the authoring workflow."
+      ],
+      "changes": [
+        "Added variant=Name scene tags and generated typed enums with Default=0 and stable FNV32 IDs. Group scene fields by resolved gameplay type before generating helpers; reject missing/duplicate defaults, colliding names/IDs, conflicting gameplay IDs and type policy declarations on variants.",
+        "Entity_Kind now holds an explicit scene-choice table, while gameplay callbacks, descriptors and census remain one per type. Added scene metadata to the canonical/structured schema; field order, field renames, source moves and import aliases do not affect variant identity.",
+        "Added Scene_Variant to factory callbacks, Session/Boot ledgers and spawn/resync events, with query helpers. The common spawn tuple carries the variant through network catch-up, interest, snapshots, save/resume and recordings. Known-ID resync verifies type and variant before applying fields.",
+        "Prediction matches owner/type/variant and returns original spawn identity for command replay. A changed unmatched prediction is canceled and replaced through normal cleanup; authoritative identities cannot be replaced. Bad scene roots are destroyed before entering the tree or census, including with assertions disabled.",
+        "Migrated all seven owned custom factory callbacks plus Boot; Session protocol revision is15 and save format is5. Added recording format1 with mandatory protocol and schema checks before packet replay, rejecting old headerless captures without compatibility fallbacks.",
+        "HelloSim now uses a default square and Diamond scene with the same Player script. Updated authoring, Session and save documentation; registered kitvariants separately from the fixed core selection."
+      ],
+      "review_notes": [
+        "Independent read-only Kit review recommended grouped scene tables, named stable identities, and coverage of every shared tuple path; it confirmed separate Session variant state was a small appropriate change.",
+        "Review identified legitimate variant changes during rejection settlement, wrong-root cleanup with assertions disabled, and replay bypassing JOIN compatibility. All three were implemented and given behavioral regression coverage."
+      ],
+      "test_diagnosis": [
+        "New native fixtures initially used private packet constants/Tracked types and an Odin redeclaration. Fixtures now capture actual sent packet tags, create predictions through public APIs, and use distinct local names; no implementation checks were weakened.",
+        "The invalid-scene fixture omitted Godot\u2019s required include_internal argument to node_get_child_count; corrected the fixture. Both authority and prediction now reject its wrong-script scene with assertions disabled, unchanged published state and no orphan nodes.",
+        "The live reject-chain fixture initially issued before lane anchoring and later queried after normal host shutdown cleared the world. It now waits for anchoring and captures successful correction while connected; the actual trace records two executions, different provisional IDs, old_alive=false and a Default replacement after the rejected Equip.",
+        "The final thirteen-gate run passed twelve gates; authorsurface found removed-attribute diagnostics inside archived source receipts under docs/replay/results. Corrected only the active-source scan boundary, preserving historical evidence and all prior current-code checks. The targeted rerun passes, as does the additional Kit acid/custom-factory journey."
+      ],
+      "evidence": {
+        "suite": "/tmp/odin-usability-variants-final-suite/report.json",
+        "suite_log": "/tmp/odin-usability-variants-final-suite.log",
+        "surface_rerun": "/tmp/odin-usability-variants-surface-final-suite/report.json",
+        "acid": "/tmp/odin-usability-variants-acid-suite/report.json",
+        "codegen": "/tmp/odin-usability-variants-final/codegen/report.json",
+        "peers": "/tmp/odin-usability-variants-final/peers/report.json",
+        "guest": "/tmp/odin-usability-variants-final/peers/project/.runlogs/guest.log",
+        "invalid_scene": "/tmp/odin-usability-variants-final/invalid/report.json",
+        "docs": "/tmp/odin-usability-variants-docs.log"
+      },
+      "validation": [
+        "Latest results are PASS for scriptgen, kitentities, kitvariants, authorsurface, wireabi, kitnet, kitsim, kitsession, kitstress, kitloot, kitarena, kitsave, repgen and kitacid; docs-check also passes.",
+        "Codegen runs native tests and freestanding WASM checks. Scene IDs/schema fingerprints stay equal under field reorder/rename, package move and alias changes; a variant-name change changes the contract. One entity kind and one gameplay schema represent both scenes.",
+        "Real HelloSim host/guest runs instantiate both authored scenes. Engine probes verify reverse-order predicted matching, provisional aliases, authoritative reuse, cancellation and actual rejected-command settlement replacing the unmatched variant. Standard scene lifecycle also passes.",
+        "Session tests verify live/world spawn, late join, interest resync, recording reconstruction, host recovery, identity mismatch refusal, unknown-variant skip and cleanup. The save saga restores the selected scene and preserves it for a reconnecting client.",
+        "Recording tests reject wrong magic/format/protocol/schema, truncated headers and old headerless captures before WELCOME, including FINGERPRINT_NONE. Native release-mode probes prove rekeyed identity refusal and wrong-scene cleanup without relying on assertions."
+      ],
+      "remaining_implementation": []
+    },
+    {
+      "id": "P3-03",
+      "phase": 3,
+      "title": "Make Replay authoring tools reusable across games",
+      "status": "complete",
+      "acceptance": "Replace Scrapyard-specific dock assumptions with capability/action declarations and reusable worker support. Provide a small editor starter with one definition, entity, preview and validation.",
+      "files": [
+        "replay/editor",
+        "build/build_scripts.sh",
+        "build/template/replay",
+        "examples/replay_scrapyard/tools",
+        "examples/replay_scrapyard/dev/ability_workbench.gd",
+        "examples/replay_scrapyard/scripts/authoring_check.odin",
+        "tests",
+        "docs"
+      ],
+      "task_id": "t_12ddcfce09794602",
+      "progress": "Complete: the dock follows declared actions/inputs, shared workers use remembered tools and structured reports, and Scrapyard callers use the common request contract. The packaged Replay starter includes PickupDef, an authored entity, an isolated preview and validation, sharing one checked extraction and copying rules into World before Session admission.",
+      "review_notes": [
+        "Independent read-only Replay review recommends actions as capabilities, without a second set of enable flags. Start with open_scene, run_scene and project-worker actions; resource/file/text/choice input declarations own their labels, defaults and filters.",
+        "The shared worker should parse and validate requests, use the remembered toolchain/build helpers, run bounded headless validation scenes, require structured results and successful exits, preserve logs and cancellation, and keep artifact publication in project handlers.",
+        "Snapshot action/input values when clicked, including queued actions waiting for import/status. Only poll status when declared. Render generic details/output navigation instead of Scrapyard casts/health/checkpoint fields.",
+        "Extend the existing Replay coin starter with one PickupDef Resource, an authored coin entity, isolated preview and shared typed extraction used by validation and gameplay; copy values into World before Session opens.",
+        "Migrate Scrapyard manifest/worker plus workbench and generated scenario CLI callers together. Retain unsaved-input regression coverage and verify a second unrelated tiny project and the installed starter."
+      ],
+      "partial_evidence": {
+        "contracts": "/tmp/odin-usability-authoring-contracts.log",
+        "generic_editor": "/tmp/odin-usability-authoring-generic/report.json",
+        "save_boundaries": "/tmp/odin-usability-authoring-save4.log",
+        "scrapyard_editor": "/tmp/odin-usability-authoring-ui-proven/editor.log",
+        "starter_editor": "/tmp/odin-usability-authoring-starter/editor-acceptance/editor.log",
+        "starter_runtime": "/tmp/odin-usability-authoring-starter/runtime.log",
+        "package": "/tmp/odin-usability-authoring-package2/result.json",
+        "workflow_in_progress": "/tmp/odin-usability-replay-authoring-final.log"
+      },
+      "test_diagnosis": [
+        "Queued input values were preserved; the first new assertion compared a Godot-parsed JSON float with an integer inside dictionary equality. Corrected the expected JSON representation, retaining checks for value80 rather than selected index0 and equality with the saved request.",
+        "Scrapyard exposed a real SavedData owner bug: inherited StyleBoxTexture resources had both their UI source scene and main.tscn as candidates, but only the source scene serialized them. The plan now proves containment and clears edits only after every proven owner is saved. Genuine stale/orphan/failed-write cases remain refused; added instance and shared-only Resource-edit coverage.",
+        "The intentional write-failure fixture left a .tscn replaced by a directory across awaited frames, allowing filesystem import to emit an unrelated dependency error. It now waits for prior scanning and restores the valid file immediately after the synchronous failed save; exact expected save diagnostics and non-publication checks remain.",
+        "A generated scenario invocation exposed an obsolete catalog importer using game.CONTENT instead of content.SEMANTIC. Migrated that caller and the authoring validator, and added useful diagnostics to formerly silent tool exits.",
+        "Installed-addon verification found SKIP_CORE returned before installing the editor dock. Moved the installation into shared project setup before that return; the fresh package now passes editor, native, peer and browser journeys.",
+        "Independent review found failed background status reports could leave Content: current visible. Failures now show issues/logs and a failed status, and recovery replaces that failure. An explicit GDScript boolean type fixed its parse error; the final failure/recovery editor test passes."
+      ],
+      "changes": [
+        "Added manifest version1 with open_scene, run_scene and project-worker actions, resource/file/text/choice inputs and optional declared status polling. The dock contains no Scrapyard controls or result-field assumptions; queued actions capture their inputs at click time and expose generic issues, details, outputs and logs.",
+        "Added the shared worker/request API, default scene validation, remembered compiler lookup, bounded process ownership and report validation. CLI --action uses declared defaults; --request accepts explicit inputs. Removed the old project-specific CLI and migrated workbench, generated scenario scripts and CI callers.",
+        "Fixed SavedData candidate-owner handling: only exact serialization owners are scheduled and used to clear edited flags. Inherited scene resources no longer create false parent-owner failures; all proven owners must save successfully, while orphan/stale/imported/failed-write cases still refuse publication.",
+        "Added one PickupDef Resource, one authored pickup scene, standalone F6 preview, validation scene and manifest to the starter. Gameplay, preview and validation share checked typed extraction; gameplay admits a value copy and hashes the authored rules for compatibility.",
+        "Moved optional authoring installation before SKIP_CORE returns, so packaged prebuilt-core projects receive their dock. Package snapshots now include authored .tres files and template manifests. Updated framework, starter and Scrapyard documentation.",
+        "Migrated the stale Scrapyard catalog semantic caller and improved silent scenario-tool failures. Failed background status checks now show issues/logs rather than retaining a current label, and successful recovery clears the failure."
+      ],
+      "evidence": {
+        "contracts": "/tmp/odin-usability-authoring-generic-final.log",
+        "generic_editor": "/tmp/odin-usability-authoring-generic-final/report.json",
+        "save_boundaries": "/tmp/odin-usability-authoring-save-final.log",
+        "save_editor": "/private/var/folders/f5/n795h3hd5nxbqwzvt3t6bpcw0000gp/T/replay-save-inputs-w0luo3gd/editor.log",
+        "scrapyard_workflow": "/tmp/odin-usability-replay-authoring-final.log",
+        "scrapyard_editor": "/tmp/odin-usability-replay-authoring-final/editor-ui/editor.log",
+        "scrapyard_commands": "/tmp/odin-usability-replay-authoring-final/commands/result.json",
+        "package": "/tmp/odin-usability-authoring-package-final/result.json",
+        "package_editor": "/tmp/odin-usability-authoring-package-final/authoring-editor/editor.log",
+        "package_validation": "/tmp/odin-usability-authoring-package-final/authoring-validation/result.json",
+        "package_authoring_runtime": "/tmp/odin-usability-authoring-package-final/authoring-runtime.log",
+        "package_log": "/tmp/odin-usability-authoring-package-final.log",
+        "docs": "/tmp/odin-usability-authoring-docs.log"
+      },
+      "validation": [
+        "Five generic contract tests pass, including malformed manifests/requests, actual choice values, no handler load for describe/refused requests, and refusal of missing/malformed reports or failed/erroring validation processes.",
+        "An unrelated Orbit project passes actual-editor checks with different actions/resources, no project worker, no undeclared status polling, clickable validation errors, preview without a worker and unsaved tracking. Its worker resolves the saved Odin selection with a minimal GUI PATH.",
+        "The complete real-editor save suite passes external/embedded/shared Resources, inherited scene owners, stale objects, closed/released owners, script buffers, failed writes, orphan drafts, transient nodes, edits during jobs, queued input snapshots, cancellation, and failed-status recovery.",
+        "The full Scrapyard workflow passes native previews, dock invalid/recovery/bake checks, ability and actor drafts, duplicate refusal, invocation of the generated draft scenario, correction/takeover/network commands, cancellation/non-overwrite checks, 108 Scrapyard model tests, four Stormcaller model tests and native/WASM corpus equality.",
+        "A freshly built installed addon passes starter editor invalid/clickable/recovery/preview checks and default worker validation without checkout-relative dependencies. Runtime checks prove invalid preview edits preserve the last valid display, a running World keeps its copied reach, and a new run applies the edited reach to gameplay.",
+        "That packaged starter also passes solo pickup/effects, host/client/observer gameplay, native mixer checks, WASM checking and actual browser export execution. docs-check passes."
+      ],
+      "remaining_implementation": [],
+      "supported_limits": [
+        "Authoring process tools remain native macOS/Linux with Python; gameplay native/browser exports are separate. Native editor/runtime acceptance was run on macOS."
+      ]
+    },
+    {
+      "id": "P3-04",
+      "phase": 3,
+      "title": "Expose a small Replay presentation context",
+      "status": "complete",
+      "acceptance": "Expose seat, epoch, reset identity and correction notifications through Session; migrate repeated server/client layout access while keeping gameplay presentation policy explicit.",
+      "files": [
+        "replay/godot",
+        "replay/view",
+        "examples/replay_scrapyard",
+        "tests",
+        "docs/replay"
+      ],
+      "task_id": "t_fa1f2fa35cf5441e",
+      "progress": "Complete: Presentation_Context exposes admitted seat/epoch/reset/role metadata and latest correction serial without World copies. Explicit non-consuming correction reads reject zero/stale contexts. Scrapyard presentation now uses these APIs while preserving display clocks, connection identity and game-specific smoothing/effect policy.",
+      "review_notes": [
+        "Independent read-only review recommends seat, admitted epoch/reset identity, authority/observer roles and latest correction serial as small copied metadata; copy full correction frames only on explicit request.",
+        "Validate retained Session ownership, refuse nil/closed/unadmitted clients, distinguish server/observer seat zero, and key correction reads by epoch+reset+serial. Zero serial and stale contexts must not produce a correction. Preserve latest-only and non-consuming behavior for independent views.",
+        "Do not substitute configured epoch hints before Welcome, or replace muster connection generation with view_reset. Keep display tick selection, generation/warp smoothing cuts, run/floor scopes and effect-retirement policy explicit in game code.",
+        "Complete-physics presentation must not invent ordinary State_Correction data when that runtime does not produce it. Reset caller tracking on Session close/reopen; avoid a new global lifetime counter solely for this card."
+      ],
+      "partial_evidence": {
+        "boundaries": "/tmp/odin-presentation-setup.log",
+        "focused_network": "/tmp/odin-usability-presentation-focused/log",
+        "net_full": "/tmp/odin-presentation-net-final.log",
+        "scrapyard": "/tmp/odin-usability-presentation-scrapyard/checks/result.json",
+        "wasm": "/tmp/odin-usability-presentation-scrapyard/wasm.log",
+        "migration": "/tmp/odin-usability-presentation-migration.log",
+        "muster_in_progress": "/tmp/odin-usability-presentation-muster.log",
+        "docs": "/tmp/odin-usability-presentation-docs.log"
+      },
+      "test_diagnosis": [
+        "New Odin test variables initially redeclared ok in the same scope, and the migrated smoothing file needed an explicit replay/net import for its correction type; corrected those compile errors.",
+        "The new memory-network fixture deliberately used a different epoch hint but omitted the protocol\u2019s opt-in epoch discovery. Enabled discovery in the fixture and retained strict Hello/Welcome admission; correction/catch-up/recovery checks pass.",
+        "The build waiter matched its own ancestor shell because that command text contained future build invocations. It now excludes its process ancestry while retaining independent build detection. The verified deadlocked waiter was stopped, its evidence retained, and the normal build/WASM/runtime sequence completed."
+      ],
+      "changes": [
+        "Added session_presentation, session_correction and presentation_same_scope. Context validates retained ownership and initialized timelines; nil/closed/unadmitted sessions expose no scope, and recovery reports the retained timeline epoch rather than the next-epoch hint. Fencing does not erase a valid presentation scope.",
+        "Correction access copies only on demand, is non-consuming for independent views, and requires a matching nonzero epoch/reset/role/seat/serial context. Complete-physics paths expose no synthetic ordinary correction.",
+        "Migrated Scrapyard drawing, actor/area/path/combat views, audio/feedback preparation, profile/muster epoch reads, wound routing and diagnostics. Smoothing tracks the complete context, resets on new/unavailable scopes and successful open, and retains generation/warp discontinuity policy. Muster connection generation remains distinct from view_reset.",
+        "Documented scope lifetime, latest-only correction semantics, independent consumers, complete-physics limits and explicit display-time/retirement policy. Fixed build-wait process ancestry detection and allowed isolated-project overrides for migration/menu peer runners."
+      ],
+      "evidence": {
+        "setup": "/tmp/odin-presentation-setup.log",
+        "network": "/tmp/odin-presentation-net-final.log",
+        "focused_final": "/tmp/odin-usability-presentation-focused/final.log",
+        "compile": "/tmp/odin-usability-presentation-final-check.log",
+        "scrapyard": "/tmp/odin-usability-presentation-scrapyard/checks/result.json",
+        "scrapyard_log": "/tmp/odin-usability-presentation-scrapyard-runtime.log",
+        "wasm": "/tmp/odin-usability-presentation-scrapyard/wasm.log",
+        "migration": "/tmp/odin-usability-presentation-migration.log",
+        "muster": "/tmp/odin-usability-presentation-muster.log",
+        "docs": "/tmp/odin-usability-presentation-docs.log"
+      },
+      "validation": [
+        "All 11 setup tests and 184 network tests pass. New coverage includes nil/closed/invalid ownership, Solo/Host/Server/client/observer roles, explicit epoch discovery, two independent correction readers, detached copies, stale/zero refusal, same-generation catch-up and epoch recovery.",
+        "A focused rerun after formatting passes, and the public package checks successfully. The real Scrapyard build and freestanding WASM check pass.",
+        "Actual actor, feedback and audio checks plus host/client/observer gameplay at120ms latency pass. Planned and host-crash recovery both preserve state and clear old-epoch effects. The separate menu peer flow passes, retaining connection-based choice rebasing.",
+        "Independent read-only review found no correctness blockers in context ownership/admission gating or migrated policy boundaries. docs-check passes."
+      ],
+      "remaining_implementation": []
+    },
+    {
+      "id": "P3-05",
+      "phase": 3,
+      "title": "Reduce mechanical Resource-to-runtime catalog mapping",
+      "status": "complete",
+      "acceptance": "Share typed catalog discovery/validation and explicit bake declarations for copies, renames, checked narrowing and bounds. Retain explicit semantic rules and intentional mod overrides; reject accidental duplicate IDs.",
+      "files": [
+        "authoring",
+        "runtime",
+        "scriptgen",
+        "replay/definitions",
+        "examples/replay_scrapyard",
+        "../scrapyard/scripts/defs.odin",
+        "tests",
+        "docs"
+      ],
+      "task_id": "t_812bd2da7d8d4b7f",
+      "progress": "Complete: neutral typed catalog loading and transactional field mapping replace repeated discovery/copy/narrowing code in both Scrapyard projects. Base duplicates and invalid authored values now fail with copied source diagnostics; semantic rules and explicit mod overrides remain game-owned. The complete base candidate is admitted atomically, and current installed SDK/source integration is validated.",
+      "review_notes": [
+        "Independent read-only review favors cold-path typed mapping declarations and a shared loader over new scriptgen annotations. Support explicit copies, renames, checked integer narrowing and finite numeric bounds; keep Resource references, string ownership/bounded names, enum-to-wire translation and semantic rules explicit.",
+        "Reject duplicate base-resource IDs with both source paths, while preserving explicit mod replacement order, combo first-match append semantics, and sparse high-water counts rather than loaded-row counts.",
+        "Keep the shared facility framework-neutral so Kit users do not need to adopt Replay for Resource baking; Replay scene helpers can adapt it to their existing validation/publication contract."
+      ],
+      "changes": [
+        "Added godot:authoring with copied bounded reports, retained typed catalogs, normalized/sorted/remap-deduplicated discovery, strict base ID/type/range checks, sparse high-water counts and ordered-list mode.",
+        "Added transactional map_fields declarations for explicit same-type value copies, renames, native integer narrowing and finite f32/f64 bounds. Reject overlapping targets, owned Odin/Godot data and pointer traversal; semantic conversions stay in game code.",
+        "Moved useful Replay Resource_Batch/resource_script behavior to adapters over the neutral package. Replay category discovery and editor validation share catalog checks; all five bake paths use explicit field declarations.",
+        "Kit Scrapyard stages the complete base catalog before publication, rejects bad values and references with source diagnostics, retains the prior catalog on failure, and keeps JSON overrides as a separate step. Fixed cloned-name replacement/rejection ownership.",
+        "Removed the obsolete baseline source-rewriting cleanup overlay and migrated its callers/current owner-query test adapters; historical raw evidence remains unchanged.",
+        "Added framework, real Godot catalog and Kit admission tests; extended editor duplicate-ID navigation coverage; added SDK packaging and generated API documentation entries."
+      ],
+      "partial_evidence": {
+        "mapping": "/tmp/odin-usability-catalog-mapping-final3.log",
+        "discovery": "/tmp/odin-usability-catalog-discovery-final.log",
+        "kit_admission": "/tmp/odin-usability-catalog-kit-admission/runtime.log",
+        "kit_wasm": "/tmp/odin-usability-catalog-kit-admission/wasm-supported.log",
+        "kit_reentry": "/tmp/odin-usability-catalog-kit-runtime.log",
+        "replay_build": "/tmp/odin-usability-catalog-replay-build.log",
+        "replay_runtime": "/tmp/odin-usability-catalog-replay/checks/result.json",
+        "canonical_bake": "/tmp/odin-usability-catalog-replay-bake.log",
+        "editor_in_progress": "/tmp/odin-usability-catalog-editor2.log",
+        "weapons_in_progress": "/tmp/odin-usability-catalog-weapons3.log",
+        "docs": "/tmp/odin-usability-catalog-docs-final.log",
+        "editor": "/tmp/odin-usability-catalog-editor2.log",
+        "mods": "/tmp/odin-usability-catalog-kit-mods-report.json",
+        "package": "/tmp/odin-usability-catalog-addon.json",
+        "installed_sdk": "/tmp/odin-usability-catalog-sdk-install.json",
+        "installed_lifecycle": "/tmp/odin-usability-catalog-installed-lifecycle.log"
+      },
+      "test_diagnosis": [
+        "Independent review found valid filenames can interleave a source and its remap; fixed discovery to normalize before sorting/deduplication and proved the case in actual Godot.",
+        "A new ownership test exposed a real bug: Godot String/Variant/containers use opaque integer words and passed ordinary pointer-free reflection. Reject their base metadata, including distinct/nested wrappers and traversal into opaque storage. The pre-fix failing evidence is retained.",
+        "Initial probe/check invocations omitted SceneTree.quit exit code, used runtime string concatenation, or omitted Kit custom attributes. Corrected test setup and reused build/common.sh ODIN_GD_ATTRS for the WASM check.",
+        "Weapon-authoring preparation still patched the deleted defs_scan implementation and used the obsolete runner_of(owner,Player_Id) query. Removed the old cleanup overlay and migrated owned test adapters to runner_owned_by without weakening gameplay/leak assertions.",
+        "The first extended editor fixture deleted a temporary Resource during import and emitted a dependency error. Replaced that setup with an edit to an existing Resource ID and strengthened the runner to reject engine errors/leaks as well as script errors.",
+        "The weapon fixture counted installed editor-addon refreshes as authored feature changes. Install the framework addon before taking the before-feature snapshot; keep all installed source files in snapshots so subsequent unexpected edits still fail.",
+        "The owned Scrapyard harness still quit before asynchronous audio retirement. It now frees the scene, waits on exact audio WeakRefs with a deadline, and uses checked prepared imports. A GDScript indentation error in that new harness code was corrected; all selected mod acts then passed with strict clean logs."
+      ],
+      "remaining_implementation": [],
+      "evidence": {
+        "mapping": "/tmp/odin-usability-catalog-mapping-final3.log",
+        "mapping_failure_before_fix": "/tmp/odin-usability-catalog-engine-ownership-before.log",
+        "discovery": "/tmp/odin-usability-catalog-discovery-final.log",
+        "discovery_runtime": "/tmp/odin-usability-catalog-discovery-final/runtime.log",
+        "kit_admission": "/tmp/odin-usability-catalog-kit-admission/runtime.log",
+        "kit_wasm": "/tmp/odin-usability-catalog-kit-admission/wasm-supported.log",
+        "kit_reentry": "/tmp/odin-usability-catalog-kit-runtime.log",
+        "kit_mods": "/tmp/odin-usability-catalog-kit-mods-report.json",
+        "kit_mods_log": "/tmp/odin-usability-catalog-kit-mods2.log",
+        "replay_build": "/tmp/odin-usability-catalog-replay-build.log",
+        "replay_wasm": "/tmp/odin-usability-catalog-replay/wasm.log",
+        "replay_runtime": "/tmp/odin-usability-catalog-replay/checks/result.json",
+        "canonical_bake": "/tmp/odin-usability-catalog-replay-bake.log",
+        "artifact": "/tmp/odin-usability-catalog-artifact/result.json",
+        "editor": "/tmp/odin-usability-catalog-editor2/editor.log",
+        "weapons": "/tmp/odin-usability-catalog-weapons3.log",
+        "weapon_evidence": "/tmp/odin-usability-catalog-weapons3",
+        "docs": "/tmp/odin-usability-catalog-docs-final.log",
+        "package": "/tmp/odin-usability-catalog-addon.json",
+        "installed_sdk": "/tmp/odin-usability-catalog-sdk-install.json",
+        "installed_build": "/tmp/odin-usability-catalog-installed-scrapyard.log",
+        "installed_lifecycle": "/tmp/odin-usability-catalog-installed-lifecycle.log"
+      },
+      "validation": [
+        "All six focused mapping tests pass, including candidate atomicity, exact copies/renames, nested fields, integer extremes and invalid narrowing declarations, finite-number/target overflow checks, overlapping fields, copied/truncated reports, and rejection of owned Odin/Godot values and opaque representation traversal.",
+        "Actual Godot catalog fixture and its freestanding WASM check pass: normalized interleaved source/remap deduplication, source-absent remap ordering, sparse high-water counts, ordered lists, duplicate IDs naming both files, reserved/out-of-range/negative IDs, wrong script types, capacity/missing directory failures and reinitialization refusal. Runtime closes without engine/leak errors.",
+        "Actual Kit admission fixture proves early invalid narrowing, late cross-reference and late duplicate failures preserve the full admitted catalog; sparse IDs preserve high-water width and corrected input restores the original digest. The WASM check passes using production custom-attribute flags.",
+        "Both native game builds pass. Replay catalog payload bytes, schema and semantic identity remain unchanged (canonical digest7605822622581753901). Kit stock table digest remains6b0405b42d025f. Replay nested-Resource artifact edit, invalid non-publication and stale source/binary rejection checks pass.",
+        "Replay actors, feedback, real native audio and host/client/observer gameplay at120ms latency pass. Kit three-scene reentry and explicit host-only weapon/status-chain/ability mods pass; all four mod processes shut down without engine/leak errors.",
+        "The actual editor passes invalid-range/clickable-error/recovery, duplicate-ID diagnostics naming both existing Resources, click navigation and successful rebake. The strict runner rejects all engine, script and leak errors.",
+        "The complete weapon authoring gate passes32 peer receipts across Kit and Replay, two repetitions, local/120ms conditions and shared/host-only Resource cases. Feature snapshots prove one added Resource and zero handwritten gameplay/network edits; native canonical catalogs and all22 report-integrity cases pass.",
+        "Nix addon builds and contains byte-matching authoring sources plus .gdignore. Whole SDK installed in sibling Scrapyard with prior addon retained; normal installed-addon build and three-scene runtime lifecycle pass. Docs link/API/site build, changed Python syntax, shell syntax and git diff --check pass.",
+        "Independent read-only reviews found no remaining blockers in neutral mapping/catalog ownership or Kit atomic publication and mod-name replacement."
+      ],
+      "supported_limits": [
+        "Native runtime/editor tests ran on macOS; WASM compilation is verified here. Final actual browser/export and clean-install journey qualification remains P3-06.",
+        "The real sibling project strict import reports a pre-existing global external-editor configuration error (enabled with an empty executable). Its installed-addon build and runtime lifecycle pass; the global preference was left unchanged and the final qualification task records the distinction."
+      ]
+    },
+    {
+      "id": "P3-06",
+      "phase": 3,
+      "title": "Qualify complete developer journeys and update documentation",
+      "status": "complete",
+      "acceptance": "Exercise clean install, Project Manager reopen, Resource/signal creation, lobby customization, entity subpackage/variant, joint placement, crate duplication, resource baking, pickup effects, scene reentry and relevant export/network paths. Diagnose whether failed tests or implementation are wrong; document exact results and remaining supported limits.",
+      "files": [
+        "tests",
+        "docs",
+        "examples",
+        "../scrapyard"
+      ],
+      "discovered_work": [
+        "Replay Scrapyard negative save/setup failures call fail()->SceneTree.quit immediately and log deferred audio/resource cleanup warnings. Make failure shutdown orderly and add strict negative-path cleanup verification; see /tmp/odin-usability-current-save-runtime.log. Browser-origin historical storage was not scanned; qualify current browser save journeys explicitly.",
+        "Align ordinary Web export preset threading with the AOT memory mode, or reject the mismatch before export. A native-free fixture with variant/thread_support=true produced a browser shared-memory LinkError; Box3D correctly uses the threaded profile. Evidence: /tmp/odin-usability-kit-ui-web2.log.",
+        "A UI-only browser fixture that quit within its first frames hit Godot AudioWorklet initialization after audio context destruction. UI validation selects the real Dummy driver; keep actual audio startup/failure/exit in final game qualification. Evidence: /tmp/odin-usability-kit-ui-web3.log.",
+        "Resolve or qualify the reproducible Godot 4.7.1 fast --import shutdown crash before claiming clean-install CLI journeys. Disassembly identifies DocTools::generate with null this, matching deferred EditorHelp::_gen_extensions_docs after cleanup_doc sets doc=null in exact engine commit a13da4feb8d8aefc283c3763d33a2f170a18d541. Normal editor startup and gameplay are separate passing paths; do not hide the failure through retries. Evidence: /tmp/odin-usability-lifecycle-slopball-disassembly.log and /tmp/odin-usability-lifecycle-games-variants.log.",
+        "While qualifying fast import, replace legacy importer failure suppression in owned runners (for example sibling Scrapyard Makefile and Cave run.sh use --import || true) with a checked supported startup/import path. Preserve real failure evidence rather than accepting retries or swallowed exits.",
+        "Exercise opening a copied Replay starter from Project Manager before its first manual build. The manifest pre-enables an addon installed by the build, so a first open without installation may remove the missing plugin from enabled settings; qualify automatic installation/re-enabling or provide the packaged bootstrap. The SKIP_CORE installation path is fixed and verified, but this first-open ordering remains part of the final clean-install journey.",
+        "Actual sibling installed-SDK build succeeded, but its strict import surfaced an existing user-level Godot4.7 setting: text_editor/external/use_external_editor=true with exec_path empty. Restoring open script tabs reports external-editor launch errors. Global preferences were left unchanged; qualify clean supported editor settings and distinguish this local configuration error from framework import failures. Evidence: /tmp/odin-usability-catalog-installed-scrapyard.log. Installed-runtime lifecycle is checked separately."
+      ],
+      "early_progress": [
+        "During P3-05, sibling Scrapyard run.sh and Makefile stopped suppressing import failures and now prepare extension registration before strict --editor --import.",
+        "Sibling Scrapyard harness now frees the game scene and waits for its audio WeakRefs before quitting; mod acts14/15/16 pass with no engine/leak errors. Other negative runtime paths remain for this final qualification.",
+        "P3-05 builds and installs a whole current SDK in the sibling game, preserving the previous addon backup. Recheck final package/journeys after remaining P3-06 changes."
+      ],
+      "task_id": "t_11b79adbe68c44b7",
+      "progress": "Complete: final developer journeys, current-source regressions, packaged SDK/source parity, installed Scrapyard integration and the requirement-by-requirement evidence audit pass within the documented platform/runtime limits. Final browser save/reload/conflict/identity/corruption checks pass after fixing large-World optimized-Wasm aggregate lowering.",
+      "review_notes": [
+        "Independent read-only review confirms replay/editor/install.py copies the addon but does not restore enabled-plugin settings after an early first open; build_scripts.sh installs only after successful compilation. Existing distribution builds before opening and does not qualify this order.",
+        "prepare_import registers generic extensions, but ordinary native-free builds invoke it only when BOX3D_NATIVE_LIBRARY is nonempty. Qualify bootstrap before first fast import for ordinary projects as well as Box3D.",
+        "Use one final packaged journey that opens the copied Replay template before its first build, then builds/reopens with GUI-like PATH and validates/previews/plays. Reuse earlier focused editor/Kit/Box3D checks where code has not changed.",
+        "Independent lifecycle/audio review confirms observed stream WeakRefs retire before orderly quit and the residual allocator signature is independently reproducible without Odin. Do not modify framework ownership further without discriminating evidence, whitelist the error in the strict diagnostic, or infer all allocations are leak-free. Qualify threaded exit separately."
+      ],
+      "partial_evidence": {
+        "first_open_before": "/tmp/odin-usability-first-open-before/editor.log",
+        "first_open": "/tmp/odin-usability-first-open-after2/journey/result.json",
+        "cold_import": "/tmp/odin-usability-cold-import2/result.json",
+        "import_runner_changes": "/tmp/odin-usability-import-runner-changes.json",
+        "build_helpers": "/tmp/odin-usability-final-build-helpers.log",
+        "bootstrap_package": "/tmp/odin-usability-bootstrap-addon2.json",
+        "staged_sdk": "/tmp/odin-usability-bootstrap-staged/addons/odin_godot",
+        "web_memory": "/tmp/odin-usability-web-memory/result.json",
+        "web_memory_exit_in_progress": "/tmp/odin-usability-web-memory-exit.log",
+        "failure_cleanup": "/tmp/odin-usability-failure-cleanup/checks",
+        "failure_cleanup_final_in_progress": "/tmp/odin-usability-failure-cleanup-final.log",
+        "docs": "/tmp/odin-usability-final-journey-docs.log",
+        "failure_cleanup_final": "/tmp/odin-usability-failure-cleanup/final",
+        "web_exit_failure": "/tmp/odin-usability-web-memory-exit",
+        "web_exit_trace": "/tmp/odin-usability-web-memory-exit-trace",
+        "plain_godot_exit_comparison": "/tmp/odin-usability-web-audio-baseline/browser-original.json",
+        "plain_godot_predelete_comparison": "/tmp/odin-usability-web-audio-baseline/browser.json",
+        "ordered_web_exit_in_progress": "/tmp/odin-usability-web-memory-orderly.log",
+        "browser_save_in_progress": "/tmp/odin-usability-final-browser-save.log",
+        "final_package_in_progress": "/tmp/odin-usability-final-package.log",
+        "ordered_browser_exit": "/tmp/odin-usability-web-memory-orderly/single/browser-errors.json",
+        "threaded_exit_in_progress": "/tmp/odin-usability-web-memory-threaded-exit.log",
+        "final_package": "/tmp/odin-usability-final-package/result.json",
+        "threaded_exit": "/tmp/odin-usability-web-memory-threaded-exit/threads/browser-result.json",
+        "final_box3d_in_progress": "/tmp/odin-usability-final-box3d-starter.log",
+        "current_editor_authoring_in_progress": "/tmp/odin-usability-final-editor-authoring.log",
+        "final_box3d": "/tmp/odin-usability-final-box3d-starter2/report.json",
+        "current_editor_authoring": "/tmp/odin-usability-final-editor-authoring.log",
+        "final_sdk": "/tmp/odin-usability-final-sdk.json",
+        "final_sdk_install": "/tmp/odin-usability-final-sdk-install.json",
+        "final_installed_build_lifecycle": "/tmp/odin-usability-final-installed-scrapyard.log",
+        "final_sibling_reopen": "/tmp/odin-usability-final-scrapyard-reopen.log",
+        "final_sibling_peers": "/tmp/odin-usability-final-scrapyard-peers.log",
+        "final_docs": "/tmp/odin-usability-final-docs-audit.log",
+        "profile_diagnostic": "/tmp/odin-usability-profile-diagnostic.log",
+        "completion_audit": "docs/design/usability-completion-audit.json",
+        "compiler_sample": "/tmp/odin-usability-web-compiler-sample.txt",
+        "before_ir": "/tmp/odin-usability-web-ir/game.ll",
+        "before_ir_functions": "/tmp/odin-usability-web-ir/functions.json",
+        "after_ir": "/tmp/odin-usability-web-ir/after.ll",
+        "after_ir_functions": "/tmp/odin-usability-web-ir/after-functions.json",
+        "optimized_object": "/tmp/odin-usability-web-ir/object-build.log",
+        "network_regression": "/tmp/odin-usability-final-large-values-net.log",
+        "large_value_regression": "/tmp/odin-usability-large-values-regression.log",
+        "corrected_browser_save": "/tmp/odin-usability-browser-save-fixed.log",
+        "corrected_presentation": "/tmp/odin-usability-large-world-bridge.log",
+        "refreshed_sdk": "/tmp/odin-usability-final-sdk-large-values.json",
+        "refreshed_sdk_install": "/tmp/odin-usability-final-sdk-value-install.json",
+        "refreshed_sdk_runtime": "/tmp/odin-usability-final-value-sdk-runtime.log",
+        "current_source_parity": "/tmp/odin-usability-large-world-current-sources.json",
+        "presentation_current": "/tmp/odin-usability-large-world-bridge/checks/result.json",
+        "bulk_ir": "/tmp/odin-usability-web-ir/bulk.ll",
+        "bulk_ir_functions": "/tmp/odin-usability-web-ir/bulk-functions.json",
+        "bulk_regressions": "/tmp/odin-usability-bulk-checkpoint-regression.log",
+        "bulk_browser_save": "/tmp/odin-usability-browser-save-bulk.log",
+        "benchmark_callers": "/tmp/odin-usability-large-world-bench.log"
+      },
+      "changes": [
+        "Package the authoring dock inside the Replay template before its first build, install authoring tool paths before compiling, discover them live, and clear stale setup errors when manifest description succeeds.",
+        "Avoid redundant native loader/descriptor diagnostics for expected fresh-editor missing DLLs while retaining real load failures and runtime errors.",
+        "Prepare extension discovery after all native builds including native-free projects. Add shipped checked import_project.sh; route45 owned framework runners through it and retain complete logs instead of swallowing exits.",
+        "Resolve Web memory mode from the active Godot preset, or matching project presets for direct builds. Compile native-free shared or unshared modules accordingly; reject incompatible Box3D presets before compilation.",
+        "Give Replay Scrapyard a scene-independent failure-exit node that releases the failed game and waits on exact audio WeakRefs before quitting. Add strict negative save/setup cleanup checks and avoid a false READY receipt after failure.",
+        "Make sibling Scrapyard web_build.sh preserve native/import/export failures instead of trusting stale output files. Document remembered tool paths, first-open setup, checked imports and Web memory choices.",
+        "Fixed large-World optimized-Wasm codegen without changing public value-copy APIs: read_values branches before copying, Scrapyard presentation selects frame pointers, and complete checkpoint transfers use same-type bulk copies into their original cleanup owners.",
+        "Added bounded large-state native/Wasm regression, migrated benchmark callers, corrected stale compiler-acquisition/missing-tool documentation, packaged the exact compiler backport and retained a complete evidence audit."
+      ],
+      "test_diagnosis": [
+        "The fresh SDK reproduction confirmed Godot removes the missing authoring addon from enabled plugins. A packaged dock solves the first-open ordering without another user configuration step.",
+        "The initial live-setup test exposed a genuine stale error report after successful describe; the dock now replaces its setup report and clears old issues. A separate cold-import fixture initially inherited read-only Nix directory modes; corrected fixture permissions before installing the SDK.",
+        "Web memory helper annotations initially required Python3.10 at evaluation time under the system Python3.9; postponed annotation evaluation to retain supported Python3 compatibility.",
+        "Native save refusal tests previously checked only nonzero exit/refusal markers. They now also require explicit orderly cleanup and reject engine/script/leak errors; original identity/corruption assertions remain intact.",
+        "Direct SceneTree.quit after browser audio playback exposed AudioContext-closed errors and a WorkerThreadPool Group allocator diagnostic. The same allocator diagnostic reproduces in a plain GDScript/no-Odin project, including an explicit PREDELETE audio stop. Retained all evidence; now qualify scene/audio retirement before engine exit with strict error checks, matching the production failure-handler order.",
+        "The Box3D clean-export fixture removed PATH tools but retained Nix DEVELOPER_DIR/SDKROOT, causing Apple install_name_tool failure. Corrected the GUI-like environment consistently with the existing toolchain test. Packaged build/import/play/export/codesign/exported-play now pass; profile subprocess failures now preserve captured stderr.",
+        "Independent completion audit found stale downloader guidance: corrected persistent tool-status/cache wording and supplied the exact tested compiler acquisition paths. The bundled compiler backport applies cleanly to the pinned upstream April source. Final SDK implementation parity with the fully qualified package differs only in captured profile-tool error diagnostics, which has a direct failure-path check.",
+        "The originally live optimized Web build was deliberately stopped after sampling showed31.7GB and optimized IR exposed a34MB read_values function and35MB paint function caused by aggregate conditionals. This was not a timeout/retry. Explicit branch returns preserve detached value reads; selecting frame pointers preserves presentation policy. read_values now emits5845bytes of optimized IR and the full optimized object completes in158.91s at2.84GB peak footprint.184 network tests pass; a large-state native/optimized-Wasm regression was added.",
+        "The corrected Odin object completed, but Binaryen O2 was SIGKILLed while optimizing the remaining large field-by-field checkpoint copies. Fresh IR identified exact tuple-assignment sites; changed only their transfer into existing outer cleanup slots to mem.copy. Independent review confirmed ownership/error cleanup and logical fields remain equivalent;184 network and11 owned-state tests pass. Public APIs and optimization levels remain unchanged."
+      ],
+      "remaining_implementation": [],
+      "supported_limits": [
+        "Native editor/runtime/export qualification is macOS; browser qualification is Chrome. Existing Linux/Windows target-host runtime and PowerShell-host limitations remain documented rather than claimed tested.",
+        "Godot4.7.1 single-threaded Web engine exit reports a WorkerThreadPool::Group allocator diagnostic after observed scene/audio retirement, also reproduced in two plain GDScript/no-Odin comparisons. Strict engine-exit diagnosis remains failing for that variant. Threaded orderly exit passes with zero errors; normal single-threaded browser gameplay/save/reload passes.",
+        "The user global Godot external-editor preference is enabled with an empty executable. It was left unchanged; actual sibling reopen succeeds using isolated valid editor preferences and remembered tools. The workflow guide explains that local preference repair.",
+        "Remote CI services were not run; corresponding local gates and registered suite entries were validated."
+      ],
+      "live_validation": {},
+      "evidence": {
+        "first_open": "/tmp/odin-usability-final-package/first-open/result.json",
+        "cold_import": "/tmp/odin-usability-cold-import2/result.json",
+        "editor_authoring": "/tmp/odin-usability-final-editor-authoring.log",
+        "replay_package": "/tmp/odin-usability-final-package/result.json",
+        "box3d_package_export": "/tmp/odin-usability-final-box3d-starter2/report.json",
+        "web_memory_modes": "/tmp/odin-usability-web-memory/result.json",
+        "threaded_orderly_exit": "/tmp/odin-usability-web-memory-threaded-exit/threads/browser-result.json",
+        "single_thread_exit_limitation": "/tmp/odin-usability-web-memory-orderly/single/browser-errors.json",
+        "plain_godot_exit_comparison": "/tmp/odin-usability-web-audio-baseline/browser-original.json",
+        "plain_godot_predelete_comparison": "/tmp/odin-usability-web-audio-baseline/browser.json",
+        "negative_save_setup_cleanup": "/tmp/odin-usability-failure-cleanup/final",
+        "browser_save": "/tmp/odin-usability-browser-save-bulk/result.json",
+        "browser_save_receipts": "/tmp/odin-usability-browser-save-bulk/receipts.json",
+        "browser_save_log": "/tmp/odin-usability-browser-save-bulk.log",
+        "current_presentation_network": "/tmp/odin-usability-large-world-bridge/checks/result.json",
+        "large_value_regression": "/tmp/odin-usability-large-values-regression.log",
+        "network_owned_regression": "/tmp/odin-usability-bulk-checkpoint-regression.log",
+        "compiler_diagnosis": "/tmp/odin-usability-web-compiler-sample.txt",
+        "before_ir": "/tmp/odin-usability-web-ir/functions.json",
+        "final_ir": "/tmp/odin-usability-web-ir/bulk-functions.json",
+        "intermediate_optimized_object": "/tmp/odin-usability-web-ir/object-build.log",
+        "benchmark_caller_compile": "/tmp/odin-usability-large-world-bench.log",
+        "final_sdk": "/tmp/odin-usability-complete-sdk.json",
+        "final_sdk_install": "/tmp/odin-usability-complete-sdk-install.json",
+        "final_sdk_consumer_build": "/tmp/odin-usability-complete-sdk-build-consumer.log",
+        "sibling_reopen": "/tmp/odin-usability-final-scrapyard-reopen.log",
+        "sibling_peers": "/tmp/odin-usability-final-scrapyard-peers.log",
+        "sibling_lifecycle": "/tmp/odin-usability-final-value-sdk-runtime.log",
+        "compiler_patch_and_profile_diagnostic": "/tmp/odin-usability-profile-diagnostic.log",
+        "docs": "/tmp/odin-usability-complete-docs.log",
+        "audit": "docs/design/usability-completion-audit.json"
+      },
+      "validation": [
+        "The actual packaged Replay starter opens before its first build with the authoring dock enabled, discovers first-build tool paths live, and reopens with minimal GUI PATH for validation, clickable errors, recovery and preview. Cold imports of native-free Replay and the former Slopball failure case pass on their first checked attempts.",
+        "The current Resource/signal authoring gate passes parser checks, actual editor creation/navigation/connection actions and runtime signal execution. Prior Kit UI/subpackage/variant and Box3D joint/duplication/preview receipts remain explicitly mapped to their completed tasks and were independently audited.",
+        "Packaged Replay passes native solo pickup/effects with measured mixer output, host/client/observer play, authored definition validation/preview and real Chrome Web gameplay. Packaged Box3D passes build/import/play/reset/reentry, clean-environment native export, signature verification and exported gameplay.",
+        "Both native-free Web memory modes export through the active preset and run pickup/effects/audio in Chrome. Threaded orderly scene/audio/engine shutdown passes with exit0 and no errors. Single-threaded engine shutdown remains explicitly unqualified because its allocator diagnostic also reproduces without Odin; the separate diagnostic retains strict error rejection.",
+        "Native raw-checkpoint, wrong-owner, corrupted-save and invalid-port setup refusals all produce ordered cleanup receipts without script/engine/resource-leak errors or false READY messages. Existing identity/corruption-preservation assertions remain intact.",
+        "The optimized Scrapyard Web save gate passes13 receipts covering upload persistence, preference changes, save-conflict refusal, crash recovery, separate save slots, preference/bundle-only restoration, and missing-asset/wrong-identity/corruption refusals without overwriting stored data. Logs contain no unexpected engine/script/leak errors.",
+        "Large-state detached-read/zero-on-missing behavior passes natively and compiles as an optimized Wasm object within the bounded gate. All184 network and11 owned-state tests pass after the final transfer changes. Actual current actors, feedback, native audio and host/client/observer gameplay at120ms latency pass; owned benchmark callers compile after migration.",
+        "Compiler sampling and optimized IR identified whole-World aggregate merges and two checkpoint tuple transfers. Equivalent branches/pointer selection/bulk transfers reduce total optimized IR193MB\u219257MB; read_values34MB\u21926KB, server_init_core20MB\u2192399KB and session_rejoin45MB\u219247KB. The complete default optimized export and browser save run succeeds; no optimization level or diagnostic capacity was reduced.",
+        "Final Nix SDK builds and502 packaged Odin implementation files match the current worktree byte-for-byte. The compiler backport matches and applies to the pinned source. The whole final SDK replaces the sibling installation with a backup, and its normal consumer build succeeds. Installed sibling minimal-PATH reopen, three-scene lifecycle and solo/duo checks pass with clean teardown.",
+        "Final docs/API/link/site checks and git diff --check pass. Independent completed-task audit confirms all referenced evidence exists, all16 API/schema cleanup inventory items are complete, removed compatibility files are absent, and intentionally retained low-level APIs are distinguished from obsolete shims."
+      ]
+    }
+  ]
+}

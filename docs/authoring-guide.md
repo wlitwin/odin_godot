@@ -50,8 +50,9 @@ Match setup and teardown: `init`/`destroy` for owned Odin storage,
 `open`/`close` for a live session, and `attach`/`detach` for an engine
 attachment. Packages with several owners add a type prefix, such as
 `session_open`. These verbs describe ownership. In a Godot script, release live
-owners in `*_exit_tree`. A `defer` in
-`*_ready` would run when that callback returns, not when the node leaves the tree.
+owners in `*_finalize`. Tree exit also happens during reparenting and is not
+final destruction. A `defer` in
+`*_ready` would run when that callback returns, not when the script instance is destroyed.
 Borrowed readers, handles and views do not acquire ownership merely by being
 returned from a procedure. A query may return copied values, an owner-borrowed
 slice, or a frame-temporary view of live entity handles. Check its lifetime
@@ -522,9 +523,29 @@ so they follow the same scoping rules as GDScript's `%Name`.
 Both are plain Odin procs whose first parameter is `^<Struct>`:
 
 - **Lifecycle**: the proc name (minus an optional `<struct>_` prefix) is one of
-  `ready`, `process`, `physics_process`, `enter_tree`, `exit_tree`, `reload`.
+  `ready`, `process`, `physics_process`, `enter_tree`, `exit_tree`, `reload`, `finalize`.
   `process` / `physics_process` take a `delta: f64` second parameter.
 - **Methods**: tagged `@(gd_method)`. Any name; exposed minus the struct prefix.
+
+#### `finalize` — final instance ownership
+
+`<struct>_finalize(self: ^T)` runs once before instance storage and exported
+Resources are released. Nodes still have their children, but may already be
+outside the tree. Script removal/replacement also finalizes, even without a
+tree-exit notification. Do not free or reassign the owner from this terminal
+callback. Keep ordinary `_exit_tree` for temporary tree-membership work.
+
+Request owning-node destruction with `queue_free`, and remove or replace owning
+scripts on the main thread. Unsupported retirement cannot safely run arbitrary
+cleanup on another thread. Core revokes weak execution and retains the affected
+storage/code with `ODIN_FINALIZE_QUARANTINED`; this is reported retention requiring
+a restart, not successful cleanup or a deferred retry. Native Godot deletion
+vetoes (such as deleting the edited scene root) remain intact.
+
+A standard Kit stack adds its ordered cleanup after this hook automatically.
+Same-layout reload preserves state without finalizing it. Changes to private
+owned-state layouts keep live instances on their original code until recreated;
+Core compares the full private layout, not only exported fields and total size.
 
 #### `reload` — the hot-reload hook
 
@@ -569,6 +590,15 @@ ordinary Odin (allocations, etc.).
 
 ### Signals
 
+Use Godot's **Signals** dock and **Connect** to create an Odin handler. The
+editor generates a typed `@(gd_method)` procedure for the
+target script, including its receiver and signal parameters. Choosing the same
+handler again navigates to it. The editor uses the unsaved script declarations,
+so a renamed struct or a different `godot:godot` import alias needs no extra setup.
+Godot stores these connections in the scene. The
+[declarative wiring](#declarative-signal-wiring) below is useful when
+the connection belongs in source instead.
+
 Declare a signal as a struct field of one of the `gd.Signal0` … `gd.Signal4`
 marker types, whose arity is the payload count. The field name is the signal name, the type
 parameters are the payload types, and the optional `gd:"args=..."` tag names the payload
@@ -586,8 +616,9 @@ Player :: struct {
 }
 ```
 
-The payload types must be Variant-able, following the same rule as `@export` and `@(gd_method)`
-args (object/node handles present as `Object`). A signal field costs one nil pointer of
+Declared signal payloads require concrete Variant-able types, as `@export` fields
+do (object/node handles present as `Object`). Untyped foreign signals can still
+be received by a method's `gd.Variant` parameter. A signal field costs one nil pointer of
 instance size and is never read or written at runtime; it exists so the declaration is
 part of the type, checked by the compiler, and visible to reflection.
 
@@ -635,6 +666,8 @@ gd.connect(self.owner, "body_entered", "collect")
 
 // 3. Use @(gd_connect), shown below, instead of a _ready/connect call.
 ```
+
+<a id="declarative-signal-wiring"></a>
 
 ### Declarative signal wiring (`@(gd_connect)`)
 
@@ -1179,8 +1212,11 @@ structs/arrays you manipulate with normal operators.
 | `^gd.<Object subclass>`, `gd.Node`, `gd.Object`, ... | `Object` | object handle |
 
 Scriptgen rejects unsupported types with a build error.
-Raw `gd.Variant` signatures are not supported at this method boundary; use a
-concrete supported type or a lower-level Variant dispatch API.
+Untyped signal arguments use `gd.Variant`. A method's Variant parameter is a
+temporary engine copy that the trampoline releases after the call, including
+any referenced resources. Read it during the call; make an explicit Variant copy
+to retain it. Do not destroy the borrowed parameter yourself. Raw Variant
+returns remain unsupported; return a concrete supported type.
 
 ### Method value ownership
 
@@ -1199,16 +1235,32 @@ strings and `context.temp_allocator` data work; a view into a local stack array
 does not. Copy an argument with `strings.clone` if you retain it across frames.
 The trampoline does not free an Odin string you return from your own allocator.
 
-A bare `@(gd_method)` uses these ownership rules: owning builtin
-argument copies belong to the callee, while returned Godot values are borrowed.
-The method must free its `gd.String`/`gd.Array` argument copies and may return
-an instance-owned value. Object-handle arguments are borrowed pointers,
-not owning builtin copies.
+Method and property-setter inputs are borrowed for the duration of the call.
+The trampoline releases its builtin argument copies afterward. Do not free a
+`gd.String`, `gd.Array` or other incoming handle; acquire a separate reference
+with a Godot copy constructor if you retain it. A copied Array/Dictionary reference
+may share mutable contents, so ownership does not imply a deep copy. Object-handle
+arguments are borrowed pointers.
 
-To change these ownership rules, add options to the attribute:
+Generated `gd.new_*` constructors for RefCounted classes return raw handles.
+Acquire your local reference before passing a new object to a retaining API,
+then release that local reference when finished:
 
 ```odin
-@(gd_method="borrowed_args,owned_return")
+material := gd.new_standard_material3d()
+gd.ref_counted_init_ref(material)
+defer gd.release_ref(material)
+gd.geometry_instance3d_set_material_override(mesh, material)
+```
+
+The node keeps its own material reference. Calling `release_ref` without first
+acquiring your local reference can destroy the material while the node uses it.
+
+Returned Godot values are borrowed by default, so a method can return an
+instance-owned value. Use `owned_return` when transferring a newly owned value:
+
+```odin
+@(gd_method="owned_return")
 player_copy_values :: proc(self: ^Player, values: gd.Array) -> gd.Array {
     return gd.new_array_array(values)
 }
@@ -1219,11 +1271,6 @@ player_description :: proc(self: ^Player) -> gd.String {
 }
 ```
 
-`borrowed_args` makes the trampoline release its builtin argument copies after
-the call. Treat those values as borrowed; use a Godot copy constructor before
-retaining or replacing a handle. A copied Array/Dictionary reference may still
-share mutable contents—ownership does not imply a deep copy.
-
 `owned_return` transfers one owned builtin reference to the trampoline, which
 releases it after the outgoing Variant retains the value. It also supports a
 declared RefCounted subclass with one owned reference (factory results, or a
@@ -1232,9 +1279,9 @@ a Variant does not own a Node's lifetime. Native Odin string results already use
 the conversion path and do not take this option. Returning a borrowed argument
 as `owned_return` requires first acquiring a separate reference.
 
-The options also follow composed methods and property accessors when the accessor
-proc has the annotated `gd_method`. Unannotated accessors use the default
-ownership rules. A String property's getter may return an Odin `string`, which is copied;
+The same input lifetime applies to composed methods and unannotated property
+setters. An annotated getter can use `owned_return`. A String property's getter
+may return an Odin `string`, which is copied;
 its actual exported storage remains `gd.String`. Native `string` exports are
 rejected by scriptgen and reflection because their storage is not a Godot String.
 
@@ -1315,7 +1362,7 @@ separate libraries:
 |---|---|---|
 | **flat `res://scripts/`** | everything, until a directory listing gets hard to read | none; this is the default |
 | **a helper subpackage** (`scripts/util/`, no annotated scripts in it) | pure Odin logic with no engine surface: math, parsers, tables. Import it relatively (`import "util"`) | none; it compiles into the same dll |
-| **a script subpackage** (`scripts/ui/`, with annotated scripts) | self-contained engine-native classes the rest of the game does not need to name: HUD widgets, menus, tools, effects. They attach from their own path (`res://scripts/ui/hud.odin`) | kit declarations must stay in the top-level scripts dir, and a subpackage may not import it back. Still one dll, so a save still rebuilds all of it |
+| **a script subpackage** (`scripts/actors/`, with annotated scripts) | Kit entities, inputs, gameplay blocks, HUD widgets, tools and effects. Scripts attach from their own source paths | keep game-specific callbacks beside their owner to avoid reverse imports. Still one dll, so a save rebuilds all of it |
 | **a script module** (`res://modules/<name>/`) | a subsystem whose rebuild latency warrants a separate library (hundreds of scripts) | its own dll, so no shared types or globals with other modules: cross-module calls go through the engine |
 | **`res://shared/`** | types, constants and pure procs several modules must agree on | verified state-free (no mutable globals, no `@(init)`, no scripts), and an edit there rebuilds every module |
 
@@ -1390,6 +1437,77 @@ item_data_item_total :: proc(self: ^ItemData) -> int {
   that accepts a custom `ItemData` `.tres`. The `resource=` hint string filters the
   picker, and because `ItemData` is registered as a global class (see below) the
   editor knows it as a type.
+
+### Baking Resources into game values
+
+Use `godot:authoring` when your game needs copied runtime tables rather than live
+Resources. It works with ordinary Odin games, Kit and Replay. Inspector hints
+guide editing; the mapping declares the bounds that gameplay actually accepts.
+
+```odin
+import a "godot:authoring"
+
+Weapon_Row :: struct {
+    damage: u8,
+    cooldown: u16,
+    speed: f32,
+}
+
+// WeaponDef is your Resource script, with id, dmg, cooldown and speed exports.
+load_weapons :: proc() -> ([256]Weapon_Row, int, a.Report) {
+    catalog: a.Catalog(WeaponDef)
+    defer a.catalog_destroy(&catalog)
+    report := a.catalog_load(&catalog, "res://data/weapons", 256)
+    if report.error != .None {return {}, 0, report}
+
+    candidate: [256]Weapon_Row
+    for entry in catalog.entries {
+        report = a.map_fields(entry.script, &candidate[entry.id], []a.Field {
+            a.integer("dmg", 0, 255, "damage"),
+            a.integer("cooldown", 1, 600),
+            a.number("speed", 0, 100),
+        }, entry.path)
+        if report.error != .None {return {}, 0, report}
+    }
+    return candidate, catalog.high_water, {}
+}
+```
+
+`Catalog(Script)` retains the Resources and exposes typed script pointers, source
+paths and checked IDs. `capacity` bounds both the batch size and the ID space;
+`minimum_id = 1` reserves ID zero. Duplicate base IDs report both source files.
+`high_water` is the highest ID plus one, so sparse tables keep their holes.
+For an ordered rulebook without IDs, pass `id_field = ""`; entries then receive
+consecutive indices in normalized filename order. Source files and their export
+`.remap` entries count once. Call `catalog_destroy` on every exit, after extraction.
+Use `resource_batch_load` / `resource_script` directly for custom discovery policies.
+
+The mapping declarations are explicit:
+
+| Declaration | Behavior |
+| --- | --- |
+| `a.field("prop")` | Copy an identical pointer-free scalar, fixed array or value struct. |
+| `a.integer("mag", 1, 65535, "mechanism.mag")` | Check native integer bounds and narrow into a nested value field. |
+| `a.number("speed", 0, 100)` | Check finite f32/f64 values, range and target overflow; ordinary float rounding is allowed. |
+
+The optional final argument renames the destination. Dotted paths traverse value
+structs, not Resource references or other pointers. A failed `map_fields` call
+leaves its entire destination unchanged. Missing fields, overlapping destination
+assignments, incompatible types and bounds that do not fit an integer target are
+errors. These declarations are checked when baking, so run your authoring validator
+after changing a source or destination type.
+
+Keep owned string conversion, Resource-to-ID references, game enum translation and
+semantic rules in the extractor. Validate cross-references and publish the complete
+candidate only after all categories succeed. Explicit mod overrides belong in a
+later step; they do not make duplicate base IDs valid. `Report` copies its path and
+message, exposes `truncated`, and survives Resource cleanup; `report_path` and
+`report_message` borrow views from that report.
+
+Replay's `scenegd.bake_fields` applies the same declarations inside a `Bake_Context`
+and preserves its first failure. The extractors in
+`examples/replay_scrapyard/scripts/defs/` demonstrate explicit references and
+semantic validation.
 
 ## Global class names
 

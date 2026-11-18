@@ -1,0 +1,31 @@
+config_version=5
+
+[application]
+config/name="Box3D Starter"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+window/size/viewport_width=960
+window/size/viewport_height=640
+
+[input]
+jump={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":32)]
+}
+reset={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":82)]
+}
+
+[physics]
+common/physics_ticks_per_second=60
+common/physics_interpolation=true
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/box3d_authoring/plugin.cfg")

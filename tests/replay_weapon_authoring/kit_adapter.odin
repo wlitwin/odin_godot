@@ -85,7 +85,7 @@ scrapyard_weapon_probe :: proc(self: ^Scrapyard, key: string, seat: gd.Int) -> g
         return gd.Int(claim.look == 0 && claim.iron == 0)
     }
 
-    r, ok := runner_of(self, kn.Player_Id(seat))
+    r, ok := runner_owned_by(&self.boot, kn.Player_Id(seat))
 
     if !ok {
         return -1

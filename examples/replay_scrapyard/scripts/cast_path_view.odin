@@ -1,5 +1,7 @@
 package replay_scrapyard
 
+import rgd "godot:replay/godot"
+
 
 import "core:fmt"
 import gd "godot:godot"
@@ -19,7 +21,9 @@ cast_paths_paint :: proc(self: ^ReplayScrapyard, observed, predicted: ^game.Worl
 }
 
 flame_paths_paint :: proc(self: ^ReplayScrapyard, observed, predicted: ^game.World, seat: u16) {
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
 
     for pass in 0 ..< 2 {
         world := pass == 0 ? predicted : observed

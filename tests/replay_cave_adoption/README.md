@@ -18,10 +18,10 @@ successor release it. Test probes only read authority observations; drivers use
 ordinary actions. Prepared source/framework and binary/export identities are
 retained with results. No original project is edited.
 
-The single scripted C7 checkpoint in `tests/replay_cave/fixtures/content7` freezes
-old-host possession before C8. Its producer requires C7 and must be regenerated
-only with the archived model sources. Conversion preserves the old gameplay
-fields and seeds the new authority fields from the checkpoint header.
+The retained host-carrier checkpoint uses the current schema under
+`tests/replay_cave/fixtures/current`. Its original frame and peer metadata are
+preserved by the migration receipt under
+`docs/replay/results/usability-legacy-2026-11-16/cavecrawl`.
 
 See [the policy contract](../../replay/net/authority.md) and
 [game behavior](../../examples/replay_cavecrawl/adoption.md).

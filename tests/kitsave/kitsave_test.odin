@@ -14,8 +14,9 @@ import ksave "godot:kit/save"
 import ksess "godot:kit/session"
 
 Bot :: struct {
-    hp: i32,
-    x:  f32,
+    hp:    i32,
+    x:     f32,
+    scene: ksess.Scene_Variant, // selected by the factory, not a replicated field
 }
 
 bot_cmd_poke :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {
@@ -44,6 +45,7 @@ bot_set := knet.Command_Set {
 }
 
 BOT_TYPE :: ksess.Entity_Type(7)
+ARMORED_VARIANT :: ksess.Scene_Variant(0x4713cd88)
 TOKEN_ALICE :: u64(0xA11CE)
 
 Envelope :: struct {
@@ -70,10 +72,12 @@ box_make_entity :: proc(
     type: ksess.Entity_Type,
     id: knet.Net_Id,
     owner: knet.Player_Id,
+    variant: ksess.Scene_Variant,
 ) -> (
     rawptr,
     ^knet.Command_Set,
 ) {
+    if variant != ksess.DEFAULT_SCENE_VARIANT && variant != ARMORED_VARIANT {return nil, nil}
     b := cast(^Peer_Box)user
 
     if type != BOT_TYPE {
@@ -81,6 +85,7 @@ box_make_entity :: proc(
     }
 
     bot := new(Bot)
+    bot.scene = variant
     b.bots[id] = bot
     return bot, &bot_set
 }
@@ -156,7 +161,7 @@ the_save_saga :: proc(t: ^testing.T) {
     bot := new(Bot)
     bot.hp = 61
     bot.x = 12.5
-    bot_id := ksess.session_spawn(&host.s, BOT_TYPE, bot, &bot_set, owner = alice.s.me)
+    bot_id := ksess.session_spawn(&host.s, BOT_TYPE, bot, &bot_set, owner = alice.s.me, variant = ARMORED_VARIANT)
     host.bots[bot_id] = bot
     ksess.session_start_replicating(&host.s)
     ksess.session_stat_add(&host.s, alice.s.me, score, 41)
@@ -198,6 +203,7 @@ the_save_saga :: proc(t: ^testing.T) {
     testing.expect(t, has_bot)
     testing.expect_value(t, bot2.hp, i32(61))
     testing.expect_value(t, bot2.x, f32(12.5))
+    testing.expect_value(t, bot2.scene, ARMORED_VARIANT)
 
     // Alice rejoins with her PERSISTED token: same id, her stats, her bot.
     alice2: Peer_Box
@@ -214,6 +220,7 @@ the_save_saga :: proc(t: ^testing.T) {
     abot, alice_sees := alice2.bots[bot_id]
     testing.expect(t, alice_sees, "the world reached the rejoiner")
     testing.expect_value(t, abot.hp, i32(61))
+    testing.expect_value(t, abot.scene, ARMORED_VARIANT)
 
     // Fresh ids never collide with saved ones (cursors persisted).
     testing.expect_value(t, host2.s.next_player, knet.Player_Id(3))
@@ -287,56 +294,61 @@ foreign_and_broken_saves_refuse_to_parse :: proc(t: ^testing.T) {
 }
 // ---- versioned local POD records (record_encode/decode, the pure core) -------
 
-// v1 of a profile, and v2 with an appended field — the append-only migration
-// the zero-default handles WITHOUT a version bump.
-Rec_V1 :: struct {
+// Deliberately different sizes: adding fields inside padding is not a size test.
+Record :: struct {
     cores: u32,
     parts: u8,
 }
 
-Rec_V2 :: struct {
+Larger_Record :: struct {
     cores:   u32,
     parts:   u8,
-    unlocks: u16, // appended at the END — old files read it as zero
+    unlocks: [16]u8,
 }
 
+#assert(size_of(Record) != size_of(Larger_Record))
+
 @(test)
-record_round_trips_and_migrates :: proc(t: ^testing.T) {
+record_requires_exact_layout_and_framing :: proc(t: ^testing.T) {
     VER :: u16(1)
-    p := Rec_V1 {
+    p := Record {
         cores = 4200,
         parts = 0b101,
     }
     bytes := ksave.record_encode(p, VER, context.temp_allocator)
 
     // Round trip: same type, same version.
-    got, res := ksave.record_decode(Rec_V1, bytes, VER)
+    got, res := ksave.record_decode(Record, bytes, VER)
     testing.expect_value(t, res, ksave.Record_Result.Ok)
     testing.expect_value(t, got.cores, u32(4200))
     testing.expect_value(t, got.parts, u8(0b101))
 
-    // APPEND-ONLY ZERO-DEFAULT: the v1 bytes decode into v2 at the SAME version —
-    // the shared fields survive, the appended `unlocks` reads as zero.
-    up, ures := ksave.record_decode(Rec_V2, bytes, VER)
-    testing.expect_value(t, ures, ksave.Record_Result.Ok)
-    testing.expect_value(t, up.cores, u32(4200))
-    testing.expect_value(t, up.parts, u8(0b101))
-    testing.expect_value(t, up.unlocks, u16(0)) // the migration, for free
-
-    // A newer file read by an OLDER build truncates cleanly (shared fields only).
-    full := ksave.record_encode(Rec_V2{cores = 1, parts = 2, unlocks = 9}, VER, context.temp_allocator)
-    down, dres := ksave.record_decode(Rec_V1, full, VER)
-    testing.expect_value(t, dres, ksave.Record_Result.Ok)
-    testing.expect_value(t, down.cores, u32(1))
-    testing.expect_value(t, down.parts, u8(2))
+    // A declared layout mismatch is explicit; no implicit resizing or prefix
+    // extraction may turn another record into valid progress/settings.
+    up, ures := ksave.record_decode(Larger_Record, bytes, VER)
+    testing.expect_value(t, ures, ksave.Record_Result.Skew)
+    testing.expect_value(t, up.cores, u32(0))
+    full := ksave.record_encode(Larger_Record{cores = 1, parts = 2}, VER, context.temp_allocator)
+    down, dres := ksave.record_decode(Record, full, VER)
+    testing.expect_value(t, dres, ksave.Record_Result.Skew)
+    testing.expect_value(t, down.cores, u32(0))
 
     // A different VERSION is .Skew (an incompatible reorder/remove/retype).
-    _, skew := ksave.record_decode(Rec_V1, bytes, VER + 1)
+    _, skew := ksave.record_decode(Record, bytes, VER + 1)
     testing.expect_value(t, skew, ksave.Record_Result.Skew)
 
     // Wrong magic / truncation is .Corrupt, never a silent misread.
-    _, badmagic := ksave.record_decode(Rec_V1, []u8{1, 2, 3, 4, 5, 6, 7, 8}, VER)
+    _, badmagic := ksave.record_decode(Record, []u8{1, 2, 3, 4, 5, 6, 7, 8}, VER)
     testing.expect_value(t, badmagic, ksave.Record_Result.Corrupt)
-    _, cut := ksave.record_decode(Rec_V1, bytes[:len(bytes) - 2], VER) // lop the tail
-    testing.expect_value(t, cut, ksave.Record_Result.Corrupt)
+    for cut in 0 ..< len(bytes) {
+        _, result := ksave.record_decode(Record, bytes[:cut], VER)
+        testing.expect_value(t, result, ksave.Record_Result.Corrupt)
+    }
+    // Enough bytes for the requested T does not satisfy a larger declared size.
+    _, missing := ksave.record_decode(Record, full[:len(bytes)], VER)
+    testing.expect_value(t, missing, ksave.Record_Result.Corrupt)
+    trailing := make([]u8, len(bytes) + 1, context.temp_allocator)
+    copy(trailing, bytes)
+    _, surplus := ksave.record_decode(Record, trailing, VER)
+    testing.expect_value(t, surplus, ksave.Record_Result.Corrupt)
 }

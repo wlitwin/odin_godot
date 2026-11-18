@@ -83,7 +83,6 @@ step_motion :: proc(
     joins, leaves: u64,
     ctx: ^r.Step(Event),
     simulated_motion: bool,
-    impact_events: bool = true,
 ) {
     w.clock = ctx.tick
     lb.roster(&w.lobby, joins, leaves)
@@ -170,7 +169,7 @@ step_motion :: proc(
         return
     }
 
-    step_rocks(w, ctx, impact_events)
+    step_rocks(w, ctx)
     step_director(w, ctx)
     step_dwellers(w, ctx)
 
@@ -232,7 +231,7 @@ hurt_player :: proc(w: ^World, victim: int, damage: i32, shooter: u16, chill: bo
     }
 }
 
-step_rocks :: proc(w: ^World, ctx: ^r.Step(Event), impact_events: bool = true) {
+step_rocks :: proc(w: ^World, ctx: ^r.Step(Event)) {
     for &rock, i in w.rocks.values {
         if !w.rocks.alive[i] {
             continue
@@ -277,17 +276,15 @@ step_rocks :: proc(w: ^World, ctx: ^r.Step(Event), impact_events: bool = true) {
         if dweller >= 0 {
             target := &w.dwellers.values[dweller]
 
-            if impact_events {
-                // The projectile identifies this occurrence; its key retains the
-                // victim's exact generation even if the pool slot is recycled.
-                target_key := u64(w.dwellers.generations[dweller]) << 32 | u64(dweller + 1)
-                r.emit(
-                    ctx,
-                    u64(1) << 60 | u64(w.rocks.generations[i]) << 16 | u64(i),
-                    target_key,
-                    Event{.Hit, target.position, 0, ROCK_DAMAGE},
-                )
-            }
+            // The projectile identifies this occurrence; its key retains the
+            // victim's exact generation even if the pool slot is recycled.
+            target_key := u64(w.dwellers.generations[dweller]) << 32 | u64(dweller + 1)
+            r.emit(
+                ctx,
+                u64(1) << 60 | u64(w.rocks.generations[i]) << 16 | u64(i),
+                target_key,
+                Event{.Hit, target.position, 0, ROCK_DAMAGE},
+            )
 
             target.hp = max(target.hp - ROCK_DAMAGE, 0)
             w.players[rock.shooter - 1].damage += u32(ROCK_DAMAGE)

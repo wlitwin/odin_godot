@@ -71,7 +71,6 @@ fi | grep '\.odin$' | grep -v -e '\.gen\.odin$' -e '^bindgen/upstream/' \
     -e '^tests/replay_lz4_staging/reference/' \
     -e '^tests/replay_shuffle/reference/' \
     -e '^tests/replay_schema_blocks/reference/' \
-    -e '^examples/replay_scrapyard/shared/revisions/' \
     -e '^tests/replay_evolution/generated/' | sort -u |
     while IFS= read -r rel; do
         if [[ -f "$ROOT/$rel" ]]; then # -c also lists files deleted from the working tree

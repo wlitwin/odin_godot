@@ -6,22 +6,12 @@ import "core:strings"
 // unresolved embed, prove that its complete inline shape has no Godot metadata.
 // Generic arguments retain their caller's package/import context: a T supplied
 // by game.World must not accidentally resolve to a same-named type in replay.
-Plain_Type :: struct {
-    text:     string,
-    from:     Struct_Def,
-    bindings: ^Plain_Bindings,
-}
-
-Plain_Bindings :: struct {
-    values: map[string]Plain_Type,
-}
-
 shared_embed_plain :: proc(from: Struct_Def, text: string) -> bool {
     budget := 4096
     return shared_plain_type({text, from, nil}, 0, &budget)
 }
 
-shared_plain_type :: proc(value: Plain_Type, depth: int, budget: ^int) -> bool {
+shared_plain_type :: proc(value: Type_Use, depth: int, budget: ^int) -> bool {
     if depth >= 64 || budget^ <= 0 {
         return false
     }
@@ -134,37 +124,9 @@ shared_plain_type :: proc(value: Plain_Type, depth: int, budget: ^int) -> bool {
         )
     }
 
-    base := t
-    arguments: [dynamic]string
-
-    if paren := strings.index_byte(t, '('); paren >= 0 {
-        if !strings.has_suffix(t, ")") {
-            return false
-        }
-
-        base = strings.trim_space(t[:paren])
-        arguments = split_type_params(t[paren + 1:len(t) - 1])
-    }
-
-    defer delete(arguments)
-    def, ok := wire_struct_lookup(value.from, base)
-
-    if !ok ||
-       def.input_decl ||
-       len(def.commands) > 0 ||
-       len(def.methods) > 0 ||
-       def.tick.proc_name != "" ||
-       len(arguments) != len(def.poly_params) {
+    def, bindings, ok := type_struct(value)
+    if !ok || def.input_decl || len(def.commands) > 0 || len(def.methods) > 0 || def.tick.proc_name != "" {
         return false
-    }
-
-    bindings := Plain_Bindings {
-        values = make(map[string]Plain_Type),
-    }
-    defer delete(bindings.values)
-
-    for parameter, i in def.poly_params {
-        bindings.values[parameter] = {strings.trim_space(arguments[i]), value.from, value.bindings}
     }
 
     for field in def.fields {
@@ -172,7 +134,7 @@ shared_plain_type :: proc(value: Plain_Type, depth: int, budget: ^int) -> bool {
             return false
         }
 
-        if !shared_plain_type({field.type_text, def, &bindings}, depth + 1, budget) {
+        if !shared_plain_type({field.type_text, def, bindings}, depth + 1, budget) {
             return false
         }
     }

@@ -2,7 +2,7 @@
 class_name Box3DShape3D
 extends Resource
 
-@export var stable_key: String = ""
+@export_storage var stable_key: String = Box3DIdentityKey.initial("shape")
 @export var authoring_metadata: Dictionary = {}
 @export var local_pose: Transform3D = Transform3D.IDENTITY
 @export var scale: Vector3 = Vector3.ONE

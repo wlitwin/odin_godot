@@ -38,22 +38,23 @@ Envelope :: struct {
 }
 
 Peer_Box :: struct {
-    peer:       ksess.Peer_Id,
-    s:          ksess.Session,
-    sent:       int, // bytes this box handed the transport (the scale test's receipt)
-    out:        [dynamic]Envelope,
-    bots:       map[knet.Net_Id]^Bot, // factory-created entities (clients)
-    laps:       map[knet.Net_Id]^Lapper, // the owner-lane edge probe's bodies
-    freed:      int, // factory frees observed
+    peer:          ksess.Peer_Id,
+    s:             ksess.Session,
+    sent:          int, // bytes this box handed the transport (the scale test's receipt)
+    out:           [dynamic]Envelope,
+    bots:          map[knet.Net_Id]^Bot, // factory-created entities (clients)
+    laps:          map[knet.Net_Id]^Lapper, // the owner-lane edge probe's bodies
+    made_variants: map[knet.Net_Id]ksess.Scene_Variant, // factory-observed scene choices
+    freed:         int, // factory frees observed
 
     // the `<field>_edge` probe: what the hp edge half saw on this peer
-    edge_fires: int,
-    edge_old:   i32,
-    edge_new:   i32,
+    edge_fires:    int,
+    edge_old:      i32,
+    edge_new:      i32,
     // the OWNER-lane edge probe (Lapper.lap, a discrete owner-streamed counter)
-    lap_fires:  int,
-    lap_old:    u8,
-    lap_new:    u8,
+    lap_fires:     int,
+    lap_old:       u8,
+    lap_new:       u8,
 }
 
 Log_Probe :: struct {
@@ -151,6 +152,7 @@ box_destroy :: proc(b: ^Peer_Box) {
     }
 
     delete(b.laps)
+    delete(b.made_variants)
     ksess.session_destroy(&b.s)
 }
 
@@ -577,10 +579,12 @@ box_make_entity :: proc(
     type: ksess.Entity_Type,
     id: knet.Net_Id,
     owner: knet.Player_Id,
+    variant: ksess.Scene_Variant,
 ) -> (
     rawptr,
     ^knet.Command_Set,
 ) {
+    if variant != ksess.DEFAULT_SCENE_VARIANT {return nil, nil}
     b := cast(^Peer_Box)user
 
     if type == LAP_TYPE {
@@ -610,6 +614,7 @@ box_make_entity :: proc(
 // lookup that tells you the entity is yours is the one that licenses the free.
 box_free_entity :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr) {
     b := cast(^Peer_Box)user
+    delete_key(&b.made_variants, id)
 
     if l, is_lap := b.laps[id]; is_lap {
         assert(rawptr(l) == entity, "the factory's record and the session disagree about this id")
@@ -754,6 +759,196 @@ unsent_spawn_draft_can_cancel_without_becoming_world_state :: proc(t: ^testing.T
     testing.expect(t, !ksess.session_spawn_pending(&box.s, id))
     testing.expect(t, box.bots[id] == nil)
     testing.expect_value(t, box.freed, 1)
+}
+
+@(test)
+canceling_a_live_draft_does_not_publish_lifecycle_events :: proc(t: ^testing.T) {
+    host, alice: Peer_Box
+    box_make(&host, 1)
+    box_make(&alice, 100)
+    defer box_destroy(&host)
+    defer box_destroy(&alice)
+    boxes := []^Peer_Box{&host, &alice}
+    probe := Born_Probe {
+        s = &host.s,
+    }
+    defer delete(probe.got)
+    ksess.session_set_born(&host.s, &probe, born_probe_hook)
+    ksess.session_host_start(&host.s, "host")
+    ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+    ksess.session_client_join(&alice.s)
+    pump(boxes)
+    ksess.session_start_replicating(&host.s)
+    pump(boxes)
+    drain(&host.s)
+    drain(&alice.s)
+
+    before := host.sent
+    draft, id := ksess.session_spawn_make(&host.s, BOT_TYPE, owner = alice.s.me)
+    (cast(^Bot)draft).hp = 19
+    ksess.session_set_owner(&host.s, id, host.s.me)
+    ksess.session_set_blob(&host.s, id, transmute([]u8)string("draft"))
+    testing.expect_value(t, len(probe.got), 0)
+    ksess.session_despawn(&host.s, id)
+    ksess.session_spawn_send(&host.s, id) // a canceled id cannot be published
+    testing.expect(t, host.freed == 1, "cancel still runs the local factory cleanup")
+    testing.expect(t, host.bots[id] == nil && !ksess.session_spawn_pending(&host.s, id))
+    testing.expect(t, len(probe.got) == 0, "a canceled draft is never born")
+    testing.expect(t, host.sent == before, "a canceled draft sends neither spawn nor despawn")
+    testing.expect(t, len(drain(&host.s)) == 0, "host observers never see the draft")
+    pump(boxes)
+    testing.expect(t, len(drain(&alice.s)) == 0, "remote observers never see the draft")
+    testing.expect_value(t, len(alice.bots), 0)
+    testing.expect_value(t, alice.freed, 0)
+
+    // A committed spawn still publishes its initialized state and normal
+    // despawn on both peers. Cancellation must not suppress that lifecycle.
+    made, committed := ksess.session_spawn_make(&host.s, BOT_TYPE, owner = alice.s.me)
+    (cast(^Bot)made).hp = 23
+    ksess.session_set_owner(&host.s, committed, host.s.me)
+    ksess.session_set_blob(&host.s, committed, transmute([]u8)string("initial blob"))
+    testing.expect_value(t, host.sent, before)
+    testing.expect_value(t, len(drain(&host.s)), 0)
+    ksess.session_spawn_send(&host.s, committed)
+    sent := host.sent
+    ksess.session_spawn_send(&host.s, committed)
+    testing.expect_value(t, host.sent, sent)
+    testing.expect_value(t, len(probe.got), 1)
+    testing.expect_value(t, probe.hp_at_born, i32(23))
+    pump(boxes)
+
+    if remote, ok := alice.bots[committed]; testing.expect(t, ok) {
+        testing.expect_value(t, remote.hp, i32(23))
+    }
+
+    testing.expect_value(t, ksess.session_owner_of(&alice.s, committed), host.s.me)
+    testing.expect_value(t, string(ksess.session_blob(&alice.s, committed)), "initial blob")
+
+    born := 0
+
+    for ev in drain(&alice.s) {
+        if spawn, ok := ev.(ksess.Ev_Spawned); ok && spawn.id == committed {
+            born += 1
+        }
+    }
+
+    testing.expect_value(t, born, 1)
+    ksess.session_despawn(&host.s, committed)
+    host_despawned := 0
+
+    for ev in drain(&host.s) {
+        if gone, ok := ev.(ksess.Ev_Despawned); ok && gone.id == committed {
+            host_despawned += 1
+        }
+    }
+
+    testing.expect_value(t, host_despawned, 1)
+    pump(boxes)
+    remote_despawned := 0
+
+    for ev in drain(&alice.s) {
+        if gone, ok := ev.(ksess.Ev_Despawned); ok && gone.id == committed {
+            remote_despawned += 1
+        }
+    }
+
+    testing.expect_value(t, remote_despawned, 1)
+    testing.expect_value(t, alice.freed, 1)
+    testing.expect(t, alice.bots[committed] == nil)
+}
+
+@(test)
+drafts_are_omitted_from_initial_world_late_join_and_save :: proc(t: ^testing.T) {
+    host, alice, bob, restored: Peer_Box
+    box_make(&host, 1)
+    box_make(&alice, 100)
+    box_make(&bob, 200)
+    box_make(&restored, 1)
+    defer box_destroy(&host)
+    defer box_destroy(&alice)
+    defer box_destroy(&bob)
+    defer box_destroy(&restored)
+    boxes := []^Peer_Box{&host, &alice, &bob}
+    ksess.session_host_start(&host.s, "host")
+    ksess.session_client_start(&alice.s, TOKEN_ALICE, "alice")
+    ksess.session_client_join(&alice.s)
+    pump(boxes)
+
+    ready, live_id := ksess.session_spawn_make(&host.s, BOT_TYPE)
+    (cast(^Bot)ready).hp = 11
+    ksess.session_spawn_send(&host.s, live_id)
+    draft, canceled_id := ksess.session_spawn_make(&host.s, BOT_TYPE)
+    (cast(^Bot)draft).hp = 55
+    later, later_id := ksess.session_spawn_make(&host.s, BOT_TYPE)
+    (cast(^Bot)later).hp = 17
+    ksess.session_start_replicating(&host.s)
+    pump(boxes)
+    testing.expect_value(t, len(alice.bots), 1)
+    testing.expect(t, alice.bots[live_id] != nil)
+    testing.expect(t, alice.bots[canceled_id] == nil && alice.bots[later_id] == nil)
+
+    snapshot := knet.writer_make()
+    defer knet.writer_destroy(&snapshot)
+    ksess.session_snapshot(&host.s, &snapshot)
+
+    if testing.expect(t, ksess.session_host_resume(&restored.s, host.s.me, "host", knet.writer_bytes(&snapshot))) {
+        testing.expect_value(t, len(restored.bots), 1)
+        testing.expect(t, restored.bots[live_id] != nil)
+        testing.expect(t, restored.bots[canceled_id] == nil && restored.bots[later_id] == nil)
+        testing.expect(t, restored.s.reg.next_id > later_id)
+    }
+
+    ksess.session_client_start(&bob.s, TOKEN_BOB, "bob")
+    ksess.session_client_join(&bob.s)
+    pump(boxes)
+    testing.expect_value(t, len(bob.bots), 1)
+    testing.expect(t, bob.bots[live_id] != nil)
+    testing.expect(t, bob.bots[canceled_id] == nil && bob.bots[later_id] == nil)
+    drain(&host.s)
+    drain(&alice.s)
+    drain(&bob.s)
+    before := host.sent
+    ksess.session_despawn(&host.s, canceled_id)
+    testing.expect_value(t, host.sent, before)
+    testing.expect_value(t, len(drain(&host.s)), 0)
+    pump(boxes)
+    testing.expect_value(t, len(drain(&alice.s)), 0)
+    testing.expect_value(t, len(drain(&bob.s)), 0)
+    ksess.session_spawn_send(&host.s, later_id)
+    pump(boxes)
+
+    for client in ([]^Peer_Box{&alice, &bob}) {
+        testing.expect_value(t, len(client.bots), 2)
+
+        if entity, ok := client.bots[later_id]; testing.expect(t, ok) {
+            testing.expect_value(t, entity.hp, i32(17))
+        }
+
+        testing.expect(t, client.bots[canceled_id] == nil)
+    }
+}
+
+@(test)
+draft_pump_guard_preserves_privacy_with_assertions_disabled :: proc(t: ^testing.T) {
+    when ODIN_DISABLE_ASSERT {
+        host: Peer_Box
+        box_make(&host, 1)
+        defer box_destroy(&host)
+        ksess.session_host_start(&host.s, "host")
+        ksess.session_start_replicating(&host.s)
+        draft, id := ksess.session_spawn_make(&host.s, BOT_TYPE, owner = host.s.me)
+        (cast(^Bot)draft).hp = 9
+        tick, now, before := host.s.ticker.tick, host.s.now, host.sent
+        ticks, sampled := ksess.session_tick(&host.s, 1, 100)
+        testing.expect_value(t, ticks, 0)
+        testing.expect_value(t, sampled, 0)
+        testing.expect_value(t, host.s.ticker.tick, tick)
+        testing.expect_value(t, host.s.now, now)
+        testing.expect_value(t, host.sent, before)
+        ksess.session_despawn(&host.s, id)
+        ticks, _ = ksess.session_tick(&host.s, 0.05, 100)
+        testing.expect(t, ticks > 0)
+    }
 }
 
 @(test)
@@ -3199,8 +3394,8 @@ version_skew_is_denied_at_the_door :: proc(t: ^testing.T) {
 // drift reaches the real JOIN packet and is refused as .Version.
 @(test)
 canonical_wire_abi_fingerprint_gates_the_handshake :: proc(t: ^testing.T) {
-    WIRE_FIXTURE_FINGERPRINT :: u64(0xfc3f66e9fcd2414b)
-    WIRE_FIXTURE_U64_FINGERPRINT :: u64(0x72a0945e37810e4e)
+    WIRE_FIXTURE_FINGERPRINT :: u64(0xe3f298604ea6f896)
+    WIRE_FIXTURE_U64_FINGERPRINT :: u64(0xb961f027c4dd84fb)
 
     host, same, drifted: Peer_Box
     box_make(&host, 1)
@@ -3678,13 +3873,13 @@ edge_halves_fire_on_net_change :: proc(t: ^testing.T) {
     testing.expect_value(t, host.edge_fires, 1)
     testing.expect_value(t, alice.edge_fires, 1)
 
-    // RESYNC IS SILENT: mutate and re-announce the spawn tuple before any
+    // RESYNC IS SILENT: mutate and send the current world before any
     // net tick ships the delta — alice catches up wholesale (Ev_Resynced),
     // her mirror re-seeds, and her half stays quiet. The HOST's own screen
     // still edges (its mutation was real gameplay there).
     drain(&alice.s)
     hbot.hp = 3
-    ksess.session_spawn_send(&host.s, id)
+    ksess.session_start_replicating(&host.s)
     pump(boxes)
     resynced := false
 
@@ -4298,10 +4493,12 @@ pin_make_entity :: proc(
     type: ksess.Entity_Type,
     id: knet.Net_Id,
     owner: knet.Player_Id,
+    variant: ksess.Scene_Variant,
 ) -> (
     rawptr,
     ^knet.Command_Set,
 ) {
+    if variant != ksess.DEFAULT_SCENE_VARIANT {return nil, nil}
     p := cast(^Pin_Peer)user
 
     if type != BOT_TYPE {

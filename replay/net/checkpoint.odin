@@ -399,38 +399,93 @@ server_restore :: proc(
     options: Resume_Options,
     allocator := context.allocator,
     ownership: Runner_Ownership = {},
-) -> Error {
+    setup: ^Setup_Report = nil,
+) -> (
+    result: Error,
+) {
+    if setup != nil {
+        setup^ = {}
+    }
+
+    stage := "checkpoint"
+    defer setup_finish(setup, result, stage, "checkpoint restore failed at this step")
+
+    if cp == nil {
+        return setup_fail(setup, .Invalid_Checkpoint, "checkpoint", "a checkpoint is required")
+    }
+
     if error := container_access(&cp.lifetime); error != .None {
         return error
     }
+
+    stage = "ownership.runner"
 
     if error := runner_context_check(ownership, allocator, &s.model, model.complete_state); error != .None {
         return error
     }
 
+    stage = "model.ownership"
+
     if error := model_context_check(model, runner_managed(ownership)); error != .None {
         return error
     }
+
+    stage = "resume.admission_user.ownership"
 
     if error := owned_context_check(ownership.admission, options.admission_user, runner_managed(ownership));
        error != .None {
         return error
     }
 
-    if model.complete_state && !complete_codec_valid(model.complete_codec) {
-        return .Incomplete_State
+    if report := model_check(model); report.error != .None {
+        return setup_assign(setup, report)
     }
 
-    if s.initialized || !checkpoint_valid(cp, model) {
-        return .Invalid_Checkpoint
+    stage = "checkpoint"
+
+    if model.complete_state {
+        if report := complete_codec_check(model.complete_codec); report.error != .None {
+            return setup_assign(setup, report)
+        }
     }
 
-    if options.epoch <= cp.header.epoch || int(options.local_seat) > N {
-        return .Invalid_Config
+    if s.initialized {
+        return setup_fail(setup, .Invalid_Checkpoint, "server", "destroy the current runner before restoring")
     }
 
-    if cp.header.policy_id != options.policy_id || (options.admission != nil) != (cp.header.policy_id != 0) {
-        return .Checkpoint_Policy
+    if !checkpoint_valid(cp, model) {
+        return setup_fail(
+            setup,
+            .Invalid_Checkpoint,
+            "checkpoint",
+            "checkpoint values, configuration or model do not satisfy the restore contract",
+        )
+    }
+
+    if options.epoch <= cp.header.epoch {
+        return setup_fail(setup, .Invalid_Config, "resume.epoch", "must be newer than the checkpoint epoch")
+    }
+
+    if int(options.local_seat) > N {
+        return setup_fail(setup, .Invalid_Config, "resume.local_seat", "seat exceeds this model's player capacity")
+    }
+
+    if cp.header.policy_id != options.policy_id {
+        return setup_fail(
+            setup,
+            .Checkpoint_Policy,
+            "resume.policy_id",
+            "must match the checkpoint's admission policy id",
+        )
+    }
+
+    if (options.admission != nil) != (cp.header.policy_id != 0) {
+        return setup_fail(
+            setup,
+            .Checkpoint_Policy,
+            "resume.admission",
+            "supply a callback exactly when the checkpoint has a nonzero admission policy id",
+        )
     }
 
     found_local := options.local_seat == 0
@@ -438,7 +493,12 @@ server_restore :: proc(
     for peer in cp.peers {
         if !peer.spectator && peer.seat == options.local_seat {
             if options.local_incarnation != 0 && options.local_incarnation < peer.incarnation {
-                return .Invalid_Config
+                return setup_fail(
+                    setup,
+                    .Invalid_Config,
+                    "resume.local_incarnation",
+                    "must not precede this seat's checkpoint incarnation",
+                )
             }
 
             found_local = true
@@ -446,7 +506,12 @@ server_restore :: proc(
     }
 
     if !found_local {
-        return .Invalid_Input
+        return setup_fail(
+            setup,
+            .Invalid_Input,
+            "resume.local_seat",
+            "must name a non-spectator checkpoint seat, or be 0 for a dedicated authority",
+        )
     }
 
     cfg := checkpoint_config(cp.header, cp.settings)
@@ -475,6 +540,7 @@ server_restore :: proc(
             allocator = allocator,
             permit = options.permit,
             ownership = ownership,
+            setup = setup,
         ); error != .None {
             return error
         }
@@ -487,12 +553,20 @@ server_restore :: proc(
         allocator = allocator,
         permit = options.permit,
         ownership = ownership,
+        setup = setup,
     ); err != .None {
         return err
     }
 
+    stage = "checkpoint.contract"
+
     if s.contract != cp.header.contract {
-        server_destroy(s)
+        cleanup := server_destroy(s)
+
+        if setup != nil {
+            setup.cleanup_error = cleanup
+        }
+
         return .Checkpoint_Contract
     }
 
@@ -584,15 +658,6 @@ server_restore :: proc(
 }
 
 checkpoint_valid :: proc(cp: ^Checkpoint($S, $C, $A, $N), model: Model(S, C, A, $E, N)) -> bool {
-    return checkpoint_valid_protocol(cp, model, PROTOCOL_VERSION)
-}
-
-@(private)
-checkpoint_valid_protocol :: proc(
-    cp: ^Checkpoint($S, $C, $A, $N),
-    model: Model(S, C, A, $E, N),
-    protocol: u64,
-) -> bool {
     if model_context_check(model, !r.owner_is_nil(cp.lifetime.ownership.allocator.owner), .Read) != .None {
         return false
     }
@@ -628,7 +693,7 @@ checkpoint_valid_protocol :: proc(
 
     if !cp.ready ||
        cp.header.version != CHECKPOINT_VERSION ||
-       cp.header.protocol != protocol ||
+       cp.header.protocol != PROTOCOL_VERSION ||
        cp.header.epoch == 0 ||
        cp.frame.tick != cp.header.tick ||
        cp.frame.tick == max(u64) ||

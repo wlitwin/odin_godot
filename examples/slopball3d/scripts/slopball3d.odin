@@ -104,7 +104,7 @@ slopball3_ready :: proc(self: ^Slopball3) {
     net_cfg.session.interp_delay = f64(gd.env_int("SLOP3_INTERP_MS", max(3000 / hz, 16))) / 1000.0
     gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
 
-    slopball3_net_attach(
+    if !slopball3_net_attach(
         self,
         kboot.Options {
             title       = "S L O P B A L L  3 D",
@@ -126,12 +126,15 @@ slopball3_ready :: proc(self: ^Slopball3) {
             },
         },
         net_cfg,
-    )
+    ) {
+        return
+    }
+
     // The factory, written by nobody: the generated table (from the entity=
     // tags above) makes/frees under boot.world; world.odin's *_spawned/
     // *_freed hooks keep the kicker/ball census.
     self.goals_to = gd.env_int("SLOP3_GOALS", 3)
-    self.bot = gd.env_string("SLOP3_BOT", "")
+    self.bot = gd.env_string("SLOP3_BOT", "", context.allocator)
     self.netgraph = kui.netgraph_make(cast(gd.Node)self.owner)
     kui.netgraph_show(&self.netgraph, true)
     install_controls()
@@ -376,4 +379,12 @@ ball_report :: proc(self: ^Slopball3) {
             bp.z * 100,
         ),
     )
+}
+
+// Game-owned state; the generated finalizer releases the standard Kit stack afterward.
+slopball3_finalize :: proc(self: ^Slopball3) {
+    kboot.retire_nodes(cast(gd.Node)self.netgraph.label)
+    delete(self.kickers)
+    delete(self.avatar_of)
+    delete(self.bot)
 }

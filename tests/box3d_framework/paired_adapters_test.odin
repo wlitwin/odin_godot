@@ -95,6 +95,7 @@ kit_init :: proc(ctx: ^Kit_Context) -> sim.World_Error {
     ctx.session.is_host = true
     ctx.session.me = 1
     sim.lane_init(&ctx.lane, &ctx.session, size_of(model.Control))
+    sim.lane_class_set_type(&ctx.lane, 0, typeid_of(model.Control))
     sim.lane_set_sim(&ctx.lane, ctx, kit_sample, kit_step)
     ctx.desc = proxy_desc()
     sim.lane_track(&ctx.lane, 1, &ctx.proxy, &ctx.desc, ctx.session.me)

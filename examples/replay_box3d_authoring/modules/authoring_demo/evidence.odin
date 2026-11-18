@@ -8,10 +8,8 @@ import "core:os"
 import gd "godot:godot"
 import b "godot:box3d"
 import bd "godot:box3d/diagnostics"
-import bp "godot:box3d/presentation"
 import bg "godot:box3d/godot"
 import meter "godot:box3d/godot/meter"
-import r "godot:replay"
 import net "godot:replay/net"
 import rgd "godot:replay/godot"
 
@@ -78,21 +76,23 @@ Final_View :: struct {
 
 export_final :: proc(self: ^ReplayAuthoringDemo) -> bool {
     state := self.state
-    checkpoint, error := rgd.session_checkpoint(&state.session, self.target)
+    checkpoint, error := physicsgd.authored_checkpoint(&self.physics,self.target)
 
     if error != .None {
         error_set(self, "final.complete_checkpoint unavailable")
         return false
     }
 
-    defer r.complete_checkpoint_destroy(&checkpoint)
+    defer {
+        if physicsgd.authored_checkpoint_release(&self.physics) != .None { error_set(self,"checkpoint.release remains pending") }
+    }
     schemas := self.hosting ? &state.session.server.physics.schemas : &state.session.client.physics.schemas
     view, ve := net.complete_view(
         state.codec.value,
-        &checkpoint,
+        checkpoint,
         &schemas.state,
         &schemas.occurrence,
-        meter.allocator(self.scope),
+        physicsgd.authored_allocator(&self.physics),
     )
 
     if ve != .None {
@@ -110,7 +110,7 @@ export_final :: proc(self: ^ReplayAuthoringDemo) -> bool {
 
     self.final_signature = signature
 
-    if len(state.output) > 0 {
+    if len(self.output) > 0 {
         manifest := Final_View {
             epoch          = view.frame.epoch,
             tick           = view.frame.tick,
@@ -122,7 +122,7 @@ export_final :: proc(self: ^ReplayAuthoringDemo) -> bool {
             name := fmt.tprintf("%v.bin", part)
             bytes := view.frame.parts[part]
 
-            if os.write_entire_file(fmt.tprintf("%s/%s", state.output, name), bytes) != nil {
+            if os.write_entire_file(fmt.tprintf("%s/%s", self.output, name), bytes) != nil {
                 error_set(self, "final.part.write")
                 return false
             }
@@ -147,14 +147,14 @@ export_final :: proc(self: ^ReplayAuthoringDemo) -> bool {
         _, signature_error := bd.signature_encode(signature, bytes[:])
 
         if signature_error != .None ||
-           os.write_entire_file(fmt.tprintf("%s/signature.bin", state.output), bytes[:]) != nil {
+           os.write_entire_file(fmt.tprintf("%s/signature.bin", self.output), bytes[:]) != nil {
             error_set(self, "final.signature.write")
             return false
         }
 
         manifest.signature_sha256 = hash_hex(bd.hash_bytes(bytes[:]))
 
-        if !json_write(fmt.tprintf("%s/final-frame.json", state.output), manifest) {
+        if !json_write(fmt.tprintf("%s/final-frame.json", self.output), manifest) {
             error_set(self, "final.manifest.write")
             return false
         }
@@ -198,17 +198,19 @@ publish_presentation :: proc(self: ^ReplayAuthoringDemo) {
         return
     }
 
-    checkpoint, error := rgd.session_checkpoint(&self.state.session, self.confirmed)
+    checkpoint, error := physicsgd.authored_checkpoint(&self.physics,self.confirmed)
 
     if error != .None {
         return
     }
 
-    defer r.complete_checkpoint_destroy(&checkpoint)
+    defer {
+        if physicsgd.authored_checkpoint_release(&self.physics) != .None { error_set(self,"checkpoint.release remains pending") }
+    }
     revision :=
         self.hosting ? u64(0) : self.state.session.client.view_reset + self.state.session.client.stats.corrections
     frame, projection_error, owner_error := physicsgd.physics_presentation_frame(
-        &checkpoint,
+        checkpoint,
         project,
         revision,
         .Confirmed,

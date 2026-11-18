@@ -8,6 +8,7 @@ import "core:testing"
 import "core:os"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import d "godot:box3d/debugdraw"
 import p "godot:box3d/presentation"
 import kp "godot:kit/physics"
@@ -66,7 +67,7 @@ definition_destroy :: proc(input: ^a.Scene_Input) {
     input^ = {}
 }
 
-game_from_maps :: proc(built: ^a.Built_Scene) -> Game {
+game_from_maps :: proc(built: ^ar.Built_Scene) -> Game {
     value: Game
 
     for body, index in built.bodies {
@@ -181,22 +182,22 @@ kit_copied_checkpoint_geometry_draws_after_all_sources_are_destroyed :: proc(t: 
     }
 
     defer a.destroy(&scene)
-    built, be := a.build(&scene, PROFILE)
+    built, be := ar.build(&scene, PROFILE)
     testing.expect_value(t, be.error, a.Error.None)
 
     if be.error != .None {
         return
     }
 
-    defer a.built_destroy(&built)
-    geometry, ge := a.debug_scene_create(&scene, &built)
+    defer ar.built_destroy(&built)
+    geometry, ge := ar.debug_scene_create(&scene, &built)
     testing.expect_value(t, ge.error, a.Error.None)
 
     if ge.error != .None {
         return
     }
 
-    defer a.debug_scene_destroy(&geometry)
+    defer ar.debug_scene_destroy(&geometry)
     value := game_from_maps(&built)
     a.destroy(&scene)
     box := new(Kit)
@@ -227,7 +228,7 @@ kit_copied_checkpoint_geometry_draws_after_all_sources_are_destroyed :: proc(t: 
     k.lane_destroy(&box.lane)
     testing.expect_value(t, kp.detach(&box.physics), k.World_Error.Ok)
     ks.session_destroy(&box.session)
-    testing.expect_value(t, a.built_destroy(&built), b.Status.Ok)
+    testing.expect_value(t, ar.built_destroy(&built), b.Status.Ok)
     other := make([]d.Line, d.MAX_LINES)
     defer delete(other)
     detached := draw(t, &frame, geometry.scene, other)
@@ -260,22 +261,22 @@ replay_copied_checkpoint_geometry_draws_without_live_solver_or_mutation :: proc(
         return
     }
 
-    built, be := a.build(&scene, PROFILE)
+    built, be := ar.build(&scene, PROFILE)
     testing.expect_value(t, be.error, a.Error.None)
 
     if be.error != .None {
         return
     }
 
-    defer a.built_destroy(&built)
-    geometry, ge := a.debug_scene_create(&scene, &built)
+    defer ar.built_destroy(&built)
+    geometry, ge := ar.debug_scene_create(&scene, &built)
     testing.expect_value(t, ge.error, a.Error.None)
 
     if ge.error != .None {
         return
     }
 
-    defer a.debug_scene_destroy(&geometry)
+    defer ar.debug_scene_destroy(&geometry)
     initial, ie := rp.authoring_checkpoint(&built, cfg, r.Frame(Game){state = game_from_maps(&built)}, u8)
     testing.expect_value(t, ie, r.Error.None)
 
@@ -314,7 +315,7 @@ replay_copied_checkpoint_geometry_draws_without_live_solver_or_mutation :: proc(
     testing.expect(t, mem.compare(before, after) == 0)
     r.complete_checkpoint_destroy(&checkpoint)
     r.destroy(&timeline)
-    testing.expect_value(t, a.built_destroy(&built), b.Status.Ok)
+    testing.expect_value(t, ar.built_destroy(&built), b.Status.Ok)
     other := make([]d.Line, d.MAX_LINES)
     defer delete(other)
     detached := draw(t, &frame, geometry.scene, other)

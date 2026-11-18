@@ -3,8 +3,8 @@ set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export ODIN_GODOT_ROOT="$ROOT"
 source "$ROOT/tests/import_project.sh"
-PROJ="$ROOT/examples/replay_scrapyard"
-COORD="$ROOT/tests/replay_migration"
+PROJ="${REPLAY_SCRAPYARD_PROJECT:-$ROOT/examples/replay_scrapyard}"
+COORD="${REPLAY_MIGRATION_COORDINATOR:-$ROOT/tests/replay_migration}"
 expected_content="$(python3 -c 'import re,sys;print(re.search(r"CONTENT :: u64\(0x([0-9a-fA-F]+)\)",open(sys.argv[1]).read())[1].lower())' "$PROJ/shared/game/game.odin")"
 work="$(mktemp -d)"
 pids=()

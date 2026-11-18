@@ -2,20 +2,20 @@
 
 Check which player values survive descent and which reset on another run. The
 suite compares complete replayed state/events and inspects actual Godot transition
-frames, including converted historical archives.
+frames, including migrated current-contract checkpoints.
 
 ```sh
 REPLAY_CAVE_FLOOR_OUT=/absolute/fresh/output nix develop --command bash tests/replay_cave_floor/run.sh
 ```
 
-Runs Cave tests, an isolated game build, all fifteen C1–C7 conversion/resume fixtures,
+Runs Cave tests, an isolated game build, all fifteen current saved-fixture resumes,
 actual Godot descent/restart checks, and normal/faulted full campaigns. Test-only
 `floor_value` reads retained authority frames; it does not set gameplay values.
 The transition cases resume genuine C4 fixture archives under the new content,
 then exercise ordinary descent and the public restart action.
 
 The legacy producer requires C4. Its actual files, log and frozen model source
-archive are retained in `tests/replay_cave/fixtures/content4`. Regenerate only
+archive are retained in `tests/replay_cave/fixtures/current`. Regenerate only
 against that archived model in a temporary collection overlay. Existing saved
 injury/timers/ledger remain intact through conversion, including already-reset
 post-descent values which cannot be retrospectively reconstructed.

@@ -24,7 +24,7 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 
 # Write .godot/extension_list.cfg + import so the runtime loads the extension. (A SIGSEGV in
 # Godot's headless editor doc-gen at import cleanup is a pre-existing engine issue, masked.)
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 # Runtime (non-editor) RPC test. Prints RPC_OK (config + call_local) on success.
 "$GODOT" --headless --path "$PROJ" --script test_rpc.gd

@@ -46,7 +46,7 @@ FSLP_PROJ="$PROJ"
 FSLP_LOGS="$LOGDIR"
 source "$ROOT/build/template/test/harness.sh"
 
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 launch() { # launch <role> <bot> <name> <token> <log> <port>
     local role="$1" bot="$2" name="$3" token="$4" log="$5" port="$6"

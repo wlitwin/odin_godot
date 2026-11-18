@@ -1,0 +1,61 @@
+[gd_scene format=3]
+
+[node name="Lobby" type="CenterContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Column" type="VBoxContainer" parent="."]
+custom_minimum_size = Vector2(260, 0)
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "My Game"
+horizontal_alignment = 1
+
+[node name="Status" type="Label" parent="Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Host a game or join a friend"
+horizontal_alignment = 1
+
+[node name="Players" type="VBoxContainer" parent="Column"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Host" type="Button" parent="Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Host"
+
+[node name="Code" type="LineEdit" parent="Column"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+placeholder_text = "Join code"
+
+[node name="Join" type="Button" parent="Column"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Join"
+
+[node name="Start" type="Button" parent="Column"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Start"
+
+[node name="Bindings" type="OdinKitUIBindings" parent="."]
+widget = 0
+title = NodePath("%Title")
+status = NodePath("%Status")
+players = NodePath("%Players")
+host = NodePath("%Host")
+join = NodePath("%Join")
+start = NodePath("%Start")
+code = NodePath("%Code")

@@ -4,8 +4,7 @@ extends RefCounted
 
 const CAPACITY = preload("res://addons/box3d_authoring/capacity_defaults.gd")
 
-const SCHEMA_VERSION := 1
-const MOTION_SCHEMA_VERSION := 2
+const SCHEMA_VERSION := 2
 const MAX_JOINTS: int = CAPACITY.PROFILE["max_joints"]
 const MAX_CHARACTERS: int = CAPACITY.PROFILE["max_bodies"]
 const MAX_KEY_BYTES := 128
@@ -29,6 +28,11 @@ static func issue(errors: Array, path: String, code: String, message: String) ->
 static func key(value: String, path: String, errors: Array) -> void:
 	if value.strip_edges().is_empty() or value.to_utf8_buffer().size() > MAX_KEY_BYTES:
 		issue(errors, path, "Key", "Use a nonempty explicit stable key of at most 128 UTF-8 bytes.")
+		return
+	for byte in value.to_utf8_buffer():
+		if byte < 32 or byte == 127:
+			issue(errors, path, "Key", "Stable keys cannot contain control characters.")
+			return
 
 static func scalar(value: float, path: String, errors: Array, nonnegative := false) -> void:
 	if not is_finite(value):
@@ -63,30 +67,52 @@ static func relative_name(node: Node, ancestor: Node) -> String:
 	return "/".join(parts)
 
 static func validate_world_frame(world: Node3D, errors: Array) -> void:
-	var current: Node = world
-	while current!=null:
-		if current is Node3D:
-			if current.top_level:
-				issue(errors,"world.ancestry["+String(current.name)+"].top_level","Pose","Top-level authoring transforms are unsupported; use a rigid local ancestry.")
-			if not rigid(current.transform):
-				issue(errors,"world.ancestry["+String(current.name)+"].transform","Pose","Every World presentation transform must be finite and rigid; scale/shear/reflection is not discarded.")
-		current=current.get_parent()
+	effective_transform(world, "world", errors)
+
+# Match Node3D's native inheritance without requiring a live SceneTree.
+# A plain Node parent ends the transform chain, including in detached scenes.
+static func effective_transform(node: Node3D, path: String, errors: Array) -> Dictionary:
+	var chain: Array[Node3D] = []
+	var current: Node = node
+	var valid := true
+	while current is Node3D:
+		if current.top_level:
+			issue(errors, path + ".ancestry[" + String(current.name) + "].top_level", "Pose", "Top-level authoring transforms are unsupported.")
+			valid = false
+		if not rigid(current.transform):
+			issue(errors, path + ".ancestry[" + String(current.name) + "].transform", "Pose", "Every effective local transform must be finite and rigid.")
+			valid = false
+		chain.append(current)
+		current = current.get_parent()
+	if not valid: return {}
+	var value := Transform3D.IDENTITY
+	for i in range(chain.size() - 1, -1, -1): value = value * chain[i].transform
+	if not rigid(value):
+		issue(errors, path + ".transform", "Pose", "The composed transform must be finite and rigid.")
+		return {}
+	return {"transform": value}
 
 static func relative_pose(node: Node3D, world: Node3D, path: String, errors: Array) -> Dictionary:
 	var chain: Array[Node3D] = []
 	var current: Node = node
+	var gap := false
 	while current!=null and current!=world:
 		if current is Node3D:
-			var field: String = path+".ancestry["+relative_name(current,world)+"]"
-			if current.top_level:
-				issue(errors,field+".top_level","Pose","Top-level detaches from the authored World frame and is unsupported.")
-			if not rigid(current.transform):
-				issue(errors,field+".transform","Pose","Every local transform must be finite and rigid; cancelling scale/shear is not silently accepted.")
 			chain.append(current)
+		else: gap = true
 		current=current.get_parent()
 	if current!=world:
 		issue(errors,path+".pose","Reference","Body is not a descendant of the supplied World.")
 		return {"position":[0.0,0.0,0.0],"rotation":[0.0,0.0,0.0,1.0]}
+	if gap:
+		var source := effective_transform(node, path, errors)
+		var target := effective_transform(world, "world", errors)
+		if source.is_empty() or target.is_empty(): return {"position":[0.0,0.0,0.0],"rotation":[0.0,0.0,0.0,1.0]}
+		return pose(target.transform.affine_inverse() * source.transform, path + ".pose", errors)
+	for item in chain:
+		var field: String = path + ".ancestry[" + relative_name(item, world) + "]"
+		if item.top_level: issue(errors, field + ".top_level", "Pose", "Top-level authoring transforms are unsupported.")
+		if not rigid(item.transform): issue(errors, field + ".transform", "Pose", "Every local transform must be finite and rigid; cancelling scale/shear is not silently accepted.")
 	var relative: Transform3D = Transform3D.IDENTITY
 	for i in range(chain.size()-1,-1,-1):
 		relative=relative*chain[i].transform

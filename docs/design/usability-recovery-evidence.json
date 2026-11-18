@@ -1,0 +1,72 @@
+{
+  "task": "P1-07",
+  "scope": "Current-only native recovery and useful primitive/authored input conveniences",
+  "native": {
+    "directory": "/tmp/odin-usability-native-recovery-fixed.I7qQDC",
+    "tests": 14,
+    "result": "PASS",
+    "log": "/tmp/odin-usability-native-recovery-fixed-build.log",
+    "initial_failed_log": "/tmp/odin-usability-native-recovery-build.log"
+  },
+  "odin": {
+    "directory": "/tmp/odin-usability-recovery-odin-lxfwnb3u",
+    "test_count": 46,
+    "framework_tests": 4,
+    "motion_tests": 14,
+    "result": "PASS"
+  },
+  "protocol": {
+    "directory": "/tmp/odin-usability-recovery-protocol.XVGmOK",
+    "result": "PASS",
+    "targets": [
+      "native",
+      "wasm32"
+    ],
+    "independent_vectors": true
+  },
+  "godot_authoring": {
+    "report": "/tmp/odin-usability-recovery-authoring.dKUSUA/result/report.json",
+    "result": "PASS"
+  },
+  "web_backends": {
+    "scalar": {
+      "report": "/tmp/odin-usability-recovery-web-scalar.DVPQp1/result/report.json",
+      "executed_programs": 8,
+      "independent_reference": true,
+      "result": "PASS"
+    },
+    "simd": {
+      "report": "/tmp/odin-usability-recovery-web-simd.xWwK1s/result/report.json",
+      "executed_programs": 8,
+      "independent_reference": true,
+      "result": "PASS"
+    }
+  },
+  "browser": {
+    "report": "/tmp/odin-usability-recovery-web-integration-8v1tgy_c/browser/report.json",
+    "export_report": "/tmp/odin-usability-recovery-web-integration-8v1tgy_c/exported/report.json",
+    "result": "PASS"
+  },
+  "docs": {
+    "log": "/tmp/odin-usability-recovery-docs.log",
+    "pages": 196,
+    "references": 19889,
+    "result": "PASS"
+  },
+  "migration": {
+    "tracked_native_archives": 0,
+    "standard_user_directories_with_save_candidates": 0,
+    "scope": "Standard macOS directories for both Box3D examples, both authored samples, Dockyard Duo and Replay Slopball3D; arbitrary overrides and browser-origin historical storage not scanned."
+  },
+  "limitations": [
+    "Native runtime tested on macOS arm64; no new Windows/Linux runtime claim.",
+    "Backend WASM tests run in Node; Chrome integration separately validates the ordinary Godot export and shared domain.",
+    "Current recovery remains exact native build/target/profile. Retained historical measurements and binary reports are not relabeled."
+  ],
+  "package": {
+    "result": "PASS",
+    "build": "/tmp/odin-usability-recovery-addon-final.json",
+    "consumer_receipt": "/tmp/odin-usability-recovery-sdk-refresh.json",
+    "consumer_validation": "/tmp/odin-usability-recovery-scrapyard.log"
+  }
+}

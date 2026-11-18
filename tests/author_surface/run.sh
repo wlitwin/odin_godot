@@ -82,24 +82,27 @@ echo "$out" | grep -qF 'bare `interp` is redundant on the owner lane and was rem
 	|| fail "redundant owner interpolation lacks a drop-interp diagnostic"
 
 production=("$ROOT/build" "$ROOT/core" "$ROOT/decl" "$ROOT/docs" "$ROOT/examples" "$ROOT/kit" "$ROOT/play" "$ROOT/scriptgen")
-if rg -n '@\(gd_(cue|fact)' "${production[@]}" --glob '!*.gen.odin' --glob '!one-way-author-surface-todo.md'; then
+# Archived replay receipts include source snapshots from their original builds.
+# Keep that historical evidence intact; the gate covers current code and guides.
+source_globs=(--glob '!*.gen.odin' --glob '!**/docs/replay/results/**')
+if rg -n '@\(gd_(cue|fact)' "${production[@]}" "${source_globs[@]}" --glob '!one-way-author-surface-todo.md'; then
 	fail "a retired presentation attribute remains in production source or docs"
 fi
-if rg -n '@\(gd_command\s*=\s*["`]' "${production[@]}" --glob '!*.gen.odin'; then
+if rg -n '@\(gd_command\s*=\s*["`]' "${production[@]}" "${source_globs[@]}"; then
 	fail "a quoted command policy remains in production source or docs"
 fi
-if rg -n 'gd:"owner,interp(?:,|"|`)' "${production[@]}" --glob '!*.gen.odin'; then
+if rg -n 'gd:"owner,interp(?:,|"|`)' "${production[@]}" "${source_globs[@]}"; then
 	fail "a redundant owner interpolation spelling remains in production source or docs"
 fi
 if rg -n '\b(Command_Access|command_issue_checked|command_execute_reason|command_result_write_reason|registry_host_command_checked|lane_command_checked|exec_checked)\b' \
-	"$ROOT/kit" "$ROOT/scriptgen" "$ROOT/docs" --glob '!*.gen.odin' --glob '!one-way-author-surface-todo.md'; then
+	"$ROOT/kit" "$ROOT/scriptgen" "$ROOT/docs" "${source_globs[@]}" --glob '!one-way-author-surface-todo.md'; then
 	fail "an obsolete action alias remains public"
 fi
-if rg -n 'gen_ids|boot_entity_ids|%s_ids :: proc' "$ROOT/kit" "$ROOT/scriptgen" --glob '!*.gen.odin'; then
+if rg -n 'gen_ids|boot_entity_ids|%s_ids :: proc' "$ROOT/kit" "$ROOT/scriptgen" "${source_globs[@]}"; then
 	fail "the ID-only entity census compatibility path returned"
 fi
 if rg -n 'gd_cue|gd_fact' "$ROOT/build" "$ROOT/core" "$ROOT/decl" "$ROOT/docs" "$ROOT/scriptgen/shared.odin" \
-	--glob '!one-way-author-surface-todo.md'; then
+	"${source_globs[@]}" --glob '!one-way-author-surface-todo.md'; then
 	fail "retired attributes remain registered or documented"
 fi
 

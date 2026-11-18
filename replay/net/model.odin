@@ -214,43 +214,7 @@ network_step :: proc(state: ^$State, input: Batch($Control, $Action, $Seats), ct
 
 @(private)
 config_valid :: proc(cfg: Config) -> bool {
-    return(
-        cfg.epoch != 0 &&
-        cfg.content != 0 &&
-        cfg.hz > 0 &&
-        cfg.hz <= 240 &&
-        cfg.history >= 32 &&
-        cfg.history <= 1024 &&
-        cfg.lead >= 2 &&
-        cfg.lead < u32(cfg.history) &&
-        cfg.max_prediction >= cfg.lead + 2 &&
-        cfg.max_future >= cfg.lead + 2 &&
-        cfg.input_delay_max <= INPUT_DELAY_MAX &&
-        cfg.max_future >= cfg.input_delay_max + 2 &&
-        cfg.max_future < u32(cfg.history) &&
-        cfg.max_prediction < u32(cfg.history - 2) &&
-        cfg.snapshot_every > 0 &&
-        cfg.snapshot_every <= 30 &&
-        cfg.watch_delay < u32(cfg.history / 2) &&
-        cfg.timeout_ms >= 1000 &&
-        cfg.timeout_ms <= 120000 &&
-        cfg.packets_per_pump > 0 &&
-        cfg.packets_per_pump <= 256 &&
-        cfg.bytes_per_pump >= 65536 &&
-        cfg.bytes_per_pump <= 1024 * 1024 &&
-        cfg.snapshot_history >= 2 &&
-        cfg.snapshot_history <= 64 &&
-        cfg.egress_bytes_per_second >= 8192 &&
-        cfg.egress_bytes_per_second <= 16 * 1024 * 1024 &&
-        cfg.egress_bytes_per_pump >= 8192 &&
-        cfg.egress_bytes_per_pump <= 1024 * 1024 &&
-        cfg.unreliable_packet_limit >= 512 &&
-        cfg.unreliable_packet_limit <= 65536 &&
-        cfg.max_rewind < u32(cfg.history) &&
-        cfg.max_view_span > 0 &&
-        cfg.max_view_span < u32(cfg.history) &&
-        cfg.view_slack <= 30 \
-    )
+    return config_validate(cfg)
 }
 
 @(private)

@@ -193,7 +193,6 @@ observe_physics_seed :: proc(self: ^ReplaySlopball3d, state: own.State(own.Pose3
 
 @(gd_method)
 replay_slopball3d_set_bot :: proc(self: ^ReplaySlopball3d, value: gd.String) {
-    defer gd.free_string(value)
     text := gd.gd_string_to_odin(value)
     delete(self.bot)
     self.bot = strings.clone(text)
@@ -207,7 +206,6 @@ replay_slopball3d_handoff :: proc(self: ^ReplaySlopball3d) -> bool {
 
 @(gd_method)
 replay_slopball3d_probe :: proc(self: ^ReplaySlopball3d, name: gd.String) -> gd.Int {
-    defer gd.free_string(name)
     key := gd.gd_string_to_odin(name)
 
     if self.session == nil {

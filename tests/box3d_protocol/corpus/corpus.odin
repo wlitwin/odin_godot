@@ -29,7 +29,7 @@ verify :: proc "c" () -> u32 {
 
     id := d.Identity {
         solver_format      = 3,
-        recovery_format    = 1,
+        recovery_format    = 3,
         game_format        = 1,
         observation_format = 1,
         profile            = 1,

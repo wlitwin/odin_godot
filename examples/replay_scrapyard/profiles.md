@@ -35,8 +35,9 @@ second player. Reusing one identity concurrently is deliberately rejected.
 
 The version-2 record stores [automatic/explicit choice modes](automatic.md),
 the identity binding, cores/parts, accepted staging preferences,
-and the epoch/tick of the last saved change. Version-1 records remain readable
-as explicit choices. Checksums, schema/version and value
+and the epoch/tick of the last saved change. Retained version-1 profiles were
+migrated once with explicit choices preserved; the runtime accepts version 2 only.
+Checksums, schema/version and value
 validation reject malformed records. Identity mismatch rejects a record copied to
 another account path. A malformed existing identity/profile fails opening instead
 of silently creating a replacement identity or resetting progress.

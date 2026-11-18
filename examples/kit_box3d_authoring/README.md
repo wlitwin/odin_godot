@@ -7,9 +7,11 @@ owned by that content. The older `kit_box3d` stress example remains unchanged.
 Use the repo's ordinary preparation and SDK Core/scripts build before opening
 the project. `scripts/boot.odin` is a real root script; the gameplay driver is
 `res://modules/authoring_demo/demo.odin`, class `KitAuthoringDemo`, on `Sample`.
-Its direct `AuthoredWorld` child is extracted once with `ga.extract`; shared
-`a.build` creates the actual world/catalog, then `p.authoring_attach` transfers
-only the world into Kit. Body/shape/joint resources never step themselves.
+It uses `godot:kit/godot/physics.Authored_World` for stable storage, exact callback
+leases, authored build, managed presentation checkpoints and checked shutdown.
+The sample still chooses the roster, lane callbacks, inputs, proxies and wire
+rules explicitly. Body/shape/joint resources never step themselves. See the
+[owner guide](../../kit/godot/physics/README.md).
 
 Prepare a NEW output with explicit verified tools/Native, then launch the two
 project instances (this project path is development, not exported proof):

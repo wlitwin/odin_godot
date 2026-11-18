@@ -34,16 +34,12 @@ comparison boundaries.
 
 ## Compatibility and acceptance
 
-Current content is `0x4341564552504c39`. Convert C1–C8 archives explicitly with
-`tools/upgrade_save` and a new destination. C6 conversion preserves the complete
-saved frame and peer ledger; it cannot reconstruct a carrier already cleared by
-old gameplay. C8 adds authority-observation fields to the world; network/checkpoint envelope
-versions are unchanged. Conversion seeds those fields from the validated
-checkpoint’s host-seat metadata.
+Current content is C9. Current checkpoint fixtures preserve carrier identity,
+relic version/position and the peer ledger through death or disconnection. They
+were migrated once; [originals and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain evidence. Loading
+cannot recover ownership already discarded by an earlier game.
 
-The [acceptance runner](../../tests/replay_cave_carrier/README.md) covers actual
-death/revive/respawn, disconnect/rejoin and identity replacement in the model,
-complete corrected-input frame/event equality, archived-state conversion, native
-retained frames, and carrier movement/release after planned or crashed-host
-recovery. The browser variant carries the relic through the existing RTC party,
-loot, door, social and handoff story.
+The [acceptance runner](../../tests/replay_cave_carrier/README.md) covers death,
+respawn, disconnect/rejoin, identity replacement, corrected-input state/events,
+exact resume and retained transition frames. Planned/crashed-host recovery and
+browser carrying/handoff scenarios remain separate live network checks.

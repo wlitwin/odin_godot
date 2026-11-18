@@ -61,6 +61,11 @@ World receives a copied catalog. Editing a Resource after admission cannot alter
 live gameplay. The host's catalog still travels in snapshots/checkpoints. Reopening
 a run admits a new value; changing schemas or rules still needs version policy.
 
+The catalog's interpretation is identified by `content.SEMANTIC`, shared by its
+runtime baker, exporter and stock reader. The gameplay/control contract uses
+`game.CONTENT` separately, so a control-only revision does not require a catalog
+version change. Source receipts still detect edits to Resources and extractors.
+
 ## Freeze before changing a contract
 
 `replay/evolution.freeze` creates self-contained old value declarations;
@@ -69,12 +74,11 @@ fields and refuses to convert until their defaults are explicitly reviewed.
 Changed/removed fields require authored mapping code. The tools do not infer
 historical reducer compatibility.
 
-Scrapyard's actual old codec uses `shared/revisions/content49/catalog.odin`, with
-no live type dependencies. The content49→50 converter explicitly supplies zero
-pulse defaults and copies all prior canonical leaf bytes. Tests verify each prior
-leaf, assert the zero defaults and decode a real old checkpoint. Use
-`tools/revision` to produce a separate review directory; keep old reducers and
-fixtures with their declared contracts. [API and limits](../../replay/evolution/README.md).
+`tools/revision` exports the current Catalog, World, Control and Action declarations
+and canonical manifests into a review directory. Capture those contracts before
+making a deliberate future change. The generic scaffolder and preservation checks
+are tested with small independent schemas; the game does not keep retired
+contracts merely to demonstrate those APIs. [API and limits](../../replay/evolution/README.md).
 
 ## Exercise the feature
 
@@ -84,7 +88,7 @@ to roundtrip a checkpoint, change authority epoch, continue, audit and compare.
 Assert feature-specific state in the returned before/after frames.
 
 Stormcaller tests remaining charge time, one hit, a late escape, death interruption
-and old-save conversion. Its native/WASM corpus uses the same takeover helper.
+and saved-catalog preservation. Its native/WASM corpus uses the same takeover helper.
 The peer runner supplies bounded process/log ownership while the game's real-peer
 script checks warnings, damage/dodge and convergence under configured latency.
 [Harness contracts](../../replay/testing/README.md).

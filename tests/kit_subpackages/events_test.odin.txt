@@ -1,0 +1,144 @@
+#+build !freestanding
+package event_game
+
+import "core:testing"
+import knet "godot:kit/net"
+import ksess "godot:kit/session"
+import ksim "godot:kit/sim"
+import rt "godot:runtime"
+import ca "coop_a"
+import cb "coop_b"
+import sa "sim_a"
+import sb "sim_b"
+import manual "manual"
+
+session_present :: proc(game:^Game,id:u16,anchor:knet.Net_Id,args:[]u8) {
+    for event in game.ses.net_event_set {
+        if event.id==id {event.present(game,&game.ses,anchor,false,args);return}
+    }
+    panic("missing event")
+}
+sim_present :: proc(game:^Game,id:u16,anchor:rawptr,args:[]u8) {
+    for event in game.lane.fact_set {
+        if event.id==id {event.fx(anchor,&game.lane,false,args);return}
+    }
+    panic("missing fact")
+}
+
+@(test)
+qualified_events :: proc(t:^testing.T) {
+    testing.expect_value(t,len(rt.registration_errors()),0)
+    game:Game
+    game.ses.reg=knet.registry_make()
+    game.ses.ctx=knet.command_ctx_make()
+    game.ses.is_host,game.ses.ran,game.ses.joined=true,true,true
+    game.ses.me=1
+    game.ses.ctx.is_authority,game.ses.ctx.me=true,1
+    game.ses.ctx.game_user=&game
+    game.boot.ses=&game.ses
+    game.boot.lane=&game.lane
+    game_lane_init(&game,&game.lane,&game.ses)
+    game_event_routes(&game,&game.ses)
+    defer {
+        ksim.lane_destroy(&game.lane)
+        ksess.session_destroy(&game.ses)
+        delete(game.boot.ent_types)
+    }
+    first:=ca.Actor{marker=3}
+    second:=cb.Actor{marker=1000}
+    third:=sa.Actor{marker=7}
+    fourth:=sb.Actor{marker=2000}
+    free_body:manual.Manual
+    bodies := [?]rawptr{&first,&second,&third,&fourth}
+    for kind,i in game_entity_kinds {
+        id:=knet.Net_Id(i+1)
+        knet.registry_insert(&game.ses.reg,id,bodies[i],kind.set,1)
+        game.boot.ent_types[id]=kind.type
+        if kind.sim_set!=nil {ksim.lane_track_set(&game.lane,id,bodies[i],kind.sim_set,1)}
+    }
+    // No factory/census registration is required for an explicitly tracked body.
+    ksim.lane_track_set(&game.lane,5,&free_body,&manual.manual_sim_set,1)
+    writer:=knet.writer_make()
+    defer knet.writer_destroy(&writer)
+
+    coop_pair(&game.boot,&first,&second,2)
+    testing.expect_value(t,game.coop_calls,i32(1))
+    testing.expect_value(t,game.result,i64(1005))
+    testing.expect(t,game.mine)
+    coop_world(&game.boot,&first,&second)
+    testing.expect_value(t,game.coop_calls,i32(2))
+    testing.expect_value(t,game.result,i64(1003))
+    static_ping(&game.boot)
+    testing.expect_value(t,game.static_calls,i32(1))
+    bad:=[1]u8{1}
+    session_present(&game,EVENT_STATIC_PING,0,bad[:])
+    testing.expect_value(t,game.static_calls,i32(1))
+
+    knet.write_net_id(&writer,1)
+    knet.write_u8(&writer,4)
+    session_present(&game,EVENT_COOP_PAIR,2,knet.writer_bytes(&writer))
+    testing.expect_value(t,game.coop_calls,i32(3))
+    testing.expect_value(t,game.result,i64(1007))
+    testing.expect(t,!game.mine)
+    session_present(&game,EVENT_COOP_PAIR,1,knet.writer_bytes(&writer)) // wrong anchor kind
+    session_present(&game,EVENT_COOP_PAIR,2,knet.writer_bytes(&writer)[:1])
+    knet.write_u8(&writer,0)
+    session_present(&game,EVENT_COOP_PAIR,2,knet.writer_bytes(&writer)) // trailing bytes
+    knet.writer_reset(&writer)
+    knet.write_net_id(&writer,2) // wrong referenced kind
+    knet.write_u8(&writer,4)
+    session_present(&game,EVENT_COOP_PAIR,2,knet.writer_bytes(&writer))
+    impostor:=first
+    coop_pair(&game.boot,&impostor,&second,2) // same ID, stale pointer
+    testing.expect_value(t,game.coop_calls,i32(3))
+
+    sim_pair(&game.boot,&third,&fourth,3)
+    testing.expect_value(t,game.sim_calls,i32(1))
+    testing.expect_value(t,game.result,i64(2010))
+    sim_world(&game.boot,&third,&fourth)
+    testing.expect_value(t,game.sim_calls,i32(2))
+    game.lane.resimming=true
+    sim_pair(&game.boot,&third,&fourth,3)
+    sim_world(&game.boot,&third,&fourth)
+    testing.expect_value(t,game.sim_calls,i32(2))
+    game.lane.resimming=false
+    knet.writer_reset(&writer)
+    knet.write_net_id(&writer,3)
+    knet.write_u8(&writer,5)
+    sim_present(&game,EVENT_SIM_PAIR,&fourth,knet.writer_bytes(&writer))
+    testing.expect_value(t,game.sim_calls,i32(3))
+    testing.expect_value(t,game.result,i64(2012))
+    testing.expect(t,!game.mine)
+    sim_present(&game,EVENT_SIM_PAIR,&third,knet.writer_bytes(&writer)) // wrong anchor kind
+    sim_present(&game,EVENT_SIM_PAIR,&fourth,knet.writer_bytes(&writer)[:1])
+    knet.write_u8(&writer,0)
+    sim_present(&game,EVENT_SIM_PAIR,&fourth,knet.writer_bytes(&writer))
+    knet.writer_reset(&writer)
+    knet.write_net_id(&writer,4) // wrong referenced kind
+    knet.write_u8(&writer,5)
+    sim_present(&game,EVENT_SIM_PAIR,&fourth,knet.writer_bytes(&writer))
+    testing.expect_value(t,game.sim_calls,i32(3))
+
+    manual_ping(&game.boot,&free_body)
+    sim_present(&game,EVENT_MANUAL_PING,&free_body,nil)
+    testing.expect_value(t,game.manual_calls,i32(2))
+    testing.expect(t,ksim.lane_untrack(&game.lane,5))
+    manual_ping(&game.boot,&free_body)
+    testing.expect_value(t,game.manual_calls,i32(2))
+
+    // The clocks may deliver after a referenced body has despawned.
+    delete_key(&game.boot.ent_types,1)
+    coop_pair(&game.boot,&first,&second,2)
+    knet.writer_reset(&writer)
+    knet.write_net_id(&writer,1)
+    knet.write_u8(&writer,4)
+    session_present(&game,EVENT_COOP_PAIR,2,knet.writer_bytes(&writer))
+    testing.expect_value(t,game.coop_calls,i32(3))
+    testing.expect(t,ksim.lane_untrack(&game.lane,3))
+    sim_pair(&game.boot,&third,&fourth,3)
+    knet.writer_reset(&writer)
+    knet.write_net_id(&writer,3)
+    knet.write_u8(&writer,5)
+    sim_present(&game,EVENT_SIM_PAIR,&fourth,knet.writer_bytes(&writer))
+    testing.expect_value(t,game.sim_calls,i32(3))
+}

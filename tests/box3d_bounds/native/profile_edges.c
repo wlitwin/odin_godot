@@ -111,12 +111,12 @@ static void profile_edge(int shape_edge) {
   OK(ogb3_recovery_config_default(&config));
   assert(config.max_bodies >= 35 && config.max_shapes >= 35);
   config.max_bodies = config.max_shapes = 35;
-  ogb3_recovery_asset_v2 asset = {
+  ogb3_recovery_authored_asset asset = {
     .version = OGB3_AUTHORING_ASSET_VERSION, .struct_bytes = sizeof(asset),
     .base = {.id = 1, .kind = OGB3_RECOVERY_BOX, .a = {.25f, .25f, .25f}}
   };
   ogb3_recovery_catalog *catalog = NULL;
-  OK(ogb3_recovery_catalog_create_v3(&config, &asset, 1, &catalog));
+  OK(ogb3_recovery_catalog_create_authored(&config, &asset, 1, &catalog));
   ogb3_recovery_identity identity;
   OK(ogb3_recovery_identity_get(catalog, &identity));
   assert(identity.recovery_format == 3);

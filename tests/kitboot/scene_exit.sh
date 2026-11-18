@@ -12,10 +12,10 @@ cleanup() {
 		for log in "$work/import.log" "$work/runtime.log"; do
 			[[ ! -f "$log" ]] || tail -40 "$log" >&2
 		done
-		printf 'Scene lifecycle artifacts: %s\n' "$work" >&2
-	else
-		rm -rf "$work"
 	fi
+	# Keep the fixture and logs as evidence. Temporary-directory deletion is
+	# not part of the game's lifecycle verdict and can race filesystem work.
+	printf 'Scene lifecycle artifacts: %s\n' "$work" >&2
 }
 trap cleanup EXIT
 python3 - "$ROOT" "$name" "$work/project" <<'PY'
@@ -66,6 +66,18 @@ $PREFIX_test_detach_rehost :: proc(self: ^$CLASS) -> bool {
 	$DETACH(self)
 	if self.ses.ran || kboot.boot_phase(&self.boot) != .Menu {return false}
 	$PREFIX_ready(self)
+	for name in ([4]cstring{"BootUi", "BootFx", "Stage", "World"}) {
+		count := 0
+		for i in 0..<gd.node_get_child_count(self.owner, false) {
+			child := gd.node_get_child(self.owner, gd.Int(i), false)
+			actual := gd.node_get_name(child)
+			text := gd.new_string_string_name(actual)
+			if gd.gd_string_to_odin(text) == string(name) {count += 1}
+			gd.free_string(text)
+			gd.free_string_name(actual)
+		}
+		if count != 1 {return false}
+	}
 	return self.ses.ran && self.ses.is_host && self.ses.replicating
 }
 
@@ -86,6 +98,10 @@ $PREFIX_test_code_lifecycle :: proc(self: ^$CLASS) -> bool {
 for key, value in {'PACKAGE': name, 'CLASS': cls, 'PREFIX': name, 'DETACH': detach}.items():
     probe = probe.replace('$'+key, value)
 (project/'scripts/kit_lifecycle_probe.odin').write_text(probe)
+if name == 'hello_net':
+    shutil.copy2(root/'tests/kitboot/spawn_probe.odin.txt', project/'scripts/spawn_probe.odin')
+else:
+    shutil.copy2(root/'tests/kitboot/spawn_sim_probe.odin.txt', project/'scripts/spawn_probe.odin')
 PY
 project="$work/project"
 case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac
@@ -96,6 +112,7 @@ HELLO_ROLE=host HELLO_PORT="${2:-45991}" HELLO_TOKEN=scene-lifecycle \
 	"$GODOT" --headless --path "$project" --script "$ROOT/tests/kitboot/scene_exit.gd" >"$work/runtime.log" 2>&1
 cat "$work/runtime.log"
 rg -q '^KIT_SCENE_EXIT_OK$' "$work/runtime.log"
+rg -q '^KIT_SPAWN_TRANSACTION_OK$' "$work/runtime.log"
 if rg -q 'SCRIPT ERROR|ERROR:|instances were leaked|resources still in use' "$work/import.log" "$work/runtime.log"; then
 	cat "$work/import.log"
 	exit 1

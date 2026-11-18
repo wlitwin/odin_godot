@@ -3,6 +3,7 @@ package core
 
 import "godot:gdext"
 import "godot:godot"
+import "godot:libgd/classdb"
 
 import "base:runtime"
 import "core:c/libc"
@@ -253,7 +254,7 @@ dir_has_odin :: proc(dir: string) -> bool {
     return false
 }
 
-@(private = "file")
+@(private)
 rescan_editor_filesystem :: proc() {
     ei := godot.singleton_editor_interface()
 
@@ -378,8 +379,12 @@ pl_enter_tree :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]g
     //   * "Build Odin Scripts" — compile the scripts dll (reuses the save-path build, streaming
     //     the same "rebuilding…" / "reloaded" status to the Output).
     plug := cast(godot.Editor_Plugin)self.object
+    godot.add_to_group(cast(godot.Node)self.object, "odin_editor")
     setup_name := godot.new_string_cstring("Set Up Odin Scripts")
     godot.editor_plugin_add_tool_menu_item(plug, setup_name, make_menu_callable(setup_menu_call))
+    kit_ui_name := godot.new_string_cstring("Create Kit UI Scenes")
+    godot.editor_plugin_add_tool_menu_item(plug, kit_ui_name, make_menu_callable(kit_ui_templates_call))
+    godot.free_string(kit_ui_name)
     build_name := godot.new_string_cstring("Build Odin Scripts")
     godot.editor_plugin_add_tool_menu_item(plug, build_name, make_menu_callable(build_menu_call))
     //   * "Generate ols.json" — completion/checker config for EXTERNAL editors: any
@@ -668,6 +673,14 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
     }
 
     if target == "web" {
+        self := cast(^OdinExportPlugin)instance
+        preset := godot.editor_export_plugin_get_export_preset(cast(godot.Editor_Export_Plugin)self.object)
+        if preset == nil {
+            export_error("odin export: the selected Web export preset is unavailable")
+            return
+        }
+        defer godot.release_ref(preset)
+        threaded := godot.get_bool(cast(godot.Object)preset, "variant/thread_support")
         // Web: the FULL extension (core + binding + this project's scripts) is AOT-compiled
         // into ONE Emscripten SIDE_MODULE wasm at <proj>/bin/libodin_godot.wasm. The
         // project's .gdextension references it as `web.{debug,release}.wasm32`, so Godot's
@@ -713,12 +726,13 @@ ep_export_begin :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^
         emcc_dir := dir_of(emcc_bin)
         // shell_quote every interpolated path (settings are user-editable; see common.odin).
         cmd := fmt.ctprintf(
-            "PATH=%s:%s:\"$PATH\" ODIN=%s EMCC=%s ODIN_EXPORT_OPT=%s ODIN_GODOT_ROOT=%s bash %s/build/build_web.sh %s 1>&2",
+            "PATH=%s:%s:\"$PATH\" ODIN=%s EMCC=%s ODIN_EXPORT_OPT=%s ODIN_WEB_THREADS=%s ODIN_GODOT_ROOT=%s bash %s/build/build_web.sh %s 1>&2",
             shell_quote(odin_dir, context.temp_allocator),
             shell_quote(emcc_dir, context.temp_allocator),
             shell_quote(odin_bin, context.temp_allocator),
             shell_quote(emcc_bin, context.temp_allocator),
             shell_quote(opt, context.temp_allocator),
+            threaded ? "1" : "0",
             shell_quote(root, context.temp_allocator),
             shell_quote(root, context.temp_allocator),
             shell_quote(proj, context.temp_allocator),
@@ -1005,6 +1019,12 @@ odin_export_register :: proc() {
         &plugin_info,
         level = .Editor,
     )
+    request_name := godot.new_string_name_cstring("request_build", false)
+    state_name := godot.new_string_name_cstring("get_build_state", false)
+    classdb.bind_void_method_0_args(&odin_editor_plugin_class_name, &request_name, editor_request_build)
+    classdb.bind_returning_method_0_args(&odin_editor_plugin_class_name, &state_name, editor_build_state)
+    godot.free_string_name(request_name)
+    godot.free_string_name(state_name)
 
     // Hand the editor plugin to the editor by class name; Godot instantiates it and
     // (via _enter_tree) it registers the export plugin.

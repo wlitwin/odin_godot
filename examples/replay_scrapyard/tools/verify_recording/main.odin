@@ -7,19 +7,14 @@ import d "godot:replay/diagnostic"
 import net "godot:replay/net"
 import recording "../../shared/recording"
 import game "../../shared/game"
-import upgrade "../../shared/upgrade"
 
 main :: proc() {
     os.exit(run())
 }
 
 run :: proc() -> int {
-    legacy :=
-        len(os.args) == 3 &&
-        (os.args[2] == "--content48" || os.args[2] == "--content49" || os.args[2] == "--content50")
-
-    if len(os.args) != 2 && !legacy {
-        fmt.eprintln("usage: verify_recording FILE.rplrec [--content48|--content49|--content50]")
+    if len(os.args) != 2 {
+        fmt.eprintln("usage: verify_recording FILE.rplrec")
         return 2
     }
 
@@ -31,18 +26,6 @@ run :: proc() -> int {
     }
 
     defer delete(bytes)
-
-    if legacy {
-        if os.args[2] == "--content50" {
-            return verify(bytes, upgrade.model_50(), upgrade.RECORDING_50)
-        }
-
-        if os.args[2] == "--content49" {
-            return verify(bytes, upgrade.model_49(), upgrade.RECORDING_49)
-        }
-
-        return verify(bytes, upgrade.model_48(), upgrade.RECORDING_48)
-    }
 
     return verify(bytes, game.model(), recording.CONTEXT)
 }

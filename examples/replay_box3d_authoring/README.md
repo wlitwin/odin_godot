@@ -46,13 +46,13 @@ state comes from the complete provider/checkpoint/codec, never a bare Frame or
 pose-only reconstruction. Hashes are diagnostics; Host/Client comparison uses
 the complete signatures and retained original part bytes.
 
-Setup extracts/bakes once, builds actual Native, copies stable logical/allocation
-maps into Game, initializes the trusted catalog and complete codec, and opens
-the real Godot ENet Session. It then destroys the detached source bake/build and
-queues the authoring nodes for deletion. Three real SDK leases protect allocator,
-codec and Session state. Teardown closes Session, codec, residual build/catalog,
-then creator owners, Runtime allocation and Meter context. Any declined cleanup
-retains the surviving owner and reports failure.
+Setup uses `godot:replay/godot/physics.Authored_Session`. The owner captures the
+World, builds its native state, maps keys through the game's initializer and
+opens the existing Replay Session with a complete codec. It tracks the initial
+and presentation checkpoints, removes the redundant catalog clone, and retains
+cleanup state after any declined close. Source authoring nodes can then be
+freed. Game models, rules, controls, role and transport remain explicit. See
+[the owner guide](../../replay/godot/physics/OWNERSHIP.md).
 
 The public methods are `status()`, `presentation()`, `control(x,z,pulse)`,
 `request_reset()` and `close()`. Presentation returns only copied poses keyed by

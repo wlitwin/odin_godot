@@ -2,6 +2,7 @@ package replay_authoring_demo
 
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bd "godot:box3d/diagnostics"
 import bp "godot:box3d/presentation"
 import r "godot:replay"
@@ -38,7 +39,7 @@ Game :: struct {
 
 Codec :: ph.Network_Codec(Game, Control, Action, Event, 2)
 
-initial_game :: proc(scene: ^a.Baked_Scene, built: ^a.Built_Scene) -> (Game, bool) {
+initial_game :: proc(scene: ^a.Baked_Scene, built: ^ar.Built_Scene) -> (Game, bool) {
     if len(scene.data.bodies) != 4 || len(scene.data.shapes) != 4 || len(scene.data.joints) != 1 {
         return {}, false
     }
@@ -154,10 +155,9 @@ model_step :: proc(game: ^Game, controls: [2]Control, _, _: u64, ctx: ^r.Step(Ev
     game.tick = ctx.tick
 }
 
-model :: proc(codec: ^Codec) -> net.Model(Game, Control, Action, Event, 2) {
+model :: proc() -> net.Model(Game, Control, Action, Event, 2) {
     return {
         complete_state = true,
-        complete_codec = codec.value,
         step = model_step,
         action = proc(_: ^Game, _: u16, _: Action, _: ^r.Step(Event)) -> bool {
             return false

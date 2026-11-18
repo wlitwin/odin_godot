@@ -133,7 +133,7 @@ wire_codec :: proc(c: ^Catalog, state, event: ^sc.Schema) -> net.Complete_Codec(
     return {
         identity = {
             solver_format = 1,
-            recovery_format = 1,
+            recovery_format = 3,
             game_format = 1,
             observation_format = 1,
             profile = 1,

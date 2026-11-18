@@ -2,12 +2,10 @@ package replay_cave_test
 
 import "core:testing"
 import "core:reflect"
-import "core:os"
 import "core:fmt"
 import r "godot:replay"
 import net "godot:replay/net"
 import cave "../../examples/replay_cavecrawl/shared/cave"
-import upgrade "../../examples/replay_cavecrawl/shared/upgrade"
 
 Director_Input :: struct {
     kill: bool,
@@ -170,36 +168,12 @@ rest_deadline_overflow_cannot_commit_partial_combat :: proc(t: ^testing.T) {
 }
 
 @(test)
-content3_conversion_preserves_complete_frame_and_scheduled_deadlines :: proc(t: ^testing.T) {
+current_director_checkpoints_preserve_scheduled_deadlines :: proc(t: ^testing.T) {
     names := [4]string{"waiting", "pending", "spawning", "rest"}
 
     for name in names {
-        bytes, error := os.read_entire_file(
-            fmt.tprintf("tests/replay_cave/fixtures/content3/%s.replay", name),
-            context.allocator,
-        )
-        testing.expect(t, error == nil)
-        defer delete(bytes)
-        old: net.Checkpoint(upgrade.World_7, cave.Control, cave.Action, cave.SEATS)
-        current: net.Checkpoint(cave.World, cave.Control, cave.Action, cave.SEATS)
-        defer net.checkpoint_destroy(&old)
+        current := load_current_fixture(fmt.tprintf("director_%s", name))
         defer net.checkpoint_destroy(&current)
-        testing.expect_value(
-            t,
-            net.checkpoint_decode(&old, bytes, upgrade.model3(), upgrade.CONTENT_3),
-            net.Error.None,
-        )
-        testing.expect(t, net.checkpoint_decode(&current, bytes, cave.model(), cave.CONTENT) != .None)
-        converted, result := upgrade.convert_archive(bytes)
-        defer delete(converted)
-        testing.expect_value(t, result, net.Error.None)
-        testing.expect_value(t, net.checkpoint_decode(&current, converted, cave.model(), cave.CONTENT), net.Error.None)
-        expected, _ := upgrade.convert_world7(old.frame.state)
-        expected.authority_known = true
-        expected.authority_seat = old.header.local_seat
-        testing.expect(t, reflect.equal(current.frame, r.Frame(cave.World){tick = old.frame.tick, state = expected}))
-        testing.expect(t, reflect.equal(old.peers[:], current.peers[:], true))
-        testing.expect_value(t, current.header.content, cave.CONTENT)
         world := current.frame.state
         ctx := r.Step(cave.Event){}
 
@@ -221,5 +195,4 @@ content3_conversion_preserves_complete_frame_and_scheduled_deadlines :: proc(t: 
         }
     }
 
-    testing.expect(t, !upgrade.world3_valid(upgrade.World_7{}))
 }

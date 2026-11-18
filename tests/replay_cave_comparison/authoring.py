@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib,json,sys
 root=Path(__file__).resolve().parents[2];output=Path(sys.argv[1])
-groups={'kit_game':['examples/cavecrawl/scripts'],'replay_common_gameplay':['examples/replay_cavecrawl/shared/cave'],'replay_common_godot':['examples/replay_cavecrawl/scripts'],'replay_owner_model':['examples/replay_cavecrawl/shared/owner_cave'],'replay_owner_preparation':['examples/replay_cavecrawl_owned/prepare.py','examples/replay_cavecrawl_owned/build.sh','examples/replay_cavecrawl_owned/play.sh'],'replay_owner_converter':['examples/replay_cavecrawl/shared/owner_upgrade','examples/replay_cavecrawl_owned/tools']}
+groups={'kit_game':['examples/cavecrawl/scripts'],'replay_common_gameplay':['examples/replay_cavecrawl/shared/cave'],'replay_common_godot':['examples/replay_cavecrawl/scripts'],'replay_owner_model':['examples/replay_cavecrawl/shared/owner_cave'],'replay_owner_preparation':['examples/replay_cavecrawl_owned/prepare.py','examples/replay_cavecrawl_owned/build.sh','examples/replay_cavecrawl_owned/play.sh']}
 result={}
 for name,locations in groups.items():
  files=[]

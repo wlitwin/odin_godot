@@ -1,10 +1,12 @@
 package box3d_authoring
 
+import bcap "godot:box3d/limits"
+
 import "core:crypto/sha2"
 import "core:encoding/json"
 import "core:math"
 import "core:mem"
-import b "godot:box3d"
+import b "godot:box3d/types"
 import bd "godot:box3d/diagnostics"
 
 @(private)
@@ -673,10 +675,6 @@ bake :: proc(input: Scene_Input, allocator := context.allocator) -> (published: 
         return {}, fail(.Capacity, "motion.counts")
     }
 
-    if input.schema_version == LEGACY_SCHEMA_VERSION && (len(input.joints) > 0 || len(input.characters) > 0) {
-        return {}, fail(.Schema, "schema1.motion_not_supported")
-    }
-
     if !key_valid(input.namespace) {
         return {}, fail(.Key, "namespace")
     }
@@ -748,7 +746,7 @@ bake :: proc(input: Scene_Input, allocator := context.allocator) -> (published: 
         }
     }
 
-    if dynamic_count > b.ALPHA_INITIAL_DYNAMIC_BODIES {
+    if dynamic_count > bcap.MAX_BODIES {
         return {}, fail(.Capacity, "dynamic_bodies.count")
     }
 
@@ -1076,8 +1074,7 @@ validate_ids :: proc(data: Scene_Data) -> Diagnostic {
         return fail(.Capacity, "motion.counts")
     }
 
-    if !schema_supported(data.schema_version) ||
-       (data.schema_version == LEGACY_SCHEMA_VERSION && (len(data.joints) > 0 || len(data.characters) > 0)) {
+    if !schema_supported(data.schema_version) {
         return fail(.Schema, "schema_version")
     }
 

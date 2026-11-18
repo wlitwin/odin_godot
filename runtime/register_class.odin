@@ -60,6 +60,7 @@ Class_Info :: struct {
     global_name:       cstring,
     base:              cstring,
     lifecycle:         Lifecycle,
+    owns_state:        bool,
     methods:           [^]Method,
     methods_count:     i32,
     signals:           [^]Signal,
@@ -125,6 +126,16 @@ type_has_generation_bound_state :: proc "contextless" (
     }
 
     base := runtime.type_info_base(ti)
+
+    // These values can retain metadata allocated in the scripts DLL, even
+    // though their headers have the same physical layout in another image.
+    if _, ok := base.variant.(runtime.Type_Info_Any); ok {
+        return true
+    }
+
+    if _, ok := base.variant.(runtime.Type_Info_Type_Id); ok {
+        return true
+    }
 
     if p, ok := base.variant.(runtime.Type_Info_Pointer); ok {
         // `distinct rawptr` reaches this branch with a nil element. A pointer directly
@@ -229,6 +240,8 @@ reflect_class_desc :: proc "contextless" (id: typeid, info: Class_Info) -> Class
         base              = info.base,
         id                = transmute(u64)id,
         lifecycle         = info.lifecycle,
+        instance_layout   = instance_layout_fingerprint(id),
+        owns_state        = b8(info.owns_state || info.lifecycle.finalize != nil),
         methods           = info.methods,
         methods_count     = info.methods_count,
         signals           = info.signals,

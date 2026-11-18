@@ -1,78 +1,52 @@
 # Your first Odin scene
 
-Create a Godot project with a colored square that moves across the window. Its
-speed is an Odin field exposed in the Inspector. This tutorial uses a repository
-checkout and the pinned Nix development shell.
+Create a colored square that moves across the window, with its speed exposed in
+the Inspector. Use Godot's scene editor and the installed addon's build commands.
+You need Godot 4.7.x, an Odin compiler, and basic familiarity with creating nodes.
 
-You need Git, Nix with flakes enabled, and Godot 4.7.x. The shell targets Godot
-4.7.1. You should know how to open and run a Godot project.
+## 1. Install and set up scripts
 
-## 1. Enter the toolchain shell
+Create an ordinary Godot project with the Compatibility renderer. Install
+`addons/odin_godot/` using the [distribution guide](../distribution.md#install-into-a-godot-project),
+then reopen the project and let its initial import finish. The addon includes
+the extension manifest and core library.
+
+Choose **Project → Tools → Set Up Odin Scripts**, then **Build Odin Scripts**.
+The first command creates `res://scripts/hello.odin`; the second compiles it.
+If Odin cannot be found, set `odin_godot/odin_bin` to the compiler's absolute path
+or launch the editor from a toolchain shell. See [workflow settings](../workflow.md#editor-settings-reference).
+
+If you are starting from a repository checkout, create your Godot project in
+`../first-odin-scene`, then build and copy the addon:
 
 ```sh
-git clone https://github.com/wlitwin/odin_godot.git
 cd odin_godot
+nix build
+mkdir -p ../first-odin-scene/addons
+cp -R result/addons/odin_godot ../first-odin-scene/addons/
+chmod -R u+w ../first-odin-scene/addons/odin_godot
 nix develop
+"$GODOT" --editor --path ../first-odin-scene
 ```
 
-If you already have a checkout, start there. The shell prints the compiler and
-Godot paths. On a setup without `/Applications/Godot.app`, select your executable
-when entering it:
+The pinned development shell provides the compiler and editor tools. On a setup
+without `/Applications/Godot.app`, enter it with `GODOT=/path/to/godot nix develop`.
 
-```sh
-GODOT=/absolute/path/to/godot nix develop
-```
+## 2. Make a visible scene
 
-Keep the following commands in this shell, at the repository root.
+1. Create a **Node2D** scene root named **Main** and save it as `main.tscn`.
+2. Add a **Node2D** child named **Mover**, positioned at `(80, 225)`.
+3. Add a **Polygon2D** child under Mover. Draw a small square around its origin
+   and choose a visible color.
+4. Select Mover, choose **Attach Script**, select **Odin**, and save the new
+   script as `res://scripts/mover.odin`.
 
-## 2. Create the project files
+The starter's `hello.odin` can stay in the package or be deleted. It does not
+need to be attached to this scene.
 
-Create a directory outside the checkout so your game stays separate from the SDK:
+## 3. Write the movement
 
-```sh
-mkdir -p ../first-odin-scene/scripts
-```
-
-Create `../first-odin-scene/project.godot`:
-
-```ini
-config_version=5
-
-[application]
-config/name="First Odin Scene"
-run/main_scene="res://main.tscn"
-
-[display]
-window/size/viewport_width=800
-window/size/viewport_height=450
-
-[rendering]
-renderer/rendering_method="gl_compatibility"
-```
-
-Create `../first-odin-scene/odin_godot.gdextension`:
-
-```ini
-[configuration]
-entry_symbol = "odin_godot_init"
-compatibility_minimum = "4.6"
-
-[libraries]
-macos.debug = "res://bin/libodin_godot.dylib"
-macos.release = "res://bin/libodin_godot.dylib"
-linux.debug.x86_64 = "res://bin/libodin_godot.so"
-linux.release.x86_64 = "res://bin/libodin_godot.so"
-windows.debug.x86_64 = "res://bin/libodin_godot.dll"
-windows.release.x86_64 = "res://bin/libodin_godot.dll"
-```
-
-The core registers the language and loads your compiled scripts. You do not list
-the scripts library in this manifest. The [distribution guide](../distribution.md)
-covers prebuilt addons and platform support; use macOS for the primary development path.
-
-## 3. Write the script
-
-Create `../first-odin-scene/scripts/mover.odin`:
+Replace `mover.odin` with:
 
 ```odin
 //gd:extends Node2D
@@ -99,70 +73,43 @@ mover_process :: proc(self: ^Mover, delta: f64) {
 }
 ```
 
-`//gd:extends Node2D` selects the Godot base class. The `owner` field has the
-matching engine handle type, `gd.Node2d`. The `mover_` prefix connects procedures
-to `Mover`; `_ready` runs once and `_process` receives elapsed seconds each frame.
+`self` addresses the script state; `self.owner` is its Godot node. The `mover_`
+prefix associates the procedures with `Mover`. `_ready` runs when the node is
+ready, and `_process` receives elapsed seconds each frame.
 
-The field tag exposes **Speed** with a default of 120. Multiplying it by `delta`
-makes motion 120 pixels per second rather than per rendered frame.
+Save the script and wait for the build to finish. Registration and boot code are
+generated for you. The Inspector now shows **Speed**, defaulting to 120.
 
-## 4. Attach it to a visible node
+## 4. Run and tune
 
-Create `../first-odin-scene/main.tscn`:
+Press **F6**. The game prints `Mover ready` and the square moves right, wrapping
+at x = 800. Stop the game, select Mover, change **Speed** to 240, save the scene,
+and run again. The square now moves twice as fast.
 
-```ini
-[gd_scene load_steps=2 format=3]
+Inspector values belong to the scene instance; the script tag supplies its
+default. The child Polygon2D follows the moving parent without extra code.
 
-[ext_resource type="Script" path="res://scripts/mover.odin" id="1"]
-
-[node name="Main" type="Node2D"]
-
-[node name="Mover" type="Node2D" parent="."]
-position = Vector2(80, 225)
-script = ExtResource("1")
-
-[node name="Square" type="Polygon2D" parent="Mover"]
-polygon = PackedVector2Array(-16, -16, 16, -16, 16, 16, -16, 16)
-color = Color(0.9, 0.4, 0.2, 1)
-```
-
-The script moves the parent node; its `Polygon2D` child follows it. Attaching
-`mover.odin` through the editor's Script slot produces the same relationship.
-
-## 5. Build and run
+For a terminal build from the project directory:
 
 ```sh
-bash build/build_scripts.sh ../first-odin-scene
-"$GODOT" --editor --path ../first-odin-scene
+SKIP_CORE=1 bash addons/odin_godot/build/build_scripts.sh .
+"$GODOT" --editor --path .
 ```
 
-The build must finish without compiler errors. It writes generated registration
-under `scripts/` and the core and scripts libraries under `bin/`. Wait for the
-editor's initial import to finish so it discovers the extension and registers
-Odin. Press **F6** to run the scene. The game prints `Mover ready` and shows a
-square moving right, wrapping to the left edge.
-
-After that first editor import, you can also launch the game directly:
-
-```sh
-"$GODOT" --path ../first-odin-scene
-```
-
-Select **Mover** and change **Speed** to 240 in the Inspector. Save and run again:
-the square takes about half as long to cross the window. This setting belongs to
-the scene instance; the script tag supplies the default.
+The builder locates its bundled SDK automatically. The prebuilt core stays in
+the addon and the game's compiled scripts go in `bin/`.
 
 ## If something fails
 
 | Symptom | Check |
 | --- | --- |
-| Godot cannot load the extension or `.odin` script | Build, then open the editor and let its initial import finish; check the manifest's core path |
-| The editor cannot find Odin after a save | Launch from the shell, or set `odin_godot/odin_bin` in [editor settings](../workflow.md#editor-settings-reference) |
-| The script compiles but the square stays still | Check the script path and `mover_process` spelling; **Speed** must be greater than zero |
-| The build cannot find the SDK | Invoke the checkout's build script, or set `ODIN_GODOT_ROOT` to that checkout |
+| Odin is absent from Attach Script or the Tools menu | Confirm the addon is installed, reopen the project, and let its import finish |
+| The editor cannot find Odin | Set `odin_godot/odin_bin`, or launch from the toolchain shell |
+| Build failed | Read the compiler error in Output; the editor keeps the previous library and blocks Play after a failed build |
+| The square stays still | Check the attached script and `mover_process` spelling; Speed must be greater than zero |
 
 ## Next
 
 - Use the [authoring reference](../authoring-guide.md) to add input, signals, and resources.
-- Read [Development workflow](../workflow.md) to configure rebuilds and reloads.
+- Read [Development workflow](../workflow.md) for builds, debugging, and external editors.
 - Follow [Kit's two-window tutorial](../kit/quickstart.md) when you need multiplayer.

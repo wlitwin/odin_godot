@@ -3,7 +3,6 @@ package core
 import "godot:gdext"
 import "godot:godot"
 
-import "core:fmt"
 import "core:strings"
 
 // ----------------------------------------------------------------------------
@@ -55,6 +54,7 @@ language_free_instance :: proc "c" (class_user_data: rawptr, instance: gdext.Ext
     }
 
     free(cast(^OdinLanguage)instance)
+    editor_authoring_clear()
 }
 
 @(private = "file")
@@ -256,49 +256,11 @@ lv_make_template :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [
     defer delete(src)
     object, self := odin_script_construct()
     gs := godot.new_string_odin(src)
+    defer godot.free_string(gs)
     odin_script_set_source(self, gs)
-    ret_object(ret, object)
-}
-
-// Build the starter source for a new `.odin` script. Uses `package scripts` (the convention
-// the template/getting-started establish) and the `to_snake(class)_` proc-prefix scriptgen
-// expects, so the result compiles and its lifecycle hooks are recognized as-is.
-@(private = "file")
-make_odin_template :: proc(class_name, base: string) -> string {
-    snake := core_to_snake(class_name)
-    defer delete(snake)
-    b := strings.builder_make()
-    fmt.sbprintf(&b, "//gd:extends %s\npackage scripts\n\n", base)
-    strings.write_string(&b, "import gd \"godot:godot\"\n\n")
-    fmt.sbprintf(
-        &b,
-        "%s :: struct {{\n\t// The engine node this script is attached to (retype for your base, e.g.\n\t// gd.Node2d). Engine calls (add_child, connect_to, queue_free, ...) take\n\t// `self.owner` — NEVER `self`, which is this Odin struct: both compile\n\t// (engine handles are raw pointers), but `self` crashes at runtime.\n\towner: gd.Node,\n}}\n\n",
-        class_name,
-    )
-    fmt.sbprintf(&b, "%s_ready :: proc(self: ^%s) {{\n\tgd.print(\"%s ready\")\n}}\n\n", snake, class_name, class_name)
-    fmt.sbprintf(&b, "%s_process :: proc(self: ^%s, delta: f64) {{\n}}\n", snake, class_name)
-    return strings.to_string(b)
-}
-
-// snake_case a PascalCase identifier (Player -> player, MyBoss -> my_boss) — mirrors
-// scriptgen's to_snake so the generated proc prefix matches what it strips.
-@(private = "file")
-core_to_snake :: proc(s: string) -> string {
-    b := strings.builder_make()
-
-    for r, i in s {
-        if r >= 'A' && r <= 'Z' {
-            if i != 0 {
-                strings.write_rune(&b, '_')
-            }
-
-            strings.write_rune(&b, r + ('a' - 'A'))
-        } else {
-            strings.write_rune(&b, r)
-        }
-    }
-
-    return strings.to_string(b)
+    // make_template returns Ref<Script>, not an Object*. Initialize the engine
+    // reference so the dialog's script_created signal retains a live script.
+    gdext.ref_set_object(ret, object)
 }
 
 @(private = "file")
@@ -564,7 +526,7 @@ odin_language_register :: proc() {
     add("_has_named_classes", lv_false)
     add("_overrides_external_editor", lv_false)
     add("_handles_global_class_type", lv_handles_global_class_type)
-    add("_can_make_function", lv_false)
+    add("_can_make_function", lv_true)
     add("_debug_get_current_stack_info", lv_debug_stack_info)
 
     // ---- remaining REQUIRED ScriptLanguageExtension virtuals (4.6.2). The editor
@@ -577,8 +539,8 @@ odin_language_register :: proc() {
     add("_preferred_file_name_casing", lv_int0) // enum (int)
     add("_validate", lv_validate) // Dictionary {valid, errors} — real odin-check diagnostics (validate.odin)
     add("_validate_path", lv_string_empty) // String (empty == valid)
-    add("_find_function", lv_intneg1) // int (-1 == not found)
-    add("_make_function", lv_string_empty) // String
+    add("_find_function", lv_find_function) // int (-1 == not found)
+    add("_make_function", lv_make_function) // String
     add("_open_in_external_editor", lv_int0) // enum::Error (0 == OK)
     add("_complete_code", lv_complete_code) // Dictionary {result, force, call_hint, options} — real ols autocomplete (complete.odin)
     add("_lookup_code", lv_lookup_code) // Dictionary {result, type, class_name, class_member} — goto-def to built-in docs (lookup.odin)

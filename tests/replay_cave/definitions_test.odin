@@ -2,11 +2,9 @@ package replay_cave_test
 
 import "core:testing"
 import "core:reflect"
-import "core:os"
 import r "godot:replay"
 import net "godot:replay/net"
 import cave "../../examples/replay_cavecrawl/shared/cave"
-import upgrade "../../examples/replay_cavecrawl/shared/upgrade"
 
 @(test)
 authored_values_remain_owned_and_support_more_than_two_waves :: proc(t: ^testing.T) {
@@ -72,73 +70,24 @@ zero_stock_and_invalid_definition_bounds_are_explicit :: proc(t: ^testing.T) {
 }
 
 @(test)
-old_archive_conversion_preserves_legacy_world_fields_and_adds_default_definitions :: proc(t: ^testing.T) {
-    bytes, err := os.read_entire_file("tests/replay_cave/fixtures/content1/cave.replay", context.allocator)
-    defer delete(bytes)
-    testing.expect(t, err == nil)
-
-    if err != nil {
-        return
-    }
-
-    old: net.Checkpoint(upgrade.Legacy_World, cave.Control, upgrade.Legacy_Action, cave.SEATS)
-    defer net.checkpoint_destroy(&old)
-    testing.expect_value(
-        t,
-        net.checkpoint_decode(&old, bytes, upgrade.legacy_model(), upgrade.CONTENT_1),
-        net.Error.None,
-    )
-    converted, result := upgrade.convert_archive(bytes)
-    defer delete(converted)
-    testing.expect_value(t, result, net.Error.None)
-
-    if result != .None {
-        return
-    }
-
-    current: net.Checkpoint(cave.World, cave.Control, cave.Action, cave.SEATS)
-    defer net.checkpoint_destroy(&current)
-    testing.expect_value(t, net.checkpoint_decode(&current, converted, cave.model(), cave.CONTENT), net.Error.None)
-    expected, ok := upgrade.convert_world(old.frame.state)
-    expected.authority_known = true
-    expected.authority_seat = old.header.local_seat
-    testing.expect(t, ok && reflect.equal(current.frame.state, expected))
-    testing.expect_value(t, current.frame.tick, old.frame.tick)
-    testing.expect_value(t, current.header.epoch, old.header.epoch)
-    testing.expect(t, reflect.equal(current.peers[:], old.peers[:], true))
-    testing.expect(t, reflect.equal(current.frame.state.floors, cave.FLOORS))
+saved_definitions_are_values_independent_of_live_defaults :: proc(t: ^testing.T) {
+    cp := load_current_fixture("definitions")
+    defer net.checkpoint_destroy(&cp)
+    testing.expect(t, cp.frame.tick == 82 && cp.header.epoch == 1 && len(cp.peers) == 1)
+    testing.expect(t, cp.frame.state.authority_known && cp.frame.state.authority_seat == cp.header.local_seat)
+    testing.expect(t, cp.frame.state.floors[0].gems == 3 && cp.frame.state.floors[1].gems == 5)
+    defaults := cave.FLOORS
+    defaults[0].gems = 99
+    other := cave.initial(floors = defaults)
+    testing.expect(t, other.floors[0].gems == 99 && cp.frame.state.floors[0].gems == 3)
 }
 
 @(test)
-content2_archive_maps_world_and_action_schemas_together :: proc(t: ^testing.T) {
-    bytes, err := os.read_entire_file("tests/replay_cave/fixtures/content2/cave.replay", context.allocator)
-    defer delete(bytes)
-    testing.expect(t, err == nil)
-
-    if err != nil {
-        return
-    }
-
-    old: net.Checkpoint(upgrade.World_2, cave.Control, upgrade.Legacy_Action, cave.SEATS)
-    defer net.checkpoint_destroy(&old)
-    testing.expect_value(t, net.checkpoint_decode(&old, bytes, upgrade.model2(), upgrade.CONTENT_2), net.Error.None)
-    converted, result := upgrade.convert_archive(bytes)
-    defer delete(converted)
-    testing.expect_value(t, result, net.Error.None)
-
-    if result != .None {
-        return
-    }
-
-    current: net.Checkpoint(cave.World, cave.Control, cave.Action, cave.SEATS)
-    defer net.checkpoint_destroy(&current)
-    testing.expect_value(t, net.checkpoint_decode(&current, converted, cave.model(), cave.CONTENT), net.Error.None)
-    expected, ok := upgrade.convert_world2(old.frame.state)
-    expected.authority_known = true
-    expected.authority_seat = old.header.local_seat
-    testing.expect(t, ok && reflect.equal(current.frame.state, expected))
-    testing.expect_value(t, current.frame.tick, old.frame.tick)
-    testing.expect_value(t, current.header.epoch, old.header.epoch)
-    testing.expect(t, reflect.equal(current.peers[:], old.peers[:], true))
-    testing.expect_value(t, current.frame.state.lobby.run, u32(1))
+saved_lobby_and_membership_use_the_current_checkpoint_contract :: proc(t: ^testing.T) {
+    cp := load_current_fixture("lobby")
+    defer net.checkpoint_destroy(&cp)
+    testing.expect(t, cp.frame.tick == 82 && cp.header.epoch == 1 && len(cp.peers) == 1)
+    testing.expect(t, cp.frame.state.authority_known && cp.frame.state.authority_seat == cp.header.local_seat)
+    testing.expect_value(t, cp.frame.state.lobby.run, u32(1))
+    testing.expect(t, cp.peers[0].local && cp.peers[0].active && cp.peers[0].seat == cp.header.local_seat)
 }

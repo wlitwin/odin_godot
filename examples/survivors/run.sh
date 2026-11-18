@@ -24,7 +24,7 @@ export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.${ODIN_GODOT_TEST_LIB_EXT}"
 # Write .godot/extension_list.cfg + import so the runtime loads the extension. (A SIGSEGV in
 # Godot's headless editor doc-gen at import cleanup is a pre-existing engine issue, unrelated
 # to this extension — masked here as in the other test harnesses.)
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 # ---- (1) editor-open smoke -------------------------------------------------------------
 ELOG="$(mktemp)"

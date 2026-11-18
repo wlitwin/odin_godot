@@ -2,6 +2,7 @@ package core
 
 import "godot:gdext"
 import "godot:godot"
+import "core:sync"
 import bg "godot:box3d/godot"
 
 // GDExtension entry point. Referenced as `entry_symbol` in odin_godot.gdextension.
@@ -48,6 +49,13 @@ initialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializati
         return
     }
 
+    when WEB {
+        script_lifecycle_engine_thread = godot.os_get_main_thread_id(godot.singleton_os())
+        _ = godot.os_get_thread_caller_id(godot.singleton_os()) // resolve on the main thread
+    } else {
+        script_lifecycle_thread = sync.current_thread_id()
+    }
+
     // Fatal-signal crash reporter (core/crash.odin; no-op stub on Windows). Installed
     // at .Scene init, which runs in BOTH the editor and the game — the install gates
     // itself to the GAME (engine_is_editor_hint false), so the editor's own crash
@@ -64,6 +72,7 @@ initialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializati
     odin_language_register()
     odin_loader_register()
     odin_saver_register()
+    ui_bindings_register()
 
     // Load the compiled scripts dll, boot its gdext/godot globals, and index the
     // classes it self-registered. After this, OdinScript instances can dispatch.
@@ -95,6 +104,7 @@ uninitialize_odin_module :: proc "c" (user_data: rawptr, level: gdext.Initializa
     // are walked by the editor's deferred doc generation AFTER extension shutdown
     // during Main::cleanup — a guaranteed `--import` exit crash. See common.odin.
     unregister_extension_classes(.Scene)
+    ui_bindings_unregister()
 
     when WEB {
         had_backend := box3d_web_image.alive

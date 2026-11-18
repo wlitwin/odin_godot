@@ -53,7 +53,7 @@ def main():
     shutil.copytree(SOURCE, project, ignore=shutil.ignore_patterns('bin', '.godot', '__pycache__', 'out', '*.gen.odin', '*.uid'))
     addon = project / 'addons/box3d_authoring'
     shutil.copytree(ROOT / 'addons/box3d_authoring', addon)
-    shutil.copytree(addon / 'tool_module', project / 'modules/box3d_authoring_tools')
+    shutil.copytree(addon / 'tool_module', project / 'modules/box3d_authoring_tools', ignore=shutil.ignore_patterns(".gdignore"))
     content = {str(p.relative_to(SOURCE / 'content')): sha(p)
                for p in (SOURCE / 'content').rglob('*') if p.is_file()}
     copied = {str(p.relative_to(project / 'content')): sha(p)

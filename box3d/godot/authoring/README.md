@@ -1,4 +1,4 @@
-Godot authoring extraction (schema1)
+Godot authoring extraction (schema 2)
 
 Install `addons/box3d_authoring` into the project's `addons/` directory. The
 standard GDScript classes/resources work without a custom Core or scriptgen
@@ -12,4 +12,5 @@ nodes/resources freely after extraction; pass the bake to existing Kit/Replay
 adapters and destroy it with `ba.destroy`. Never call extraction during replay.
 `extract_json` instead returns detached bytes owned by the supplied allocator.
 Call `diagnostic_destroy` on any returned diagnostic; invalid-authoring JSON
-contains the editor's exact field paths. Native construction is a separate API.
+contains the editor's exact field paths. Native construction lives in `godot:box3d/authoring/runtime`. Extraction and
+editor baking need no native solver library.

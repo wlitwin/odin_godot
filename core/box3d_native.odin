@@ -129,7 +129,7 @@ box3d_native_initialize :: proc() -> bool {
        contract.abi_version != 2 ||
        contract.logical_version != 4 ||
        contract.resource_version != 2 ||
-       contract.recovery_version != 1 {
+       contract.recovery_version != 3 {
         _ = dynlib.unload_library(native.__handle)
         return false
     }
@@ -413,4 +413,13 @@ box3d_context_release :: proc "contextless" (token: u64) {
     if token != 0 {
         _ = bh.context_release(token)
     }
+}
+
+@(private)
+box3d_context_liveness :: proc "contextless" (token: u64) -> ^u32 {
+    if token == 0 {
+        return nil
+    }
+
+    return bh.context_liveness_cell(token)
 }

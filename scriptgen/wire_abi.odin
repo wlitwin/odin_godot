@@ -55,6 +55,11 @@ Wire_Entity_Meta :: struct {
     avatar:    bool,
 }
 
+Wire_Scene_Meta :: struct {
+    entity, name: string,
+    id:           u32,
+}
+
 Wire_Constraint_Meta :: struct {
     field, range, mask:       string,
     finite, unit, enum_check: bool,
@@ -107,6 +112,7 @@ Wire_Message_Meta :: struct {
 Wire_ABI_Metadata :: struct {
     canonical:   string,
     entities:    [dynamic]Wire_Entity_Meta,
+    scenes:      [dynamic]Wire_Scene_Meta,
     types:       [dynamic]Wire_Type_Meta,
     fields:      [dynamic]Wire_Field_Meta,
     inputs:      [dynamic]Wire_Input_Meta,
@@ -120,17 +126,19 @@ Wire_ABI_Metadata :: struct {
 }
 
 Wire_Walk :: struct {
-    b:      strings.Builder,
-    active: map[string]bool,
-    types:  ^[dynamic]Wire_Type_Meta,
+    depth, visits: int,
+    b:             strings.Builder,
+    active:        map[string]bool,
+    types:         ^[dynamic]Wire_Type_Meta,
 }
 
 Wire_Input_Root :: struct {
-    type_name:   string,
-    class_id:    int,
-    ctx:         Struct_Def,
-    loc:         Loc,
-    constraints: []Input_Field_Constraint,
+    identity, wire_name: string,
+    type_name:           string,
+    class_id:            int,
+    ctx:                 Struct_Def,
+    loc:                 Loc,
+    constraints:         []Input_Field_Constraint,
 }
 
 // Strip insignificant whitespace from small declaration expressions (enum
@@ -394,67 +402,12 @@ wire_struct_lookup :: proc(from: Struct_Def, type_text: string) -> (Struct_Def, 
     return {}, false
 }
 
-wire_resolve_type :: proc(from: Struct_Def, type_text: string) -> (Struct_Def, map[string]string, bool) {
-    t := strings.trim_space(type_text)
-
-    if t == "" || t[0] == '^' || strings.has_prefix(t, "[") {
-        return {}, nil, false
-    }
-
-    if paren := strings.index_byte(t, '('); paren >= 0 {
-        if !strings.has_suffix(t, ")") {
-            return {}, nil, false
-        }
-
-        def, ok := wire_struct_lookup(from, strings.trim_space(t[:paren]))
-
-        if !ok {
-            return {}, nil, false
-        }
-
-        args := split_type_params(t[paren + 1:len(t) - 1])
-        defer delete(args)
-        subst := make(map[string]string)
-
-        for p, i in def.poly_params {
-            if i < len(args) {
-                subst[p] = strings.trim_space(args[i])
-            }
-        }
-
-        return def, subst, true
-    }
-
-    def, ok := wire_struct_lookup(from, t)
-    return def, nil, ok
-}
-
 wire_align_up :: proc(n, a: int) -> int {
     if a <= 1 {
         return n
     }
 
     return (n + a - 1) / a * a
-}
-
-wire_fixed_array :: proc(t: string) -> (count: int, elem: string, ok: bool) {
-    if !strings.has_prefix(t, "[") {
-        return
-    }
-
-    rb := strings.index_byte(t, ']')
-
-    if rb <= 1 || rb == len(t) - 1 {
-        return
-    }
-
-    n, nok := strconv.parse_int(strings.trim_space(t[1:rb]))
-
-    if !nok || n <= 0 {
-        return
-    }
-
-    return n, strings.trim_space(t[rb + 1:]), true
 }
 
 wire_primitive :: proc(t: string) -> Wire_Layout {
@@ -560,8 +513,16 @@ wire_emit_type :: proc(w: ^Wire_Walk, path: string, layout: Wire_Layout, extra :
     fmt.sbprintf(&w.b, "type %s kind=%s width=%d align=%d%s\n", path, layout.kind, layout.size, layout.align, extra)
 }
 
-wire_type_layout :: proc(w: ^Wire_Walk, from: Struct_Def, type_text, path: string, loc: Loc) -> Wire_Layout {
-    t := strings.trim_space(type_text)
+wire_type_layout :: proc(w: ^Wire_Walk, value: Type_Use, path: string, loc: Loc) -> Wire_Layout {
+    if w.depth >= 64 || w.visits >= 4096 {
+        error_at(loc, "%s: wire type expansion exceeds the bounded depth/size limit", path)
+        return {}
+    }
+    w.depth += 1
+    w.visits += 1
+    defer w.depth -= 1
+    value := type_follow(value)
+    from, t := value.from, value.text
 
     if t == "" {
         error_at(loc, "%s: empty type in a network declaration", path)
@@ -614,16 +575,16 @@ wire_type_layout :: proc(w: ^Wire_Walk, from: Struct_Def, type_text, path: strin
         return {}
     }
 
-    if count, elem, is_array := wire_fixed_array(t); is_array {
+    if count, elem, is_array := type_array(value); is_array {
         child_path := strings.concatenate({path, "[]"}, context.temp_allocator)
-        child := wire_type_layout(w, from, elem, child_path, loc)
+        child := wire_type_layout(w, elem, child_path, loc)
 
         if !child.ok {
             return {}
         }
 
         if child.size > 0 && count > WIRE_APP_MESSAGE_MAX_BYTES / child.size {
-            error_at(loc, "%s: fixed array [%d]%s exceeds the protocol-wide byte ceiling", path, count, elem)
+            error_at(loc, "%s: fixed array [%d]%s exceeds the protocol-wide byte ceiling", path, count, elem.text)
             return {}
         }
 
@@ -647,8 +608,12 @@ wire_type_layout :: proc(w: ^Wire_Walk, from: Struct_Def, type_text, path: strin
         return {}
     }
 
-    if def, subst, is_struct := wire_resolve_type(from, t); is_struct {
-        key := strings.concatenate({def.id, "|", t}, context.temp_allocator)
+    if def, bindings, is_struct := type_struct(value); is_struct {
+        key, _, valid := type_identity(value)
+        if !valid {
+            error_at(loc, "%s: generic wire arguments are unresolved or exceed the bounded expansion limit", path)
+            return {}
+        }
 
         if w.active[key] {
             error_at(loc, "%s: recursive value type %q has no finite wire representation", path, t)
@@ -670,9 +635,8 @@ wire_type_layout :: proc(w: ^Wire_Walk, from: Struct_Def, type_text, path: strin
         offset, max_align := 0, 1
 
         for f in def.fields {
-            ft := apply_subst(f.type_text, subst)
             fp := strings.concatenate({path, ".", f.name}, context.temp_allocator)
-            child := wire_type_layout(w, def, ft, fp, f.loc)
+            child := wire_type_layout(w, {f.type_text, def, bindings}, fp, f.loc)
 
             if !child.ok {
                 return {}
@@ -754,10 +718,13 @@ wire_type_layout :: proc(w: ^Wire_Walk, from: Struct_Def, type_text, path: strin
             dir     = def.dir,
             imports = def.imports,
         }
+        if def.kind == .Alias {
+            // An ordinary alias is the same type, not another wire layer.
+            return wire_type_layout(w, {def.underlying, ctx, nil}, path, def.loc)
+        }
         under := wire_type_layout(
             w,
-            ctx,
-            def.underlying,
+            Type_Use{def.underlying, ctx, nil},
             strings.concatenate({path, "::<base>"}, context.temp_allocator),
             def.loc,
         )
@@ -824,13 +791,17 @@ wire_type_schema :: proc(
     string,
     []Wire_Type_Meta,
 ) {
+    return wire_type_schema_use({type_text, from, nil}, path, loc)
+}
+
+wire_type_schema_use :: proc(value: Type_Use, path: string, loc: Loc) -> (Wire_Layout, string, []Wire_Type_Meta) {
     types := make([dynamic]Wire_Type_Meta, context.temp_allocator)
     w := Wire_Walk {
         active = make(map[string]bool),
         types  = &types,
     }
     strings.builder_init(&w.b, context.temp_allocator)
-    layout := wire_type_layout(&w, from, type_text, path, loc)
+    layout := wire_type_layout(&w, value, path, loc)
     return layout, strings.to_string(w.b), types[:]
 }
 
@@ -849,18 +820,6 @@ wire_command_arg_shape :: proc(wire: string) -> (kind: string, width: int, varia
     }
 
     return "", 0, false, false
-}
-
-wire_codec_size :: proc(dir, name: string) -> (int, bool) {
-    index_pkg_dir(dir)
-
-    if codecs, has := g_wire_codec_sizes[dir]; has {
-        if n, ok := codecs[name]; ok {
-            return n, true
-        }
-    }
-
-    return 0, false
 }
 
 // Resolve the byte value behind a typed-message tag. Hashing only the constant
@@ -899,6 +858,7 @@ wire_u8_constant :: proc(from: Struct_Def, expr: string, active: ^map[string]boo
 // both NET_SCHEMA_CANONICAL and the public package-level NET_SCHEMA.
 canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_Metadata {
     meta: Wire_ABI_Metadata
+    profiles_seen := make(map[string]Wire_Layout, context.temp_allocator)
     b := strings.builder_make(context.temp_allocator)
     fmt.sbprintf(&b, "wire-abi v=%d endian=little\n", WIRE_ABI_VERSION)
 
@@ -948,6 +908,36 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
         return a.name < b.name
     })
 
+    for s in sorted {
+        for entity in s.entities {
+            for scene in entity.scenes {
+                found := false
+                for previous in meta.scenes {
+                    if previous.entity == entity.target && previous.id == scene.id {
+                        if previous.name != scene.name {
+                            error_at(
+                                Loc{path = s.path, line = scene.line},
+                                "entity %s: scene names %s and %s collide; rename one variant",
+                                entity.target,
+                                previous.name,
+                                scene.name,
+                            )
+                        }
+                        found = true
+                        break
+                    }
+                }
+                if !found {append(&meta.scenes, Wire_Scene_Meta{entity.target, scene.name, scene.id})}
+            }
+        }
+    }
+    slice.sort_by(meta.scenes[:], proc(a, b: Wire_Scene_Meta) -> bool {
+        return a.entity == b.entity ? a.id < b.id : a.entity < b.entity
+    })
+    for scene in meta.scenes {
+        fmt.sbprintf(&b, "scene entity.%s.%s id=%d\n", scene.entity, scene.name, scene.id)
+    }
+
     // A tick input is a wire root even when the game wires its lane manually and
     // has no generated lane-owner input table. Collect from tick declarations so
     // an absent @(gd_sample)/@(gd_step) cannot bypass recursive validation.
@@ -961,7 +951,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
         seen := false
 
         for root in input_roots {
-            if root.type_name == s.tick.input_type {
+            if root.identity == s.tick.input_identity {
                 seen = true
                 break
             }
@@ -975,15 +965,17 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
             &input_roots,
             Wire_Input_Root {
                 type_name = s.tick.input_type,
+                identity = s.tick.input_identity,
+                wire_name = s.tick.input_name,
                 class_id = s.tick.input_class,
-                ctx = wire_root_context(s),
+                ctx = s.tick.input_context,
                 loc = Loc{path = s.path, line = s.tick.line},
             },
         )
     }
 
     slice.sort_by(input_roots[:], proc(a, b: Wire_Input_Root) -> bool {
-        return a.type_name < b.type_name
+        return a.wire_name < b.wire_name
     })
 
     for &root in input_roots {
@@ -991,7 +983,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 
         for s in sorted {
             for &ic in s.input_classes {
-                if ic.type_name != root.type_name {
+                if ic.identity != root.identity {
                     continue
                 }
 
@@ -1006,16 +998,12 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
         }
 
         if !constraints_found {
-            index_pkg_dir(root.ctx.dir)
-
-            if pkg, has_pkg := g_pkgs[root.ctx.dir]; has_pkg {
-                if def, has_def := pkg[root.type_name]; has_def && def.input_decl {
-                    root.constraints = parse_input_constraints(def)
-                }
+            if def, bindings, found := type_struct({root.type_name, root.ctx, nil}); found && def.input_decl {
+                root.constraints = parse_input_constraints(def, bindings)
             }
         }
 
-        path := strings.concatenate({"input.", root.type_name}, context.temp_allocator)
+        path := strings.concatenate({"input.", root.wire_name}, context.temp_allocator)
         layout, detail, types := wire_type_schema(root.ctx, root.type_name, path, root.loc)
 
         if !layout.ok {
@@ -1034,13 +1022,13 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
         }
 
         for s in sorted {
-            if s.tick.input_type == root.type_name {
+            if s.tick.input_identity == root.identity {
                 s.tick.input_abi_size = layout.size
                 s.tick.input_abi_align = layout.align
             }
 
             for &ic in s.input_classes {
-                if ic.type_name == root.type_name {
+                if ic.identity == root.identity {
                     ic.abi_size, ic.abi_align = layout.size, layout.align
                 }
             }
@@ -1096,7 +1084,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
             &meta.inputs,
             Wire_Input_Meta {
                 path = path,
-                type_name = root.type_name,
+                type_name = root.wire_name,
                 encoding = "raw",
                 class_id = root.class_id,
                 width = layout.size,
@@ -1124,7 +1112,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                 continue
             }
 
-            r.abi_size, r.abi_align = layout.size, layout.align
+            r.abi_size, r.abi_align, r.abi_kind = layout.size, layout.align, layout.kind
             encoding := "raw"
             r.wire_size = layout.size
 
@@ -1132,19 +1120,10 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                 encoding = "f16"
                 r.wire_size = layout.size / 2
             } else if r.wire == ".Custom" {
-                encoding = strings.concatenate({"custom:", r.codec}, context.temp_allocator)
+                encoding = strings.concatenate({"custom:", r.codec_name}, context.temp_allocator)
 
-                if n, ok := wire_codec_size(dir_of(s.path), r.codec); ok {
-                    r.wire_size = n
-                } else {
-                    error_at(
-                        r.loc,
-                        "%s: custom wire codec %q must be a package-level knet.Wire_Codec literal with a positive integer `size` so its width can enter the canonical schema",
-                        path,
-                        r.codec,
-                    )
-                    continue
-                }
+                r.wire_size = r.codec_size
+                if r.wire_size <= 0 {continue}     // the declaration-context diagnostic already failed the build
             }
 
             if layout.size > WIRE_FIELD_MAX_BYTES || r.wire_size > WIRE_FIELD_MAX_BYTES {
@@ -1393,12 +1372,17 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
             )
         }
 
-        if s.profile_type != "" {
-            path := strings.concatenate({"profile.", s.profile_type}, context.temp_allocator)
-            layout, detail, types := wire_type_schema(ctx, s.profile_type, path, Loc{path = s.path})
+        previous_profile, profile_seen := profiles_seen[s.profile_name]
+        if s.profile_type != "" && profile_seen {
+            s.profile_abi_size, s.profile_abi_align = previous_profile.size, previous_profile.align
+        }
+        if s.profile_type != "" && !profile_seen {
+            path := strings.concatenate({"profile.", s.profile_name}, context.temp_allocator)
+            layout, detail, types := wire_type_schema(s.profile_context, s.profile_type, path, s.profile_context.loc)
 
             if layout.ok {
                 s.profile_abi_size, s.profile_abi_align = layout.size, layout.align
+                profiles_seen[s.profile_name] = layout
 
                 if layout.size > WIRE_PROFILE_MAX_BYTES {
                     error_at(
@@ -1426,7 +1410,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                         &meta.profiles,
                         Wire_Profile_Meta {
                             path = path,
-                            type_name = s.profile_type,
+                            type_name = s.profile_name,
                             encoding = "raw",
                             width = layout.size,
                             bound = WIRE_PROFILE_MAX_BYTES,
@@ -1439,25 +1423,14 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 
         for &m in s.messages {
             path := fmt.tprintf("message.%s.%s", s.struct_name, m.name)
-            layout, detail, types := wire_type_schema(ctx, m.payload_type, path, Loc{m.path, m.line})
+            layout, detail, types := wire_type_schema(m.type_context, m.payload_type, path, Loc{m.path, m.line})
 
             if !layout.ok {
                 continue
             }
 
             m.abi_size, m.abi_align = layout.size, layout.align
-            tag_active := make(map[string]bool)
-            tag, tag_ok := wire_u8_constant(ctx, m.tag_ident, &tag_active)
-
-            if !tag_ok {
-                error_at(
-                    Loc{m.path, m.line},
-                    "%s: message tag %q must resolve to a package-level byte literal such as `TAG_MESSAGE :: u8(4)` so its actual route enters NET_SCHEMA_CANONICAL",
-                    path,
-                    m.tag_ident,
-                )
-                continue
-            }
+            tag := m.tag_value
 
             if layout.size > WIRE_APP_MESSAGE_MAX_BYTES {
                 error_at(
@@ -1472,10 +1445,9 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
 
             fmt.sbprintf(
                 &b,
-                "message %s tag=%d tag-name=%s encoding=raw width=%d bound=%d\n",
+                "message %s tag=%d encoding=raw width=%d bound=%d\n",
                 path,
                 tag,
-                wire_compact_expr(m.tag_ident),
                 layout.size,
                 WIRE_APP_MESSAGE_MAX_BYTES,
             )
@@ -1491,7 +1463,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                     path = path,
                     entity = s.struct_name,
                     name = m.name,
-                    payload_type = m.payload_type,
+                    payload_type = m.payload_name,
                     tag = tag,
                     tag_name = wire_compact_expr(m.tag_ident),
                     encoding = "raw",
@@ -1515,7 +1487,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                     s.struct_name,
                     f.name,
                     cmd_wire_id(f.name),
-                    f.anchor == "" ? "none" : f.anchor,
+                    f.anchor_index < 0 ? "none" : event_wire_anchor(f),
                 )
             } else {
                 fmt.sbprintf(
@@ -1524,12 +1496,13 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                     s.struct_name,
                     f.name,
                     cmd_wire_id(f.name),
-                    f.anchor == "" ? "none" : f.anchor,
+                    f.anchor_index < 0 ? "none" : event_wire_anchor(f),
                     f.audience,
                 )
             }
 
-            for entity_type, i in f.entity_types {
+            for ref, i in f.entity_refs {
+                entity_type := ref.wire_name
                 if i == f.anchor_index {
                     continue
                 }
@@ -1546,7 +1519,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                     &meta.arguments,
                     Wire_Argument_Meta {
                         owner = fact_path,
-                        name = f.entity_names[i],
+                        name = ref.parameter,
                         kind = "net_id",
                         target = entity_type,
                         width = 4,
@@ -1605,7 +1578,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                     entity = s.struct_name,
                     name = f.name,
                     id = int(cmd_wire_id(f.name)),
-                    anchor = f.anchor,
+                    anchor = event_wire_anchor(f),
                     source = "declared",
                     schedule = "watch",
                     audience = f.audience,
@@ -1626,11 +1599,12 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                 e.name,
                 cmd_wire_id(e.name),
                 e.timing,
-                e.anchor == "" ? "none" : e.anchor,
+                e.anchor_index < 0 ? "none" : event_wire_anchor(e),
                 e.audience,
             )
 
-            for entity_type, i in e.entity_types {
+            for ref, i in e.entity_refs {
+                entity_type := ref.wire_name
                 if i == e.anchor_index {
                     continue
                 }
@@ -1647,7 +1621,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                     &meta.arguments,
                     Wire_Argument_Meta {
                         owner = event_path,
-                        name = e.entity_names[i],
+                        name = ref.parameter,
                         kind = "net_id",
                         target = entity_type,
                         width = 4,
@@ -1706,7 +1680,7 @@ canonical_wire_abi :: proc(scripts: []^Script, scripts_dir: string) -> Wire_ABI_
                     entity = s.struct_name,
                     name = e.name,
                     id = int(cmd_wire_id(e.name)),
-                    anchor = e.anchor,
+                    anchor = event_wire_anchor(e),
                     source = "declared",
                     schedule = e.timing,
                     audience = e.audience,

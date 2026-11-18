@@ -27,8 +27,8 @@ fields keep their defaults. For example:
 
 Build and select this backend through the [ordinary profile workflow](capacities.md).
 The SDK propagates matching compiler settings to Odin and the authoring addon.
-The resolved profile uses schema version 2; capacity-only version-1 project
-profiles are accepted and gain the default timing settings.
+The resolved profile uses schema version 2. Partial current profiles gain default
+timing settings; an explicitly older schema version is rejected.
 
 | Field | Default | Admitted settings |
 | --- | --- | --- |

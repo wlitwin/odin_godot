@@ -1,0 +1,226 @@
+{
+  "targets": {
+    "cave": "0x4341564552504c39",
+    "owner": "0x434156454f574e33"
+  },
+  "rows": [
+    {
+      "source": "tests/replay_cave/fixtures/content1/cave.replay",
+      "source_sha256": "f5b51edfd0bd9ace611e27833f827a2ea37ffee1c7256846594eb4ccc25f20af",
+      "target": "tests/replay_cave/fixtures/current/definitions.checkpoint",
+      "target_sha256": "4ab093a41548d204dda165a3a62ea0ddeb9079f5b2457e3e0dd43cac713c419e",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c31->4341564552504c39 tick=82 hash=-186378568216968567",
+      "current_decode_roundtrip": true,
+      "id": "definitions"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content2/cave.replay",
+      "source_sha256": "efe3cd77bf3ff0b28d3c35bc307cd67df76d9604f9a29312bf12435cfa2ea1fd",
+      "target": "tests/replay_cave/fixtures/current/lobby.checkpoint",
+      "target_sha256": "a5b4f8a9bc6eca3aa2c29ea68d2f64cc9eeaa3a7dca0fc28a22a63624d4ceb81",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c32->4341564552504c39 tick=82 hash=-186378568216968567",
+      "current_decode_roundtrip": true,
+      "id": "lobby"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content3/pending.replay",
+      "source_sha256": "c9be78b3ca247b80b55fe36d6201309521fb05d719953dd0bad865aacec370bc",
+      "target": "tests/replay_cave/fixtures/current/director_pending.checkpoint",
+      "target_sha256": "905f0848a8b1879b1d420c81654e497e6ddabc56f5d1e53d368954f7239e5794",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c33->4341564552504c39 tick=5 hash=449268440466687169",
+      "current_decode_roundtrip": true,
+      "id": "director_pending"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content3/rest.replay",
+      "source_sha256": "e6c33aa89e02aa01fccb7debef14ee718580db2ca919058f160294d83463da93",
+      "target": "tests/replay_cave/fixtures/current/director_rest.checkpoint",
+      "target_sha256": "ae904a9c842cdb5b95e30be1690dd09ca12ae0c3abbf8308a968af8200eb2785",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c33->4341564552504c39 tick=10 hash=6010577043609431661",
+      "current_decode_roundtrip": true,
+      "id": "director_rest"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content3/spawning.replay",
+      "source_sha256": "f25e02649eb53d7bf7cf1f933d72021dff290948870f3cf6a13fe1c86cbe970c",
+      "target": "tests/replay_cave/fixtures/current/director_spawning.checkpoint",
+      "target_sha256": "9a1789a774e502b0dfe03c81f44c69f97431bcbad230bfebcb548c258166bc02",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c33->4341564552504c39 tick=22 hash=687343557302197636",
+      "current_decode_roundtrip": true,
+      "id": "director_spawning"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content3/waiting.replay",
+      "source_sha256": "1c43854eb1b0207fedcc6247dfcb66bc348c7a18309850466bdfbdc507e1dabc",
+      "target": "tests/replay_cave/fixtures/current/director_waiting.checkpoint",
+      "target_sha256": "c0ce34edbe721afd4835de11a7e9c7c317517b38969d3b4724705b4271a5332c",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c33->4341564552504c39 tick=4 hash=2272007590264994195",
+      "current_decode_roundtrip": true,
+      "id": "director_waiting"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content4/after-descent.replay",
+      "source_sha256": "bb2bb03b879f421fe1a2e3ba563b627899b57503b8451ea38ae9d27d690bd2fb",
+      "target": "tests/replay_cave/fixtures/current/floor_after_descent.checkpoint",
+      "target_sha256": "b8f86d1108336707aff6d525fdb3d7ac7385c9fd6bdfb64f8a3437c5dd9d0a6b",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c34->4341564552504c39 tick=101 hash=-9086492371037501160",
+      "current_decode_roundtrip": true,
+      "id": "floor_after_descent"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content4/before-descent.replay",
+      "source_sha256": "840bb9e287362d1117c0d342e421c28e4a1a8eebc20d0af8c5c56fb2fb12754a",
+      "target": "tests/replay_cave/fixtures/current/floor_before_descent.checkpoint",
+      "target_sha256": "cf0bdeaebd5201e6fa0470861c8cfdf016edf0963e064fe284efe10cc20c08e5",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c34->4341564552504c39 tick=100 hash=-1839699072712826135",
+      "current_decode_roundtrip": true,
+      "id": "floor_before_descent"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content4/before-restart.replay",
+      "source_sha256": "f4e2dc3f24ea44d50aa53361af31917378535225561e24853c89484b25bcc254",
+      "target": "tests/replay_cave/fixtures/current/floor_before_restart.checkpoint",
+      "target_sha256": "929f104fa11635396c6a77e7532e94766755ed185b500ec78a7297e61cd0ade6",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c34->4341564552504c39 tick=100 hash=-1523885488886838319",
+      "current_decode_roundtrip": true,
+      "id": "floor_before_restart"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content5/carried.replay",
+      "source_sha256": "c62dbe775d212c53d43c801a32d72f0a08a8c11461afaf9fd1dba1425de22327",
+      "target": "tests/replay_cave/fixtures/current/relic_carried.checkpoint",
+      "target_sha256": "38dcc44101a538e11a3a46d05c7cc1b8a687d151d9367ff829b2f5ce40340ee0",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c35->4341564552504c39 tick=100 hash=4110248645302864611",
+      "current_decode_roundtrip": true,
+      "id": "relic_carried"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content5/restart.replay",
+      "source_sha256": "0ed739606d4ab6d18f6717c684bed6e9186d1f0190e0f95df80abc00fbc06d7c",
+      "target": "tests/replay_cave/fixtures/current/relic_restart.checkpoint",
+      "target_sha256": "67fba5958b4bd26201c002092932b781faa15e315cc64db817154e87bcd1229a",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c35->4341564552504c39 tick=100 hash=-6284863050884569785",
+      "current_decode_roundtrip": true,
+      "id": "relic_restart"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content5/resting.replay",
+      "source_sha256": "f495ba221d6bd54cc96d9606ab98135b99b7a8711f1148446a35e493d2e292a8",
+      "target": "tests/replay_cave/fixtures/current/relic_resting.checkpoint",
+      "target_sha256": "d089818de7fbec737477f511e57dabdc6d4d5ad75b4b2c6eb59119233408f3d0",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c35->4341564552504c39 tick=100 hash=6469550715979369650",
+      "current_decode_roundtrip": true,
+      "id": "relic_resting"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content6/dead.replay",
+      "source_sha256": "2edd6a1be438deb4c9f188f0353f8ceed33c4f6159f03bc48b43d7b614c8c99c",
+      "target": "tests/replay_cave/fixtures/current/carrier_dead.checkpoint",
+      "target_sha256": "3b743e035f51aaac6403bdeceedf2d4188e61404a77252bec450edc4b0bd0a35",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c36->4341564552504c39 tick=100 hash=-5950458230980019684",
+      "current_decode_roundtrip": true,
+      "id": "carrier_dead"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content6/disconnected.replay",
+      "source_sha256": "beefe3b647e9a415e215e362addc50c3298e3866814d30976d9995cb35f5f63d",
+      "target": "tests/replay_cave/fixtures/current/carrier_disconnected.checkpoint",
+      "target_sha256": "4d2b73cf861c70def00dd79e05e233142a25992b453c153b7b829d96defc8eb1",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c36->4341564552504c39 tick=100 hash=1278201780243886960",
+      "current_decode_roundtrip": true,
+      "id": "carrier_disconnected"
+    },
+    {
+      "source": "tests/replay_cave/fixtures/content7/old-host-carrier.replay",
+      "source_sha256": "ca74794bd8e7de626d82419953be8e92af91b224976ff886d26fdd72e25e2146",
+      "target": "tests/replay_cave/fixtures/current/adoption_old_host_carrier.checkpoint",
+      "target_sha256": "fd1686b84b5fd4e043a02acb5d24fab43894efecb5fd00d086f9f971f073de44",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c37->4341564552504c39 tick=100 hash=-6014031194662788386",
+      "current_decode_roundtrip": true,
+      "id": "adoption_old_host_carrier"
+    },
+    {
+      "source": "tests/replay_cave_impact/fixtures/c8.checkpoint",
+      "source_sha256": "e7adfe367f31b048d9e50d6d4cf53e43e195b99c4002a49e1b83d8ac09bc8f41",
+      "target": "tests/replay_cave_impact/fixtures/current/server.checkpoint",
+      "target_sha256": "99ca96cb8a78695d025b6d8141ef888303fc989c5a8a6ea0669a15f650cd86f2",
+      "validation": "REPLAY_CAVE_UPGRADE_OK content=4341564552504c38->4341564552504c39 tick=1 hash=5238034006598872146",
+      "current_decode_roundtrip": true,
+      "id": "impact_server"
+    },
+    {
+      "source": "tests/replay_cave_owner/fixtures/owner1/pending.checkpoint",
+      "source_sha256": "70e9aec422bf0548901e1992a616710ea74e626c03974d586780dc7150bd314f",
+      "target": "tests/replay_cave_owner/fixtures/current/accepted-pose.checkpoint",
+      "target_sha256": "d60fec6427bab2f012f0cf5e2453deaf7c4b647b8920507e7fe3a13f894fdee8",
+      "validation": "REPLAY_CAVE_OWNER_UPGRADE_OK content=434156454f574e31->434156454f574e33 tick=1 hash=3430068151389578032",
+      "current_decode_roundtrip": true,
+      "id": "owner_accepted_pose"
+    },
+    {
+      "source": "tests/replay_cave_impact/fixtures/o2.checkpoint",
+      "source_sha256": "f612d0d9eb80082baf625b7be4a9ff1756d4b15f5db1c03c7ea113111ac3baad",
+      "target": "tests/replay_cave_impact/fixtures/current/owner.checkpoint",
+      "target_sha256": "80ec27d22cb913334026f7a0af5677a9de9d9c4418654cc56e9700b64d87509e",
+      "validation": "REPLAY_CAVE_OWNER_UPGRADE_OK content=434156454f574e32->434156454f574e33 tick=1 hash=-8407251526665505112",
+      "current_decode_roundtrip": true,
+      "id": "impact_owner"
+    }
+  ],
+  "original_recordings": "Original c8/o2 traces intentionally remain historical evidence; current event histories will be captured separately.",
+  "current_recordings": [
+    {
+      "profile": "server",
+      "path": "tests/replay_cave_impact/fixtures/current/server.rplrec",
+      "sha256": "48c9b2d3e584f1a115443bd525b7ab5713fedebb92d7dd4dbe5e53ac04d1fc24",
+      "origin": "New current-model capture after restoring the migrated checkpoint; not converted historical event expectations.",
+      "epoch": 2,
+      "first": 1,
+      "head": 4,
+      "ticks": 3,
+      "dweller_hits": 1,
+      "pending_door_verdicts": 1
+    },
+    {
+      "profile": "owner",
+      "path": "tests/replay_cave_impact/fixtures/current/owner.rplrec",
+      "sha256": "defe782f81490f6d1fb0bed3a983dde7b6a8d974b7cc0d1e910bcffe255b5b9d",
+      "origin": "New current-model capture after restoring the migrated checkpoint; not converted historical event expectations.",
+      "epoch": 2,
+      "first": 1,
+      "head": 4,
+      "ticks": 3,
+      "dweller_hits": 1,
+      "pending_door_verdicts": 1
+    }
+  ],
+  "capture_source": "tests/replay_cave_impact/capture/main.odin",
+  "capture_source_sha256": "fd67712de8240a10cfb0d1d50ade9a20b6d337ffbcca2a8f014d6281f0752f75",
+  "retired_producer_sources": [
+    {
+      "source": "tests/replay_cave_director/legacy_fixture/main.odin",
+      "archived": "docs/replay/results/usability-legacy-2026-11-16/cavecrawl/originals/producers/director.odin.txt",
+      "sha256": "0d3b4594065089d608720df8d9af823d9efbcfc6058f3b4d73f2b35a9c623924"
+    },
+    {
+      "source": "tests/replay_cave_floor/legacy_fixture/main.odin",
+      "archived": "docs/replay/results/usability-legacy-2026-11-16/cavecrawl/originals/producers/floor.odin.txt",
+      "sha256": "2fa1e62c27a3417fb7f96d45d88f574688f3632927a029e2d6f0275d8756ed94"
+    },
+    {
+      "source": "tests/replay_cave_relic/legacy_fixture/main.odin",
+      "archived": "docs/replay/results/usability-legacy-2026-11-16/cavecrawl/originals/producers/relic.odin.txt",
+      "sha256": "f785c5a33a09a4da6d6e63672854424e223ac8524a5e13c48fd29e7bc8930237"
+    },
+    {
+      "source": "tests/replay_cave_carrier/legacy_fixture/main.odin",
+      "archived": "docs/replay/results/usability-legacy-2026-11-16/cavecrawl/originals/producers/carrier.odin.txt",
+      "sha256": "0871e7224a83a5168dad57d2ce440573b14a89834a854c58eb61be1e776a4b15"
+    },
+    {
+      "source": "tests/replay_cave_adoption/legacy_fixture/main.odin",
+      "archived": "docs/replay/results/usability-legacy-2026-11-16/cavecrawl/originals/producers/adoption.odin.txt",
+      "sha256": "b7a842392682cc81ba349880bb6a2995b3183a9a4905b7c98e78fdca9fd6fd1f"
+    }
+  ]
+}

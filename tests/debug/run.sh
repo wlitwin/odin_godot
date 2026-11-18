@@ -141,7 +141,7 @@ PLIST
     fi
 
     # Ensure the .godot import dir exists so the extension loads under lldb.
-    "$GDBG" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+    GODOT="$GDBG" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
     LLDB_LOG="$ROOT/tests/.logs/debug-lldb.log"; mkdir -p "$ROOT/tests/.logs"
     # Batch mode: bind a REGEX breakpoint (lldb won't bind `b pkg::proc` — `::` parse), run,

@@ -4,6 +4,7 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:testing"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import b "godot:box3d"
 import f "godot:tests/box3d_authoring/pure"
 
@@ -35,11 +36,11 @@ detached_loaded_artifact_builds_real_six_shapes_after_all_source_storage_gone ::
     }
 
     input = {}
-    built, bp := a.build(&loaded.scene, 0x454449544f523501)
+    built, bp := ar.build(&loaded.scene, 0x454449544f523501)
     a.artifact_destroy(&loaded)
 
     defer {
-        testing.expect_value(t, a.built_destroy(&built), b.Status.Ok)
+        testing.expect_value(t, ar.built_destroy(&built), b.Status.Ok)
         engine, es := b.engine_allocation_stats()
         wrapper, ws := b.snapshot_allocation_stats()
         testing.expect(t, es == .Ok && ws == .Ok && engine.live_bytes == 0 && wrapper.live_bytes == 0)

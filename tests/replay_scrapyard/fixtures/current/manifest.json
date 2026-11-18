@@ -1,0 +1,92 @@
+[
+  {
+    "source": "tests/replay_scrapyard/fixtures/content42_protocol7/run.replay",
+    "source_sha256": "f5c07f206fad3cf979861a5df7f4b7c6d839b5be3b28904b167bf539af0ae833",
+    "source_uncompressed_sha256": "f5c07f206fad3cf979861a5df7f4b7c6d839b5be3b28904b167bf539af0ae833",
+    "target": "tests/replay_scrapyard/fixtures/current/captured-42.replay",
+    "target_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "target_uncompressed_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "validation": "CHECKPOINT_OK source=5253435241503042 target=525343524150304c epoch=1 tick=13 peers=1 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/content43/run.replay",
+    "source_sha256": "ea8c02c89ea384e78e52f56ac031691dd8da051bbebc1e0b695b47bc40df2298",
+    "source_uncompressed_sha256": "ea8c02c89ea384e78e52f56ac031691dd8da051bbebc1e0b695b47bc40df2298",
+    "target": "tests/replay_scrapyard/fixtures/current/captured-43.replay",
+    "target_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "target_uncompressed_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "validation": "CHECKPOINT_OK source=5253435241503043 target=525343524150304c epoch=1 tick=13 peers=1 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/content44/run.replay",
+    "source_sha256": "871f6be247a99b02f63338d9192dc2712768d16cd20c0527154d6eee20c7ee20",
+    "source_uncompressed_sha256": "871f6be247a99b02f63338d9192dc2712768d16cd20c0527154d6eee20c7ee20",
+    "target": "tests/replay_scrapyard/fixtures/current/captured-44.replay",
+    "target_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "target_uncompressed_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "validation": "CHECKPOINT_OK source=5253435241503044 target=525343524150304c epoch=1 tick=13 peers=1 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/content45/run.replay",
+    "source_sha256": "786338b2c587395aad5f6b4fb6a94a9088967f58550eaaadeecd5b559fc51b65",
+    "source_uncompressed_sha256": "786338b2c587395aad5f6b4fb6a94a9088967f58550eaaadeecd5b559fc51b65",
+    "target": "tests/replay_scrapyard/fixtures/current/captured-45.replay",
+    "target_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "target_uncompressed_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "validation": "CHECKPOINT_OK source=5253435241503045 target=525343524150304c epoch=1 tick=13 peers=1 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/content46/run.replay",
+    "source_sha256": "fd4e90a8caee9476dfa96efc3036e65d387ac21b2646c88a5d1793bae1244dfe",
+    "source_uncompressed_sha256": "fd4e90a8caee9476dfa96efc3036e65d387ac21b2646c88a5d1793bae1244dfe",
+    "target": "tests/replay_scrapyard/fixtures/current/captured-46.replay",
+    "target_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "target_uncompressed_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "validation": "CHECKPOINT_OK source=5253435241503046 target=525343524150304c epoch=1 tick=13 peers=1 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/content47/run.replay",
+    "source_sha256": "d716ba5942576fc406cf2942a32b722085c8e8d3ccb2c0dc47ad18e5cbc1e721",
+    "source_uncompressed_sha256": "d716ba5942576fc406cf2942a32b722085c8e8d3ccb2c0dc47ad18e5cbc1e721",
+    "target": "tests/replay_scrapyard/fixtures/current/history.replay",
+    "target_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "target_uncompressed_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "validation": "CHECKPOINT_OK source=5253435241503047 target=525343524150304c epoch=1 tick=13 peers=1 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/content48/dedicated.checkpoint",
+    "source_sha256": "124d72a30db8803ca3257d47a64b551d55cb20df2bc23ffa93adb09f78fb9f79",
+    "source_uncompressed_sha256": "124d72a30db8803ca3257d47a64b551d55cb20df2bc23ffa93adb09f78fb9f79",
+    "target": "tests/replay_scrapyard/fixtures/current/dedicated.checkpoint",
+    "target_sha256": "3011d892a51e5de6056ec2ca77f7b4f75d1025239f2258c6fa9b9671e8a556fd",
+    "target_uncompressed_sha256": "3011d892a51e5de6056ec2ca77f7b4f75d1025239f2258c6fa9b9671e8a556fd",
+    "validation": "CHECKPOINT_OK source=5253435241503048 target=525343524150304c epoch=1 tick=103 peers=0 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/profile1/profile.bin",
+    "source_sha256": "f288df1730bad7880b6243774d6678aa30e0f5f192ed1cb9440cbf76c5021fad",
+    "source_uncompressed_sha256": "f288df1730bad7880b6243774d6678aa30e0f5f192ed1cb9440cbf76c5021fad",
+    "target": "tests/replay_scrapyard/fixtures/current/profile.bin",
+    "target_sha256": "ed1b68b7f9bc34a3977f2edfe8e9c9e8158d3b1244d2aea043921d7e8fdcf3eb",
+    "target_uncompressed_sha256": "ed1b68b7f9bc34a3977f2edfe8e9c9e8158d3b1244d2aea043921d7e8fdcf3eb",
+    "validation": "PROFILE_OK source=52535950524f4631 target=52535950524f4632 epoch=0 tick=0 automatic=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/protocol6/plain.replay",
+    "source_sha256": "831c360e380fe4649fcd51ff2a2b8a069e7247aa74210e30bacd127157589d3d",
+    "source_uncompressed_sha256": "831c360e380fe4649fcd51ff2a2b8a069e7247aa74210e30bacd127157589d3d",
+    "target": "tests/replay_scrapyard/fixtures/current/plain.replay",
+    "target_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "target_uncompressed_sha256": "247c77072ecb87b389535fcb64876473c4c1f213bfd1f294dd1a8103c7d120ac",
+    "validation": "CHECKPOINT_OK source=5253435241503042 target=525343524150304c epoch=1 tick=13 peers=1 actions=0 inputs=0 assets=0"
+  },
+  {
+    "source": "tests/replay_scrapyard/fixtures/protocol6/spray.replay",
+    "source_sha256": "26c58cf3609baf7316808bffe38114fd023755ebc3afbf9fbb5a5568723c7f50",
+    "source_uncompressed_sha256": "26c58cf3609baf7316808bffe38114fd023755ebc3afbf9fbb5a5568723c7f50",
+    "target": "tests/replay_scrapyard/fixtures/current/spray.replay",
+    "target_sha256": "b996d4d26e33e0937943fa27a8df5c4e20ae04ee00d8a2226b6f65ccd2ffddbc",
+    "target_uncompressed_sha256": "b996d4d26e33e0937943fa27a8df5c4e20ae04ee00d8a2226b6f65ccd2ffddbc",
+    "validation": "CHECKPOINT_OK source=5253435241503042 target=525343524150304c epoch=1 tick=14 peers=1 actions=0 inputs=0 assets=1"
+  }
+]

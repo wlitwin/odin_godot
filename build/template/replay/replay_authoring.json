@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "actions": [
+    {"id": "validate", "label": "Save & Validate Pickup", "kind": "run_scene", "scene": "res://dev/validate.tscn"},
+    {"id": "preview", "label": "Open Pickup Preview", "kind": "open_scene", "scene": "res://dev/pickup_preview.tscn"}
+  ]
+}

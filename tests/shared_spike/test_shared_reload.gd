@@ -1,8 +1,9 @@
-extends SceneTree
+@tool
+extends Node
 
 # REBUILD-ON-SAVE for the SHARED tree, in ONE running editor process.
 #
-# Run: $GODOT --editor --headless --path tests/shared_spike --script test_shared_reload.gd
+# Run through the acceptance EditorPlugin with SHARED_SPIKE_RELOAD=1.
 #
 # res://shared/<pkg> belongs to no module, so the reload coordinator's per-module content
 # hashes (core/reload.odin) would miss an edit there entirely and rebuild NOTHING — the
@@ -26,9 +27,10 @@ const NEW := "STEP :: 70\n"
 
 var done := false
 var original := ""
+var owned_nodes: Array[Node] = []
 
-func _init() -> void:
-	process_frame.connect(_run, CONNECT_ONE_SHOT)
+func _ready() -> void:
+	_run.call_deferred()
 
 func _fail(reason: String) -> void:
 	if done:
@@ -37,7 +39,7 @@ func _fail(reason: String) -> void:
 	if original != "":
 		_write(original)
 	print("SHARED_RELOAD_FAIL: ", reason)
-	quit(1)
+	_finish(1)
 
 func _write(text: String) -> void:
 	var f := FileAccess.open(SHARED, FileAccess.WRITE)
@@ -60,11 +62,13 @@ func _run() -> void:
 		return
 	var game := Node.new()
 	game.set_script(game_script)
-	root.add_child(game)
+	get_tree().root.add_child(game)
+	owned_nodes.append(game)
 	var enemy := Node.new()
 	enemy.set_script(enemy_script)
-	root.add_child(enemy)
-	await process_frame
+	get_tree().root.add_child(enemy)
+	owned_nodes.append(enemy)
+	await get_tree().process_frame
 
 	# ===== 1. baseline: both dlls carry STEP == 7 =====
 	if int(game.call("shared_step")) != 7 or int(enemy.call("shared_step")) != 7:
@@ -96,7 +100,7 @@ func _run() -> void:
 	var main_live := false
 	var module_live := false
 	for i in range(6000): # the two module builds take seconds; polled every frame
-		await process_frame
+		await get_tree().process_frame
 		if not main_live and int(game.call("shared_step")) == 70:
 			main_live = true
 		if not module_live and int(enemy.call("shared_step")) == 70:
@@ -115,6 +119,24 @@ func _run() -> void:
 		return
 
 	print("SHARED_RELOAD_BOTH_SWAPPED (main + enemies rebuilt from ONE shared edit)")
-	print("SHARED_RELOAD_OK")
 	done = true
-	quit(0)
+	_finish(0)
+
+func _finish(code: int) -> void:
+	for node in owned_nodes:
+		if is_instance_valid(node): node.queue_free()
+	owned_nodes.clear()
+	await get_tree().process_frame
+	# Let the ordinary editor process detach script instances and finish any
+	# source-restoration build before its normal shutdown path.
+	var deadline := Time.get_ticks_msec() + 180000
+	await get_tree().create_timer(0.25).timeout
+	var services := get_tree().get_nodes_in_group("odin_editor")
+	while not services.is_empty() and services[0].get_build_state() == 1 and Time.get_ticks_msec() < deadline:
+		await get_tree().create_timer(0.1).timeout
+	if not services.is_empty() and services[0].get_build_state() != 0:
+		print("SHARED_RELOAD_FAIL: source restoration did not finish cleanly")
+		code = 1
+	if code == 0:
+		print("SHARED_RELOAD_OK")
+	get_tree().quit(code)

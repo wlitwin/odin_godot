@@ -15,6 +15,7 @@ import rs "godot:replay/schema"
 Typed_Codec :: struct($T: typeid) {
     owner:       sim.World_Owner,
     users:       u32,
+    closing:     bool,
     schema:      rs.Schema,
     desc:        ^knet.Entity_Desc, // nil: whole typed value; nonnil: registered prediction subset
     desc_copy:   knet.Entity_Desc,
@@ -53,7 +54,8 @@ codec_init :: proc(
         return e
     }
 
-    if c.schema.initialized {
+    if e := sim.world_owner_check(c.owner); e != .Ok { return e }
+    if c.schema.initialized || c.closing || !sim.world_owner_is_empty(c.owner) {
         return .Invalid
     }
 
@@ -69,8 +71,7 @@ codec_init :: proc(
 
     defer {
         if !transferred {
-            c.owner = {}
-            _ = sim.world_owner_drop(ownership.owner)
+            _ = codec_destroy(c) // any refused final drop remains in c.owner
         }
     }
 
@@ -183,6 +184,7 @@ codec_init :: proc(
 
             c := cast(^Typed_Codec(T))user
 
+            if c.closing || !c.schema.initialized { return .Busy }
             if c.users == max(u32) {
                 return .Capacity
             }
@@ -320,7 +322,12 @@ codec_destroy :: proc(c: ^Typed_Codec($T)) -> sim.World_Error {
     delete(c.desc_names, c.schema.allocator)
     rs.destroy(&c.schema)
     c^ = {}
-    return sim.world_owner_drop(owner)
+    if error := sim.world_owner_drop(owner); error != .Ok {
+        c.owner = owner
+        c.closing = true
+        return error
+    }
+    return .Ok
 }
 
 @(private)
@@ -364,6 +371,7 @@ Network_Identity :: bd.Identity
 
 Network :: struct($Side: typeid) {
     owner:        sim.World_Owner,
+    side_context, observation_context: SDK_User_Owner,
     side_valid:   proc(value: Side) -> bool,
     instance:     ^Instance(Side),
     catalog:      b3.Recovery_Catalog,
@@ -437,7 +445,7 @@ network_attach :: proc(
         return .Capacity
     }
 
-    if n.instance != nil ||
+    if n.instance != nil || !sim.world_owner_is_empty(n.owner) ||
        a.lane == nil ||
        a.lane.world == nil ||
        a.lane.world.network != nil ||
@@ -467,11 +475,9 @@ network_attach :: proc(
         }
     }
 
-    side_owner, observation_owner: SDK_User_Owner
-
     when #config(BOX3D_REQUIRE_DOMAIN, false) {
         var_error: sim.World_Error
-        side_owner, var_error = sdk_user_owner_create(
+        n.side_context, var_error = sdk_user_owner_create(
             a.config.allocator_context,
             ownership.allocation_base,
             ownership.allocation_size,
@@ -483,8 +489,7 @@ network_attach :: proc(
             return var_error
         }
 
-        defer sdk_user_owner_destroy(&side_owner)
-        observation_owner, var_error = sdk_user_owner_create(
+        n.observation_context, var_error = sdk_user_owner_create(
             a.config.allocator_context,
             ownership.allocation_base,
             ownership.allocation_size,
@@ -496,14 +501,13 @@ network_attach :: proc(
             return var_error
         }
 
-        defer sdk_user_owner_destroy(&observation_owner)
     }
 
-    if e := codec_init(&n.side, ownership = side_owner); e != .Ok {
+    if e := codec_init(&n.side, ownership = n.side_context); e != .Ok {
         return e
     }
 
-    if e := codec_init(&n.observations, ownership = observation_owner); e != .Ok {
+    if e := codec_init(&n.observations, ownership = n.observation_context); e != .Ok {
         return e
     }
 
@@ -883,9 +887,6 @@ network_destroy :: proc(n: ^Network($Side)) -> sim.World_Error {
         }
     }
 
-    assert(g_network_bytes >= n.owned)
-    g_network_bytes -= n.owned
-
     if status := b3.recovery_catalog_destroy(&n.catalog); status != .Ok {
         return map_status(status)
     }
@@ -898,9 +899,17 @@ network_destroy :: proc(n: ^Network($Side)) -> sim.World_Error {
         return e
     }
 
+    if error := sdk_user_owner_destroy(&n.side_context); error != .Ok { return error }
+    if error := sdk_user_owner_destroy(&n.observation_context); error != .Ok { return error }
     delete(n.fields, n.allocator)
     delete(n.inputs, n.allocator)
     owner := n.owner
+    assert(g_network_bytes >= n.owned)
+    g_network_bytes -= n.owned
     n^ = {}
-    return sim.world_owner_drop(owner)
+    if error := sim.world_owner_drop(owner); error != .Ok {
+        n.owner = owner
+        return error
+    }
+    return .Ok
 }

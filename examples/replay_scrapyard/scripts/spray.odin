@@ -322,7 +322,7 @@ spray_preparation_ready :: proc(user: rawptr, point: auth.Point, bytes: []u8) ->
         }
         cp: net.Checkpoint(game.World, game.Control, game.Action, game.SEATS)
         defer net.checkpoint_destroy(&cp)
-        codec := &self.session.link.incoming.archive_codec
+        codec := &rgd.session_link(self.session).incoming.archive_codec
 
         if !codec.ready {
             codec = nil

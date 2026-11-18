@@ -11,6 +11,7 @@ package kit_ui
 //     kui.chat_refresh(&self.chat, &self.comms)   // on any Ev_Line
 
 import gd "godot:godot"
+import binding "bindings"
 import "godot:gdext"
 import kcomms "godot:kit/comms"
 import "core:fmt"
@@ -52,20 +53,33 @@ chat_make :: proc(parent: gd.Node) -> Chat {
     return ch
 }
 
-// Adopt a game-authored chat scene (full replacement — see ui.odin's header).
-// The CONTRACT, by node name at any depth:
-//
-//   Lines (any container — the scrollback rows land here) · Input (LineEdit)
-//
-// The scene owns its own anchoring; the kit only pours lines and reads the
-// input. Row Labels are kit-created — theme them from the scene root.
-chat_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Chat {
-    ch: Chat
-    node := gd.instantiate(scene)
-    gd.add_child(parent, node)
-    ch.root = cast(gd.Control)node
-    ch.lines_box = cast(gd.Control)adopt_child(node, "Lines", "chat")
-    ch.input = cast(gd.Line_Edit)adopt_child(node, "Input", "chat")
+// Validate while detached, then transfer the complete widget to its parent.
+@(require_results)
+chat_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> (Chat, Binding_Report) {
+    prepared, report := prepare_scenes(nil, scene, nil)
+    defer prepared_destroy(&prepared)
+
+    if report.count > 0 {
+        return {}, report
+    }
+
+    if scene == nil {
+        return chat_make(parent), {}
+    }
+
+    widget := prepared.widgets[.Chat]
+    prepared.widgets[.Chat] = {}
+    return chat_bind(parent, widget), {}
+}
+
+@(private)
+chat_bind :: proc(parent: gd.Node, widget: binding.Result) -> Chat {
+    ch := Chat {
+        root      = cast(gd.Control)widget.root,
+        lines_box = cast(gd.Control)widget.nodes[.Lines],
+        input     = cast(gd.Line_Edit)widget.nodes[.Input],
+    }
+    gd.add_child(parent, widget.root)
     return ch
 }
 

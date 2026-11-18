@@ -11,7 +11,14 @@ import game "../shared/game"
 import scenegd "godot:replay/godot/scene"
 import transportgd "godot:replay/godot/transport"
 
-open_session :: proc(self: ^ReplayScrapyard, initial: game.World, options: rgd.Session_Options) -> net.Error {
+open_session :: proc(
+    self: ^ReplayScrapyard,
+    initial: game.World,
+    options: rgd.Session_Options,
+) -> (
+    result: net.Error,
+) {
+    defer if result == .None {self.presentation, self.smoothing = {}, {}}
     if self.online.launch {
         if self.resume_requested {
             return .Invalid_Config
@@ -154,7 +161,7 @@ observe_recovery :: proc(self: ^ReplayScrapyard) {
     if prepared.ready && prepared.point != probe.point {
         cp: net.Checkpoint(game.World, game.Control, game.Action, game.SEATS)
         defer net.checkpoint_destroy(&cp)
-        codec := &self.session.link.incoming.archive_codec
+        codec := &rgd.session_link(self.session).incoming.archive_codec
 
         if !codec.ready {
             codec = nil
@@ -191,10 +198,10 @@ observe_recovery :: proc(self: ^ReplayScrapyard) {
 
 @(gd_method)
 replay_scrapyard_handoff :: proc(self: ^ReplayScrapyard) -> bool {
-    if scrap_int("RSY_SLOW_BACKUP", 0) == 1 && self.session.link.outgoing.ready {
-        self.session.link.outgoing.cfg.bytes_per_second = 16 * 1024
-        self.session.link.outgoing.cfg.bytes_per_update = 2048
-        self.session.link.outgoing.clock.budget = 0
+    if scrap_int("RSY_SLOW_BACKUP", 0) == 1 && rgd.session_link(self.session).outgoing.ready {
+        rgd.session_link(self.session).outgoing.cfg.bytes_per_second = 16 * 1024
+        rgd.session_link(self.session).outgoing.cfg.bytes_per_update = 2048
+        rgd.session_link(self.session).outgoing.clock.budget = 0
     }
 
     return rgd.room_handoff(&self.room) == .None

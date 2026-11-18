@@ -44,7 +44,7 @@ MAGIC :: u32(0x46534C50) // "FSLP"
 // ENVELOPE — magic, stamps, two length-prefixed ranges — which has no field
 // set to hash and must be readable by a reader that has agreed to nothing yet.
 // The changelog below IS the contract; bump it with the snapshot layout.
-FORMAT :: u16(4) // 2: entity blobs + wire codecs · 3: the door — locked + denied — rides the roster · 4: host id in the snapshot (orphan re-own on takeover)
+FORMAT :: u16(5) // 5: immutable scene variant in each entity tuple
 
 Header :: struct {
     game_version: u16,
@@ -204,11 +204,11 @@ read_file :: proc(path: cstring, allocator := context.allocator) -> (bytes: []u8
 // gd:"backup" POD discipline pointed at a file.
 //
 // The value IS its bytes (POD only — the #assert below refuses a pointer or a
-// slice, which a raw copy would serialize as a dangling address). MIGRATION is
-// append-only zero-default: add new fields at the END and leave the version
-// alone — an older file is SHORTER, and record_decode reads its missing tail as
-// zero. Bump the version only when you REORDER, REMOVE, or RETYPE a field, which
-// makes an old file a .Skew the game restarts from rather than a silent misread.
+// slice, which a raw copy would serialize as a dangling address). A record must
+// match this build's version and exact payload size. Bump the version for every
+// layout change, including appended fields: padding can hide a changed layout
+// behind an unchanged size. Migrate owned files explicitly before retiring an
+// old layout; the runtime never guesses by truncating or zero-filling bytes.
 // Same-machine bytes: padding and endianness are stable within a version, which
 // is exactly the scope ("local record") this serves.
 RECORD_MAGIC :: u32(0x5245_4344) // "RECD"
@@ -216,7 +216,7 @@ RECORD_MAGIC :: u32(0x5245_4344) // "RECD"
 Record_Result :: enum u8 {
     Ok, // decoded into `value`
     Missing, // no file yet — a fresh start, silently
-    Skew, // a different version — an incompatible format; start fresh, loudly
+    Skew, // a different version or payload size — an incompatible layout
     Corrupt, // wrong magic / truncated / garbled; start fresh, loudly
 }
 
@@ -239,9 +239,7 @@ record_encode :: proc(value: $T, version: u16, allocator := context.allocator) -
     return knet.writer_bytes(&w)
 }
 
-// Parse bytes framed by record_encode back into a T of THIS build's layout. A
-// shorter payload (an older, append-only version) leaves the extra tail zero;
-// a longer one is truncated to this build's size. The pure half of record_read.
+// Parse exactly one current-layout record. The pure half of record_read.
 record_decode :: proc($T: typeid, bytes: []u8, version: u16) -> (value: T, result: Record_Result) {
     #assert(
         intrinsics.type_is_nearly_simple_compare(T) &&
@@ -251,28 +249,17 @@ record_decode :: proc($T: typeid, bytes: []u8, version: u16) -> (value: T, resul
     )
     r := knet.reader_make(bytes)
 
-    if knet.read_u32(&r) != RECORD_MAGIC {
+    magic := knet.read_u32(&r)
+    stored_version := knet.read_u16(&r)
+    size := int(knet.read_u32(&r))
+    if r.err || magic != RECORD_MAGIC || size != len(knet.reader_remaining(&r)) {
         return {}, .Corrupt
     }
-
-    if knet.read_u16(&r) != version {
+    if stored_version != version || size != size_of(T) {
         return {}, .Skew
     }
-
-    size := int(knet.read_u32(&r))
-
-    if r.err || size < 0 {
-        return {}, .Corrupt
-    }
-
-    n := min(size, size_of(T))
-
-    if r.off + n > len(bytes) {
-        return {}, .Corrupt // the payload is shorter than its own length says
-    }
-
-    if n > 0 {
-        mem.copy(&value, &bytes[r.off], n) // value is zero-init; any tail past n stays zero
+    if size > 0 {
+        mem.copy(&value, &bytes[r.off], size)
     }
 
     return value, .Ok

@@ -129,35 +129,67 @@ Pass `selected` to display the inventory row as a hotbar.
 
 ## Adopting your own scenes
 
-To use an authored lobby, chat, or scoreboard, build its scene in the editor
-and pass it through Boot's `Options.lobby_scene` / `chat_scene` / `score_scene`;
-see [boot.md](boot.md). Kit instantiates the scene and finds its required
-controls by name at any depth. Those controls receive the standard behavior,
-while the game controls additional nodes and appearance. A missing required
-node produces a log message once during boot and leaves the widget inactive
-without crashing.
+Choose **Project → Tools → Create Kit UI Scenes**. The command creates editable
+`res://ui/kit_lobby.tscn`, `kit_chat.tscn` and `kit_scoreboard.tscn`, preserving
+existing files. The SDK also includes these scenes under `kit/ui/templates/`.
+
+Each scene has one `OdinKitUIBindings` child of its Control root. Select
+**Bindings** to assign its controls in the Inspector. The pickers filter by
+required type, and the node's configuration warning identifies missing,
+ambiguous, incorrectly typed or out-of-scene references. Warnings update after
+renames, Undo and changes to **Access as Unique Name**. Your root can keep its
+own script and its own layout.
+
+The templates use scene-unique references such as `%Host`. Keep one matching
+scene-owned name for each such reference. If decorative controls share a name,
+choose an explicit path instead, such as `../Column/Host`; paths are relative
+to the Bindings node. Nesting ordinary controls is supported. Keep Bindings a
+direct child of the widget scene root, including inherited widget scenes.
+
+| Widget | Required bindings | Optional bindings |
+| --- | --- | --- |
+| Lobby | Title and Status: Label; Players: Control; Host, Join and Start: Button | Code: LineEdit |
+| Chat | Lines: Control; Input: LineEdit | — |
+| Scoreboard | Grid: GridContainer | — |
+
+An empty Code reference is valid. An assigned Code reference must resolve to a
+LineEdit. Different roles must use different controls. A compatible widget root can fill
+a role too: a GridContainer scoreboard root can bind Grid to `..`.
+
+Assign the PackedScenes to your game's exported fields and pass them through
+Boot's `Options.lobby_scene`, `chat_scene` and `score_scene`; see
+[boot.md](boot.md). Keep the startup guard:
 
 ```odin
-lobby_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene, title: string) -> Lobby
-chat_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Chat
-score_adopt :: proc(parent: gd.Node, scene: gd.Packed_Scene) -> Score
+if !my_game_net_attach(self, options) {
+    return
+}
 ```
 
-Each widget requires these node names:
+Boot validates **all** custom widgets while detached, including scenes that
+are not open in the editor. A failure reports the scene and binding, frees the
+candidates, leaves UI/comms/transport unpublished and disables processing on
+the game node. Correct the scene and Play again. This is refusal before
+gameplay; editor warnings do not cancel Godot's F5/F6 launch itself.
 
-- **Lobby**: `Title` (Label), `Status` (Label), `Players` (a container for
-  roster rows), `Host` (Button), `Join` (Button), and `Start` (Button,
-  initially hidden). Join-code games can add an optional `Code` (LineEdit)
-  revealed by `lobby_show_code`; omitting it is supported.
-- **Chat**: `Lines` (a container for scrollback rows) and `Input` (LineEdit).
-- **Scoreboard**: `Grid` (GridContainer). Kit sets its column count and adds
-  the cells.
+Custom shells can adopt one widget and handle its owning diagnostic directly:
 
-Authored scenes control their layout. Anchors under Boot's layer bind to the
-viewport; stock sizing and scoreboard centering are skipped. Kit creates row
-and cell Labels, which inherit themes from the scene root. After `boot_attach`,
-use the widget's `root` to connect extra controls such as a Single Player
-button or address field.
+```odin
+lobby, report := kui.lobby_adopt(parent, scene, "My Game")
+if report.count > 0 {
+    kui.report_binding_error(&report)
+    return
+}
+```
+
+`chat_adopt` and `score_adopt` return the same `(widget, Binding_Report)` pair.
+Each validates before attaching nodes. `prepare_scenes`, `attach_scenes` and
+`prepared_destroy` expose the same staged operation for custom multi-widget
+owners; Boot handles that lifetime for ordinary games.
+
+Authored scenes control layout. Kit creates roster/scrollback rows and score
+cells, which inherit the scene theme. After successful attach, use each
+widget's `root` to connect game-specific controls.
 
 ## Worked example (cavecrawl)
 

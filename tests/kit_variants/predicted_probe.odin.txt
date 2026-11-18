@@ -1,0 +1,94 @@
+package hello_sim
+
+import gd "godot:godot"
+import knet "godot:kit/net"
+import ksess "godot:kit/session"
+import kboot "godot:kit/boot"
+import actors "actors"
+import "core:fmt"
+
+variant_scene_is :: proc(b: ^kboot.Boot, id: knet.Net_Id, expected: string) -> bool {
+    node, exists := kboot.boot_node(b, id)
+    if !exists {return false}
+    path := gd.node_get_scene_file_path(node)
+    defer gd.free_string(path)
+    return gd.gd_string_to_odin(path) == expected
+}
+
+@(gd_method)
+hello_sim_test_predicted_variants :: proc(self: ^HelloSim) -> bool {
+    previous_seq := self.lane.cmd_exec_seq
+    defer self.lane.cmd_exec_seq = previous_seq
+    before := len(player_all(&self.boot))
+    self.lane.cmd_exec_seq = 701
+    diamond, provisional_diamond := player_spawn(&self.boot, owner = self.ses.me, variant = .Diamond)
+    self.lane.cmd_exec_seq = 702
+    plain, provisional_plain := player_spawn(&self.boot, owner = self.ses.me)
+    REAL_PLAIN :: knet.Net_Id(0x7fff0001)
+    REAL_DIAMOND :: knet.Net_Id(0x7fff0002)
+    cleanup := [4]knet.Net_Id{provisional_diamond, provisional_plain, REAL_PLAIN, REAL_DIAMOND}
+    defer {
+        for id in cleanup {
+            if _, exists := kboot.boot_node(&self.boot, id); exists {
+                if body, live := kboot.boot_entity(&self.boot, id, PLAYER_TYPE); live {
+                    self.ses.factory_free(self.ses.factory_user, id, body)
+                }
+            }
+        }
+    }
+    if diamond == nil || plain == nil {return false}
+    if !variant_scene_is(&self.boot, provisional_diamond, "res://player_diamond.tscn") ||
+       !variant_scene_is(&self.boot, provisional_plain, "res://player.tscn") {return false}
+    unknown, _ := self.ses.factory_make(self.ses.factory_user, PLAYER_TYPE, 4999, self.ses.me, ksess.Scene_Variant(123))
+    if unknown != nil {return false}
+    // Reverse the creation order: scene identity must select the right prediction.
+    matched_plain, _ := self.ses.factory_make(self.ses.factory_user, PLAYER_TYPE, REAL_PLAIN, self.ses.me, ksess.DEFAULT_SCENE_VARIANT)
+    matched_diamond, _ := self.ses.factory_make(self.ses.factory_user, PLAYER_TYPE, REAL_DIAMOND, self.ses.me, ksess.Scene_Variant(Player_Variant.Diamond))
+    if matched_plain != rawptr(plain) || matched_diamond != rawptr(diamond) {return false}
+    chosen, known := kboot.boot_entity_variant(&self.boot, provisional_diamond)
+    if !known || chosen != ksess.Scene_Variant(Player_Variant.Diamond) {return false}
+    if body, alive := player_of(&self.boot, provisional_diamond); !alive || body != diamond {return false}
+    self.lane.cmd_exec_seq = 701
+    repeated, repeated_id := player_spawn(&self.boot, owner = self.ses.me, variant = .Diamond)
+    if repeated != diamond || repeated_id != REAL_DIAMOND || len(player_all(&self.boot)) != before + 2 {return false}
+    self.lane.cmd_exec_seq = 703
+    canceled, cancel_id := player_spawn(&self.boot, owner = self.ses.me, variant = .Diamond)
+    if canceled == nil || !kboot.boot_spawn_cancel(&self.boot, cancel_id) {return false}
+    if _, alive := player_of(&self.boot, cancel_id); alive {return false}
+    gd.print("HELLO_PREDICTED_VARIANTS_OK")
+    return true
+}
+
+@(gd_method)
+hello_sim_test_begin_variant_chain :: proc(self: ^HelloSim) -> bool {
+    if !self.lane.anchored {return false}
+    player, found := player_mine(&self.boot)
+    if !found {return false}
+    player.test_allow = true // local prediction permits Equip; authority refuses it
+    equip := actors.player_test_equip_cmd(&self.boot, player)
+    fire := actors.player_test_fire_cmd(&self.boot, player)
+    return equip.state == .Predicted && fire.state == .Predicted
+}
+
+@(gd_method)
+hello_sim_test_variant_chain_done :: proc(self: ^HelloSim) -> bool {
+    player, found := player_mine(&self.boot)
+    if !found || player.test_fires < 2 || player.test_first_id == player.test_last_id {return false}
+    if _, old_alive := player_of(&self.boot, player.test_first_id); old_alive {return false}
+    projectile, alive := player_of(&self.boot, player.test_last_id)
+    if !alive {return false}
+    scene := gd.node_get_scene_file_path(cast(gd.Node)projectile.owner)
+    defer gd.free_string(scene)
+    if gd.gd_string_to_odin(scene) != "res://player.tscn" {return false}
+    gd.print("HELLO_VARIANT_REJECT_CHAIN_OK")
+    return true
+}
+
+@(gd_method)
+hello_sim_test_variant_chain_status :: proc(self: ^HelloSim) -> string {
+    player, found := player_mine(&self.boot)
+    if !found {return "no local player"}
+    _, old_alive := player_of(&self.boot, player.test_first_id)
+    _, new_alive := player_of(&self.boot, player.test_last_id)
+    return fmt.tprintf("anchored=%v fires=%d mode=%d first=%d last=%d old_alive=%v new_alive=%v", self.lane.anchored, player.test_fires, player.test_mode, player.test_first_id, player.test_last_id, old_alive, new_alive)
+}

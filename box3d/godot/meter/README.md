@@ -67,3 +67,22 @@ continues to return Capacity.
 Run pure tests with `odin test box3d/godot/meter/tests -collection:godot=.
 -define:ODIN_TEST_THREADS=1`. Tests live in a separate subpackage so a default or
 WASM consumer imports neither core:testing nor any native physics linkage.
+
+## Stable typed storage
+
+`Storage(T)` centralizes the standard payload allocation and exact callback
+leases used by the Kit/Replay owners. `storage_open` creates metered storage;
+`storage_bind(&storage, &storage.data.field)` returns a borrowed capability for
+that precise field. Consumers retain their own reference. Optional
+`live_instance=true` supplies a separate scene-bound capability. Root and first
+field bindings may share an address when both spans are inside the payload.
+
+Close the payload's resources before `storage_close`. Each completed release is
+recorded; a refused final release preserves the control record for retry even
+when `data` is already nil. Do not copy live Storage or discard it after failure.
+
+Retain `allocator_owner` for independently owned allocations/checkpoints. It pins
+both the meter and stable payload until the last relevant capability drops, so a
+new source cannot reuse a retired callback address. Those retained bytes remain
+metered. A raw `data_lease(memory)` retains only the meter context and is not a
+replacement for this storage capability; exact subfield leases remain separate.

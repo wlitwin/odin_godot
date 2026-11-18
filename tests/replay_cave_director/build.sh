@@ -9,4 +9,3 @@ if rg -q 'SCRIPT ERROR|ERROR:' "$work/import.log";then tail -35 "$work/import.lo
 python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$project" "$work/build-wait.json"
 bash "$ROOT/build/build_scripts.sh" "$project" >"$work/final-build.log" 2>&1
 odin check "$project/scripts" -collection:godot="$ROOT" -target:freestanding_wasm32 -no-entry-point -custom-attribute:gd_method >"$work/wasm.log" 2>&1
-odin build "$ROOT/examples/replay_cavecrawl/tools/upgrade_save" -collection:godot="$ROOT" -out:"$work/upgrade"

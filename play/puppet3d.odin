@@ -42,6 +42,7 @@ body3_impose :: proc(body: gd.Rigid_Body3d, pos: [3]f32, rot: gd.Quaternion) {
     gd.node3d_set_quaternion(n, rot)
     t := gd.node3d_get_transform(n)
     v := gd.variant_from_transform3d(&t)
+    defer gd.variant_destroy(&v)
     gd.physics_server3d_body_set_state(
         gd.singleton_physics_server3d(),
         gd.collision_object3d_get_rid(cast(gd.Collision_Object3d)body),
@@ -61,9 +62,13 @@ body3_impel :: proc(body: gd.Rigid_Body3d, vel, avel: [3]f32) {
     rid := gd.collision_object3d_get_rid(cast(gd.Collision_Object3d)body)
     srv := gd.singleton_physics_server3d()
     lv := gd.Vector3(vel)
-    gd.physics_server3d_body_set_state(srv, rid, .Body_State_Linear_Velocity, gd.variant_from_vector3(&lv))
+    linear := gd.variant_from_vector3(&lv)
+    defer gd.variant_destroy(&linear)
+    gd.physics_server3d_body_set_state(srv, rid, .Body_State_Linear_Velocity, linear)
     av := gd.Vector3(avel)
-    gd.physics_server3d_body_set_state(srv, rid, .Body_State_Angular_Velocity, gd.variant_from_vector3(&av))
+    angular := gd.variant_from_vector3(&av)
+    defer gd.variant_destroy(&angular)
+    gd.physics_server3d_body_set_state(srv, rid, .Body_State_Angular_Velocity, angular)
 }
 
 @(private = "file")

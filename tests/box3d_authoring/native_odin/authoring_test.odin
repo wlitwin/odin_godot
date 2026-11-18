@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:testing"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import b "godot:box3d"
 import f "godot:tests/box3d_authoring/pure"
 
@@ -46,7 +47,7 @@ all_six_shapes_sensor_detached_sources_restore_and_canonical_roundtrip :: proc(t
     input: f.Fixture
     f.fixture_init(&input)
     baked, problem := a.bake(input.scene)
-    built: a.Built_Scene
+    built: ar.Built_Scene
     catalog: b.Recovery_Catalog
     snapshot, decoded: b.Snapshot
     scratch: b.World
@@ -64,7 +65,7 @@ all_six_shapes_sensor_detached_sources_restore_and_canonical_roundtrip :: proc(t
             ok(t, b.snapshot_destroy(&decoded), "decoded cleanup")
         }
 
-        ok(t, a.built_destroy(&built), "built cleanup")
+        ok(t, ar.built_destroy(&built), "built cleanup")
         a.destroy(&baked)
 
         if catalog._handle != nil {
@@ -85,7 +86,7 @@ all_six_shapes_sensor_detached_sources_restore_and_canonical_roundtrip :: proc(t
         return
     }
 
-    built, problem = a.build(&baked, 0x415554484f523501)
+    built, problem = ar.build(&baked, 0x415554484f523501)
 
     if !f.valid(t, problem) {
         return
@@ -103,7 +104,7 @@ all_six_shapes_sensor_detached_sources_restore_and_canonical_roundtrip :: proc(t
         return
     }
 
-    testing.expect_value(t, identity.recovery_format, u32(2))
+    testing.expect_value(t, identity.recovery_format, u32(3))
     counts, cs := b.world_counters(built.world)
 
     if !ok(t, cs, "real constructed counts") {
@@ -180,7 +181,7 @@ all_six_shapes_sensor_detached_sources_restore_and_canonical_roundtrip :: proc(t
 
     testing.expect(t, mem.compare(wire, again) == 0)
 
-    if !ok(t, a.built_destroy(&built), "source world/catalog owner destroyed") {
+    if !ok(t, ar.built_destroy(&built), "source world/catalog owner destroyed") {
         return
     }
 
@@ -219,10 +220,10 @@ malformed_canonical_and_mutated_bake_leave_live_world_unchanged :: proc(t: ^test
         return
     }
 
-    built, build_problem := a.build(&baked, 0x415554484f523501)
+    built, build_problem := ar.build(&baked, 0x415554484f523501)
 
     defer {
-        ok(t, a.built_destroy(&built), "build drop")
+        ok(t, ar.built_destroy(&built), "build drop")
         cleanup0(t)
     }
 
@@ -262,13 +263,13 @@ malformed_canonical_and_mutated_bake_leave_live_world_unchanged :: proc(t: ^test
     defer delete(after)
     testing.expect(t, mem.compare(before, after) == 0)
     baked.data.shapes[0].definition.friction += 0.1
-    failed, fp := a.build(&baked, 0x415554484f523501)
-    defer ok(t, a.built_destroy(&failed), "unpublished failure cleanup")
+    failed, fp := ar.build(&baked, 0x415554484f523501)
+    defer ok(t, ar.built_destroy(&failed), "unpublished failure cleanup")
     testing.expect(t, fp.error == .Corrupt && failed.world == 0 && failed.catalog._handle == nil)
 }
 
 @(test)
-legacy_primitive_catalog_identity_and_v2_layout_compatibility :: proc(t: ^testing.T) {
+current_primitive_catalog_identity_and_authored_layout :: proc(t: ^testing.T) {
     defer cleanup0(t)
 
     if !ok(t, b.authoring_asset_abi_check(), "layout72 actual C query") {
@@ -284,18 +285,20 @@ legacy_primitive_catalog_identity_and_v2_layout_compatibility :: proc(t: ^testin
     }
     catalog, status := b.recovery_catalog_create(config, assets[:])
 
-    if !ok(t, status, "legacy primitive constructor") {
+    if !ok(t, status, "primitive constructor") {
         return
     }
 
-    defer ok(t, b.recovery_catalog_destroy(&catalog), "legacy drop")
+    defer ok(t, b.recovery_catalog_destroy(&catalog), "catalog drop")
     identity, identity_status := b.recovery_catalog_identity(&catalog)
 
-    if ok(t, identity_status, "legacy identity") {
-        testing.expect_value(t, identity.recovery_format, u32(1))
+    if ok(t, identity_status, "current identity") {
+        testing.expect_value(t, identity.recovery_format, u32(3))
     }
 
-    bad := [1]b.Recovery_Asset_V2{{version = 99, struct_bytes = u32(size_of(b.Recovery_Asset_V2)), base = assets[0]}}
-    invalid, is := b.recovery_catalog_create_v2(config, bad[:])
+    bad := [1]b.Recovery_Authored_Asset {
+        {version = 99, struct_bytes = u32(size_of(b.Recovery_Authored_Asset)), base = assets[0]},
+    }
+    invalid, is := b.recovery_catalog_create_authored(config, bad[:])
     testing.expect(t, is != .Ok && invalid._handle == nil)
 }

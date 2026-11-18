@@ -3,8 +3,7 @@ package box3d_motion_pure_test
 import "core:encoding/json"
 import "core:testing"
 import a "godot:box3d/authoring"
-import b "godot:box3d"
-import bd "godot:box3d/diagnostics"
+import b "godot:box3d/types"
 
 KINDS :: [8]string{"pin", "hinge", "slider", "spherical", "distance", "motor", "weld", "wheel"}
 
@@ -17,7 +16,7 @@ Fixture :: struct {
 }
 
 fixture_init :: proc(f: ^Fixture, kind: string = "") {
-    f.scene = a.scene_input_default("motion.test.world", 2)
+    f.scene = a.scene_input_default("motion.test.world")
     f.scene.gravity = {}
     f.scene.bodies = f.bodies[:]
     keys := [3]string{"floor", "mover", "wall"}
@@ -176,6 +175,10 @@ joint_references_limits_flags_capacity_and_finite_reject_before_publish :: proc(
     fixture_init(&input, "weld")
     two := [2]a.Joint_Input{input.joints[0], input.joints[0]}
     input.scene.joints = two[:]
+    reject(t, input.scene, .Duplicate)
+    too_many := make([]a.Joint_Input, a.MAX_JOINTS + 1, context.temp_allocator)
+    for &joint in too_many {joint = input.joints[0]}
+    input.scene.joints = too_many
     reject(t, input.scene, .Capacity)
 }
 
@@ -227,43 +230,12 @@ character_copied_pod_configuration_references_order_and_failures :: proc(t: ^tes
 }
 
 @(test)
-legacy_schema1_identity_and_new_motion_collision_checks :: proc(t: ^testing.T) {
+only_current_schema_and_unique_motion_ids_are_accepted :: proc(t: ^testing.T) {
     input: Fixture
     fixture_init(&input)
     input.scene.schema_version = 1
     input.scene.characters = {}
-    scene, p := a.bake(input.scene)
-    defer a.destroy(&scene)
-
-    if !valid(t, p) {
-        return
-    }
-
-    legacy := struct {
-        schema_version: u32,
-        namespace:      string,
-        world:          b.World_Def,
-        bodies:         []a.Baked_Body,
-        shapes:         []a.Baked_Shape,
-        assets:         []a.Baked_Asset,
-        resources:      []a.Baked_Resource,
-    } {
-        1,
-        scene.data.namespace,
-        scene.data.world,
-        scene.data.bodies,
-        scene.data.shapes,
-        scene.data.assets,
-        scene.data.resources,
-    }
-    bytes, error := json.marshal(legacy)
-    testing.expect(t, error == nil)
-
-    if error == nil {
-        testing.expect_value(t, scene.content_hash, bd.hash_bytes(bytes))
-        delete(bytes)
-    }
-
+    reject(t, input.scene, .Schema)
     input.scene.characters = input.characters[:]
     reject(t, input.scene, .Schema)
     fixture_init(&input, "slider")

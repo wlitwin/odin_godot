@@ -10,3 +10,6 @@ config/features=PackedStringArray("4.6")
 textures/vram_compression/import_etc2_astc=true
 
 [headless]
+
+[editor_plugins]
+enabled=PackedStringArray("res://addons/acceptance/plugin.cfg")

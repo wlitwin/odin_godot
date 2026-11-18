@@ -293,8 +293,10 @@ session_rejoin :: proc(
     complete_history: net.Complete_Departing_Host(S, C, A, E, N)
 
     if model.complete_state {
-        err: net.Error
-        complete_history, err = net.server_departing_complete(&s.server)
+        captured, err := net.server_departing_complete(&s.server)
+        // The outer slot owns the checkpoint after this transfer. Keep a bulk
+        // copy rather than expanding the two embedded Frames field by field.
+        mem.copy(&complete_history, &captured, size_of(complete_history))
 
         if err != .None {
             return err

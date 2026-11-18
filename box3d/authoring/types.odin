@@ -4,20 +4,19 @@ package box3d_authoring
 import bcap "godot:box3d/limits"
 
 import "core:mem"
-import b "godot:box3d"
+import b "godot:box3d/types"
 import bd "godot:box3d/diagnostics"
 
 @(private)
 Native_Vec3 :: b.Vec3
 
-LEGACY_SCHEMA_VERSION :: 1
 SCHEMA_VERSION :: 2
 MAX_JOINTS :: bcap.MAX_JOINTS
 MAX_CHARACTERS :: MAX_BODIES
 MAX_KEY_BYTES :: 128
-MAX_BODIES :: b.ALPHA_TOTAL_BODIES
-MAX_SHAPES :: b.ALPHA_SHAPES
-MAX_ASSETS :: b.RECOVERY_MAX_ASSETS
+MAX_BODIES :: bcap.MAX_BODIES
+MAX_SHAPES :: bcap.MAX_SHAPES
+MAX_ASSETS :: bcap.MAX_ASSETS
 MAX_VERTICES :: 4096
 MAX_HULL_POINTS :: 256
 MAX_INDICES :: 24576
@@ -228,44 +227,8 @@ Diagnostic :: struct {
     native_status:        b.Status,
 }
 
-Body_Map :: struct {
-    logical_id: u64,
-    handle:     b.Body,
-    key:        b.Body_Key,
-}
-
-Shape_Map :: struct {
-    logical_id, body_id: u64,
-    asset_id:            u32,
-    handle:              b.Shape,
-    key:                 b.Shape_Key,
-}
-
-Joint_Map :: struct {
-    logical_id, body_a_id, body_b_id: u64,
-    key:                              b.Joint_Key,
-}
-
-Character_Map :: struct {
-    logical_id: u64,
-    config:     b.Character_Config,
-    initial:    b.Character_State,
-}
-
-// Local runtime owner, never canonical Game state. Destroy world before catalog.
-Built_Scene :: struct {
-    world:        b.World,
-    catalog:      b.Recovery_Catalog,
-    bodies:       []Body_Map,
-    shapes:       []Shape_Map,
-    joints:       []Joint_Map,
-    characters:   []Character_Map,
-    content_hash: bd.Digest,
-    allocator:    mem.Allocator,
-}
-
-scene_input_default :: proc(namespace: string, schema_version: u32 = LEGACY_SCHEMA_VERSION) -> Scene_Input {
-    return {schema_version = schema_version, namespace = namespace, gravity = {0, -9.81, 0}, enable_sleep = true}
+scene_input_default :: proc(namespace: string) -> Scene_Input {
+    return {schema_version = SCHEMA_VERSION, namespace = namespace, gravity = {0, -9.81, 0}, enable_sleep = true}
 }
 
 body_input_default :: proc(key: string) -> Body_Input {

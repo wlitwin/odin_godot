@@ -64,6 +64,13 @@ Net_Entity_Schema :: struct {
     avatar:    bool,
 }
 
+// Stable presentation identity within a gameplay entity. Default is ID zero;
+// names/IDs are schema data, while project scene paths and field names are not.
+Net_Scene_Schema :: struct {
+    entity, name: string,
+    id:           u32,
+}
+
 Net_Input_Constraint_Schema :: struct {
     field:      string,
     range:      string, // "" = none; otherwise canonical "min:max"
@@ -170,6 +177,7 @@ Net_Schema :: struct {
     fingerprint:     u64,
     canonical:       string,
     entities:        []Net_Entity_Schema,
+    scenes:          []Net_Scene_Schema,
     types:           []Net_Type_Schema,
     fields:          []Net_Field_Schema,
     inputs:          []Net_Input_Schema,
@@ -206,6 +214,18 @@ net_schema_valid :: proc(schema: ^Net_Schema) -> bool {
        schema.canonical == "" ||
        schema.abi_fingerprint != net_schema_canonical_fingerprint(schema) {
         return false
+    }
+
+    for scene, i in schema.scenes {
+        entity, known := net_schema_entity(schema, scene.entity)
+        if !known ||
+           entity.wire_id == 0 ||
+           scene.name == "" ||
+           (scene.id == 0) != (scene.name == "Default") {return false}
+        for previous in schema.scenes[:i] {
+            if previous.entity == scene.entity &&
+               (previous.id == scene.id || previous.name == scene.name) {return false}
+        }
     }
 
     for typ in schema.types {
@@ -315,6 +335,15 @@ net_schema_entity :: proc(schema: ^Net_Schema, name: string) -> (^Net_Entity_Sch
         }
     }
 
+    return nil, false
+}
+
+net_schema_scene :: proc(schema: ^Net_Schema, entity, name: string) -> (^Net_Scene_Schema, bool) {
+    if schema != nil {
+        for &scene in schema.scenes {
+            if scene.entity == entity && scene.name == name {return &scene, true}
+        }
+    }
     return nil, false
 }
 

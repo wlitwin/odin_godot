@@ -45,7 +45,7 @@ replay_scrapyard_bridge_benchmark :: proc(self: ^ReplayScrapyard, wanted: gd.Int
         began := gd.time_get_ticks_usec(gd.singleton_time())
 
         for _ in 0 ..< 120 {
-            paint(self, frame, frame, 1.0 / 60)
+            paint(self, &frame, &frame, 1.0 / 60)
         }
 
         elapsed := gd.time_get_ticks_usec(gd.singleton_time()) - began

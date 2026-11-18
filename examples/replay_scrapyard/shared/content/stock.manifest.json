@@ -1,11 +1,11 @@
 {
-  "artifact_sha256": "5d1dac3f013d30ffa4b14c2845362626121b69491cc61f646955e4bac56e6838",
+  "artifact_sha256": "b74a9d03e89fb8c05c500c69c2370f4b615677704b82dea077d5b93dbc3f4646",
   "bytes": 4017,
   "canonical_digest": 7605822622581753901,
   "format": 1,
   "schema": 3257166025468810148,
   "semantic": 5932159154739228747,
-  "source_id": 921178334469632811,
+  "source_id": 6234876653729950117,
   "sources": {
     "data/abilities/battlecry.tres": "3f84cf487ba34e1aac42f5628786750abe4fcad00aefcdbb7e1fe59994ce9427",
     "data/abilities/frostwave.tres": "50ca79866c7d6f00bace7cd9012fc81eceb470ed2a2dd4ea1e048d3299e543d8",
@@ -46,13 +46,13 @@
     "data/status/shock.tres": "25a7ce671bbcd41a9bc38f5603547fe883a36a1c11cde9a9bd9f54f77a4c0fe5",
     "data/status/slimed.tres": "4733079aa5f4f59a082a453889d23f722b414b6014c4938f412932e9dcd6ba8c",
     "data/status/surge.tres": "ddc16e17ca1394cf700a87c76f647d8e2f8abd15d1e2a8ea5603600d9059234a",
-    "scripts/content.odin": "f00002d2066367bc2ff63440fba953bb04a2098f101993832fc556c87c6c33e0",
-    "scripts/content_export.odin": "a4004e7adcc43b5d47d00113274f55c7e6f0f0408802d336c804a78cb61341cd",
+    "scripts/content.odin": "c79db0f64de3aafdeee7d01d14d7d87f629495e410bff0f1c638bcf33ca422ad",
+    "scripts/content_export.odin": "0c34c088205e4f318eb847152e0070660b8f7ebbaae1fa673cc0975e194f9feb",
     "scripts/defs/ability_def.odin": "8cd3602942f2b40cc8546ef83064ff32b4f05fb5b93e256e7df790444a9814ac",
-    "scripts/defs/bake_ability.odin": "dfb1e08ef9a5bdeb0ecd2cf5afcbca6afc07dc93f06795e5340bd2b27dd3593e",
-    "scripts/defs/bake_gun.odin": "aaa3ceeee4d90e47ef41a4bf4d72e2d43f1d5e305dc321df6a925e9559b3a50c",
-    "scripts/defs/bake_mob.odin": "5c119359433f025e00f177a3f3ce56dc9f3aa146bfffeebff2ba961376d4269d",
-    "scripts/defs/bake_status.odin": "d549872c4bdf16a64d33eaebb0de87c8908baa2799f5f0e7de09b586793fb3d1",
+    "scripts/defs/bake_ability.odin": "028abc6e21c8faa59bd2ddd5a6c18d9f14a809ee0aa5e24b12e8b5c23cd8138a",
+    "scripts/defs/bake_gun.odin": "0fd7dc40a0d8b2dcc80e96895fa70b57298808a6b8b06ffd5c0cf36d3a90eb10",
+    "scripts/defs/bake_mob.odin": "dc36d8fdeda290d7b7f91151149382b47f54b368e53ca0ac5e7a5435adc53f0a",
+    "scripts/defs/bake_status.odin": "541d92e9b9bd1ce1f293ef70d167eec0e66a37110692e20bc0a2452d10132672",
     "scripts/defs/combo_def.odin": "8f4144539a5f3047eb16d8841f81f9a292e591804401edfd9a0cbf5f1e26fecd",
     "scripts/defs/gun_def.odin": "0fe7e3b9d23555c49886ce045227a9475c00a4f300e67e3e68821c0f7cad8213",
     "scripts/defs/mob_def.odin": "9c325dfad553b77c2451cde193cb900c660305c0fe0e183efa90c56a8d62c492",
@@ -61,6 +61,6 @@
     "scripts/defs/references.odin": "a36ebbf5c2bd82f443d13f378fef376b3e9430f213a7fd4c164a107092aad629",
     "scripts/defs/status_def.odin": "b8b67d06404f29fc6fed1102b374f120b5a50904f8e0e74df794d11841ed6b37",
     "scripts/defs/turret_def.odin": "33f0e3743b73d446cf86e31f3e4ae6f5753753183368e155c722e6abc1ee9970",
-    "shared/content/content.odin": "d3e34998d7f35cbfbc2895499e1747ae3753822b19953c28c753a7f4380f7f53"
+    "shared/content/content.odin": "9a2b0ea2a496c3b1c9e0e227ce06ac930435fa968f1f80dfbc7648ce7de925ce"
   }
 }

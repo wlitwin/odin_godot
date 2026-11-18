@@ -79,7 +79,9 @@ muster_scope :: proc(self: ^ReplayScrapyard, world: ^game.World, seat: u16) {
         return
     }
 
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
     connection := self.session.authority ? u64(0) : self.session.client.generation
     generation := world.players[seat - 1].generation
 

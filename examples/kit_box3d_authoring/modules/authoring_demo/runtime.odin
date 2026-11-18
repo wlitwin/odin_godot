@@ -9,12 +9,11 @@ import "core:os"
 import "core:strings"
 import gd "godot:godot"
 import b "godot:box3d"
-import a "godot:box3d/authoring"
-import ga "godot:box3d/godot/authoring"
 import bg "godot:box3d/godot"
 import bm "godot:box3d/godot/meter"
 import bd "godot:box3d/diagnostics"
 import p "godot:kit/physics"
+import owned "godot:kit/godot/physics"
 import k "godot:kit/sim"
 import n "godot:kit/net"
 import s "godot:kit/session"
@@ -36,7 +35,7 @@ Cleanup :: struct {
 
 Result :: struct {
     role:                                         string,
-    ok:                                           bool,
+    ok, run_ok:                                   bool,
     target, head, confirmed, final_tick, sampled: u64,
     content_hash:                                 bd.Digest,
     errors:                                       [8]Failure,
@@ -44,75 +43,39 @@ Result :: struct {
     cleanup:                                      Cleanup,
 }
 
-Demo :: struct {
-    sdk:                                                                                                                                                                                              p.SDK_Context,
-    allocator:                                                                                                                                                                                        mem.Allocator,
-    owners:                                                                                                                                                                                           [5]p.SDK_User_Owner,
-    wire_owner:                                                                                                                                                                                       bg.Owner,
-    node:                                                                                                                                                                                             gd.Node,
-    wire:                                                                                                                                                                                             ng.Session_Wire,
-    ses:                                                                                                                                                                                              s.Session,
-    lane:                                                                                                                                                                                             k.Lane,
-    physics:                                                                                                                                                                                          p.Instance(
-        Side,
-    ),
-    network:                                                                                                                                                                                          p.Network(
-        Side,
-    ),
-    controls:                                                                                                                                                                                         p.Typed_Codec(
-        Control,
-    ),
-    proxy_codec:                                                                                                                                                                                      p.Typed_Codec(
-        Proxy,
-    ),
-    descriptor:                                                                                                                                                                                       n.Entity_Desc,
-    baked:                                                                                                                                                                                            a.Baked_Scene,
-    built:                                                                                                                                                                                            a.Built_Scene,
-    body_names:                                                                                                                                                                                       [35]string,
-    body_count:                                                                                                                                                                                       int,
-    proxies:                                                                                                                                                                                          [35]Proxy,
-    host,
-    scripted,
-    failed,
-    finished,
-    closing,
-    wire_ready,
-    lane_ready,
-    model_ready,
-    ready_sent,
-    ready_pending,
-    welcome_sent,
-    welcome_ack,
-    baseline_ready,
-    started,
-    lead_applied,
-    exported,
-    final_ack: bool,
-    target,
-    baseline,
-    scope,
-    wait_fresh,
-    sampled,
-    accepted_through,
-    submitted,
-    held,
-    authority,
-    unavailable,
-    pulse_rows:                                                                              u64,
-    players:                                                                                                                                                                                          [2]n.Player_Id,
-    seat:                                                                                                                                                                                             u16,
-    peer:                                                                                                                                                                                             s.Peer_Id,
-    input:                                                                                                                                                                                            Control,
-    pulse_pending:                                                                                                                                                                                    bool,
-    content_hash,
-    rules:                                                                                                                                                                              bd.Digest,
-    finish_after:                                                                                                                                                                                     f64,
-    output:                                                                                                                                                                                           string,
-    errors:                                                                                                                                                                                           [8]Failure,
-    error_count:                                                                                                                                                                                      int,
-    owners_before:                                                                                                                                                                                    u32,
-    owners_before_observed:                                                                                                                                                                           bool,
-    telemetry:                                                                                                                                                                                        Sample_Telemetry,
+Demo_State :: struct {
+    node: gd.Node,
+    descriptor: n.Entity_Desc,
+    body_names: [35]string,
+    body_count: int,
+    proxies: [35]Proxy,
+    host, scripted, failed, finished, model_ready, ready_sent, ready_pending,
+    welcome_sent, welcome_ack, baseline_ready, started, lead_applied, exported, final_ack: bool,
+    target, baseline, scope, wait_fresh, sampled, accepted_through, submitted,
+    held, authority, unavailable, pulse_rows: u64,
+    players: [2]n.Player_Id,
+    seat: u16,
+    peer: s.Peer_Id,
+    input: Control,
+    pulse_pending: bool,
+    rules: bd.Digest,
+    finish_after: f64,
+    output: string,
+    errors: [8]Failure,
+    error_count: int,
+    owners_before: u32,
+    owners_before_observed: bool,
+    telemetry: Sample_Telemetry,
+}
+
+Demo :: owned.Authored_Data(Side,Control,Proxy,Demo_State)
+Demo_Owner :: owned.Authored_World(Side,Control,Proxy,Demo_State)
+
+cleanup_demo :: proc(game: ^Demo_State, allocator: mem.Allocator) -> k.World_Error {
+    for &name in game.body_names[:game.body_count] { delete(name,allocator); name="" }
+    delete(game.output,allocator)
+    game.output=""
+    return .Ok
 }
 
 role :: proc(rt: ^Demo) -> string {
@@ -140,18 +103,6 @@ fail :: proc(rt: ^Demo, site: string, status: k.World_Error) {
     rt.failed = true
 }
 
-bind :: proc(rt: ^Demo, index: int, user: rawptr, size: u64) -> bool {
-    owner, error := p.sdk_user_owner_create(rt.sdk.memory, rt, u64(size_of(rt^)), user, size)
-
-    if error != .Ok {
-        fail(rt, "sdk_user_owner_create", error)
-        return false
-    }
-
-    rt.owners[index] = owner
-    return true
-}
-
 owner_snapshot :: proc() -> (u32, bool) {
     contract, status := b.domain_contract_get()
 
@@ -163,19 +114,16 @@ owner_snapshot :: proc() -> (u32, bool) {
     return ledger.owner_count, ls == .Ok
 }
 
-demo_create :: proc(node: gd.Node) -> ^Demo {
+demo_create :: proc(node: gd.Node, owner: ^Demo_Owner) -> ^Demo {
     owners_before, owners_observed := owner_snapshot() // BEFORE any Sample Context/user.
-    sdk, error := p.sdk_context_create()
-
-    if error != .Ok {
+    report := owned.authored_open(owner,gd.get_node(node,"AuthoredWorld"),profile=PROFILE,cleanup_user=cleanup_demo)
+    if report.error != .Ok {
+        gd.error_str(owned.describe(&report))
         return nil
     }
-
-    allocator := bm.allocator(sdk.memory)
+    rt := owner.storage.data
+    allocator := rt.allocator
     context.allocator = allocator
-    rt := new(Demo, allocator)
-    rt.sdk = sdk
-    rt.allocator = allocator
     rt.node = node
     rt.owners_before = owners_before
     rt.owners_before_observed = owners_observed
@@ -205,40 +153,12 @@ demo_create :: proc(node: gd.Node) -> ^Demo {
         return rt
     }
 
-    if !bind(rt, 0, rt, u64(size_of(rt^))) ||
-       !bind(rt, 1, &rt.physics, u64(size_of(rt.physics))) ||
-       !bind(rt, 2, &rt.network, u64(size_of(rt.network))) ||
-       !bind(rt, 3, &rt.controls, u64(size_of(rt.controls))) ||
-       !bind(rt, 4, &rt.proxy_codec, u64(size_of(rt.proxy_codec))) {
+    count := len(rt.built.bodies)
+    if count != 4 || len(rt.built.joints) != 1 {
+        fail(rt,"shared_world.body_joint_count",.Incompatible)
         return rt
     }
-
-    source := gd.get_node(node, "AuthoredWorld")
-    scene, diagnostic := ga.extract(source, allocator)
-    defer ga.diagnostic_destroy(&diagnostic)
-
-    if diagnostic.error != .None {
-        fail(rt, "AuthoredWorld.extract", .Invalid)
-        return rt
-    }
-
-    rt.baked = scene
-    rt.content_hash = scene.content_hash
-    built, error_bake := a.build(&rt.baked, PROFILE)
-    rt.built = built
-
-    if error_bake.error != .None {
-        fail(rt, "AuthoredWorld.build", .Step_Failed)
-        return rt
-    }
-
-    rt.body_count = len(rt.built.bodies)
-
-    if rt.body_count != 4 || len(rt.built.joints) != 1 {
-        fail(rt, "shared_world.body_joint_count", .Incompatible)
-        return rt
-    }
-
+    rt.body_count = count
     for body, i in rt.baked.data.bodies {
         rt.body_names[i] = strings.clone(body.stable_key, allocator)
     }
@@ -258,37 +178,6 @@ demo_create :: proc(node: gd.Node) -> ^Demo {
     }
 
     rt.rules = rules
-    lease, ls := bm.block_lease(sdk.memory, rt, u64(size_of(rt^)), &rt.wire, u64(size_of(rt.wire)))
-
-    if ls != bg.OK {
-        fail(rt, "wire.data_lease", .Invalid)
-        return rt
-    }
-
-    rt.wire_owner, error = p.sdk_owner_create(true, lease)
-
-    if error != .Ok {
-        fail(rt, "wire.owner", error)
-        return rt
-    }
-
-    if ng.wire_configure(
-           &rt.wire,
-           {
-               allocator = allocator,
-               owner = rt.wire_owner,
-               user_data = &rt.wire,
-               allocator_owner = sdk.detached,
-               allocator_data = allocator.data,
-           },
-       ) !=
-       .Ok {
-        fail(rt, "wire.configure", .Invalid)
-        return rt
-    }
-
-    rt.wire_ready = true
-    rt.ses.allocator = allocator
     s.session_configure(&rt.ses, {tick_hz = 60, max_players = 2})
     mp := gd.node_get_multiplayer(node)
     gd.scene_multiplayer_set_server_relay_enabled(cast(gd.Scene_Multiplayer)mp, false)
@@ -951,121 +840,36 @@ write_final :: proc(rt: ^Demo) -> bool {
     return true
 }
 
-demo_close :: proc(rt: ^Demo, result: ^Result) -> bool {
+demo_close :: proc(owner: ^Demo_Owner, result: ^Result) -> bool {
     context = base.default_context()
-
-    if rt == nil {
-        return true
-    }
-
-    context.allocator = rt.allocator
-    rt.closing = true
-    result^ = {
-        role         = role(rt),
-        ok           = !rt.failed && (!rt.scripted || (rt.exported && (rt.host ? rt.final_ack : true))),
-        target       = rt.target,
-        content_hash = rt.content_hash,
-        sampled      = rt.sampled,
-        errors       = rt.errors,
-        error_count  = rt.error_count,
-    }
-
-    if rt.model_ready {
-        result.head = rt.lane.ticker.tick
-        result.confirmed = k.lane_world_confirmed(&rt.lane)
-    }
-
-    if rt.exported {
-        result.final_tick = rt.target
-    }
-
-    if rt.wire_ready {
-        if ng.wire_detach(&rt.wire) != .Ok {
-            result.ok = false
-            return false
+    rt := owner.storage.data
+    if rt != nil && !rt.closing {
+        result^ = {
+            role=role(rt),
+            run_ok=!rt.failed && (!rt.scripted || (rt.exported && (rt.host ? rt.final_ack : true))),
+            target=rt.target,content_hash=rt.content_hash,sampled=rt.sampled,
+            errors=rt.errors,error_count=rt.error_count,
         }
-
-        rt.wire_ready = false
+        result.cleanup.owners_before=rt.owners_before
+        result.cleanup.owners_observed=rt.owners_before_observed
+        if rt.model_ready { result.head=rt.lane.ticker.tick; result.confirmed=k.lane_world_confirmed(&rt.lane) }
+        if rt.exported { result.final_tick=rt.target }
     }
-
-    if rt.network.instance != nil {
-        if p.network_destroy(&rt.network) != .Ok {
-            result.ok = false
-            return false
-        }
-    }
-
-    if p.codec_destroy(&rt.controls) != .Ok ||
-       p.codec_destroy(&rt.proxy_codec) != .Ok ||
-       p.detach(&rt.physics) != .Ok {
-        result.ok = false
-        return false
-    }
-
-    if rt.lane_ready {
-        k.lane_destroy(&rt.lane)
-    }
-
-    s.session_destroy(&rt.ses)
-
-    if a.built_destroy(&rt.built) != .Ok {
-        result.ok = false
-        return false
-    }
-
-    a.destroy(&rt.baked)
-
-    for name in rt.body_names[:rt.body_count] {
-        delete(name, rt.allocator)
-    }
-
-    delete(rt.output, rt.allocator)
-    sdk, allocator, owners, wire_owner := rt.sdk, rt.allocator, rt.owners, rt.wire_owner
-    owners_before, baseline_observed := rt.owners_before, rt.owners_before_observed
-    free(rt, allocator)
-    success := true
-
-    for &owner in owners {
-        if p.sdk_user_owner_destroy(&owner) != .Ok {
-            success = false
-        }
-    }
-
-    if wire_owner.user != nil && wire_owner.drop(wire_owner.user) != bg.OK {
-        success = false
-    }
-
-    if p.sdk_context_destroy(&sdk) != .Ok {
-        success = false
-    }
-
-    context = base.default_context()
-    engine, es := b.engine_allocation_stats()
-    wrapper, ws := b.snapshot_allocation_stats()
-    meter, ms := bm.category_stats(bg.CATEGORY_KIT_CORE)
-    contract, cs := b.domain_contract_get()
-    ledger, ls := b.host_ledger_get(contract.cookie)
-    owner_observed := baseline_observed && cs == .Ok && ls == .Ok
+    if owned.authored_close(owner) != .Ok { result.ok=false; return false }
+    engine,es := b.engine_allocation_stats()
+    wrapper,ws := b.snapshot_allocation_stats()
+    meter,ms := bm.category_stats(bg.CATEGORY_KIT_CORE)
+    contract,cs := b.domain_contract_get()
+    ledger,ls := b.host_ledger_get(contract.cookie)
+    before,baseline := result.cleanup.owners_before,result.cleanup.owners_observed
+    observed := baseline && cs==.Ok && ls==.Ok
     result.cleanup = {
-        native          = engine.live_bytes,
-        wrapper         = wrapper.live_bytes,
-        meter           = meter.live_bytes,
-        owners          = i64(ledger.owner_count) - i64(owners_before),
-        owners_before   = owners_before,
-        owners_after    = ledger.owner_count,
-        owners_observed = owner_observed,
-        observed        = es == .Ok && ws == .Ok && ms == bg.OK && owner_observed,
+        native=engine.live_bytes,wrapper=wrapper.live_bytes,meter=meter.live_bytes,
+        owners=i64(ledger.owner_count)-i64(before),owners_before=before,owners_after=ledger.owner_count,
+        owners_observed=observed,observed=es==.Ok && ws==.Ok && ms==bg.OK && observed,
     }
-    result.ok =
-        result.ok &&
-        success &&
-        result.cleanup.observed &&
-        result.cleanup.native == 0 &&
-        result.cleanup.wrapper == 0 &&
-        result.cleanup.meter == 0 &&
-        result.cleanup.owners == 0
-    // Runtime storage has been consumed. A later owner/ledger error is a failed
-    // result, never permission for the Node to retry through a freed pointer.
+    result.ok = result.run_ok && result.cleanup.observed && result.cleanup.native==0 &&
+        result.cleanup.wrapper==0 && result.cleanup.meter==0 && result.cleanup.owners==0
     return true
 }
 

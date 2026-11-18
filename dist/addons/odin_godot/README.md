@@ -24,7 +24,13 @@ library beside Kit, and `template/replay/` as a separate starter project. See th
 [Replay guide](docs/replay.md) for its API model, supported configurations,
 and limitations.
 
-Box3D's source APIs, shared capacity profiles, and guides are included. Native
+Box3D's source APIs, shared capacity profiles, and guides are included. The
+release also contains the optional sibling `addons/box3d_authoring/` frontend.
+Copy both addon directories, enable Box3D Authoring in Project Settings → Plugins,
+and choose **Box3D: setup and status** to install and build its editor tools.
+See [editor tools](docs/box3d/editor.md) for updates and local source changes.
+`template/box3d/` is a small offline game with an authored floor/crate, automatic
+visual bindings, reset and checked cleanup; see [the starter guide](docs/box3d/quickstart.md). Native
 Box3D games use the
 [source-checkout setup](https://wlitwin.github.io/odin_godot/box3d/building.html)
 to build and select a matching backend; this addon does not include prebuilt
@@ -51,17 +57,17 @@ game needs no compiler.
 | Need | Where |
 |------|-------|
 | **Godot 4.7+** | <https://godotengine.org> |
-| **Odin compiler — `@ODIN_VERSION@` tested/recommended** (`odin` on your PATH) | <https://github.com/odin-lang/Odin/releases> |
+| **Odin compiler — build `@ODIN_VERSION@` tested** | [Obtain the tested compiler](docs/getting-started.md#obtain-the-tested-compiler) |
 | **A C linker** Odin can drive | macOS: Xcode Command Line Tools (`xcode-select --install`) · Linux: `gcc`/`clang` · Windows: Visual Studio Build Tools (run builds from a *"x64 Native Tools Command Prompt for VS"*) |
 
-> **Compiler compatibility:** `@ODIN_VERSION@` is the tested release used to
-> build the addon's core. Prefer it for the tested toolchain, especially
-> before Odin 1.0. Before boot, the core checks the complete ABI fingerprint:
+> **Compiler compatibility:** `@ODIN_VERSION@` is the repository's patched
+> development build, not an upstream release name. The setup guide provides the
+> locked Nix toolchain and non-Nix source/patch instructions. Before boot, the core checks the complete ABI fingerprint:
 > every boundary size, alignment, and field offset. Another compiler release
 > can load when it compiles the bundled sources to the same contract. A
 > mismatch is rejected before user code runs and reports the need to
-> rebuild/update. If a Finder/Steam-launched editor cannot find `odin` on its
-> PATH, set `odin_godot/odin_bin` to the binary's absolute path.
+> rebuild/update. A successful build remembers local tool paths for later editor
+> launches; `odin_godot/odin_bin` is an optional explicit override.
 
 Install these tools when using the corresponding features:
 
@@ -148,7 +154,7 @@ Choose **Export → Web**. For the full procedure, including serving headers, se
 
 | Symptom | Cause / fix |
 |---------|-------------|
-| **Editor crashes after updating / replacing the addon** | Don't swap the addon's core dll while the editor is open — Godot tries to hot-reload the GDExtension in place and crashes ("class already registered"). **Quit Godot first, replace `addons/odin_godot/`, then reopen.** (Same restart rule as first install.) |
+| **Editor crashes after updating / replacing the addon** | Don't swap the addon's core dll while the editor is open — Godot tries to hot-reload the GDExtension in place and crashes ("class already registered"). **Quit Godot first, replace the SDK addon directories, then reopen.** (Same restart rule as first install.) |
 | Editor warns **"no compiled Odin scripts found"** | Normal on a fresh install — follow *Quick start* to build the scripts library. |
 | Editor warns **"`odin` not found"** (validation/reload off) | The editor process can't see `odin` on PATH. Set the `odin_godot/odin_bin` project setting to the absolute path of your `odin`, or launch the editor from a shell where `odin` is on PATH. |
 | Web export logs **"Emscripten `emcc` not found"** | Install the Emscripten SDK (activate 4.0.20) and set the `odin_godot/emcc_bin` project setting to its `emcc`. See [docs/exporting.md](docs/exporting.md). |

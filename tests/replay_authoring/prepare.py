@@ -6,7 +6,6 @@ root=Path(__file__).resolve().parents[2]; here=Path(__file__).resolve().parent
 out=Path(sys.argv[1]).resolve();out.mkdir(parents=True,exist_ok=True)
 assert not (out/'kit').exists() and not (out/'replay').exists(),out
 subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/prepare_baseline.py'),str(root.parent/'scrapyard'),str(out/'kit/project'),str(root)],check=True)
-subprocess.run([sys.executable,str(root/'tests/replay_scrapyard/baseline_cleanup.py'),str(out/'kit/project')],check=True)
 shutil.copytree(root/'examples/replay_scrapyard',out/'replay/project',ignore=shutil.ignore_patterns('.godot','bin','out','node_modules','*.gen.odin','*.uid','*.import','__pycache__'))
 for implementation in ('kit','replay'):
     project=out/implementation/'project';p=project/'project.godot';s=p.read_text()
@@ -18,7 +17,7 @@ for implementation in ('kit','replay'):
     files=[p for p in project.rglob('*') if p.is_file() and p.suffix in ('.odin','.gd','.tscn','.tres','.png','.wav','.mp3') and not p.name.endswith('.gen.odin')]
     (out/implementation/'source.json').write_text(json.dumps({str(p.relative_to(project)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)},indent=2)+'\n')
 shutil.copy2(here/'contract.json',out/'contract.json')
-info={'platform':platform.platform(),'framework_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'original_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root.parent/'scrapyard',text=True).strip(),'authoring_timed':False,'baseline_overlay':'Existing explicit ownership cleanup; applied before feature diffs and excluded from feature counts.'}
+info={'platform':platform.platform(),'framework_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip(),'original_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root.parent/'scrapyard',text=True).strip(),'authoring_timed':False,'baseline_overlay':None}
 info['godot_binary']=os.environ.get('GODOT','godot')
 info['godot_version']=subprocess.check_output([info['godot_binary'],'--version'],text=True).strip()
 info['machine']=platform.machine();info['render']='headless; gl_compatibility; max-fps 60'

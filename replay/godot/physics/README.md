@@ -27,3 +27,6 @@ Code that used `replaygd.physics_presentation_frame` imports this feature and
 changes that call to `physicsgd.physics_presentation_frame`. The arguments and
 ownership rules are unchanged. Root Session, Party, and Room APIs keep their
 existing import and names.
+
+For standard authored initialization and checked teardown, use the
+[complete-physics Session owner](OWNERSHIP.md).

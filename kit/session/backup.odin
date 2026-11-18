@@ -77,7 +77,7 @@ backup_slot :: proc(s: ^Session, t: u64) {
 
 // The re-hostable snapshot: everything needed to BECOME the host of this
 // run — identity table (hashed tokens), roster names, allocation cursors,
-// the stat registry, and every entity as a spawn tuple. session_host_resume
+// the stat registry, and every committed entity as a spawn tuple. session_host_resume
 // parses it. Two consumers: the backup-host wire (below) and kit/save, which
 // wraps it in a versioned file envelope — saving a run and surviving a dead
 // host are the SAME contract.
@@ -142,13 +142,7 @@ session_snapshot :: proc(s: ^Session, w: ^knet.Writer) {
     }
 
     knet.write_u32(w, u32(s.reg.next_id))
-    assert(knet.registry_count(&s.reg) <= int(max(u16)))
-    assert(knet.registry_count(&s.reg) <= knet.MAX_CONTAINER_ITEMS)
-    knet.write_u16(w, u16(knet.registry_count(&s.reg)))
-
-    for id in s.types {
-        write_spawn_tuple(s, w, id)
-    }
+    write_committed_entities(s, w)
 }
 
 // Host-side state the SESSION cannot know about — wave directors, AI
@@ -393,7 +387,7 @@ session_host_resume :: proc(s: ^Session, me: knet.Player_Id, name: string, backu
     _ = knet.read_u32(&probe)
     pentities := int(knet.read_u16(&probe))
 
-    if !knet.reader_admit_count(&probe, pentities, 24) {
+    if !knet.reader_admit_count(&probe, pentities, 28) {
         return false
     }
 

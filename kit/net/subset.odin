@@ -22,12 +22,13 @@ package kit_net
 // CACHE: process-lifetime, mutex-guarded (the kit runtime is single-threaded,
 // but `odin test` drives suites in PARALLEL threads — an unguarded global map
 // here is the exact "never mutate kit globals in tests" lesson), allocated
-// from the heap allocator directly so a per-test tracking allocator doesn't
+// from a persistent allocator so a per-test tracking allocator doesn't
 // bill a deliberate process-lifetime cache as that test's leak. Views are
 // heap-boxed so returned pointers survive map growth. The backing arrays of
 // every desc — generated ([?] file-static) and hand-built (@(static)) —
 // outlive the process; a desc built over a freed heap slice would alias keys,
-// and no such desc exists (don't make one).
+// and no such desc exists (don't make one). Native defaults to the heap; the
+// Web host supplies its engine allocator and destroys the cache at shutdown.
 
 import "base:runtime"
 import "core:mem"
@@ -96,6 +97,36 @@ g_views: map[Subset_Key]^Subset_View
 @(private = "file")
 g_views_mu: sync.Mutex
 
+@(private = "file")
+g_views_allocator: mem.Allocator
+
+// Host integration: select persistent storage before the first view is used.
+// The allocator must outlive every cached view. Ordinary native users need no
+// setup; the Godot Web host installs its allocator automatically. Reconfiguring
+// a populated cache would invalidate borrowed views and is refused.
+subset_cache_init :: proc(allocator: mem.Allocator) -> bool {
+    sync.lock(&g_views_mu)
+    defer sync.unlock(&g_views_mu)
+    if allocator.procedure == nil || len(g_views) != 0 {return false}
+    g_views_allocator = allocator
+    return true
+}
+
+// Host shutdown only, after all users have released their borrowed views.
+subset_cache_destroy :: proc() {
+    sync.lock(&g_views_mu)
+    defer sync.unlock(&g_views_mu)
+    if g_views_allocator.procedure == nil {return}
+    context.allocator = g_views_allocator
+    for _, view in g_views {
+        delete(view.entries)
+        free(view)
+    }
+    delete(g_views)
+    g_views = nil
+    g_views_allocator = {}
+}
+
 // The view for (desc, subset) — built on first use, cached for the process.
 // The returned pointer is stable forever (views are heap-boxed).
 subset_view :: proc(desc: ^Entity_Desc, subset: Lane_Subset) -> ^Subset_View {
@@ -107,7 +138,14 @@ subset_view :: proc(desc: ^Entity_Desc, subset: Lane_Subset) -> ^Subset_View {
         return v
     }
 
-    context.allocator = runtime.heap_allocator()
+    if g_views_allocator.procedure == nil {
+        when ODIN_OS == .Freestanding {
+            panic("kit/net: the freestanding host must install persistent storage with subset_cache_init before using descriptors")
+        } else {
+            g_views_allocator = runtime.heap_allocator()
+        }
+    }
+    context.allocator = g_views_allocator
     n := 0
 
     for f in desc.fields {

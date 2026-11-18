@@ -79,7 +79,7 @@ EOF
 # The point of the test is the core's OWN scripts-dll resolution — no env override.
 unset ODIN_SCRIPTS_DLL
 
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 OUT="$("$GODOT" --headless --path "$PROJ" --script test_splitaddon.gd 2>&1)" || true
 echo "$OUT" | tail -n 8

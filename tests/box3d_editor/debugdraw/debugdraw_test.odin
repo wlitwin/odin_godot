@@ -370,7 +370,8 @@ stable_binding_frame_order_and_preview_limits :: proc(t: ^testing.T) {
     _, error = d.preview_geometry({id = 1, kind = .Mesh, vertices = vertices[:]}, IDENTITY, RED, 16, b[:])
     testing.expect(t, error == .Capacity)
     unchanged(t, b[:])
-    // Many valid triangles explicitly exceed only the preview line budget.
+    // This valid mesh needs more output than the caller supplied. Larger
+    // capacity profiles may fit the whole mesh within their global budget.
     tri := [3]d.Vec3{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}
     indices: [3 * d.MAX_TRIANGLES]u32
 
@@ -387,6 +388,21 @@ stable_binding_frame_order_and_preview_limits :: proc(t: ^testing.T) {
         16,
         b[:],
     )
-    testing.expect(t, limit_error == .Capacity && required == d.MAX_LINES + 1)
+    testing.expect(t, limit_error == .Capacity && required == min(u32(3 * d.MAX_TRIANGLES), u32(d.MAX_LINES + 1)))
     unchanged(t, b[:])
+
+    // Independently reach the selected global line limit with valid bindings,
+    // rather than assuming a fixed profile or an oversized single geometry.
+    copies := d.MAX_LINES / (3 * d.MAX_TRIANGLES) + 1
+    if copies <= d.MAX_BINDINGS {
+        repeated := make([]d.Binding, copies)
+        defer delete(repeated)
+        for &binding, i in repeated {
+            binding = {id = u64(i + 1), body = 11, geometry = 1, local = IDENTITY, color = RED}
+        }
+        mesh := [1]d.Geometry{{id = 1, kind = .Mesh, vertices = tri[:], indices = indices[:]}}
+        batch, failure := d.generate(&f, {geometries = mesh[:], bindings = repeated}, {enabled = true, expected = d.stamp_of(&f)}, b[:])
+        testing.expect(t, failure == .Capacity && batch.required == d.MAX_LINES + 1 && batch.count == 0)
+        unchanged(t, b[:])
+    }
 }

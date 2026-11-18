@@ -11,10 +11,10 @@ cfg.session.max_players = 4
 cfg.lane.smooth_cut = 48
 cfg.lane.rewind_max = 30
 
-my_game_net_attach(self, kboot.Options{
+if !my_game_net_attach(self, kboot.Options{
 	title = "MY GAME",
 	env = "MY_GAME",
-}, cfg)
+}, cfg) {return}
 ```
 
 `rewind_max` caps historical rewind for hit judgment. For each shooter, the
@@ -134,7 +134,7 @@ cfg.session.interp_adapt = false
 cfg.session.interp_delay = 0.12
 cfg.lane.echo_inputs = true
 cfg.lane.tolerance = 0.5
-my_game_net_attach(self, opts, cfg)
+if !my_game_net_attach(self, opts, cfg) {return}
 ```
 
 The complete value is validated before `boot_attach` or `lane_init`. Validation
@@ -165,7 +165,7 @@ cfg := kboot.network_configure(
 		all_inputs_validated = true,
 	},
 )
-kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, opts)
+if !kboot.boot_attach(&self.boot, self.owner, &self.ses, &self.comms, opts) {return}
 my_game_lane_init(self, &self.lane, &self.ses, cfg = cfg.lane)
 kboot.boot_lane(&self.boot, &self.lane)
 ```

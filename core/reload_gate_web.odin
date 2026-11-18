@@ -12,7 +12,7 @@ web_outer_temp: runtime.Arena_Temp
 
 @(private)
 script_access_enter :: proc "contextless" () {
-    if !box3d_web_on_thread() {
+    if !instance_lifecycle_on_thread() {
         return
     }
 
@@ -31,7 +31,7 @@ script_access_enter :: proc "contextless" () {
 
 @(private)
 script_access_leave :: proc "contextless" () {
-    if !box3d_web_on_thread() {
+    if !instance_lifecycle_on_thread() {
         return
     }
 

@@ -8,7 +8,7 @@ import d "godot:box3d/diagnostics"
 identity :: proc() -> d.Identity {
     return {
         solver_format = 3,
-        recovery_format = 1,
+        recovery_format = 3,
         game_format = 1,
         observation_format = 1,
         profile = 1,

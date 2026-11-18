@@ -42,6 +42,19 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 PROJ="${1:-$ROOT/tests/web}"
 SCRIPTS="${2:-$PROJ/scripts}"
 OUT="${3:-$PROJ/bin/libodin_godot.wasm}"
+odin_gd_toolchain_resolve "$PROJ" web
+
+# Godot passes the active preset's mode during export. Direct builds use the
+# project's Web preset(s), so a normal thread toggle needs no second setting.
+WEB_MEMORY_ARGS=()
+if [[ -n "${BOX3D_WEB_ARCHIVE:-}" ]]; then WEB_MEMORY_ARGS+=(--box3d); fi
+WEB_THREADS="$(python3 "$ROOT/build/web_memory.py" "$PROJ" ${WEB_MEMORY_ARGS[@]+"${WEB_MEMORY_ARGS[@]}"})"
+WEB_ODIN_FLAGS=()
+WEB_LINK_FLAGS=()
+if [[ "$WEB_THREADS" == 1 ]]; then
+    WEB_ODIN_FLAGS=(-target-features:atomics,bulk-memory)
+    WEB_LINK_FLAGS=(-pthread)
+fi
 
 mkdir -p "$(dirname "$OUT")"
 
@@ -88,7 +101,7 @@ PY
         echo 'build_web.sh: invalid Box3D profile fields' >&2
         exit 1
     fi
-    BOX3D_WEB_FLAGS=(-target-features:atomics,bulk-memory -define:BOX3D_HOST_ENABLED=true -define:BOX3D_REQUIRE_DOMAIN=true
+    BOX3D_WEB_FLAGS=(-define:BOX3D_HOST_ENABLED=true -define:BOX3D_REQUIRE_DOMAIN=true
         "-define:BOX3D_LIBRARY=${BOX3D_WEB_FIELDS[0]}"
         "-define:BOX3D_EXPECTED_BUILD=sha256:${BOX3D_WEB_FIELDS[1]}"
         "-define:BOX3D_EXPECTED_TARGET=sha256:${BOX3D_WEB_FIELDS[2]}")
@@ -201,6 +214,7 @@ ODIN_OBJ="$OBJ_DIR/$(basename "${OUT%.wasm}").wasm.o"
     -no-entry-point \
     -reloc-mode:pic \
     -define:ODIN_GODOT_WEB=true \
+    ${WEB_ODIN_FLAGS[@]+"${WEB_ODIN_FLAGS[@]}"} \
     ${BOX3D_WEB_FLAGS[@]+"${BOX3D_WEB_FLAGS[@]}"} \
     ${ODIN_GD_ATTRS[@]+"${ODIN_GD_ATTRS[@]}"} \
     -out:"$ODIN_OBJ" \
@@ -222,6 +236,7 @@ if [ "${#BOX3D_WEB_FLAGS[@]}" -ne 0 ]; then
     mv -f "${TMP_WASM%.wasm}.box3d-link.json" "${OUT%.wasm}.box3d-link.json"
 else
     "$EMCC" "$ODIN_OBJ" \
+        ${WEB_LINK_FLAGS[@]+"${WEB_LINK_FLAGS[@]}"} \
         -sSIDE_MODULE=1 \
         -sSUPPORT_LONGJMP=wasm \
         -O2 \
@@ -230,5 +245,6 @@ fi
 mv -f "$TMP_WASM" "$OUT"
 rm -rf "$WASM_STAGE"
 
-echo "build_web.sh: built $OUT"
+echo "build_web.sh: built $OUT (thread support=$WEB_THREADS)"
 file "$OUT" || true
+odin_gd_toolchain_remember "$PROJ" web

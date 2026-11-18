@@ -1,4 +1,4 @@
-# Canonical solver recovery, format 1
+# Canonical solver recovery, format 3
 
 The fixed-count measurements in this record describe the legacy qualification
 profile. Current world capacities are selected through
@@ -11,11 +11,11 @@ image. Kit and Replay compose their own Game, Side, registered prediction
 fields, completed observations, occurrences, tick/epoch and input identities
 around these solver bytes. Their ordinary value-only packages remain native-free.
 
-The initial contract is **same native build, target and declared primitive
-profile**. A matching field grammar is not a claim of Mac/Linux exact-physics
+The contract is **same native build, target and declared catalog/profile**. A matching field grammar is not a claim of Mac/Linux exact-physics
 compatibility. Historical Gate A v2 artifacts remain historical. Local normalized
-solver comparison remains version 3 and owned local resources remain version 2;
-the recovery format has its own version 1.
+solver comparison uses version 4 and owned local resources use version 2;
+the recovery format has its own version 3. Earlier qualification reports retain
+the versions and measurements they actually tested.
 
 ## Public ownership and limits
 
@@ -27,7 +27,11 @@ uses `Recovery_Config`, `Recovery_Asset`, `Recovery_Catalog`,
 1. Start with `recovery_config_default()`. It supplies the actual embedded native
    build identity. A caller-supplied replacement identity is rejected.
 2. Create a catalog from sorted, unique nonzero asset IDs. The catalog copies
-   immutable definitions. Clone explicitly and release every owner.
+   immutable definitions. Use `recovery_catalog_create` for primitives or
+   `recovery_catalog_create_authored` with `Recovery_Authored_Asset` for hulls
+   and meshes. Both produce identical identities and bytes for equivalent
+   primitives. Equivalent geometry must share one ID. Clone explicitly and
+   release every owner.
 3. `recovery_write(catalog, snapshot, nil)` queries the exact size. NULL/zero is
    successful; a short output returns Capacity with the required size and leaves
    the output untouched. Neither query nor write consumes either owner.
@@ -37,31 +41,33 @@ uses `Recovery_Config`, `Recovery_Asset`, `Recovery_Catalog`,
 5. Restore/open that image through the existing staged-world transaction.
    Decoding never selects or modifies a published execution.
 
-Defaults are 512 KiB wire, 2 MiB DTO requests, 35 live bodies/shapes, 147 live
-contacts/manifolds, one hinge, one sensor, 512 sparse slots per allocation domain,
-512 tree nodes per tree, 128 total retained sensor visitor entries, and 35/147
-pending sensor/contact ends. Limits may be lowered, not increased. Every world
-has three trees with at least the pinned constructor's 31 nodes. Sparse/free
-slots and retained history counts are separate from live object limits. The
-initial 32 dynamic-body check, H=128 and repair-age policy belong to adapter
-admission; this solver codec has no gameplay clock or timeline.
+Defaults come from [the shared capacity profile](../../docs/box3d/capacities.md).
+Callers may lower limits, not exceed that build's limits. Sparse/free slots,
+retained history, live objects and tree nodes have separate bounds. This solver
+codec has no gameplay clock or timeline; adapter history and repair policies are
+additional admission constraints.
 
-The profile admits Box, Sphere and Capsule assets only. Box `a` is positive
-half extents; Sphere `a` is its center; Capsule `a,b` are its endpoints. Radius
-is positive for sphere/capsule. Dimensions/radius are at least 0.01 m, all asset
-coordinates and dimensions are finite and at most 32 m in magnitude, unused
-fields/reserved words are zero. Asset IDs are catalog identity, not body keys or
-game identity. General hulls, meshes, compounds, height fields, multiple inline
-materials and non-hinge joints return Unsupported; the historical mesh floor
-is never converted into a box during export. The new primitive fixture is
-measured separately by both adapters.
+The primitive convenience accepts Box, Sphere and Capsule assets. Box `a` is
+positive half extents; Sphere `a` is its center; Capsule `a,b` are its endpoints.
+Radius is positive for sphere/capsule. Dimensions/radius are at least 0.01 m,
+coordinates and dimensions are finite and at most 32 m in magnitude, and unused
+fields/reserved words are zero. Authored descriptors also support copied Hull
+and static Mesh geometry, including externally baked heightfields. See
+[the authoring contract](../authoring/API.md) for geometry validation.
+
+Both constructors support all current joint families. The authored descriptor
+ABI version `AUTHORING_ASSET_VERSION` is separate from the recovery format.
+Recovery formats 1 and 2 are rejected. Primitive catalogs reserve only catalog
+storage; hull/mesh construction also reserves geometry and staging storage.
+Asset IDs identify geometry, not bodies or gameplay entities. Compounds and
+multiple inline materials remain outside this recovery contract.
 
 Precommit `recovery_world_admit(catalog, idle_world, external_bytes)` runs the
 same full semantic verifier and scalar/count/asset/size walker directly on a
 checked borrowed execution, returning the exact canonical byte count. It creates,
 restores and steps no world and mutates no solver state. Temporary DTO checks
 include external charges. Adapters capture this same execution and preserve the
-trusted source image <= `RECOVERY_MAX_SOURCE_IMAGE_BYTES` (2 MiB) gate before
+trusted source image <= `RECOVERY_MAX_SOURCE_IMAGE_BYTES` gate before
 publication. This admission path produces no transport bytes and bypasses none
 of decoding's validation. Actual export still uses full `recovery_write`. An internal sizing callback may
 reuse an exact required length produced by this complete admission for the same
@@ -71,8 +77,8 @@ returned transport bytes rely on a cached validation ticket alone.
 
 Encoding uses disposable native scratch worlds and can require two spare world
 slots. Before scratch creation, trusted resource preflight bounds the local
-image to 2 MiB, bounds body count, and checks every retained hull against the
-actual catalog boxes; other geometry is rejected. A public world slot cannot
+image to `RECOVERY_MAX_SOURCE_IMAGE_BYTES`, bounds body count, and checks retained
+geometry against the immutable catalog; unknown geometry is rejected. A public world slot cannot
 be substituted for missing history.
 
 ## Identity and bytes
@@ -89,8 +95,8 @@ The 192-byte header is:
 | Offset | Field |
 | ---: | --- |
 | 0 | Eight bytes `OGB3REC\0` |
-| 8 | recovery format u32 = 1 |
-| 12 | logical solver format u32 = 3 |
+| 8 | recovery format u32 = 3 |
+| 12 | logical solver format u32 = 4 |
 | 16 | header length u32 = 192 |
 | 20 | section count u32 = 12 |
 | 24 | profile u64 |
@@ -107,8 +113,10 @@ The native build digest binds actual native source/header/patch/dependency
 content, effective compiler/version/target/SDK/deployment configuration, build
 configuration, FP/assert/SIMD compile options and the runtime private-ABI
 fingerprint. CMake records content-relative paths and refreshes on source edits.
-The asset digest hashes `ogb3-primitives-assets-v1\0` followed by each sorted
-40-byte descriptor (id/kind, seven binary32 values, reserved zero). The solver
+The asset digest hashes `ogb3-authored-assets-v2\0` followed by each sorted
+40-byte base descriptor (id/kind, seven binary32 values, reserved zero), two u32
+vertex/triangle counts, and copied geometry payloads. Primitive counts are zero.
+This algorithm is shared by both constructors; no API choice enters identity. The solver
 schema binds the generated field visitor digest, manual format rules and all
 configured limits. Debug and Release are different build identities.
 
@@ -132,7 +140,7 @@ payload_bytes:u64}`. Tags must appear once in ascending order. Payloads are:
 
 The exact scalar order is the explicit bidirectional visitor in
 [recovery_codec.c](../native/recovery_codec.c), generated from the
-audited dump-v3 visitor by
+audited logical dump visitor by
 [generate_fields.py](../../tests/box3d_recovery/generate_fields.py).
 `--check` rejects drift and checks the scalar schema digest. Variable collections,
 active union dispatch and geometry IDs are explicit manual visitors. Inactive
@@ -145,7 +153,7 @@ callbacks, scratch arenas, mutexes and allocator capacities are excluded. Game
 rebinding is explicit. Both adapters separately preserve completed sensor
 observations needed within a tick. The current future end queue is included,
 including retired generations after slot reuse; it is not cleared as completed
-output. Logical dump3 still includes tree node capacity, so an undersized tree
+output. Logical dump4 still includes tree node capacity, so an undersized tree
 is rejected rather than silently inflated. Sensor array capacities are not
 logical state; reconstructed/locally restored sensors receive the constructor's
 hits=4 and overlap=16 minimum storage to satisfy the pinned zero-count append
@@ -248,19 +256,19 @@ not link independent engine domains into modules.
 semantic controls, independently rechecksummed scalar mutations, truncation and
 identity/finite/budget controls, wrapper/write/native-ledger failure sweeps,
 unchanged-publication and zero-owner checks; a separate lifecycle suite exercises
-all three asset families, defaults, source destruction, slot reuse, pending ends
+all three primitive asset families, defaults, source destruction, slot reuse, pending ends
 exactly once and longer suffix equality. An independent Python parser checks LE
 framing, SHA256, catalog identity, fixed defaults and ID-pool order. Odin's actual
 32-body fixture exercises motor/limits, contacts, sensor deletion, sleep/wake,
-detached catalog/world lifetime, exact dump3/re-encode and resimulation.
+detached catalog/world lifetime, exact full-dump/re-encode and resimulation.
 
-Final per-target/configuration artifacts, sanitizer results and the separate Kit
+Historical per-target/configuration artifacts, sanitizer results and the separate Kit
 and Replay integration results are recorded in the P3.4 task report. Passing
 limited fuzzing and bounded local/network fixtures is not a general untrusted
 geometry importer, portable save-game certification or mixed-target lockstep
 claim.
 
-The native functional matrix does not certify the full adapter CPU budget.
+The historical native functional matrix did not certify the full adapter CPU budget.
 Whole-call depth-eight complete recovery remains above 4 ms in the recorded Kit
 and Replay runs; this is an explicit UNMET GateB/P4.4 requirement. The native
 codec's functional closure does not waive it or claim the full goal achieved.

@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://dev/pickup_preview.gd" id="1"]
+[ext_resource type="PackedScene" path="res://entities/pickup.tscn" id="2"]
+
+[node name="PickupPreview" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Pickup" parent="." instance=ExtResource("2")]
+position = Vector2(320,180)
+show_reach = true
+
+[node name="Status" type="Label" parent="."]
+position = Vector2(24,24)
+text = "Pickup preview — edit and save data/pickup.tres, then refresh."
+
+[node name="Refresh" type="Button" parent="."]
+position = Vector2(24,64)
+text = "Refresh saved definition"
+
+[connection signal="pressed" from="Refresh" to="." method="refresh"]

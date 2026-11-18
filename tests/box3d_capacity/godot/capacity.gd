@@ -32,7 +32,7 @@ func _initialize() -> void:
 		body.shapes.append(cube)
 		world.add_child(body)
 	for i in range(100):
-		var joint := Box3DHingeJoint3D.new()
+		var joint := Box3DHingeJoint3D.new(); joint.frame_mode = Box3DJoint3D.FrameMode.BODY_LOCAL
 		joint.stable_key = "hinge-%03d" % i
 		joint.body_a = "body-0000"
 		joint.body_b = "body-%04d" % (i+1)

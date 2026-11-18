@@ -63,23 +63,50 @@ Internet deployment needs its own reachability and admission configuration.
 | --- | --- |
 | `shared/game/game.odin` | World, initial state, controls, actions, occurrences, and step rules |
 | `scripts/starter.odin` | Session lifecycle, device input, action submission, and copied frame presentation |
+| `scripts/effects.odin` | Typed pickup visual/audio routes, event identity, and checked presentation updates |
+| `scripts/pickup_def.odin`, `data/pickup.tres` | Typed authoring Resource and shared checked extraction |
+| `entities/pickup.tscn`, `dev/pickup_preview.tscn` | Authored entity and isolated preview |
+| `effects/pickup.tscn`, `effects/pickup.wav` | Replaceable flash scene and pickup sound |
 | `main.tscn` | Nodes that display the players, coin, and status |
 
 In `replay_starter_ready`, the script copies `rgd.SESSION_OPTIONS`, chooses a
 role, sets content identity, and calls `rgd.session_open`. Treat a failed open as
 a setup error; do not enter the frame loop.
 
+The starter shows the specific setup problem in its status label and Output.
+For your own adapter:
+
+```odin
+if error := rgd.session_open(&self.session, initial, model, options); error != .None {
+    gd.print_str(rgd.session_setup_message(&self.session))
+    return
+}
+```
+
+Examples include `network.max_prediction` with its permitted range,
+`model.control_valid` for a missing callback, and `State.inventory.name` for an
+unsupported schema field. The error enum remains available for programmatic
+handling. `session_setup_report` returns a copy containing the path, message,
+schema/frame cause and any pending cleanup error. It survives the cleanup
+performed by a failed open; a subsequent attempt or explicit `session_close`
+replaces it. Copy a report before closing if you want to retain it.
+
+`net.config_check` and `rgd.session_options_check` check configuration without
+opening a connection. `net.model_check` checks required callbacks and policy
+declarations without invoking gameplay. Initialization additionally checks
+schemas, ownership, and the authority's initial state/neutral input.
+
 In `_process`, it samples controls, submits discrete actions, calls
 `rgd.session_frame`, drains `rgd.session_changes`, and reads
-`rgd.session_state` to position nodes. `_exit_tree` calls `rgd.session_close`.
-The imports in this script are the complete starting point for your own code.
+`rgd.session_state` to position nodes. It forwards occurrence changes to the
+pickup routes and advances the flash animation. The `finalize` hook closes the
+Session and destroys the effects when the script instance is released.
 
 ## Change the game
 
 Change a gameplay predicate in `shared/game/game.odin`, rebuild, and run both
 roles from the same build. Keep scene effects and device access in the script.
-When adding sound, map occurrence changes to effects using
-[the presentation guide](presentation.md).
+Customize the pickup flash and sound using [the presentation guide](presentation.md).
 
 ## Next
 

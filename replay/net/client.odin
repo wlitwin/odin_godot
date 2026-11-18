@@ -20,36 +20,72 @@ client_init :: proc(
     permit: Permit = {},
     incarnation: u64 = 0,
     ownership: Runner_Ownership = {},
-) -> Error {
+    setup: ^Setup_Report = nil,
+) -> (
+    result: Error,
+) {
+    if setup != nil {
+        setup^ = {}
+    }
+
+    stage := "client"
+    defer setup_finish(setup, result, stage, "initialization failed at this step")
     #assert(Seats >= 1 && Seats <= 8)
 
-    if model.complete_state && !complete_codec_valid(model.complete_codec) {
-        return .Incomplete_State
+    if model.complete_state {
+        if report := complete_codec_check(model.complete_codec); report.error != .None {
+            return setup_assign(setup, report)
+        }
+
+        if report := physics_config_check(model, cfg); report.error != .None {
+            return setup_assign(setup, report)
+        }
     }
 
-    if model.complete_state && !physics_config_valid(model, cfg) {
-        return .Invalid_Config
+    if c.owner_cleanup || c.initialized {
+        return setup_fail(
+            setup,
+            .Invalid_Config,
+            "client",
+            "destroy the previous runner and finish pending owner cleanup before initializing again",
+        )
     }
 
-    if c.owner_cleanup || c.initialized || !config_valid(cfg) || authority == 0 || !token_valid(token) {
-        return .Invalid_Config
+    if report := config_check(cfg); report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if authority == 0 {
+        return setup_fail(setup, .Invalid_Config, "authority", "authority peer id must be nonzero")
+    }
+
+    if !token_valid(token) {
+        return setup_fail(setup, .Invalid_Config, "token", "provide a nonzero stable player token")
     }
 
     if cfg.require_permit && permit.allow == nil {
-        return .Fenced
+        return setup_fail(setup, .Fenced, "permit.allow", "required when network.require_permit is true")
     }
+
+    stage = "ownership.runner"
 
     if error := runner_context_check(ownership, allocator, &c.model, model.complete_state); error != .None {
         return error
     }
 
+    stage = "model.ownership"
+
     if error := model_context_check(model, runner_managed(ownership)); error != .None {
         return error
     }
 
+    stage = "wire.ownership"
+
     if error := owned_context_check(ownership.wire, wire.user, runner_managed(ownership)); error != .None {
         return error
     }
+
+    stage = "permit.ownership"
 
     if error := owned_context_check(ownership.permit, permit.user, runner_managed(ownership)); error != .None {
         return error
@@ -61,37 +97,46 @@ client_init :: proc(
     c.wire = wire
     c.permit = permit
 
+    stage = "client.ownership"
+
     if error := client_access(c); error != .None {
         c^ = {}
         return error
     }
 
+    stage = "ownership.retains"
+
     if error := runner_retain(&c.owner_retains, ownership, &c.model); error != .None {
-        client_destroy(c)
+        cleanup := client_destroy(c)
+
+        if setup != nil {
+            setup.cleanup_error = cleanup
+        }
+
         return error
     }
 
     committed := false
 
     defer if !committed {
-        client_destroy(c)
+        cleanup := client_destroy(c)
+
+        if setup != nil {
+            setup.cleanup_error = cleanup
+        }
     }
 
-    if (model.step == nil && model.step_view == nil) ||
-       model.control_valid == nil ||
-       model.hold == nil ||
-       model.state_valid == nil ||
-       !group_config_valid(model.group) ||
-       !replication_config_valid(model.replication) ||
-       model.control_timing > .Latest_Observation ||
-       model.action_timing > .Receipt ||
-       !action_schedule_valid(model.action_schedule) ||
-       !authority_policy_valid(model.authority) {
-        return .Invalid_Model
+    if report := model_check(model); report.error != .None {
+        return setup_assign(setup, report)
     }
 
     if model.replication.id != 0 && !spectator && model.group.id == 0 {
-        return .Invalid_Model
+        return setup_fail(
+            setup,
+            .Invalid_Model,
+            "model.group.id",
+            "a predicting client with recipient-specific replication needs a prediction group",
+        )
     }
 
     c.allocator, c.model, c.cfg, c.wire, c.token, c.spectator, c.authority =
@@ -99,7 +144,11 @@ client_init :: proc(
     c.permit = permit
     c.incarnation = incarnation
 
+    stage = "model.complete_codec"
+
     if model.complete_state {
+        stage = "model.complete_codec.acquire"
+
         if model.complete_codec.acquire != nil {
             if error := model.complete_codec.acquire(model.complete_codec.catalog); error != .None {
                 return error
@@ -108,6 +157,7 @@ client_init :: proc(
             c.complete_lease = true
         }
 
+        stage = "State"
         payload := physics_client_payload(State, Control, Action, Event, Seats)
 
         if payload > 8 * 1024 * 1024 {
@@ -116,6 +166,8 @@ client_init :: proc(
 
         bytes := payload + PHYSICS_SCHEMA_RESERVE
 
+        stage = "model.complete_codec.reserve"
+
         if error := model.complete_codec.reserve(model.complete_codec.catalog, bytes); error != .None {
             return error
         }
@@ -123,12 +175,18 @@ client_init :: proc(
         c.complete_charge = bytes
     }
 
-    if !codecs_init(&c.codecs, State, Control, Action, Event, Seats, allocator, model.replication.id != 0) {
-        return .Invalid_Model
+    if report := codecs_init(&c.codecs, State, Control, Action, Event, Seats, allocator, model.replication.id != 0);
+       report.error != .None {
+        return setup_assign(setup, report)
     }
 
     if !spectator && c.codecs.state.excluded_fields != 0 && model.replication.id == 0 {
-        return .Invalid_Model
+        return setup_fail(
+            setup,
+            .Invalid_Model,
+            "model.replication",
+            "a predicting client with authority-only state needs a replication policy",
+        )
     }
 
     c.contract = contract_hash(
@@ -142,16 +200,23 @@ client_init :: proc(
         authority_policy = model.authority.id,
     )
 
+    stage = "timeline"
+
     thunk := proc(state: ^State, input: Batch(Control, Action, Seats), ctx: ^r.Step(Net_Event(Event))) {
         network_step(state, input, ctx)
     }
 
     if model.complete_state {
         if c.codecs.state.excluded_fields != 0 {
-            return .Invalid_Model
+            return setup_fail(
+                setup,
+                .Invalid_Model,
+                "State",
+                "complete physics requires all state fields; public schema excludes authority-only fields",
+            )
         }
 
-        if error := client_physics_init(c); error != .None {
+        if error := client_physics_init(c, setup); error != .None {
             return error
         }
 
@@ -177,6 +242,8 @@ client_init :: proc(
         return .Invalid_Model
     }
 
+    stage = "presentation.journal"
+
     if view.journal_init(
            &c.journal,
            epoch = cfg.epoch,
@@ -187,6 +254,7 @@ client_init :: proc(
         return .Invalid_Model
     }
 
+    stage = "client.storage"
     client_install_policy(c)
     c.facts = make([]Facts_Packet(Event), cfg.history, allocator)
     c.observed = make([]r.Frame(State), cfg.history, allocator)

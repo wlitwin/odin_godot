@@ -15,17 +15,72 @@ session_open_complete :: proc(
     options: Session_Options,
     allocator := context.allocator,
     ownership: Session_Ownership = {},
-) -> net.Error {
-    if s.ready ||
-       !model.complete_state ||
-       initial == nil ||
-       options.reuse_equal_corrections ||
-       (options.role != .Solo && options.role != .Host && options.role != .Server) ||
-       (options.discover_epoch && options.network.require_permit) {
-        return .Invalid_Config
+) -> (
+    result: net.Error,
+) {
+    report: net.Setup_Report
+    stage := "session.complete"
+
+    defer {
+        net.setup_finish(&report, result, stage, "complete Session initialization failed at this step")
+        s.setup_report = report
     }
 
-    if error := session_begin(s, model, options, allocator, ownership); error != .None {
+    if s.ready {
+        return session_setup_fail(
+            &report,
+            .Invalid_Config,
+            "session.ready",
+            "close the current Session before opening another",
+        )
+    }
+
+    if s.cleanup {
+        return session_setup_fail(
+            &report,
+            .Wrong_Phase,
+            "session.cleanup",
+            "finish pending session_close cleanup before opening another Session",
+        )
+    }
+
+    if !model.complete_state {
+        return session_setup_fail(
+            &report,
+            .Invalid_Config,
+            "model.complete_state",
+            "must be true for session_open_complete",
+        )
+    }
+
+    if initial == nil {
+        return session_setup_fail(&report, .Invalid_Config, "initial", "a complete checkpoint is required")
+    }
+
+    if options.reuse_equal_corrections {
+        return session_setup_fail(
+            &report,
+            .Invalid_Config,
+            "options.reuse_equal_corrections",
+            "game-value equality cannot establish complete physics equality; disable this option",
+        )
+    }
+
+    if options.role != .Solo && options.role != .Host && options.role != .Server {
+        return session_setup_fail(
+            &report,
+            .Invalid_Config,
+            "options.role",
+            "complete authority startup needs Solo, Host or Server; clients use session_open",
+        )
+    }
+
+    if detail := session_options_check(options); detail.error != .None {
+        report = detail
+        return detail.error
+    }
+
+    if error := session_begin(s, model, options, allocator, ownership, &report); error != .None {
         return error
     }
 
@@ -34,7 +89,8 @@ session_open_complete :: proc(
     s.options.rtc = {}
     s.options.steam.peer = nil
 
-    if error := session_connect(s, options); error != .None {
+    if error := session_connect(s, options, setup = &report); error != .None {
+        report.cleanup_error = session_close(s)
         return error
     }
 
@@ -55,16 +111,19 @@ session_open_complete :: proc(
         incarnation = options.incarnation,
         allocator = s.allocator,
         ownership = session_runner_ownership(s, true),
+        setup = &report,
     ); error != .None {
-        session_close(s)
+        report.cleanup_error = session_close(s)
         return error
     }
 
     s.server.epoch_discovery = options.discover_epoch
 
     if s.server.local_seat != 0 {
+        stage = "options.token"
+
         if error := net.server_set_local_token(&s.server, s.token); error != .None {
-            session_close(s)
+            report.cleanup_error = session_close(s)
             return error
         }
     }

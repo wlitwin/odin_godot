@@ -65,7 +65,7 @@ assert_grep() {
 echo "== (1) file:line breakpoint binds across dlopen; args + printers live =="
 PROJ="$ROOT/tests/showcase"
 bash "$ROOT/build/build_scripts.sh" "$PROJ" >/dev/null
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$PROJ" || exit 1
 
 # Anchor the breakpoint to the marker line's CONTENT, not a hardcoded number, so edits
 # to player.odin don't silently break this test.
@@ -99,7 +99,7 @@ echo "== (2) script panic freezes the session at native_script_assertion_failure
 CPROJ="$ROOT/tests/crash"
 bash "$ROOT/build/build_scripts.sh" "$CPROJ" >/dev/null
 export ODIN_SCRIPTS_DLL="$CPROJ/bin/libodinscripts.dylib"
-"$GODOT" --headless --path "$CPROJ" --import >/dev/null 2>&1 || true
+GODOT="$GODOT" ODIN_GODOT_ROOT="$ROOT" bash "$ROOT/build/import_project.sh" "$CPROJ" || exit 1
 
 PANIC_LOG="$LOGDIR/debug_launch-panic.log"
 GODOT="$GODOT" bash "$ROOT/build/debug_game.sh" \

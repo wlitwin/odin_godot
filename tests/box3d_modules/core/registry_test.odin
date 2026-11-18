@@ -3,7 +3,10 @@ package host_core_test
 import rt "base:runtime"
 import "core:mem"
 import "core:testing"
+import "core:sync"
+import "core:thread"
 import bg "godot:box3d/godot"
+import b "godot:box3d"
 import bh "godot:box3d/godot/host"
 
 NATIVE :: #config(BOX3D_LIBRARY, "/tmp/odin-box3d-goal-t4jbbj4v/box3d-native-p4/cache/build/Release/libogb3.a")
@@ -41,10 +44,7 @@ foreign native {
     state_dump :: proc(_: u32, _: [^]u8, _: u64, _: ^u64) -> bg.Status ---
 }
 
-World_Def :: struct {
-    gravity:           [3]f32,
-    sleep, continuous: u32,
-}
+World_Def :: b.World_Def
 
 Code :: struct {
     refs, drops: int,
@@ -278,6 +278,24 @@ actual_native_ledger_origin_lifetime_and_complete_capsule :: proc(t: ^testing.T)
     testing.expect_value(t, enter(nil), bg.OK)
     scope, status = bh.origin_enter(a.user, weak)
     testing.expect_value(t, status, bg.OK)
+    cell := bh.context_liveness_cell(weak)
+    testing.expect(t, cell != nil)
+    worker := thread.create(
+    proc(worker: ^thread.Thread) {
+        // The only permitted off-thread operation: revoke this source-owned
+        // stable liveness cell without registry/callback/producer mutations.
+        sync.atomic_store_explicit(cast(^u32)worker.data, 0, .Release)
+    },
+    )
+    worker.data = cell
+    thread.start(worker)
+    thread.join(worker)
+    thread.destroy(worker)
+    rejected_scope, rejected_status := bh.origin_enter(a.user, weak)
+    testing.expect_value(t, rejected_status, bg.INVALID_HANDLE)
+    testing.expect_value(t, rejected_scope, bg.Origin_Scope{})
+    testing.expect_value(t, capsule.invoke(capsule.user, 3, nil), bg.INVALID_HANDLE)
+    testing.expect_value(t, capsule.invoke(capsule.user, 2, &read), bg.OK)
     testing.expect_value(t, bh.context_invalidate(weak), bg.OK)
     testing.expect_value(t, a.owner_create(a.user, 0, &bad_lease, &rejected_owner), bg.UNSUPPORTED)
     mem.free(source)

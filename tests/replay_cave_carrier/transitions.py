@@ -1,14 +1,15 @@
 from pathlib import Path
 import hashlib,json,os,re,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2];out=Path(sys.argv[1]).resolve();run=out/'transitions';run.mkdir(exist_ok=False);ext='dylib' if sys.platform=='darwin' else 'so';sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+sys.path.insert(0,str(root/'tests/replay_cave'))
+from current_fixtures import stage
 for name,digest in json.loads((out/'prepared.json').read_text()).items():assert sha(out/'project'/name)==digest,name
 for name,digest in json.loads((out/'framework.json').read_text()).items():assert sha(root/name)==digest,name
 shutil.copy2(root/'tests/replay_cave_carrier/transition.gd',run/'driver.gd')
 (run/'inputs.json').write_text(json.dumps({'driver':sha(run/'driver.gd'),'binaries':{p.name:sha(p) for p in (out/'project/bin').glob('*.'+ext)}},indent=2)+'\n')
 for mode,source_name in [('dead','dead'),('disconnected','disconnected')]:
- source=root/'tests/replay_cave/fixtures/content6'/(source_name+'.replay');target=run/(mode+'.replay')
- converted=subprocess.run([str(out/'upgrade'),str(source),str(target)],capture_output=True,text=True,timeout=30);assert converted.returncode==0,converted.stderr
- (run/(mode+'-convert.log')).write_text(converted.stdout+converted.stderr)
+ target=run/(mode+'.replay')
+ stage('carrier_'+source_name.replace('-','_'),target)
  env=os.environ.copy();env.update(ODIN_SCRIPTS_DLL=str(out/('project/bin/libodinscripts.'+ext)),REPLAY_CAVE_ROLE='solo',REPLAY_CAVE_TOKEN='cave-carrier-legacy',REPLAY_CAVE_RESUME='1',REPLAY_CAVE_SAVE=str(target),REPLAY_CAVE_PERSIST='0',CAVE_CARRIER_CASE=mode,CAVE_CARRIER_OUT=str(run))
  with (run/(mode+'.log')).open('w') as log:
   result=subprocess.run([env['GODOT'],'--headless','--max-fps','60','--path',str(out/'project'),'--script',str(run/'driver.gd')],env=env,stdout=log,stderr=subprocess.STDOUT,timeout=20)

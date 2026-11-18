@@ -132,6 +132,7 @@ measured_32_body_history_and_eight_tick_transaction :: proc(t: ^testing.T) {
     e.ses.me = 1
     e.desc = actor_desc()
     sim.lane_init(&e.lane, &e.ses, size_of(fixture.Input))
+    sim.lane_class_set_type(&e.lane, 0, typeid_of(fixture.Input))
     sim.lane_set_sim(&e.lane, e, envelope_sample, envelope_step)
     fields: [32]sim.World_Field_Type
 

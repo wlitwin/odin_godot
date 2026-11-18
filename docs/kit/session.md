@@ -178,14 +178,18 @@ check. Peers then reject mismatched content tables during admission.
 sorted so registration order does not matter. Cavecrawl includes its
 `GEM`/`TORCH` table this way.
 
-In cavecrawl's `ready`, the game installs its entity factory, attaches the
-transport, and registers transport callbacks:
+In Cavecrawl's `ready`, generated setup installs the declared entity factory,
+attaches the transport, and connects its generated transport callbacks:
 
 ```odin
-ksess.session_set_factory(&self.ses, self, cave_make_entity, cave_free_entity)
-netgd.wire_attach(&self.wire, self.owner, &self.ses, MSG_SESSION)
-netgd.wire_listen(&self.wire, "on_packet", "on_peer_left", "on_net_up", "on_net_down")
+if !cave_lobby_net_attach(self, kboot.Options{
+	title = "C A V E C R A W L",
+	env = "CAVE",
+}, kboot.network_profile(.Friends_Coop)) {return}
 ```
+
+The lower-level factory and wire procedures are available for custom
+composition; they are not extra setup required by the generated path.
 
 ### The allocator tiers
 
@@ -383,9 +387,9 @@ below, which are available for custom factories and batches containing
 multiple entity kinds.
 
 ```odin
-session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID) -> (entity: rawptr, id: knet.Net_Id)
+session_spawn_make :: proc(s: ^Session, type: Entity_Type, owner := knet.PLAYER_ID_INVALID, variant := DEFAULT_SCENE_VARIANT) -> (entity: rawptr, id: knet.Net_Id)
 session_spawn_send :: proc(s: ^Session, id: knet.Net_Id)
-session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID) -> knet.Net_Id
+session_spawn :: proc(s: ^Session, type: Entity_Type, entity: rawptr, set: ^knet.Command_Set, owner := knet.PLAYER_ID_INVALID, variant := DEFAULT_SCENE_VARIANT) -> knet.Net_Id
 session_despawn :: proc(s: ^Session, id: knet.Net_Id)
 session_start_replicating :: proc(s: ^Session)
 session_teleport :: proc(s: ^Session, id: knet.Net_Id)
@@ -414,6 +418,14 @@ or a client-provisional predicted spawn; it cannot delete a committed entity.
 This gives complex factories explicit rollback without forcing ordinary Odin
 callers through a non-capturing callback API.
 
+An authoritative draft stays local until `boot_spawn_send`: world catch-up and
+save/backup snapshots omit it, and its initial owner/blob changes are included
+in the committed spawn. Canceling it performs factory cleanup without a public
+spawn or despawn event. Sending a canceled or already committed ID is a no-op.
+Complete the transaction before pumping the session; an unfinished draft
+produces a diagnostic in development and refuses the pump when assertions are
+disabled.
+
 For a ticking entity, the helper calls `boot_fire_spawn`: the host creates the
 accepted entity and a client creates a predicted entity, as in sim.md's fired
 projectile example. The `session_spawn_make`/`session_spawn_send` pair remains
@@ -430,7 +442,7 @@ position instead of interpolating across the map.
 The client-side factory:
 
 ```odin
-Make_Entity_Proc :: proc(user: rawptr, type: Entity_Type, id: knet.Net_Id, owner: knet.Player_Id) -> (entity: rawptr, set: ^knet.Command_Set)
+Make_Entity_Proc :: proc(user: rawptr, type: Entity_Type, id: knet.Net_Id, owner: knet.Player_Id, variant: Scene_Variant) -> (entity: rawptr, set: ^knet.Command_Set)
 Free_Entity_Proc :: proc(user: rawptr, id: knet.Net_Id, entity: rawptr)
 ```
 

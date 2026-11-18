@@ -23,7 +23,7 @@ The [editor workflow](editor-workflow.md) adds validation/baking, refreshable
 previews, Resource pickers, feature drafts and an ability workbench with replay tests.
 
 The [authoring tools workflow](authoring-tools.md) covers typed enemy registration,
-one canonical bake, frozen revisions and reusable feature tests.
+one canonical bake, current contract snapshots and reusable feature tests.
 
 For scene composition, read the [editor-first authoring guide](editor-first.md).
 It explains authored actor scenes, reusable child components, detached HUD/display
@@ -130,7 +130,7 @@ nix develop --command bash examples/replay_scrapyard/profile_run.sh
 nix develop --command bash examples/replay_scrapyard/migration_run.sh
 nix develop --command bash examples/replay_scrapyard/lobby_migration_run.sh
 nix develop --command bash examples/replay_scrapyard/save_run.sh
-nix develop --command bash tests/replay_scrapyard/upgrade_run.sh
+nix develop --command bash tests/replay_scrapyard/saved_fixtures_run.sh
 nix develop --command bash examples/replay_scrapyard/workbench_run.sh
 nix develop --command bash examples/replay_scrapyard/shop_run.sh
 nix develop --command bash examples/replay_scrapyard/hud_run.sh

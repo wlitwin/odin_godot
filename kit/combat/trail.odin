@@ -14,12 +14,7 @@ package kit_combat
 //   kcombat.trail_note(&m.brain.hist, tick, m.x, m.y)     // top of the host tick
 //   if at, ok := kcombat.trail_read(&m.brain.hist, tick - rewind) { ... }
 //
-// Born in play/ and moved DOWN here when the arrow demanded it: play is
-// replicated state + generated hooks, kit is mechanism, and a pure off-wire
-// ring is mechanism — the coop lag-comp option lands beside it and could
-// never have imported play to get it. play.Trail remains as the alias.
-// Graduated from the recipes idiom by its second consumer (scrapyard's
-// mender rewinds RUNNERS the same way the lance rewinds mobs). Each slot
+// This local history belongs to kit/combat alongside lag compensation. Each slot
 // stores the tick that wrote it, so an unwritten or lapped slot reads
 // ok=false instead of a sentinel value — a target younger than the window
 // tests live, by the caller's choice, not by accident. Pure and off-wire:

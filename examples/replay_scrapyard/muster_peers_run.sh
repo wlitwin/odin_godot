@@ -3,7 +3,7 @@ set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export ODIN_GODOT_ROOT="$ROOT"
 export RSY_RUN=0
-PROJ="$ROOT/examples/replay_scrapyard"; work="$(mktemp -d)"; pids=()
+PROJ="${REPLAY_SCRAPYARD_PROJECT:-$ROOT/examples/replay_scrapyard}"; work="$(mktemp -d)"; pids=()
 cleanup() { for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; done; if [[ "${REPLAY_KEEP_LOGS:-0}" == 1 ]]; then echo "Replay Scrapyard logs: $work"; else rm -rf "$work"; fi; }
 trap cleanup EXIT
 case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac

@@ -65,12 +65,16 @@ jobs:
           python3 - "$RUNNER_TEMP/desktop-native/build/Release" >> "$GITHUB_ENV" <<'PY'
           import hashlib,json,pathlib,sys
           p=pathlib.Path(sys.argv[1]);m=json.loads((p/'build-manifest.json').read_text())
-          expected={'domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
+          expected={'capacity','domain_static','domain_shared','domain_modules','motion','authoring','recovery','recovery_reference','recovery_fields','recovery_lifecycle','api_static','api_shared','lifecycle','upgrade_state_fields'}
           assert m['ctest']=='passed' and set(m['test_names'])==expected,m
           lib=p/('libogb3.dylib' if sys.platform=='darwin' else 'libogb3.so')
           print('BOX3D_DESKTOP_NATIVE='+str(lib))
           print('BOX3D_DESKTOP_NATIVE_SHA256='+hashlib.sha256(lib.read_bytes()).hexdigest())
           PY
+      - name: Script instance physics finalization and denied-thread isolation
+        run: python3 tests/instance_lifecycle/physics.py --native-library "$BOX3D_DESKTOP_NATIVE" --out "$RUNNER_TEMP/lifecycle-physics"
+      - name: Partial editor previews with strict bake and native allocation fences
+        run: python3 tests/box3d_editor/preview/run.py --native-library "$BOX3D_DESKTOP_NATIVE" --out "$RUNNER_TEMP/editor-preview"
       - name: Plan exact case with explicit installed inputs
         shell: bash
         run: |
@@ -96,6 +100,8 @@ jobs:
         with:
           name: desktop-${{ matrix.target }}-${{ matrix.framework }}
           path: |
+            ${{ runner.temp }}/lifecycle-physics/
+            ${{ runner.temp }}/editor-preview/
             ${{ runner.temp }}/desktop-plan-${{ matrix.target }}-${{ matrix.framework }}/
             ${{ runner.temp }}/desktop-case-${{ matrix.target }}-${{ matrix.framework }}/
             ${{ runner.temp }}/desktop-native/build/Release/build-manifest.json

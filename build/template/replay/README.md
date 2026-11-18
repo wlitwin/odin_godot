@@ -1,22 +1,21 @@
 # Replay starter
 
-The current Godot Session package also links Box3D presentation code, including
-for this value-only model. Use the
-[checkout setup](https://wlitwin.github.io/odin_godot/replay/godot.html)
-to select the required native backend. The packaged template alone does not
-provide that dependency; the command below assumes a coherent addon and backend
-setup. The engine-free local Timeline does not require Box3D.
+This starter uses a value-only World and needs no Box3D backend. The installed
+addon and Odin compiler are sufficient. See the
+[Session setup](https://wlitwin.github.io/odin_godot/replay/godot.html) for the
+checkout workflow; native physics has its own optional backend setup.
 
 This is a separate optional starter for the experimental `godot:replay` library.
 It does not replace the addon's ordinary Hello template or the Kit framework.
 Copy this directory's contents into a **new** project root containing the installed
 `addons/odin_godot` folder. The project includes its scene and pure gameplay model.
 
-Build with the packaged helpers:
+You can open the copied installed starter before its first build. Its authoring
+dock is included, and reports that the first build is needed. Build through
+**Project → Tools → Build Odin Scripts**, or with the packaged helpers:
 
 ```sh
-ODIN_GODOT_ROOT="$PWD/addons/odin_godot" SKIP_CORE=1 \
-bash addons/odin_godot/build/build_scripts.sh .
+SKIP_CORE=1 bash addons/odin_godot/build/build_scripts.sh .
 ```
 
 Open the project in Godot and run `main.tscn`. Arrows move; Space takes the center
@@ -37,11 +36,36 @@ other native setups. These commands are a local networking example, not a public
 matchmaking/NAT solution. Browser exports run the default offline model; networked
 browser deployment requires an RTC/Party configuration supplied by your game.
 
+Edit `data/pickup.tres` in the Inspector to change pickup reach. The **Replay**
+dock offers **Save & Validate Pickup** and **Open Pickup Preview**. Run the
+preview scene with F6; its reach guide updates when you refresh the saved
+definition, and invalid edits leave the last valid preview visible. The first
+build supplies local tool paths to the included dock; it becomes usable without
+toggling the plugin or restarting the editor. No project-specific Python worker
+is needed. Checkout-based projects install the dock through the normal build.
+The authoring process tools currently target macOS/Linux with Python; the
+gameplay model and its exports remain platform-independent.
+
+`entities/pickup.tscn` is the authored coin. Its `PickupDef` Resource is checked
+by one extractor in `scripts/pickup_def.odin`, shared by preview, validation and
+game startup. Startup copies the checked reach into World before opening Session.
+Resource edits do not change a running match; a new run admits the new value.
+The content fingerprint includes those rules so incompatible peers are refused.
+
 Edit `shared/game/game.odin` for simulation rules. It has no Godot objects or I/O.
 `scripts/starter.odin` owns Session, samples input, and displays frames: retained
 copies of the World at individual ticks. Keep scene effects outside the simulation.
-The starter consumes occurrence notifications without playing irreversible effects.
-When adding effects, use occurrence IDs to revise or cancel them if prediction changes.
+`scripts/effects.odin` turns the pickup occurrence into a short colored flash and
+a sound. The visual follows the journal and can be canceled; the sound waits for
+confirmation. Both routes keep the original occurrence identity, so correction
+does not play the same event twice. Replace `effects/pickup.tscn` or `pickup.wav`
+to customize the presentation. Routes and the audio stream are released by the
+script's `finalize` hook.
+If startup fails, the status label and Output include the configuration field,
+missing model callback, or schema path to fix. Read `session_setup_message` in
+your own startup error handler; the underlying error enum is still returned.
+See the [pickup recipe](https://wlitwin.github.io/odin_godot/replay/presentation.html)
+for projection, animation, cancellation, and safe retirement of consumed IDs.
 
 Build artifacts and generated scripts remain in your project, not in the addon.
 The installed `addons/odin_godot/docs/replay.md` guide describes the model,

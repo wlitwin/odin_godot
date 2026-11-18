@@ -1,5 +1,7 @@
 package replay_scrapyard
 
+import rgd "godot:replay/godot"
+
 import gd "godot:godot"
 import r "godot:replay"
 import content "../shared/content"
@@ -76,8 +78,10 @@ combat_bridge_close :: proc(self: ^ReplayScrapyard) {
 
 combat_bridge_paint :: proc(self: ^ReplayScrapyard, observed: game.World, dt: f64) {
     bridge := &self.combat_bridge[0]
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
-    reset := self.session.authority ? u64(0) : self.session.client.view_reset
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
+    reset := scope_info.reset
     scope, error := v.scope_update(
         &bridge.scope,
         {epoch, reset, observed.clock},

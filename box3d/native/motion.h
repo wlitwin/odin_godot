@@ -5,7 +5,6 @@
 extern "C" {
 #endif
 #define OGB3_MOTION_VERSION 1u
-#define OGB3_MOTION_RECOVERY_FORMAT 3u
 /* Compatibility buffer-size hint; actual query capacity is caller-supplied. */
 #define OGB3_MOTION_MAX_HITS OGB3_MAX_SHAPES
 #define OGB3_MOTION_MAX_PLANES 256u

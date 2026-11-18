@@ -56,12 +56,14 @@ main :: proc() {
     id, parsed := strconv.parse_u64(os.args[3])
 
     if !parsed || id >= content.MAX_ABILITIES {
+        fmt.eprintln("ability ID is outside the catalog bounds")
         os.exit(2)
     }
 
     bytes, read := os.read_entire_file(os.args[2], context.allocator)
 
     if read != nil {
+        fmt.eprintf("cannot read catalog: %v\n", read)
         os.exit(2)
     }
 
@@ -70,18 +72,21 @@ main :: proc() {
     defer d.destroy(&store)
 
     if d.init(&store, 1).error != .None {
+        fmt.eprintln("could not initialize the catalog store")
         os.exit(2)
     }
 
-    ref, report := d.artifact_import(&store, bytes, game.CONTENT)
+    ref, report := d.artifact_import(&store, bytes, content.SEMANTIC)
 
     if report.error != .None {
+        fmt.eprintf("catalog %s: %s\n", d.report_path(&report), d.report_message(&report))
         os.exit(2)
     }
 
     catalog, _ := d.get(&store, ref)
 
     if !content.valid(catalog) || !content.ability_present(&catalog, u8(id)) {
+        fmt.eprintln("catalog is invalid or does not contain the selected ability")
         os.exit(2)
     }
 

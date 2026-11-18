@@ -26,7 +26,9 @@ Network_Codec :: struct($State, $Control, $Action, $Event: typeid, $Seats: int) 
     native_identity:                                                            b.Recovery_Identity,
     allocator:                                                                  mem.Allocator,
     state, occurrence, accepted, controls, actions, decisions, provider_config: sc.Schema,
-    ready:                                                                      bool,
+    ready, closing:                                                             bool,
+    pending_context_drops:                                                     u64,
+    cleanup_error:                                                             net.Error,
     runtime_leases:                                                             u32,
     owned_bytes:                                                                u64,
     profile_clock:                                                              r.Profile_Clock,
@@ -66,7 +68,8 @@ network_codec_init :: proc(
         return .Invalid_Model
     }
 
-    if c.ready ||
+    if c.ready || c.closing || c.catalog._handle != nil ||
+       !r.owner_is_nil(c.context_ownership.owner) || !r.owner_is_nil(c.ownership.owner) ||
        game_rules == (bd.Digest{}) ||
        !valid_config(config) ||
        !state_supported(S) ||
@@ -90,13 +93,17 @@ network_codec_init :: proc(
         return .Wrong_Phase
     }
 
-    if r.owner_retain(ownership.owner) != .None {
-        temporary := context_ownership.owner
-        r.owner_drop(&temporary)
-        return .Wrong_Phase
+    // Publish each acquired capability immediately. Rollback is checked and
+    // can leave cleanup-only state for a later destroy, never a lost retain.
+    c.context_ownership = context_ownership
+    committed := false
+    defer if !committed {
+        c.closing = true
+        cleanup := network_codec_destroy(c)
+        if cleanup != .None { c.cleanup_error = cleanup }
     }
 
-    c.context_ownership = context_ownership
+    if r.owner_retain(ownership.owner) != .None { return .Wrong_Phase }
     c.ownership = ownership
     c.allocator = allocator
     c.config = config
@@ -111,30 +118,11 @@ network_codec_init :: proc(
 
     c.catalog, status = b.recovery_catalog_clone(catalog)
 
-    if status != .Ok {
-        a, b := c.context_ownership.owner, c.ownership.owner
-        c^ = {}
-        r.owner_drop(&b)
-        r.owner_drop(&a)
-        return .Checkpoint_Contract
-    }
+    if status != .Ok { return .Checkpoint_Contract }
 
-    c.owned_bytes = u64(size_of(Network_Codec(S, C, A, E, N))) + net.PHYSICS_SCHEMA_RESERVE
-
-    if error := charge(c.owned_bytes); error != .None {
-        b.recovery_catalog_destroy(&c.catalog)
-        a, z := c.context_ownership.owner, c.ownership.owner
-        c^ = {}
-        r.owner_drop(&z)
-        r.owner_drop(&a)
-        return .Capacity
-    }
-
-    committed := false
-
-    defer if !committed {
-        network_codec_destroy(c)
-    }
+    owned_bytes := u64(size_of(Network_Codec(S, C, A, E, N))) + net.PHYSICS_SCHEMA_RESERVE
+    if error := charge(owned_bytes); error != .None { return .Capacity }
+    c.owned_bytes = owned_bytes
 
     if sc.init(&c.state, S, allocator = allocator).error != .None ||
        sc.init(&c.occurrence, r.Occurrence(net.Net_Event(E)), allocator = allocator).error != .None ||
@@ -219,7 +207,7 @@ network_codec_init :: proc(
         ) {
             ctx := cast(^Network_Codec(S, C, A, E, N))pointer
 
-            if codec_context_access(ctx) != .None {
+            if codec_context_access(ctx) != .None || !ctx.ready {
                 return 0, .Wrong_Phase
             }
 
@@ -314,7 +302,7 @@ network_codec_init :: proc(
         ) {
             ctx := cast(^Network_Codec(S, C, A, E, N))pointer
 
-            if codec_context_access(ctx) != .None {
+            if codec_context_access(ctx) != .None || !ctx.ready {
                 return {}, .Wrong_Phase
             }
 
@@ -397,7 +385,7 @@ network_codec_init :: proc(
         ) {
             ctx := cast(^Network_Codec(S, C, A, E, N))pointer
 
-            if codec_context_access(ctx) != .None {
+            if codec_context_access(ctx) != .None || !ctx.ready {
                 return 0, .Wrong_Phase
             }
 
@@ -461,23 +449,32 @@ network_codec_init :: proc(
     return .None
 }
 
+// Idempotent, checked teardown. Failure keeps a cleanup-only codec containing
+// every outstanding capability, including releases refused by void callbacks.
 network_codec_destroy :: proc(c: ^Network_Codec($S, $C, $A, $E, $N)) -> net.Error {
+    if c == nil { return .Wrong_Phase }
+    // Validate the fixed ownership prefix before reading typed/schema state.
+    if codec_context_access(c, true) != .None || r.owner_access(c.ownership.owner) != .None { return .Wrong_Phase }
+    empty := !c.ready && !c.closing && c.catalog._handle == nil &&
+        r.owner_is_nil(c.context_ownership.owner) && r.owner_is_nil(c.ownership.owner)
+    if empty { return .None }
     if codec_context_access(c) != .None || r.owner_access(c.ownership.owner) != .None {
         return .Wrong_Phase
     }
+    for c.pending_context_drops != 0 {
+        owner := c.context_ownership.owner
+        if r.owner_drop(&owner) != .None { c.cleanup_error = .Wrong_Phase; return .Wrong_Phase }
+        c.pending_context_drops -= 1
+    }
+    if c.runtime_leases != 0 || c.budget_live != 0 { return .Wrong_Phase }
 
-    if c.runtime_leases != 0 || c.budget_live != 0 {
+    c.closing = true
+    c.ready = false
+    c.value = {}
+    if c.catalog._handle != nil && b.recovery_catalog_destroy(&c.catalog) != .Ok {
+        c.cleanup_error = .Wrong_Phase
         return .Wrong_Phase
     }
-
-    if c.catalog._handle != nil {
-        if b.recovery_catalog_destroy(&c.catalog) != .Ok {
-            return .Wrong_Phase
-        }
-
-        uncharge(c.owned_bytes)
-    }
-
     sc.destroy(&c.state)
     sc.destroy(&c.occurrence)
     sc.destroy(&c.accepted)
@@ -485,10 +482,22 @@ network_codec_destroy :: proc(c: ^Network_Codec($S, $C, $A, $E, $N)) -> net.Erro
     sc.destroy(&c.actions)
     sc.destroy(&c.decisions)
     sc.destroy(&c.provider_config)
-    a, z := c.context_ownership.owner, c.ownership.owner
+    uncharge(c.owned_bytes)
+    c.owned_bytes = 0
+    if owner_context_destroy(&c.ownership) != .None {
+        c.cleanup_error = .Wrong_Phase
+        return .Wrong_Phase
+    }
+    // The last context drop can release the codec's own backing allocation.
+    // Clear before it; restore only if the drop explicitly retained ownership.
+    remaining := c.context_ownership
     c^ = {}
-    r.owner_drop(&z)
-    r.owner_drop(&a)
+    if owner_context_destroy(&remaining) != .None {
+        c.context_ownership = remaining
+        c.closing = true
+        c.cleanup_error = .Wrong_Phase
+        return .Wrong_Phase
+    }
     return .None
 }
 
@@ -746,9 +755,8 @@ codec_acquire :: proc(c: ^Network_Codec($S, $C, $A, $E, $N)) -> net.Error {
 @(private)
 codec_drop :: proc(c: ^Network_Codec($S, $C, $A, $E, $N)) {
     assert(codec_context_access(c) == .None && c.runtime_leases > 0)
-    owner := c.context_ownership.owner
     c.runtime_leases -= 1
-    r.owner_drop(&owner)
+    codec_release_context(c)
 }
 
 @(private)
@@ -778,8 +786,7 @@ codec_reserve :: proc(c: ^Network_Codec($S, $C, $A, $E, $N), bytes: u64) -> net.
 
     if error := memory_check(bytes); error != .None {
         if retained {
-            owner := c.context_ownership.owner
-            r.owner_drop(&owner)
+            codec_release_context(c)
         }
 
         return .Capacity
@@ -787,8 +794,7 @@ codec_reserve :: proc(c: ^Network_Codec($S, $C, $A, $E, $N), bytes: u64) -> net.
 
     if error := charge(bytes); error != .None {
         if retained {
-            owner := c.context_ownership.owner
-            r.owner_drop(&owner)
+            codec_release_context(c)
         }
 
         return .Capacity
@@ -806,13 +812,21 @@ codec_unreserve :: proc(c: ^Network_Codec($S, $C, $A, $E, $N), bytes: u64) {
     }
 
     assert(codec_context_access(c) == .None && c.budget_live >= bytes)
-    owner := c.context_ownership.owner
     prior := c.budget_live
     c.budget_live -= bytes
     uncharge(bytes)
 
-    if prior != 0 && c.budget_live == 0 {
-        r.owner_drop(&owner)
+    if prior != 0 && c.budget_live == 0 { codec_release_context(c) }
+}
+
+@(private)
+codec_release_context :: proc(c: ^Network_Codec($S, $C, $A, $E, $N)) {
+    owner := c.context_ownership.owner
+    if r.owner_drop(&owner) != .None {
+        c.pending_context_drops += 1
+        c.closing = true
+        c.ready = false
+        c.cleanup_error = .Wrong_Phase
     }
 }
 

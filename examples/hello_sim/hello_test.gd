@@ -13,6 +13,12 @@ var start_x := -1.0
 
 const TIMEOUT_MS := 30000
 
+func _player_scenes(node: Node, counts: Dictionary) -> void:
+	if node.scene_file_path in ["res://player.tscn", "res://player_diamond.tscn"]:
+		counts[node.scene_file_path] = counts.get(node.scene_file_path, 0) + 1
+	for child in node.get_children():
+		_player_scenes(child, counts)
+
 func _initialize() -> void:
 	role = OS.get_environment("ROLE")
 	if role == "": role = "host"
@@ -30,6 +36,12 @@ func _process(_delta: float) -> bool:
 	match phase:
 		"boot":
 			if game.probe_player_count() == 2:
+				var scenes := {}
+				_player_scenes(game, scenes)
+				if scenes.get("res://player.tscn", 0) != 1 or scenes.get("res://player_diamond.tscn", 0) != 1:
+					print("HELLO_FAIL scene variants ", scenes)
+					quit(1); return true
+				print("HELLO_VARIANTS_OK default=1 diamond=1")
 				print("HELLO_TWO_UP me=", game.probe_my_player())
 				phase = "walk"; t0 = now
 				press_x = game.probe_player_x(0)

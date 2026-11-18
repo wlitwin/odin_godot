@@ -1,5 +1,7 @@
 package replay_scrapyard
 
+import rgd "godot:replay/godot"
+
 
 import "core:math"
 import "core:fmt"
@@ -72,7 +74,9 @@ combat_rigs_make :: proc(self: ^ReplayScrapyard) {
 combat_paint :: proc(self: ^ReplayScrapyard, observed, predicted: game.World, seat: u16, dt: f64) {
     shown := observed
     forecast := predicted
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
     combat_bridge_paint(self, observed, dt)
 
     // Spit is always observed. Its simulation slot keeps an independent pulse
@@ -341,7 +345,9 @@ status_tint :: proc(w: game.World, effects: []p.Effect) -> gd.Color {
 abilities_paint :: proc(self: ^ReplayScrapyard, observed, predicted: game.World, seat: u16, dt: f64) {
     shown := observed
     forecast := predicted
-    epoch := self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch
+    scope_info, scope_ready := rgd.session_presentation(self.session)
+    if !scope_ready {return}
+    epoch := scope_info.epoch
 
     for pass in 0 ..< 2 {
         world := pass == 0 ? &forecast : &shown

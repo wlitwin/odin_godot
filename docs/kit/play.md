@@ -88,7 +88,10 @@ The package also includes state and procedures that do not cross the wire:
 | `every`, `latch` | Frame cadence and rising-edge helpers. |
 | `Pace(T)`, `Deadlines(K, T)` with `due`, `arm`, `ready` | Re-armable deadlines over a caller-selected clock. |
 | `Edge(T)` with `see`, `sync` | Detect changes in derived or local state that has no generated replicated-field edge. |
-| `Trail`, `trail_note`, `trail_read` | Authority-side position history for game-owned state. For streamed session entities, prefer `session_rewound`. |
+
+Authority-side position history for game-owned state is available as `Trail`,
+`trail_note` and `trail_read` in `godot:kit/combat`. For streamed session entities,
+prefer `session_rewound`.
 
 `Edge(T)` is not needed for a directly replicated field. Use it for a value
 derived from several fields or for local persistence state, and call `sync`

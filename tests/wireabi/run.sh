@@ -41,7 +41,7 @@ grep -q 'field entity.WireAbiFixture.state lane=delta encoding=raw struct-width=
 grep -q 'type entity.WireAbiFixture.state.inner.mode kind=enum width=1 align=1 base=u8 values=Idle=#0,Walk=#1,Run=#2' "$GUARD"
 grep -q 'action entity.WireAbiFixture.set id=.* access=any-seat prediction=optimistic schedule=immediate args-bound=32' "$GUARD"
 grep -q 'arg entity.WireAbiFixture.set.sample index=0 kind=i16 width=2 bound=1' "$GUARD"
-grep -q 'message message.WireAbiFixture.note tag=4 tag-name=TAG_WIRE_ABI encoding=raw width=4 bound=262144' "$GUARD"
+grep -q 'message message.WireAbiFixture.note tag=4 encoding=raw width=4 bound=262144' "$GUARD"
 grep -q '{path = "entity.WireAbiFixture.state", entity = "WireAbiFixture", name = "state", lane = .Delta' "$GUARD"
 grep -q '{path = "entity.WireAbiFixture.set", entity = "WireAbiFixture", name = "set".*model = .Immediate' "$GUARD"
 grep -q '{owner = "entity.WireAbiFixture.set", name = "accepted", type_name = "i16"}' "$GUARD"
@@ -75,11 +75,11 @@ grep -q 'stamp:   u64' "$ALT/fixture.odin" || {
 run_scriptgen "$ALT"
 BASE_FP="$(sed -n 's/^NET_FINGERPRINT :: u64(\(0x[0-9a-f]*\)).*/\1/p' "$GUARD")"
 ALT_FP="$(sed -n 's/^NET_FINGERPRINT :: u64(\(0x[0-9a-f]*\)).*/\1/p' "$ALT/odin_godot_guard.gen.odin")"
-[[ "$BASE_FP" == "0xfc3f66e9fcd2414b" ]]
-[[ "$ALT_FP" == "0x72a0945e37810e4e" ]]
+[[ "$BASE_FP" == "0xe3f298604ea6f896" ]]
+[[ "$ALT_FP" == "0xb961f027c4dd84fb" ]]
 [[ "$BASE_FP" != "$ALT_FP" ]]
-grep -q 'WIRE_FIXTURE_FINGERPRINT :: u64(0xfc3f66e9fcd2414b)' "$ROOT/tests/kitsession/kitsession_test.odin"
-grep -q 'WIRE_FIXTURE_U64_FINGERPRINT :: u64(0x72a0945e37810e4e)' "$ROOT/tests/kitsession/kitsession_test.odin"
+grep -q 'WIRE_FIXTURE_FINGERPRINT :: u64(0xe3f298604ea6f896)' "$ROOT/tests/kitsession/kitsession_test.odin"
+grep -q 'WIRE_FIXTURE_U64_FINGERPRINT :: u64(0xb961f027c4dd84fb)' "$ROOT/tests/kitsession/kitsession_test.odin"
 echo "  ok  incompatible recursive schema moves the handshake fingerprint"
 
 # The route's numeric byte, not merely its source identifier, is schema data.
@@ -91,7 +91,7 @@ rm -f "$TAG_ALT/fixture.odin.bak"
 run_scriptgen "$TAG_ALT"
 TAG_FP="$(sed -n 's/^NET_FINGERPRINT :: u64(\(0x[0-9a-f]*\)).*/\1/p' "$TAG_ALT/odin_godot_guard.gen.odin")"
 [[ "$BASE_FP" != "$TAG_FP" ]]
-grep -q 'message message.WireAbiFixture.note tag=5 tag-name=TAG_WIRE_ABI' "$TAG_ALT/odin_godot_guard.gen.odin"
+grep -q 'message message.WireAbiFixture.note tag=5' "$TAG_ALT/odin_godot_guard.gen.odin"
 echo "  ok  changing a typed-message tag byte moves the fingerprint"
 
 expect_reject() {

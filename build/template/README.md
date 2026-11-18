@@ -12,7 +12,8 @@ the initial script for that library.
 
 ## Get started
 
-1. **Copy `scripts/` into your project root** as `res://scripts/`.
+1. Choose **Project → Tools → Set Up Odin Scripts**, or copy `scripts/` into
+   your project root as `res://scripts/`.
    - `hello.odin` — a minimal example class (`Hello`, extends `Node`). Edit or replace it
      with your own.
    - The build generates the `*.gen.odin` files for you and you never write or edit them:
@@ -22,11 +23,11 @@ the initial script for that library.
      guard). To customize the boot shim, define `odin_scripts_boot` in an authored
      file; the generator omits its default implementation.
 
-2. **Build the scripts dll** (you need `odin` on your PATH):
+2. Choose **Project → Tools → Build Odin Scripts**. For a terminal build
+   (with `odin` on your PATH):
    - **macOS / Linux:**
      ```sh
-     ODIN_GODOT_ROOT="$PWD/addons/odin_godot" SKIP_CORE=1 \
-       bash addons/odin_godot/build/build_scripts.sh .
+     SKIP_CORE=1 bash addons/odin_godot/build/build_scripts.sh .
      ```
    - **Windows** (from a "x64 Native Tools Command Prompt for VS"):
      ```powershell

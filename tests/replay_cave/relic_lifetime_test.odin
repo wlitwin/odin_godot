@@ -1,10 +1,8 @@
 package replay_cave_test
 import "core:testing"
 import "core:reflect"
-import "core:os"
 import "core:fmt"
 import net "godot:replay/net"
-import upgrade "../../examples/replay_cavecrawl/shared/upgrade"
 import r "godot:replay"
 import cave "../../examples/replay_cavecrawl/shared/cave"
 
@@ -104,35 +102,12 @@ relic_descent_correction_restores_identity_position_and_events :: proc(t: ^testi
 }
 
 @(test)
-content5_conversion_preserves_relic_archive_before_new_rules_execute :: proc(t: ^testing.T) {
+current_relic_checkpoints_preserve_lifetime_through_transitions :: proc(t: ^testing.T) {
     names := [3]string{"resting", "carried", "restart"}
 
     for name in names {
-        bytes, error := os.read_entire_file(
-            fmt.tprintf("tests/replay_cave/fixtures/content5/%s.replay", name),
-            context.allocator,
-        )
-        testing.expect(t, error == nil)
-        defer delete(bytes)
-        old: net.Checkpoint(upgrade.World_7, cave.Control, cave.Action, cave.SEATS)
-        current: net.Checkpoint(cave.World, cave.Control, cave.Action, cave.SEATS)
-        defer net.checkpoint_destroy(&old)
+        current := load_current_fixture(fmt.tprintf("relic_%s", name))
         defer net.checkpoint_destroy(&current)
-        testing.expect_value(
-            t,
-            net.checkpoint_decode(&old, bytes, upgrade.model5(), upgrade.CONTENT_5),
-            net.Error.None,
-        )
-        testing.expect(t, net.checkpoint_decode(&current, bytes, cave.model(), cave.CONTENT) != .None)
-        converted, result := upgrade.convert_archive(bytes)
-        defer delete(converted)
-        testing.expect_value(t, result, net.Error.None)
-        testing.expect_value(t, net.checkpoint_decode(&current, converted, cave.model(), cave.CONTENT), net.Error.None)
-        expected, _ := upgrade.convert_world7(old.frame.state)
-        expected.authority_known = true
-        expected.authority_seat = old.header.local_seat
-        testing.expect(t, reflect.equal(current.frame, r.Frame(cave.World){tick = old.frame.tick, state = expected}))
-        testing.expect(t, reflect.equal(current.peers[:], old.peers[:], true))
         w := current.frame.state
         events: [32]r.Occurrence(cave.Event)
         ctx := context_for(events[:], 101)
@@ -141,7 +116,7 @@ content5_conversion_preserves_relic_archive_before_new_rules_execute :: proc(t: 
             testing.expect(t, cave.act(&w, 1, cave.Action{verb = .Lobby, lobby = {verb = .Restart}}, &ctx))
             testing.expect_value(t, w.relic.carrier, u16(0))
             testing.expect_value(t, w.relic.version, u32(8))
-            testing.expect_value(t, w.relic.position, old.frame.state.relic.position)
+            testing.expect_value(t, w.relic.position, current.frame.state.relic.position)
         } else {
             cave.step(&w, [cave.SEATS]cave.Control{}, 0, 0, &ctx)
             testing.expect_value(t, w.depth, u8(2))
@@ -151,7 +126,7 @@ content5_conversion_preserves_relic_archive_before_new_rules_execute :: proc(t: 
                 testing.expect_value(t, w.relic.carrier, u16(1))
                 testing.expect_value(t, w.relic.position, w.players[0].position + ([2]f32{10, -12}))
             } else {
-                testing.expect(t, reflect.equal(w.relic, old.frame.state.relic))
+                testing.expect(t, reflect.equal(w.relic, current.frame.state.relic))
             }
         }
     }

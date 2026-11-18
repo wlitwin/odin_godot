@@ -121,7 +121,7 @@ can hide problems visible over a connection. While adding delay and loss:
 - teleport or respawn and check that interpolation does not draw a trip across the map;
 - vary rendering frame rate while keeping the simulation rate fixed.
 
-Begin with [Hello Sim's player](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_sim/scripts/player.odin),
+Begin with [Hello Sim's player](https://github.com/wlitwin/odin_godot/blob/main/examples/hello_sim/scripts/actors/player.odin),
 which separates tick mutation from node positioning. Then continue with
 [spawning and lifetime](spawning-and-lifetime.md) or
 [presentation and effects](../concepts/presentation-and-effects.md).

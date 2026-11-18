@@ -197,6 +197,7 @@ init :: proc(
     f.with_sensor = with_sensor
     f.post_destroy = post_destroy
     sim.lane_init(&f.lane, &f.ses, size_of(Input))
+    sim.lane_class_set_type(&f.lane, 0, typeid_of(Input))
     sim.lane_set_sim(&f.lane, f, sample, step)
     types: [3]sim.World_Field_Type
 

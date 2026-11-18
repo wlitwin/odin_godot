@@ -35,6 +35,8 @@ kicker3_process :: proc(self: ^Kicker3, delta: f64) {
     if play.latch(&self.painted, self.pid != 0) {
         // 3D has no per-node modulate: give this capsule its own material.
         mat := gd.new_standard_material3d()
+        gd.ref_counted_init_ref(cast(gd.Ref_Counted)mat)
+        defer gd.release_ref(cast(gd.Ref_Counted)mat)
         gd.base_material3d_set_albedo(cast(gd.Base_Material3d)mat, gd.peer_color(int(self.pid)))
         gd.geometry_instance3d_set_material_override(cast(gd.Geometry_Instance3d)self.skin, cast(gd.Material)mat)
     }

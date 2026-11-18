@@ -3,16 +3,13 @@
 Use F5 to save an uncoordinated solo/host run, then resume it in a fresh process
 with the same identity. Native files and browser slots contain the complete
 gameplay checkpoint and required spray images. The sections below describe each
-store and the explicit conversion path for older Replay archives.
+store and the current saved-fixture checks.
 
-Current content 51 adds shared turrets; content 50 added authored pulse attacks and
-content 49 records takeover timer resets in the simulation. Content 48 made
-rewind history authority-only in ordinary replication; complete saves retain it.
-Content 47 added receipt-time dash actions. The explicit offline converter
-accepts content 42–50 and retains their pending action IDs/ticks, recorded controls
-and assets. Frozen old action enums prevent the new Dash member from changing the
-source schema. The [control contract](controls.md) explains why the legacy dash
-control bit remains available for imported history.
+The current content identifier is `0x525343524150304c`. Dash uses a scheduled
+`Action.Dash`; continuous controls contain movement, aim, firing and revival.
+Loaders accept the current contracts only. Owned archives were migrated before
+retiring the old readers; [receipts and original fixture bytes](../../docs/replay/results/usability-legacy-2026-11-16/scrapyard/receipt.json)
+record that conversion. [Controls](controls.md) describes current action timing.
 
 Browser solo play saves the complete checkpoint-and-image bundle in IndexedDB.
 F5 starts an asynchronous write; **Saving run…** changes to **Run saved.** only
@@ -106,85 +103,19 @@ Only current-frame dependencies are bundled: the default resume policy retires
 pending old actions. A different pending-action policy must include their asset
 dependencies too. See the [bundle contract](../../replay/assets/bundles.md).
 
-<a id="converting-a-protocol-6-run"></a>
+## Current saved fixtures
 
-## Converting older Replay runs
+`tests/replay_scrapyard/saved_fixtures_run.sh` reads current-schema saved fixtures,
+checks their identity and public state digest, resumes each in a fresh Godot
+process, and verifies exact installation, asset restoration and continued combat.
+It does not require historical types or converters. The original bytes and
+migration receipts are retained as evidence separately from active inputs.
 
-The standalone Odin tool converts protocol-6 or protocol-7 / checkpoint-4 saves
-from Scrapyard content `0x5253435241503042`, plus protocol-7 contents `...3043` through `...304a`,
-into current content `...304b`. It uses frozen original world/Flash and action/event contracts
-and preserves existing world values and the control schema while updating the
-world, action and timing contracts for Arc paths and receipt-time dash. Content-42 actions receive a
-zeroed development payload. Archived event histories do not exist, so the new
-event detail, wall-contact kind and arc kind change the contract without inventing
-past occurrences or spread hops.
-The converter seeds `authority_epoch` from the validated checkpoint epoch while preserving the original timer values. Restore installs that exact converted frame; the first committed tick of the new epoch rearms the original takeover timers. See [succession behavior](recovery.md#takeover-timers).
+The ordinary [save gate](save_run.sh) also rejects a raw checkpoint presented as a
+game save, a wrong identity and corrupted data while preserving the rejected file.
+Use the explicit `net.checkpoint_decode` API when deliberately composing raw
+checkpoint storage; the game's save format includes the bundle envelope.
 
-The normal game loader remains strict. Build and invoke from the repository root:
-
-```sh
-nix develop --command odin build examples/replay_scrapyard/tools/upgrade_run \
-  -collection:godot=. -out:/tmp/replay-upgrade-run
-/tmp/replay-upgrade-run /path/to/old-run.replay /path/to/new-run.replay \
-  --identity-file /path/to/replay_identity
-```
-
-Use the filesystem path of this Replay project's 16-byte `replay_identity`, not a
-`user://` URI. For a test save created with `RSY_TOKEN`, supply `--token SAME_LABEL`
-instead. The identity must resolve to a playable reservation in the archive.
-Identity verification here prevents accidental selection of another local save;
-local archives are not a secure competitive progression ledger.
-
-The tool validates the old contract, the full archive and bundle, matching
-container metadata, complete current-frame image dependencies and bounded PNG
-header information. It updates schema/content/protocol/contract stamps, maps
-pending original actions into the new representation, and rebuilds container checksums.
-Godot performs the full PNG decode during normal resume. The world, roster, action
-sequences/refusal reasons, image bytes, tick and old epoch remain intact. Raw
-checkpoints are supported only when their worlds have no external image dependencies.
-
-The output path must be new. The tool stages and syncs a complete file in the same
-directory, then publishes it using a hard link that cannot replace an existing
-file or symlink. A failed conversion leaves the source and any existing destination
-untouched. Concurrent writers cannot replace the winner. Filesystems without hard
-links fail explicitly; portable power-loss durability of directory changes is not
-claimed. No interactive confirmation or in-place overwrite mode is needed.
-
-Resume the output with the same identity and `RSY_SAVE=/path/to/new-run.replay`.
-Normal resume advances the epoch and applies its existing pending-action retirement
-policy. Stop the old uncoordinated authority before resuming its world.
-
-The CLI rejects coordinator-permit archives and custom admission policies; use an
-application-owned coordinated upgrade/recovery path for those. It does not convert
-Scrapyard content `...3040`/`...3041`, older layouts or other game schemas. It also
-does not edit browser IndexedDB records; browser import/export UX remains separate
-work. See the [library conversion contract](../../replay/net/checkpoint_upgrade.md).
-
-```sh
-nix develop --command bash tests/replay_scrapyard/upgrade_run.sh
-```
-
-This gate converts genuine older plain/spray saves from retained protocol-6 and
-protocol-7 game binaries, resumes them in fresh Godot processes, checks exact frame
-hashes/ticks and continued combat, and exercises
-corruption, wrong identity/content, missing dependencies, existing destinations,
-symlinks and concurrent publication. The original game and original saves remain
-separate and unchanged.
-
-See [authority history](authority-history.md) for projection, prediction and full-checkpoint guarantees.
-
-## Content 50 / Stormcaller
-
-The Stormcaller revision introduced content 50/J. The offline converter also accepts
-content 49/I, freezing its catalog shape and adding disabled zero-valued pulse
-components. Converted runs preserve their catalog; new runs load the current
-Resources. Network protocol 7 is unchanged, but old peers cannot join the new
-content/schema contract. See [Stormcaller](stormcaller.md) for the feature and tests.
-
-## Content 51 / shared turret
-
-Content 51/K adds the turret pool, authored turret definitions, and targeted
-mount/release actions. Content-50 imports start with no turrets; new configuration
-and action-target fields are zero. Existing catalogs and pending action identities
-remain intact, so this conversion does not inject the new ability into an old run.
-See [shared turret](shared-turret.md) for behavior and recovery tests.
+See [authority history](authority-history.md) for projection, prediction and
+complete-checkpoint guarantees. Generic future schema conversion tools remain
+available through [replay/evolution](../../replay/evolution/README.md).

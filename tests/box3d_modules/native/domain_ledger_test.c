@@ -74,7 +74,7 @@ int main(void) {
   cookie = c.cookie;
   assert(cookie && c.size == sizeof c && c.version == 1 && c.abi_version == 2 &&
          c.logical_version == OGB3_STATE_DUMP_VERSION && c.resource_version == 2 &&
-         c.recovery_version == 1 && c.pointer_bits == 8 * sizeof(void *) &&
+         c.recovery_version == 3 && c.pointer_bits == 8 * sizeof(void *) &&
          c.endian == 1);
   uint8_t bits = 0, target_bits = 0;
   for (unsigned i = 0; i < 32; ++i) {

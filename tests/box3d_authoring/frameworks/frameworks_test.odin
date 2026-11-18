@@ -8,6 +8,7 @@ import "core:testing"
 import b "godot:box3d"
 import bd "godot:box3d/diagnostics"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import kn "godot:kit/net"
 import ks "godot:kit/session"
 import k "godot:kit/sim"
@@ -35,7 +36,7 @@ Kit_Box :: struct {
     physics: kp.Instance(State),
     network: kp.Network(State),
     control: kp.Typed_Codec(u8),
-    built:   ba.Built_Scene,
+    built:   ar.Built_Scene,
     out:     [dynamic]Parcel,
 }
 
@@ -79,7 +80,7 @@ kit_step :: proc(user: rawptr, tick: u64) {
 }
 
 kit_setup :: proc(t: ^testing.T, box: ^Kit_Box, scene: ^ba.Baked_Scene) -> bool {
-    built, diag := ba.build(scene, PROFILE)
+    built, diag := ar.build(scene, PROFILE)
     testing.expect_value(t, diag.error, ba.Error.None)
 
     if diag.error != .None {
@@ -124,7 +125,7 @@ kit_destroy :: proc(t: ^testing.T, box: ^Kit_Box) {
     }
 
     delete(box.out)
-    testing.expect_value(t, ba.built_destroy(&box.built), b.Status.Ok)
+    testing.expect_value(t, ar.built_destroy(&box.built), b.Status.Ok)
 }
 
 kit_same :: proc(t: ^testing.T, a, z: ^Kit_Box, tick: u64) -> bool {
@@ -299,14 +300,14 @@ replay_network_scene :: proc(t: ^testing.T, scene: ^ba.Baked_Scene, minimum_part
         return
     }
 
-    built, build_error := ba.build(scene, PROFILE)
+    built, build_error := ar.build(scene, PROFILE)
     testing.expect_value(t, build_error.error, ba.Error.None)
 
     if build_error.error != .None {
         return
     }
 
-    defer ba.built_destroy(&built)
+    defer ar.built_destroy(&built)
     initial, ie := rp.authoring_checkpoint(&built, cfg, r.Frame(State){}, rn.Net_Event(u8))
     testing.expect_value(t, ie, r.Error.None)
 

@@ -12,12 +12,11 @@ falling back to the first loaded ability if needed. Explicit choices remain fixe
 Resolution happens before declaring a profile, so remote peers and the simulation
 receive ordinary concrete, validated IDs. No automatic sentinel enters gameplay.
 
-The local profile codec now writes version-2 content `0x52535950524f4632`. It adds
-four automatic-choice bits to the identity-bound record. The strict version-1
-reader maps older records to explicit choices, preserving their stored profile,
-identity and epoch/tick. Merely decoding an old record does not modify its bytes;
-subsequent successful saving uses version 2. Undefined bits, corrupt envelopes and
-wrong identities are rejected. Automatic choices add no world/action/event or
+The local profile codec uses version-2 content `0x52535950524f4632`, including
+four automatic-choice bits in the identity-bound record. Retained version-1 data
+was migrated once with explicit choices and identity preserved; the runtime no
+longer accepts the older schema. Undefined bits, corrupt envelopes and wrong
+identities are rejected. Automatic choices add no world/action/event or
 run-checkpoint fields; gameplay content changes are tracked separately.
 
 Native atomic-file writes and browser revision-checked IndexedDB writes retain
@@ -36,7 +35,7 @@ nix develop --command bash examples/replay_scrapyard/automatic_web_run.sh
 ```
 
 [Evidence](../../docs/replay/results/scrapyard-automatic-2026-09-08/README.md) covers
-model resolution/cycling, a frozen version-1 record, native/browser fresh-process
+the original model resolution/cycling and profile migration, native/browser fresh-process
 and changed-seat checks, and profile corruption/write-conflict regressions. The
 browser fixture also verifies that another peer receives the resolved choices.
 The ability pickers now offer an explicit return to Auto; the original ability

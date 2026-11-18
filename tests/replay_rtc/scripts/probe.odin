@@ -11,6 +11,7 @@ import transportgd "godot:replay/godot/transport"
 
 ReplayRtcProbe :: struct {
     owner:                                                gd.Node,
+    expect_rejection:                                     bool `gd:"export"`,
     rtc:                                                  transportgd.Rtc,
     wire:                                                 tr.Transport,
     ready, failed, room_reported, done:                   bool,
@@ -20,7 +21,7 @@ ReplayRtcProbe :: struct {
     buffer:                                               [tr.MAX_PACKET_BYTES]u8,
 }
 
-@(gd_method = "borrowed_args")
+@(gd_method)
 replay_rtc_probe_start :: proc(self: ^ReplayRtcProbe, role, url, room: gd.String) {
     abi.run()
     a, b, c := probe_string(role), probe_string(url), probe_string(room)
@@ -55,6 +56,23 @@ replay_rtc_probe_process :: proc(self: ^ReplayRtcProbe, dt: f64) {
     if self.rtc.registered && !self.room_reported {
         self.room_reported = true
         gd.print_str(fmt.tprintf("REPLAY_RTC_ROOM %s id=%d", self.rtc.room, self.rtc.id))
+    }
+
+    if self.expect_rejection {
+        for id in 1 ..< 17 {
+            if tr.peer_connected(&self.wire, tr.Peer_Id(id)) {
+                probe_fail(self, "unsupported control contract connected")
+                return
+            }
+        }
+        if self.rtc.failed_peers > 0 && !self.done {
+            self.done = true
+            gd.print_str("REPLAY_RTC_CONTROL_REJECTED")
+        }
+        if !self.done && now - self.started > 10000 {
+            probe_fail(self, "unsupported control contract was not rejected")
+        }
+        return
     }
 
     for id in 1 ..< 17 {

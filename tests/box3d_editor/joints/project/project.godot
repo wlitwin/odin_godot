@@ -1,0 +1,8 @@
+config_version=5
+[application]
+config/name="Box3D joint authoring"
+config/features=PackedStringArray("4.7")
+[rendering]
+renderer/rendering_method="gl_compatibility"
+[editor_plugins]
+enabled=PackedStringArray("res://addons/box3d_authoring/plugin.cfg", "res://addons/acceptance/plugin.cfg")

@@ -44,8 +44,6 @@ import d "godot:replay/diagnostic"
     net.checkpoint_capture(&s, &cp)
     bytes, _ := net.checkpoint_encode(&cp, game.network_model())
     net.checkpoint_decode(&decoded, bytes, game.network_model(), 1)
-    converted, _ := net.checkpoint_upgrade_v6(bytes, game.network_model(), 1)
-    delete(converted)
     mapped, _ := net.checkpoint_convert_actions(
         bytes,
         game.network_model(),

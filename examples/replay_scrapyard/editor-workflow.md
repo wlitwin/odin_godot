@@ -48,9 +48,12 @@ browser gameplay services.
    Both equip the selected definition, the host casts, and they must agree on a
    retained public world hash. Jobs have deadlines, cancellation and preserved logs.
 8. Back in the editor, **Save & Bake Content** publishes the canonical artifact
-   through the same extractor. The dock shows current/stale status. Save other
-   independently edited Resources first; the buttons save open scenes and the
-   selected saved Resource. Failed validation/baking preserves the last valid files.
+   through the same extractor. The buttons save edited project Resources and their
+   embedded data, open scenes and script buffers, including Resources no longer
+   selected. Unsaved drafts or failed writes block the action with clickable issues;
+   save or assign the listed data and retry. The dock distinguishes current/stale
+   saved content from newer unsaved edits. Failed validation/baking preserves the
+   last valid files.
 
 These steps were exercised through the actual editor plugin and running
 workbench, in addition to the CLI commands. [Acceptance evidence](../../docs/replay/results/editor-workflow-2026-09-21/README.md)
@@ -97,9 +100,14 @@ starting check, not evidence for rules that have not been implemented.
 
 ## Commands and boundaries
 
-`tools/authoring.py` backs every editor/workbench command and writes structured
-results/logs under `.godot/replay_authoring/jobs`. Use it from CI with explicit
-`--project`, `--framework`, `--godot`, `--result` and the action. Direct catalog
+`replay_authoring.json` declares the dock's actions and inputs. The framework's
+`replay/editor/worker.py` entry point runs them, using `tools/authoring.py` for
+Scrapyard-specific policy. Results/logs stay under `.godot/replay_authoring/jobs`.
+From the project directory, run the shared worker with `--action validate` or
+`--request request.json`, plus `--godot` when Godot is not on PATH. A request such
+as `{"action":"network","inputs":{"latency":150}}` uses the manifest's default
+definition. `--project`, `--framework` and `--result` remain available for CI.
+Generated draft `scenario.py` scripts use this same request contract. Direct catalog
 checks remain `python3 tools/stock.py --check`; rebaking requires Godot and a current
 compiled extractor.
 

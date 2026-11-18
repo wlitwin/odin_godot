@@ -47,8 +47,8 @@ static void joints(void){
   for(int i=0;i<8;i++)OK(ogb3_world_step_fixed(w));
   ogb3_snapshot *snapshot=NULL,*clone=NULL;OK(ogb3_snapshot_capture(w,&snapshot));OK(ogb3_snapshot_clone(snapshot,&clone));
   OK(ogb3_snapshot_restore(r,snapshot));equal(w,r);OK(ogb3_snapshot_restore(w,clone));equal(w,r);
-  ogb3_recovery_config config;OK(ogb3_recovery_config_default(&config));ogb3_recovery_asset_v2 asset={.version=2,.struct_bytes=sizeof(asset),.base={.id=1,.kind=OGB3_RECOVERY_BOX,.a={.25f,.25f,.25f}}};
-  ogb3_recovery_catalog *catalog=NULL;OK(ogb3_recovery_catalog_create_v3(&config,&asset,1,&catalog));
+  ogb3_recovery_config config;OK(ogb3_recovery_config_default(&config));ogb3_recovery_authored_asset asset={.version=2,.struct_bytes=sizeof(asset),.base={.id=1,.kind=OGB3_RECOVERY_BOX,.a={.25f,.25f,.25f}}};
+  ogb3_recovery_catalog *catalog=NULL;OK(ogb3_recovery_catalog_create_authored(&config,&asset,1,&catalog));
   ogb3_recovery_identity identity;OK(ogb3_recovery_identity_get(catalog,&identity));assert(identity.recovery_format==3);
   uint64_t n=0;OK(ogb3_recovery_write(catalog,snapshot,NULL,0,&n,NULL));uint8_t *bytes=malloc(n),*again=malloc(n),*mutated=malloc(n+1024);assert(bytes&&again&&mutated);
   OK(ogb3_recovery_write(catalog,snapshot,bytes,n,&n,NULL));assert(bytes[8]==3);ogb3_snapshot *decoded=NULL;OK(ogb3_recovery_read(catalog,bytes,n,0,&decoded,NULL));
@@ -58,7 +58,15 @@ static void joints(void){
    uint64_t size=0;OK(ogb3_recovery_test_mutate(catalog,bytes,n,code,mutated,n+1024,&size));ogb3_snapshot *candidate=(void *)(uintptr_t)1;uint64_t allocations=live();
    assert(ogb3_recovery_read(catalog,mutated,size,0,&candidate,NULL)!=OGB3_OK&&!candidate);assert(live()==allocations);equal(w,r);
   }
-  ogb3_recovery_catalog *old=NULL;OK(ogb3_recovery_catalog_create_v2(&config,&asset,1,&old));ogb3_snapshot *candidate=(void *)(uintptr_t)1;assert(ogb3_recovery_read(old,bytes,n,0,&candidate,NULL)!=OGB3_OK&&!candidate);ogb3_recovery_catalog_release(old);
+  ogb3_recovery_catalog *primitive=NULL;OK(ogb3_recovery_catalog_create(&config,&asset.base,1,&primitive));
+  ogb3_recovery_identity primitive_id;OK(ogb3_recovery_identity_get(primitive,&primitive_id));assert(!memcmp(&identity,&primitive_id,sizeof(identity)));
+  OK(ogb3_recovery_write(primitive,snapshot,again,n,&m,NULL));assert(m==n&&!memcmp(bytes,again,n));
+  ogb3_snapshot *candidate=NULL;OK(ogb3_recovery_read(primitive,bytes,n,0,&candidate,NULL));OK(ogb3_snapshot_restore(r,candidate));equal(w,r);ogb3_snapshot_release(candidate);
+  for(uint8_t old_format=1;old_format<=2;old_format++){
+   memcpy(mutated,bytes,n);mutated[8]=old_format;candidate=(void *)(uintptr_t)1;uint64_t allocations=live();
+   assert(ogb3_recovery_read(primitive,mutated,n,0,&candidate,NULL)==OGB3_CORRUPT&&!candidate);assert(live()==allocations);equal(w,r);
+  }
+  ogb3_recovery_catalog_release(primitive);
   for(int fail=0;fail<4;fail++){uint64_t allocations=live();ogb3_recovery_test_fail_build_after(fail);candidate=NULL;assert(ogb3_recovery_read(catalog,bytes,n,0,&candidate,NULL)==OGB3_OUT_OF_MEMORY&&!candidate);ogb3_recovery_test_fail_build_after(-1);assert(live()==allocations);}
   ogb3_recovery_catalog_release(catalog);ogb3_snapshot_release(snapshot);ogb3_snapshot_release(clone);OK(ogb3_world_destroy(w));w=world();OK(ogb3_snapshot_restore(w,decoded));equal(w,r);ogb3_snapshot_release(decoded);
   for(int i=0;i<5;i++){OK(ogb3_world_step_fixed(w));OK(ogb3_world_step_fixed(r));equal(w,r);}
@@ -80,12 +88,12 @@ static void distance_default_boundaries(void){
  OK(ogb3_body_get_key(anchor,&d.body_a));OK(ogb3_body_get_key(actor,&d.body_b));
  ogb3_joint_key key=0;OK(ogb3_motion_joint_create(w,&d,&key));assert(key);
  ogb3_recovery_config config;OK(ogb3_recovery_config_default(&config));
- ogb3_recovery_asset_v2 assets[]={
-  {.version=2,.struct_bytes=sizeof(ogb3_recovery_asset_v2),.base={.id=1,.kind=OGB3_RECOVERY_BOX,.a={8,.5f,8}}},
-  {.version=2,.struct_bytes=sizeof(ogb3_recovery_asset_v2),.base={.id=2,.kind=OGB3_RECOVERY_BOX,.a={.25f,.25f,.25f}}},
-  {.version=2,.struct_bytes=sizeof(ogb3_recovery_asset_v2),.base={.id=3,.kind=OGB3_RECOVERY_BOX,.a={.25f,1,3}}}
+ ogb3_recovery_authored_asset assets[]={
+  {.version=2,.struct_bytes=sizeof(ogb3_recovery_authored_asset),.base={.id=1,.kind=OGB3_RECOVERY_BOX,.a={8,.5f,8}}},
+  {.version=2,.struct_bytes=sizeof(ogb3_recovery_authored_asset),.base={.id=2,.kind=OGB3_RECOVERY_BOX,.a={.25f,.25f,.25f}}},
+  {.version=2,.struct_bytes=sizeof(ogb3_recovery_authored_asset),.base={.id=3,.kind=OGB3_RECOVERY_BOX,.a={.25f,1,3}}}
  };
- ogb3_recovery_catalog *catalog=NULL;OK(ogb3_recovery_catalog_create_v3(&config,assets,3,&catalog));
+ ogb3_recovery_catalog *catalog=NULL;OK(ogb3_recovery_catalog_create_authored(&config,assets,3,&catalog));
  for(unsigned tick=0;tick<=1;tick++){
   uint64_t required=0;ogb3_recovery_diagnostic diagnostic={0};
   OK(ogb3_recovery_world_admit(catalog,w,0,&required,&diagnostic));assert(required);

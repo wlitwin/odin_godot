@@ -7,7 +7,6 @@ import p "godot:replay/play"
 import net "godot:replay/net"
 import d "godot:replay/diagnostic"
 import game "../../examples/replay_scrapyard/shared/game"
-import upgrade "../../examples/replay_scrapyard/shared/upgrade"
 
 // Test oracle for archive round trips: the uninterrupted source receives the
 // same new epoch as the decoded server, without altering either world. This is
@@ -172,20 +171,13 @@ takeover_over_dwell_and_failed_tick_are_transactional :: proc(t: ^testing.T) {
 }
 
 @(test)
-historical_content48_import_preserves_frame_then_applies_takeover :: proc(t: ^testing.T) {
-    bytes := transmute([]u8)#load("fixtures/content48/dedicated.checkpoint")
-    old: net.Checkpoint(upgrade.World_48, game.Control, upgrade.Action_50, game.SEATS)
-    defer net.checkpoint_destroy(&old)
-    testing.expect_value(t, net.checkpoint_decode(&old, bytes, upgrade.model_48(), upgrade.CONTENT_48), net.Error.None)
-    converted, err := upgrade.root_48(bytes)
-    defer delete(converted)
-    testing.expect_value(t, err, net.Error.None)
+saved_dedicated_frame_is_unchanged_until_takeover_commits :: proc(t: ^testing.T) {
+    bytes := transmute([]u8)#load("fixtures/current/dedicated.checkpoint")
     current: net.Checkpoint(game.World, game.Control, game.Action, game.SEATS)
     defer net.checkpoint_destroy(&current)
-    testing.expect_value(t, net.checkpoint_decode(&current, converted, game.model(), game.CONTENT), net.Error.None)
-    expected, ok := upgrade.map_world_48(old.frame.state)
-    expected.authority_epoch = old.header.epoch
-    testing.expect(t, ok && reflect.equal(current.frame.state, expected))
+    testing.expect_value(t, net.checkpoint_decode(&current, bytes, game.model(), game.CONTENT), net.Error.None)
+    testing.expect_value(t, current.frame.tick, u64(103))
+    testing.expect_value(t, current.frame.state.authority_epoch, u64(1))
     s: net.Server(game.World, game.Control, game.Action, game.Event, game.SEATS)
     defer net.server_destroy(&s)
     testing.expect_value(

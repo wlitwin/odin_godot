@@ -166,7 +166,7 @@ box3d_web_initialize :: proc() -> bool {
            actual.abi_version != 2 ||
            actual.logical_version != 4 ||
            actual.resource_version != 2 ||
-           actual.recovery_version != 1 ||
+           actual.recovery_version != 3 ||
            actual.pointer_bits != 32 ||
            actual.endian != 1 {
             return false
@@ -376,4 +376,13 @@ box3d_host_shutdown :: proc() -> bg.Status {
         // references are real pins and may be dropped during final engine teardown.
         return bg.OK
     }
+}
+
+@(private)
+box3d_context_liveness :: proc "contextless" (token: u64) -> ^u32 {
+    if token == 0 {
+        return nil
+    }
+
+    return bh.context_liveness_cell(token)
 }

@@ -1,6 +1,16 @@
 #+build wasm32, wasm64p32
 package core
 
+editor_authoring_clear :: proc() {}
+
+// Source authoring is native-editor-only; browser games do not create scripts.
+make_odin_template :: proc(class_name, base: string) -> string {return ""}
+lv_find_function :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {ret_int(ret, -1)}
+lv_make_function :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gdext.TypePtr, ret: gdext.TypePtr) {
+    context = gdext.godot_context()
+    ret_string(ret, godot.new_string_cstring(""))
+}
+
 import "godot:gdext"
 import "godot:godot"
 

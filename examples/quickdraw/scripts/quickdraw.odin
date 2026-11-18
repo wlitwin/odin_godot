@@ -90,7 +90,7 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
 
     // The build's wire contract (generated): a version-skewed join is refused
     // at the door (Deny_Reason.Version) instead of misparsing deltas.
-    quickdraw_net_attach(
+    if !quickdraw_net_attach(
         self,
         kboot.Options {
             title       = "Q U I C K D R A W",
@@ -111,7 +111,9 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
             },
         },
         net_cfg,
-    )
+    ) {
+        return
+    }
 
     // The sim lane beside the session is wired by that generated attach from the
     // @(gd_sample)/@(gd_step) attributes (typed procs, input size, and the
@@ -130,7 +132,7 @@ quickdraw_ready :: proc(self: ^Quickdraw) {
     kui.netgraph_show(&self.netgraph, true)
 
     install_controls()
-    self.bot = gd.env_string("QD_BOT", "")
+    self.bot = gd.env_string("QD_BOT", "", context.allocator)
 
     role := gd.env_string("QD_ROLE", "")
 
@@ -710,4 +712,11 @@ run_respawns :: proc(g: ^Quickdraw, tick: u64) {
         gun.hp_frame = g.frame // same stamp, from the AUTHORITY world pass
         gd.print_str(fmt.tprintf("QD_RESPAWN pid=%d", gun.pid))
     }
+}
+
+// Game-owned state; the generated finalizer releases the standard Kit stack afterward.
+quickdraw_finalize :: proc(self: ^Quickdraw) {
+    kboot.retire_nodes(cast(gd.Node)self.netgraph.label)
+    delete(self.respawns)
+    delete(self.bot)
 }

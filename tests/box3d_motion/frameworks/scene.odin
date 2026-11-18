@@ -2,6 +2,7 @@ package box3d_motion_frameworks_test
 
 import b "godot:box3d"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import "core:testing"
 import kp "godot:kit/physics"
 import rp "godot:replay/physics"
@@ -24,7 +25,7 @@ State :: struct {
 
 // Same immutable authored scene in both frameworks, one native joint per run.
 scene_input :: proc(kind: string) -> ba.Scene_Input {
-    input := ba.scene_input_default("box3d.motion.frameworks.v1", 2)
+    input := ba.scene_input_default("box3d.motion.frameworks.v1")
     input.gravity = {0, 0, 0}
     input.enable_sleep = false
     input.bodies = make([]ba.Body_Input, 3)
@@ -75,7 +76,7 @@ scene_input_destroy :: proc(input: ^ba.Scene_Input) {
     input^ = {}
 }
 
-initial_state :: proc(built: ^ba.Built_Scene) -> State {
+initial_state :: proc(built: ^ar.Built_Scene) -> State {
     value := State {
         character = built.characters[0].initial,
         joint     = built.joints[0].key,

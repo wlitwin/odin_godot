@@ -3,6 +3,7 @@ package replay_net
 import bcap "godot:box3d/limits"
 
 import "core:mem"
+import "core:fmt"
 import bd "godot:box3d/diagnostics"
 import r "godot:replay"
 import sc "godot:replay/schema"
@@ -153,23 +154,102 @@ complete_input_schema :: proc(accepted, control, action, decisions: ^sc.Schema) 
 
 @(private)
 complete_codec_valid :: proc(codec: Complete_Codec($S, $E)) -> bool {
-    if complete_codec_owner_check(codec) != .None {
-        return false
+    return complete_codec_validate(codec)
+}
+
+@(private)
+complete_codec_check :: proc(codec: Complete_Codec($S, $E)) -> (report: Setup_Report) {
+    _ = complete_codec_validate(codec, &report)
+    return
+}
+
+@(private)
+complete_codec_fail :: proc(out: ^Setup_Report, error: Error, path, message: string) -> bool {
+    setup_fail(out, error, path, message)
+    return false
+}
+
+@(private)
+complete_codec_validate :: proc(codec: Complete_Codec($S, $E), out: ^Setup_Report = nil) -> bool {
+    if error := complete_codec_owner_check(codec); error != .None {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.ownership",
+            fmt.tprintf("codec catalog ownership check failed: %v", error),
+        )
     }
 
     if (codec.acquire == nil) != (codec.drop == nil) {
-        return false
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.acquire/drop",
+            "supply both lease callbacks or neither",
+        )
     }
 
-    if codec.game_rules == (bd.Digest{}) ||
-       codec.encode == nil ||
-       codec.decode == nil ||
-       codec.diagnostic_part == nil ||
-       codec.reserve == nil ||
-       codec.release == nil ||
-       codec.max_attachment_bytes == 0 ||
-       codec.max_attachment_bytes > COMPLETE_MAX_BYTES {
-        return false
+    if codec.game_rules == (bd.Digest{}) {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.game_rules",
+            "game rules identity must be nonzero",
+        )
+    }
+
+    if codec.encode == nil {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.encode",
+            "required codec callback is missing",
+        )
+    }
+
+    if codec.decode == nil {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.decode",
+            "required codec callback is missing",
+        )
+    }
+
+    if codec.diagnostic_part == nil {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.diagnostic_part",
+            "required codec callback is missing",
+        )
+    }
+
+    if codec.reserve == nil {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.reserve",
+            "required capacity callback is missing",
+        )
+    }
+
+    if codec.release == nil {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.release",
+            "required capacity callback is missing",
+        )
+    }
+
+    if codec.max_attachment_bytes == 0 || codec.max_attachment_bytes > COMPLETE_MAX_BYTES {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.max_attachment_bytes",
+            fmt.tprintf("expected 1..%d, got %d", COMPLETE_MAX_BYTES, codec.max_attachment_bytes),
+        )
     }
 
     one := [?]u8{0}
@@ -178,8 +258,17 @@ complete_codec_valid :: proc(codec: Complete_Codec($S, $E)) -> bool {
         epoch = 1,
         parts = {.Solver = one[:], .Game = nil, .Side = nil, .Observations = nil, .Occurrences = nil},
     }
-    _, error := bd.sign(frame)
-    return error == .None
+
+    if _, error := bd.sign(frame); error != .None {
+        return complete_codec_fail(
+            out,
+            .Incomplete_State,
+            "model.complete_codec.identity",
+            fmt.tprintf("complete identity is invalid: %v; build the codec for the selected backend and model", error),
+        )
+    }
+
+    return true
 }
 
 // Uses canonical schema bytes for all typed state and semantic occurrence IDs.

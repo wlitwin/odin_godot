@@ -1,17 +1,17 @@
 package kit_physics
 
-import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import b "godot:box3d"
 import sim "godot:kit/sim"
 
 // Attaches a shared authored native candidate through the existing Kit provider.
 // Only world ownership transfers on success. The caller still owns the copied
-// logical maps/catalog in built and destroys them with ba.built_destroy.
+// logical maps/catalog in built and destroys them with ar.built_destroy.
 // Bind network mode with that catalog through the existing network_configure.
 authoring_attach :: proc(
     a: ^Instance($Side),
     lane: ^sim.Lane,
-    built: ^ba.Built_Scene,
+    built: ^ar.Built_Scene,
     initial: Side,
     fields: []sim.World_Field_Type,
     cfg: Config,

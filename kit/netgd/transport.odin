@@ -53,6 +53,7 @@ package kit_netgd
 // already see it.
 
 import gd "godot:godot"
+import "godot:gdext"
 import ksess "godot:kit/session"
 import "core:mem"
 
@@ -169,11 +170,38 @@ transport_close :: proc(wire: ^Session_Wire) {
         peer := gd.multiplayer_api_get_multiplayer_peer(mp)
         defer gd.release_ref(peer)
 
+        // A retained reference to our displaced peer must not keep its socket
+        // open after this owner closes. Do not touch the replacement API peer.
+        owned := gdext.object_get_instance_from_id(installed_id)
+
+        if owned != nil {
+            ref := cast(gd.Ref_Counted)owned
+
+            if gd.ref_counted_reference(ref) {
+                gd.multiplayer_peer_close(cast(gd.Multiplayer_Peer)owned)
+                gd.release_ref(ref)
+            }
+        }
+
         if peer != nil && gd.object_get_instance_id(cast(gd.Object)peer) == installed_id {
-            gd.multiplayer_peer_close(peer)
             gd.multiplayer_api_set_multiplayer_peer(mp, nil)
         }
     }
+}
+
+// Hand a synchronously installed peer to this wire without starting/resetting
+// its Session. This is useful after restoring a save before opening its socket.
+// Normal host/join flows use transport_host/transport_join instead. Close any
+// previous owned transport BEFORE replacing its peer. Raw wire_attach alone
+// continues to borrow a peer and never takes its ownership implicitly.
+transport_adopt_peer :: proc(wire: ^Session_Wire, t: ^Transport) -> bool {
+    if wire == nil || t == nil || wire.node == nil || t.rendezvous == .Web_Room || wire.installed_mp != nil {
+        return false
+    }
+
+    wire.transport = t
+    transport_note_peer(wire)
+    return wire.installed_peer_id != 0
 }
 
 @(private = "file")

@@ -2,10 +2,8 @@ package replay_cave_test
 
 import "core:testing"
 import "core:reflect"
-import "core:os"
 import "core:fmt"
 import net "godot:replay/net"
-import upgrade "../../examples/replay_cavecrawl/shared/upgrade"
 import r "godot:replay"
 import cave "../../examples/replay_cavecrawl/shared/cave"
 
@@ -118,42 +116,19 @@ correcting_carrier_departure_restores_complete_state_and_events :: proc(t: ^test
 }
 
 @(test)
-content6_carrier_conversion_retains_complete_frame_and_peer_values :: proc(t: ^testing.T) {
+current_carrier_checkpoints_preserve_death_disconnect_and_rejoin :: proc(t: ^testing.T) {
     names := [2]string{"dead", "disconnected"}
 
     for name in names {
-        bytes, error := os.read_entire_file(
-            fmt.tprintf("tests/replay_cave/fixtures/content6/%s.replay", name),
-            context.allocator,
-        )
-        testing.expect(t, error == nil)
-        defer delete(bytes)
-        old: net.Checkpoint(upgrade.World_7, cave.Control, cave.Action, cave.SEATS)
-        current: net.Checkpoint(cave.World, cave.Control, cave.Action, cave.SEATS)
-        defer net.checkpoint_destroy(&old)
+        current := load_current_fixture(fmt.tprintf("carrier_%s", name))
         defer net.checkpoint_destroy(&current)
-        testing.expect_value(
-            t,
-            net.checkpoint_decode(&old, bytes, upgrade.model6(), upgrade.CONTENT_6),
-            net.Error.None,
-        )
-        testing.expect(t, net.checkpoint_decode(&current, bytes, cave.model(), cave.CONTENT) != .None)
-        converted, result := upgrade.convert_archive(bytes)
-        defer delete(converted)
-        testing.expect_value(t, result, net.Error.None)
-        testing.expect_value(t, net.checkpoint_decode(&current, converted, cave.model(), cave.CONTENT), net.Error.None)
-        expected, _ := upgrade.convert_world7(old.frame.state)
-        expected.authority_known = true
-        expected.authority_seat = old.header.local_seat
-        testing.expect(t, reflect.equal(current.frame, r.Frame(cave.World){tick = old.frame.tick, state = expected}))
-        testing.expect(t, reflect.equal(current.peers[:], old.peers[:], true))
         w := current.frame.state
         events: [32]r.Occurrence(cave.Event)
         ctx := context_for(events[:], 101)
         cave.step(&w, [cave.SEATS]cave.Control{}, 0, 0, &ctx)
         testing.expect_value(t, w.relic.carrier, u16(1))
         testing.expect_value(t, w.relic.version, u32(7))
-        testing.expect_value(t, w.relic.position, old.frame.state.relic.position)
+        testing.expect_value(t, w.relic.position, current.frame.state.relic.position)
         ctx = context_for(events[:], 104)
         cave.step(&w, [cave.SEATS]cave.Control{}, name == "disconnected" ? 1 : 0, 0, &ctx)
         testing.expect(t, w.players[0].connected && w.players[0].hp > 0)

@@ -20,7 +20,7 @@ Replay runtime must own stepping. Each world has one tick owner.
 
 | Use | Owner | Start here |
 | --- | --- | --- |
-| Offline physics | Your Odin script | [Tower knockdown tutorial](quickstart.md) |
+| Offline physics | Your Odin script | [Editor-authored starter](quickstart.md) |
 | Editor-authored collision | Detached bake and your chosen runtime | [Author a world](authoring.md) |
 | Kit multiplayer | Kit Lane and `kit/physics` | [Multiplayer integration](multiplayer.md) |
 | Replay multiplayer | Replay runtime and `replay/physics` | [Multiplayer integration](multiplayer.md) |
@@ -32,7 +32,8 @@ and [authoring API](../api/generated/box3d/authoring.md).
 
 | Page | What you will learn |
 | --- | --- |
-| [Tower knockdown](quickstart.md) | Run physics without networking and trace world creation, stepping, and node updates |
+| [Offline starter](quickstart.md) | Author a small world, step it, reset it and bind visuals automatically |
+| [Procedural tower](procedural.md) | Create bodies at runtime and export a browser game |
 | [Physics ownership](ownership.md) | Separate source content, live solver, checkpoints, and presentation |
 | [Author a world](authoring.md) | Create worlds, bodies, sensors, shape Resources, and stable keys |
 | [Editor and baking](editor.md) | Install tools, bake mesh collision, save artifacts, and display debug geometry |

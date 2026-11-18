@@ -92,9 +92,8 @@ you finish exploring.
 
 ## 5. See the same model in Godot
 
-First configure the native backend as described in
-[the Godot Session setup](godot.md). The current Godot example package imports
-that adapter even for the Loot scene. Open the editor for its initial import:
+The value-only Loot scene needs no Box3D backend. Use the ordinary script build
+and open the editor for its initial import:
 
 ```sh
 bash build/build_scripts.sh examples/replay_hello

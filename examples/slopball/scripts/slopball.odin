@@ -119,7 +119,7 @@ slopball_ready :: proc(self: ^Slopball) {
     // session over 60Hz physics just streams duplicate poses.
     gd.engine_set_physics_ticks_per_second(gd.singleton_engine(), gd.Int(hz))
 
-    slopball_net_attach(
+    if !slopball_net_attach(
         self,
         kboot.Options {
             title       = "S L O P B A L L",
@@ -140,12 +140,15 @@ slopball_ready :: proc(self: ^Slopball) {
             },
         },
         net_cfg,
-    )
+    ) {
+        return
+    }
+
     // The factory, written by nobody: the generated table (from the entity=
     // tags above) makes/frees under boot.world; world.odin's *_spawned/
     // *_freed hooks keep the kicker/ball census.
     self.goals_to = gd.env_int("SLOP_GOALS", 3)
-    self.bot = gd.env_string("SLOP_BOT", "")
+    self.bot = gd.env_string("SLOP_BOT", "", context.allocator)
     self.netgraph = kui.netgraph_make(cast(gd.Node)self.owner)
     kui.netgraph_show(&self.netgraph, true)
     install_controls()
@@ -427,4 +430,10 @@ ball_report :: proc(self: ^Slopball) {
             bp.y,
         ),
     )
+}
+
+// Game-owned state; the generated finalizer releases the standard Kit stack afterward.
+slopball_finalize :: proc(self: ^Slopball) {
+    kboot.retire_nodes(cast(gd.Node)self.netgraph.label)
+    delete(self.bot)
 }

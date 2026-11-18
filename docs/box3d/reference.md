@@ -8,7 +8,12 @@ Start with [the tutorial](quickstart.md) for a running project.
 | Import | Public surface | Source reference |
 | --- | --- | --- |
 | `godot:box3d` | Worlds, bodies, shapes, fixed stepping, queries, characters, joints, snapshots | [Native binding](https://github.com/wlitwin/odin_godot/blob/main/box3d/README.md) |
-| `godot:box3d/authoring` | Parse, bake, build, catalogs, mappings, artifacts | [Authoring API](https://github.com/wlitwin/odin_godot/blob/main/box3d/authoring/API.md) |
+| `godot:box3d/authoring` | Pure parsing, baking, validation, artifacts and editor previews | [Authoring API](https://github.com/wlitwin/odin_godot/blob/main/box3d/authoring/API.md) |
+| `godot:box3d/authoring/runtime` | Native world/catalog construction, mappings and runtime draw ownership | [Authoring API](https://github.com/wlitwin/odin_godot/blob/main/box3d/authoring/API.md) |
+| `godot:box3d/types` | Shared physics values without native registration | [Package](https://github.com/wlitwin/odin_godot/tree/main/box3d/types) |
+| `godot:kit/godot/physics` | Standard authored Kit owner and temporary checkpoints | [Owner guide](https://github.com/wlitwin/odin_godot/tree/main/kit/godot/physics) |
+| `godot:replay/godot/physics` | Standard authored Replay Session owner and presentation | [Owner guide](https://github.com/wlitwin/odin_godot/blob/main/replay/godot/physics/OWNERSHIP.md) |
+| `godot:box3d/godot/scene` | Local authored world ownership, reset and automatic visual binding | [Scene owner](https://github.com/wlitwin/odin_godot/tree/main/box3d/godot/scene) |
 | `godot:box3d/godot/authoring` | Extract Godot nodes and Resources into detached authoring data | [Extractor](https://github.com/wlitwin/odin_godot/blob/main/box3d/godot/authoring/README.md) |
 | `godot:box3d/debugdraw` | Bounded line generation from copied geometry and frames | [Debug API](https://github.com/wlitwin/odin_godot/blob/main/box3d/debugdraw/API.md) |
 | `godot:box3d/presentation` | Copied presentation values without a live solver | [Package](https://github.com/wlitwin/odin_godot/tree/main/box3d/presentation) |

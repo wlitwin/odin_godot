@@ -11,7 +11,7 @@ set -uo pipefail
 
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 source "$ROOT/tests/platform.sh"
-PROJ="$ROOT/examples/hello_sim"
+PROJ="${HELLO_SIM_PROJECT:-$ROOT/examples/hello_sim}"
 
 if ! bash "$ROOT/build/build_scripts.sh" "$PROJ"; then
 	echo "HELLO_SIM_FAIL: script build failed"
@@ -23,7 +23,14 @@ FSLP_PROJ="$PROJ"
 FSLP_DRIVER="hello_test.gd"
 source "$ROOT/build/template/test/harness.sh"
 
-"$GODOT" --headless --path "$PROJ" --import >/dev/null 2>&1 || true
+if ! "$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$FSLP_LOGS/editor.log" 2>&1; then
+	cat "$FSLP_LOGS/editor.log"
+	exit 1
+fi
+if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$FSLP_LOGS/editor.log"; then
+	cat "$FSLP_LOGS/editor.log"
+	exit 1
+fi
 
 two_windows() {
 	local port="$1"
@@ -39,12 +46,18 @@ two_windows() {
 	expect "$glog" "HELLO_SEATED me=2" "the guest was never seated"
 	expect "$hlog" "HELLO_TWO_UP me=1" "the host never saw both squares"
 	expect "$glog" "HELLO_TWO_UP" "the guest never saw both squares"
+	expect "$hlog" "HELLO_VARIANTS_OK" "host did not create both scene variants"
+	expect "$glog" "HELLO_VARIANTS_OK" "guest did not receive both scene variants"
 	# THE PROMOTION'S TWO RECEIPTS: my square is instant (predicted)...
 	expect "$glog" "HELLO_PREDICTED d=([4-9][0-9]|[0-9]{3,})" "the guest's own square was not predicted"
 	# ...and the remote walk still crossed the wire (watched clock).
 	expect "$glog" "HELLO_SAW_WALK x=([3-9][0-9]{2})" "the host's walk never arrived on the guest's screen"
 	expect "$hlog" "HOST_DONE" "host did not finish"
 	expect "$glog" "GUEST_DONE" "guest did not finish"
+	if grep -Eq 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use' "$hlog" "$glog"; then
+		echo "  FAIL: runtime errors or retained resources"
+		FSLP_OK=0
+	fi
 
 	if ((!FSLP_OK)); then
 		echo "  --- host ---"; tail -n 10 "$hlog" | sed 's/^/    /'
@@ -61,6 +74,6 @@ scene_lifecycle() {
 	fi
 }
 
-fslp_act "scene lifecycle" 1 scene_lifecycle
-fslp_act "two predicted windows" 3 two_windows
+fslp_act "scene lifecycle" 1 scene_lifecycle || exit 1
+fslp_act "two predicted windows" 1 two_windows || exit 1
 fslp_verdict HELLO_SIM

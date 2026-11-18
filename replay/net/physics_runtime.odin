@@ -1,5 +1,7 @@
 package replay_net
 
+import "core:fmt"
+
 import bcap "godot:box3d/limits"
 
 import "core:mem"
@@ -147,22 +149,84 @@ physics_config_default :: proc() -> Config {
 }
 
 @(private)
-physics_config_valid :: proc(model: Model($S, $C, $A, $E, $N), cfg: Config) -> bool {
-    return(
-        model.complete_state &&
-        complete_codec_valid(model.complete_codec) &&
-        cfg.history == PHYSICS_HISTORY &&
-        cfg.hz == bcap.TICK_HZ &&
-        cfg.max_prediction <= PHYSICS_WINDOW &&
-        cfg.max_future <= PHYSICS_WINDOW &&
-        cfg.lead <= PHYSICS_WINDOW - 2 &&
-        cfg.max_rewind <= PHYSICS_WINDOW &&
-        cfg.snapshot_every <= 8 &&
-        cfg.egress_bytes_per_pump >= COMPLETE_PART_BYTES + 512 &&
-        model.group.id == 0 &&
-        model.replication.id == 0 &&
-        model.control_timing == .Scheduled \
-    )
+physics_config_check :: proc(model: Model($S, $C, $A, $E, $N), cfg: Config) -> Setup_Report {
+    if !model.complete_state {
+        return setup_problem(
+            .Invalid_Config,
+            "model.complete_state",
+            "complete physics requires a complete-state model",
+        )
+    }
+
+    if report := complete_codec_check(model.complete_codec); report.error != .None {
+        return report
+    }
+
+    for check in ([]Setup_Range {
+            {
+                "network.history",
+                i64(cfg.history),
+                PHYSICS_HISTORY,
+                PHYSICS_HISTORY,
+                "complete physics must match the selected history profile; start with physics_config()",
+            },
+            {
+                "network.hz",
+                i64(cfg.hz),
+                bcap.TICK_HZ,
+                bcap.TICK_HZ,
+                "complete physics must match the backend tick rate",
+            },
+            {
+                "network.max_prediction",
+                i64(cfg.max_prediction),
+                0,
+                PHYSICS_WINDOW,
+                "complete physics prediction window",
+            },
+            {"network.max_future", i64(cfg.max_future), 0, PHYSICS_WINDOW, "complete physics future-input window"},
+            {"network.lead", i64(cfg.lead), 0, PHYSICS_WINDOW - 2, "complete physics lead window"},
+            {"network.max_rewind", i64(cfg.max_rewind), 0, PHYSICS_WINDOW, "complete physics rewind window"},
+            {"network.snapshot_every", i64(cfg.snapshot_every), 0, 8, "complete physics snapshot interval"},
+        }) {
+        if report := setup_range(check); report.error != .None {
+            return report
+        }
+    }
+
+    if cfg.egress_bytes_per_pump < COMPLETE_PART_BYTES + 512 {
+        return setup_problem(
+            .Invalid_Config,
+            "network.egress_bytes_per_pump",
+            fmt.tprintf(
+                "complete physics needs at least %d bytes per pump; got %d",
+                COMPLETE_PART_BYTES + 512,
+                cfg.egress_bytes_per_pump,
+            ),
+        )
+    }
+
+    if model.group.id != 0 {
+        return setup_problem(
+            .Invalid_Config,
+            "model.group.id",
+            "complete physics does not support prediction groups; expected 0",
+        )
+    }
+
+    if model.replication.id != 0 {
+        return setup_problem(
+            .Invalid_Config,
+            "model.replication.id",
+            "complete physics does not support recipient projections; expected 0",
+        )
+    }
+
+    if model.control_timing != .Scheduled {
+        return setup_problem(.Invalid_Config, "model.control_timing", "complete physics requires Scheduled controls")
+    }
+
+    return {}
 }
 
 @(private)
@@ -172,37 +236,84 @@ physics_schemas_init :: proc(
     $N: int,
     model: Model(S, C, A, E, N),
     allocator: mem.Allocator,
+    setup: ^Setup_Report = nil,
 ) -> Error {
-    if sc.init(&s.state, S, allocator = allocator).error != .None ||
-       sc.init(&s.occurrence, r.Occurrence(Net_Event(E)), allocator = allocator).error != .None ||
-       sc.init(&s.accepted, Accepted_Input(C, A, N), allocator = allocator).error != .None ||
-       sc.init(&s.decisions, Accepted_Decisions(N), allocator = allocator).error != .None ||
-       sc.init(&s.chunk, Physics_Chunk_Header, allocator = allocator).error != .None ||
-       sc.init(&s.ack, Physics_Ack, allocator = allocator).error != .None ||
-       sc.init(&s.fact, Physics_Fact_Header, allocator = allocator).error != .None ||
-       sc.init(&s.status, Physics_Status, allocator = allocator).error != .None {
-        return .Invalid_Schema
+    if report := schema_setup(&s.state, S, "State", sc.DEFAULT_OPTIONS, allocator); report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(
+        &s.occurrence,
+        r.Occurrence(Net_Event(E)),
+        "physics.occurrence",
+        sc.DEFAULT_OPTIONS,
+        allocator,
+    ); report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(&s.accepted, Accepted_Input(C, A, N), "physics.accepted", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(&s.decisions, Accepted_Decisions(N), "physics.decisions", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(&s.chunk, Physics_Chunk_Header, "physics.chunk", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(&s.ack, Physics_Ack, "physics.ack", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(&s.fact, Physics_Fact_Header, "physics.fact", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(&s.status, Physics_Status, "physics.status", sc.DEFAULT_OPTIONS, allocator);
+       report.error != .None {
+        return setup_assign(setup, report)
     }
 
     game, error := complete_game_schema(&s.state, &s.occurrence, model.complete_codec.game_rules)
 
     if error != .None || game != model.complete_codec.identity.game_schema {
-        return .Checkpoint_Contract
+        return setup_fail(
+            setup,
+            .Checkpoint_Contract,
+            "model.complete_codec.identity.game_schema",
+            "game schema does not match this codec; rebuild it from the current State and Event types",
+        )
     }
 
     controls, actions: sc.Schema
     defer sc.destroy(&controls)
     defer sc.destroy(&actions)
 
-    if sc.init(&controls, C, allocator = allocator).error != .None ||
-       sc.init(&actions, A, allocator = allocator).error != .None {
-        return .Invalid_Schema
+    if report := schema_setup(&controls, C, "Control", sc.DEFAULT_OPTIONS, allocator); report.error != .None {
+        return setup_assign(setup, report)
+    }
+
+    if report := schema_setup(&actions, A, "Action", sc.DEFAULT_OPTIONS, allocator); report.error != .None {
+        return setup_assign(setup, report)
     }
 
     inputs, input_error := complete_input_schema(&s.accepted, &controls, &actions, &s.decisions)
 
     if input_error != .None || inputs != model.complete_codec.identity.input_schema {
-        return .Checkpoint_Contract
+        return setup_fail(
+            setup,
+            .Checkpoint_Contract,
+            "model.complete_codec.identity.input_schema",
+            "input schema does not match this codec; rebuild it from the current Control and Action types",
+        )
     }
 
     if s.state.wire_size > 65536 ||
@@ -232,7 +343,7 @@ physics_schemas_destroy :: proc(s: ^Physics_Schemas) {
 }
 
 @(private)
-server_physics_init :: proc(s: ^Server($S, $C, $A, $E, $N)) -> Error {
+server_physics_init :: proc(s: ^Server($S, $C, $A, $E, $N), setup: ^Setup_Report = nil) -> Error {
     bytes := u64(size_of(Server_Physics(S, C, A, E, N))) + u64(PHYSICS_HISTORY) * size_of(Physics_Metadata(N))
 
     if error := s.model.complete_codec.reserve(s.model.complete_codec.catalog, bytes); error != .None {
@@ -256,7 +367,7 @@ server_physics_init :: proc(s: ^Server($S, $C, $A, $E, $N)) -> Error {
         charged   = bytes,
     }
 
-    if error := physics_schemas_init(&s.physics.schemas, S, C, A, E, N, s.model, s.allocator); error != .None {
+    if error := physics_schemas_init(&s.physics.schemas, S, C, A, E, N, s.model, s.allocator, setup); error != .None {
         return error
     }
 
@@ -285,7 +396,7 @@ server_physics_destroy :: proc(s: ^Server($S, $C, $A, $E, $N)) {
 }
 
 @(private)
-client_physics_init :: proc(c: ^Client($S, $C, $A, $E, $N)) -> Error {
+client_physics_init :: proc(c: ^Client($S, $C, $A, $E, $N), setup: ^Setup_Report = nil) -> Error {
     bytes := u64(size_of(Client_Physics(S, C, A, E, N))) + u64(PHYSICS_HISTORY) * size_of(Accepted_Input(C, A, N))
 
     if bytes > 8 * 1024 * 1024 {
@@ -313,7 +424,7 @@ client_physics_init :: proc(c: ^Client($S, $C, $A, $E, $N)) -> Error {
         charged   = bytes,
     }
 
-    if error := physics_schemas_init(&c.physics.schemas, S, C, A, E, N, c.model, c.allocator); error != .None {
+    if error := physics_schemas_init(&c.physics.schemas, S, C, A, E, N, c.model, c.allocator, setup); error != .None {
         return error
     }
 

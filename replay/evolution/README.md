@@ -56,9 +56,13 @@ These helpers compile schemas and allocate scratch. They search paths linearly
 inside field loops, so keep them in authoring tools, offline upgrades, and tests.
 Do not call them from a simulation tick or each presentation frame.
 
-Scrapyard demonstrates this with a fully frozen
-[`content49`](../../examples/replay_scrapyard/shared/revisions/content49/catalog.odin),
-its committed contract, and the actual content49→50 checkpoint converter. Run:
+The independent fixtures in `tests/replay_evolution/schema_fixture` exercise
+frozen declarations, exact manifests, an unreviewed scaffold's refusal, explicit
+new defaults and detection of changes to old leaves. They do not require retired
+game schemas.
+
+Scrapyard's revision tool exports its current Catalog, World, Control and Action
+contracts for review before a deliberate future change:
 
 ```sh
 mkdir -p /absolute/staging/revision
@@ -67,6 +71,7 @@ nix develop --command odin run examples/replay_scrapyard/tools/revision \
 nix develop --command odin test tests/replay_evolution -collection:godot=.
 ```
 
-The example command writes a reviewable pair of frozen catalogs, JSON contracts
-and a disabled conversion scaffold into the staging directory. Review before
-adopting them; retain the historical reducer and real old-file fixtures.
+The command writes current frozen declarations and JSON contracts. When adding a
+supported conversion, use the generic scaffolder with the chosen source and target
+types and review each default. Migrate retained data explicitly, then retire source
+schemas that no longer have supported callers.

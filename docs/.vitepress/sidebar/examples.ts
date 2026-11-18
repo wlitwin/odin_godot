@@ -29,7 +29,7 @@ const sidebar: DefaultTheme.SidebarItem[] = [
         "link": "/replay/godot"
       },
       {
-        "text": "Box3D tower",
+        "text": "Box3D starter",
         "link": "/box3d/quickstart"
       },
       {

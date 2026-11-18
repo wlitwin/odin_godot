@@ -326,7 +326,7 @@ probe_network :: proc(self: ^ReplayScrapyard, field: string, wanted: gd.Int) -> 
         return gd.Int(self.diagnostics[0].scope.epoch), true
 
     case "frag_rejected":
-        return gd.Int(self.session.rtc.fragments.stats.rejected), true
+        return gd.Int(rgd.session_rtc(self.session).fragments.stats.rejected), true
     case "facts":
         return gd.Int(self.session.client.facts_contiguous), true
     case "confirmed":
@@ -479,7 +479,8 @@ probe_network :: proc(self: ^ReplayScrapyard, field: string, wanted: gd.Int) -> 
     case "authority":
         return gd.Int(self.session.authority), true
     case "epoch":
-        return gd.Int(self.session.authority ? self.session.server.cfg.epoch : self.session.client.cfg.epoch), true
+        scope_info, scope_ready := rgd.session_presentation(self.session)
+        return scope_ready ? gd.Int(scope_info.epoch) : 0, true
     case "hz":
         return gd.Int(self.session.options.network.hz), true
     }
@@ -530,7 +531,7 @@ probe_recovery :: proc(self: ^ReplayScrapyard, field: string) -> (gd.Int, bool) 
         return gd.Int(self.recovery_probe[0].point.archive.tick), true
     case "backup_sequence":
         return gd.Int(
-                self.session.authority ? self.session.link.outgoing.acknowledged.archive.sequence : self.recovery_probe[0].point.archive.sequence,
+                self.session.authority ? rgd.session_link(self.session).outgoing.acknowledged.archive.sequence : self.recovery_probe[0].point.archive.sequence,
             ),
             true
     case "lobby_backup":
@@ -583,9 +584,9 @@ probe_recovery :: proc(self: ^ReplayScrapyard, field: string) -> (gd.Int, bool) 
     case "control_error":
         return gd.Int(self.room.control_error), true
     case "link_error":
-        return gd.Int(self.session.link.error), true
+        return gd.Int(rgd.session_link(self.session).error), true
     case "link_model_error":
-        return gd.Int(self.session.link.model_error), true
+        return gd.Int(rgd.session_link(self.session).model_error), true
     case "archive_bytes":
         return gd.Int(self.room.recovery.archive_bytes), true
     case "frozen_tick":

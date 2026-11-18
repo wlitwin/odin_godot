@@ -1,103 +1,95 @@
-# Knock down a tower offline
+# Make a small offline physics game
 
-Run a single-player game that launches a ball at a pyramid of fifteen boxes.
-Then change the ball's mass and inspect the loop that connects Box3D to ordinary
-Godot nodes. Kit and Replay are optional for this tutorial.
+Start with an editor-authored crate and floor. The Odin script owns one physics
+scene; the framework binds its bodies to their visual nodes. Kit and Replay are
+optional.
 
-You need the repository checkout, Nix shell, and working Godot executable from
-[the scripting tutorial](../scripting/first-scene.md). Run commands from the
-repository root. The native build needs to download its pinned engine source
-on the first run.
+![The offline starter: an orange crate on a floor, with jump and reset controls](../img/box3d-starter.png)
 
-## 1. Build and play
+## 1. Open the starter
+
+With an installed SDK, copy the contents of
+`addons/odin_godot/template/box3d` into a new project containing the SDK's two
+addon directories. Build and select your native backend once using
+[Build and export](building.md), then open `main.tscn` and press **F6**.
+
+From the source checkout, the convenience command performs the initial setup:
 
 ```sh
-nix develop --command bash examples/box3d_offline/play.sh -e
+nix develop --command bash examples/box3d_starter/play.sh --editor
 ```
 
-The helper builds the native backend into `.box3d-cache`, builds the Odin
-scripts, and opens the editor. Wait for its initial import, then press **F6**.
-A pyramid should stand on the ground.
+The crate drops onto the floor. **Space** makes it jump; **R** resets it.
+Successful builds remember the compiler and backend, so later Project Manager
+launches use **Build Odin Scripts** and normal save-time rebuilding.
 
-| Control | Action |
-| --- | --- |
-| Left click or Space | Launch a ball toward the mouse |
-| Hold right mouse and drag | Orbit the camera |
-| W / S or Up / Down | Move the camera in or out |
-| R | Rebuild the tower |
+## 2. Change the scene
 
-Aim near the base and launch. Boxes fall and the HUD counts knocked-down boxes.
-Press **R** to return to the initial scene.
+Open `content/world.tscn` and select **Crate**. Move it higher or rotate it.
+In its shape Resource, change friction, restitution or density. Its **Visual**
+child supplies appearance; its shape Resource supplies collision. Keep their
+dimensions consistent.
 
-If setup fails, inspect the native build error before the script build. To use
-an existing compatible shared backend, set `BOX3D_NATIVE_LIBRARY` as described in
-[Build and export](building.md).
+Select a body and choose **Install tools and build** to enable collision
+previews and **Validate physics**. Runtime physics does not require this editor
+module.
 
-## 2. Find the world owner
+Use **Duplicate Box3D selection** to add another crate, move it apart from the
+first, then play. The new crate receives a saved ID and automatically gets a
+physics body and visual binding. The Space action still targets the original
+Crate node.
 
-Open [scripts/tower.odin](https://github.com/wlitwin/odin_godot/blob/main/examples/box3d_offline/scripts/tower.odin).
-Its script stores a `b.World`, body handles, and the corresponding mesh nodes.
+## 3. Read the game loop
+
+Open `scripts/game.odin`. These are the ownership operations:
 
 ```odin
-import b "godot:box3d"
-import gd "godot:godot"
+import physics "godot:box3d/godot/scene"
+
+// In ready: capture the initial World and bind its authored bodies.
+self.scene, problem = physics.open(self.world)
+
+// In physics_process: advance exactly one configured fixed step and show it.
+problem = physics.step_fixed(&self.scene)
+
+// On reset: restore captured content, including original positions.
+problem = physics.reset(&self.scene)
+
+// In finalize: release native ownership before releasing its copied data.
+status := physics.destroy(&self.scene)
 ```
 
-Follow these procedures in that file:
+The complete script checks each diagnostic, reports actionable errors and stops
+stepping on failure. `body_for_node` resolves a current handle when gameplay
+needs to apply an impulse, including after reset.
 
-| Procedure | Responsibility |
-| --- | --- |
-| `build_world` | Create the world, static ground, dynamic boxes, and shapes |
-| `box_tower_physics_process` | Handle launches and call `b.world_step_fixed` once per physics frame |
-| `sync_nodes` | Read each body's pose and copy it to its mesh node |
-| `box_tower_process` | Update camera controls once per rendered frame |
-| `destroy_world` | Destroy the world and clear body handles on reset or scene exit |
+The helper keeps an immutable initial bake. Reset does not extract the moved
+nodes again. Temporary tree exit/re-entry preserves the owner; finalization
+handles node destruction and script removal even outside the tree. A failed
+open or reset still leaves a destroyable owner.
 
-With the default build profile, `world_step_fixed` advances 1/60 second with four
-substeps. Keep Godot's physics rate at 60 Hz for this loop. A custom
-[timing profile](timing.md) changes that fixed duration and substep count; match
-the callback rate or use an explicit fixed-step accumulator. Passing a frame
-delta does not change `world_step_fixed`.
+Body poses are published relative to the current World frame in hierarchy order.
+Mesh-child offsets and scale stay unchanged. Nested Worlds are separate scopes;
+removing a bound node or changing its body ancestry reports an error before the
+next step. Use the lower-level API for runtime spawning or custom ownership.
 
-The mesh nodes display solver results. Moving one of them manually does not move
-its physics body. Read [Physics ownership](ownership.md) before adding a second
-system that changes poses.
+The project uses 60 physics ticks per second, matching the default Box3D timing
+profile. If you select another profile, set the Godot rate to match. The helper
+reports a mismatch instead of changing global engine timing.
 
-## 3. Change the ball's density
+## 4. Export normally
 
-Open the project in the editor through the same helper:
+Use **Project → Export** with the supplied **macOS arm64** or **Linux x86_64**
+preset and a matching native backend. The standard Odin exporter compiles the
+game and deploys the selected backend. Exported games need no compiler.
 
-```sh
-nix develop --command bash examples/box3d_offline/play.sh -e
-```
-
-In `scripts/tower.odin`, change `BALL_DENSITY` from 4000 to 250. Save, wait for
-the script build to finish, and run the scene. The ball has the same radius and
-launch speed but much less mass, so it transfers less momentum to the boxes.
-
-The boxes use a density of 250 kg/m³; shapes otherwise default to 1000 kg/m³.
-Density and shape volume determine mass. Restore `BALL_DENSITY` to 4000 when you
-finish comparing.
-
-Launch the editor through `play.sh` so rebuilds inherit `BOX3D_NATIVE_LIBRARY`.
-Opening it from the Project Manager without that environment can leave saving
-unable to link Box3D; inspect the build error if a change does not appear.
-
-## 4. Make a browser build
-
-```sh
-nix develop --command bash examples/box3d_offline/export_web.sh
-nix develop --command bash build/serve.sh examples/box3d_offline/out/web
-```
-
-Open `http://localhost:8099/`. The export writes `out/web/` and
-`out/box3d-offline-web.zip` inside the example. The server supplies headers
-needed by the threaded build. The example's
-[README](https://github.com/wlitwin/odin_godot/blob/main/examples/box3d_offline/README.md)
-has itch.io upload settings.
+The macOS preset combines Godot's universal launcher with arm64 SDK libraries;
+it is not an Intel-compatible SDK build. See [Support](support.md) for target
+qualification.
 
 ## Next
 
-- [Author a world](authoring.md) to move initial collision data into the editor.
-- Read [Build and export](building.md) before creating your own Box3D project.
-- Use [Multiplayer integration](multiplayer.md) when a framework should own ticks and history.
+- [Editor tools](editor.md) covers IDs, duplication, joints and collision baking.
+- [Authoring](authoring.md) explains the detached bake and native construction APIs.
+- [The procedural tower](procedural.md) demonstrates spawning and a browser export.
+- [Multiplayer integration](multiplayer.md) hands clock/history ownership to Kit or Replay.

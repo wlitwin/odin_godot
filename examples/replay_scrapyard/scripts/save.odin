@@ -178,7 +178,7 @@ replay_scrapyard_save_run :: proc(self: ^ReplayScrapyard) -> bool {
         refs[i] = player.spray.image
     }
 
-    codec := self.session.link.publish_codec.ready ? &self.session.link.publish_codec : nil
+    codec := rgd.session_link(self.session).publish_codec.ready ? &rgd.session_link(self.session).publish_codec : nil
 
     when gd.IS_WEB {
         bytes, encoded_result := storagegd.checkpoint_bundle_encode(

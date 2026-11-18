@@ -1,5 +1,7 @@
 package scriptgen
 
+import decl "godot:decl"
+
 // @(gd_event) resolution. The anchor selects the existing runtime:
 // sim-tracked anchors become watch-clock events; cooperative entities and
 // explicit static/immediate occurrences become session net events. An
@@ -39,17 +41,31 @@ net_event_params :: proc(cand: Fact_Candidate) -> (types, names: [dynamic]string
     return
 }
 
-@(private = "file")
-net_event_registered_entity :: proc(scripts: []^Script, target: string) -> bool {
+module_script_type :: proc(scripts: []^Script, from: Struct_Def, spelling: string) -> (^Script, bool) {
+    def, _, found := type_struct({spelling, from, nil})
+    if !found {return nil, false}
     for s in scripts {
-        for e in s.entities {
-            if e.target == target {
-                return true
-            }
-        }
+        if dir_of(s.path) == def.dir && s.struct_name == def.name {return s, true}
     }
+    return nil, false
+}
 
-    return false
+event_wire_anchor :: proc(event: $Event) -> string {
+    return event.anchor_index < 0 ? "" : event.entity_refs[event.anchor_index].wire_name
+}
+
+emit_event_kind_guard :: proc(b: ^strings.Builder, ref: Event_Entity_Ref, boot, id, raw: string, index: int) {
+    if ref.binding == nil {return}
+    fmt.sbprintf(
+        b,
+        "\t_kind%d, _kind%d_ok := kboot.boot_entity(%s, %s, %s_TYPE)\n",
+        index,
+        index,
+        boot,
+        id,
+        strings.to_upper(entity_helper(ref.binding^)),
+    )
+    fmt.sbprintf(b, "\tif !_kind%d_ok || _kind%d != rawptr(%s) {{return}}\n", index, index, raw)
 }
 
 @(private = "file")
@@ -81,12 +97,7 @@ net_event_audience_expr :: proc(audience: string) -> string {
 
 // Resolve declarations after resolve_sim has classified every entity and
 // identified the lane owner.
-resolve_net_events :: proc(
-    scripts: []^Script,
-    decls: []Fact_Candidate,
-    by_struct: map[string]^Script,
-    taken: map[string]Proc_Site,
-) {
+resolve_net_events :: proc(scripts: []^Script, decls: []Fact_Candidate, taken: map[string]Proc_Site) {
     GENERATED_SUFFIXES :: [?]string{"_cmd", "_spawn", "_step", "_events", "_event_routes"}
 
     for cand in decls {
@@ -221,8 +232,13 @@ resolve_net_events :: proc(
             continue
         }
 
+        from := Struct_Def {
+            dir     = dir_of(cand.path),
+            imports = g_file_imports[norm_path(cand.path)],
+            loc     = loc,
+        }
         game_name := strings.trim_prefix(types[0], "^")
-        game, game_ok := by_struct[game_name]
+        game, game_ok := module_script_type(scripts, from, game_name)
 
         if !game_ok || game.boot_fields != 1 || game.session_fields != 1 {
             error_at(
@@ -233,6 +249,17 @@ resolve_net_events :: proc(
             )
             continue
         }
+
+        if dir_of(game.path) != from.dir {
+            error_at(
+                loc,
+                "%s: declare the event callback in the game owner's package (%s), so generated routing does not create a reverse import",
+                cand.name,
+                dir_of(game.path),
+            )
+            continue
+        }
+        game_name = game.struct_name
 
         mine_at := -1
 
@@ -248,8 +275,7 @@ resolve_net_events :: proc(
             continue
         }
 
-        entity_names := make([dynamic]string, context.temp_allocator)
-        entity_types := make([dynamic]string, context.temp_allocator)
+        refs := make([dynamic]Event_Entity_Ref, context.temp_allocator)
         shape_ok := true
 
         for i in 1 ..< mine_at {
@@ -259,20 +285,18 @@ resolve_net_events :: proc(
                 break
             }
 
-            target := strings.trim_prefix(types[i], "^")
-
-            if target == game_name {
-                error_at(loc, "%s: the game parameter cannot also be an event entity", cand.name)
-                shape_ok = false
-                break
-            }
-
-            if _, ok := by_struct[target]; !ok {
+            target_type := strings.trim_prefix(types[i], "^")
+            target, known := module_script_type(scripts, from, target_type)
+            if !known {
                 error_at(loc, "%s: event entity %q has unknown script type %s", cand.name, names[i], types[i])
                 shape_ok = false
                 break
             }
-
+            if target == game {
+                error_at(loc, "%s: the game parameter cannot also be an event entity", cand.name)
+                shape_ok = false
+                break
+            }
             name := names[i] != "" ? names[i] : fmt.tprintf("entity%d", i - 1)
 
             if name == "b" {
@@ -281,8 +305,11 @@ resolve_net_events :: proc(
                 break
             }
 
-            append(&entity_names, name)
-            append(&entity_types, target)
+            binding: ^Entity_Tag
+            for &entry in game.entities {if entry.symbol == target {binding = &entry; break}}
+            code, rendered := type_expression({target_type, from, nil}, dir_of(game.path), &game.code_imports)
+            if !rendered {error_at(loc, "%s: cannot render entity type %s", cand.name, target_type); shape_ok = false; break}
+            append(&refs, Event_Entity_Ref{parameter = name, symbol = target, binding = binding, type_code = code})
         }
 
         if !shape_ok {
@@ -294,7 +321,8 @@ resolve_net_events :: proc(
         switch {
         case anchor_set && anchor_name == "none":
         case anchor_set:
-            for name, i in entity_names {
+            for ref, i in refs {
+                name := ref.parameter
                 if name == anchor_name {
                     anchor_index = i
                     break
@@ -305,15 +333,15 @@ resolve_net_events :: proc(
                 error_at(loc, "%s: `anchor=%s` does not name an event entity parameter", cand.name, anchor_name)
                 continue
             }
-        case len(entity_names) == 0:
-        case len(entity_names) == 1:
+        case len(refs) == 0:
+        case len(refs) == 1:
             anchor_index = 0
         case:
             error_at(
                 loc,
                 "%s: %d entity parameters are ambiguous; choose anchor=PARAM or anchor=none",
                 cand.name,
-                len(entity_names),
+                len(refs),
             )
             continue
         }
@@ -326,7 +354,7 @@ resolve_net_events :: proc(
         anchor_script: ^Script
 
         if anchor_index >= 0 {
-            anchor_script = by_struct[entity_types[anchor_index]]
+            anchor_script = refs[anchor_index].symbol
         }
 
         sim_route :=
@@ -350,8 +378,9 @@ resolve_net_events :: proc(
                 continue
             }
 
-            for target in entity_types {
-                ts := by_struct[target]
+            for ref in refs {
+                ts := ref.symbol
+                target := ref.type_code
 
                 if ts.tick.proc_name == "" && len(ts.block_ticks) == 0 {
                     error_at(loc, "%s: sim event entity %s is not lane-tracked", cand.name, target)
@@ -382,10 +411,11 @@ resolve_net_events :: proc(
                 continue
             }
 
-            for target in entity_types {
-                ts := by_struct[target]
+            for ref in refs {
+                ts := ref.symbol
+                target := ref.type_code
 
-                if !net_event_registered_entity(scripts, target) || ts.net_id_type == "" {
+                if ref.binding == nil || ts.net_id_type == "" {
                     error_at(
                         loc,
                         "%s: cooperative event entity %s must be a registered entity kind with a net_id field",
@@ -424,7 +454,9 @@ resolve_net_events :: proc(
             }
 
             append(&arg_names, name)
-            append(&arg_types, types[i])
+            code, rendered := type_expression({types[i], from, nil}, dir_of(game.path), &game.code_imports)
+            if !rendered {error_at(loc, "%s: cannot render event argument %s", cand.name, types[i]); shape_ok = false; break}
+            append(&arg_types, code)
             append(&arg_wires, wire)
         }
 
@@ -438,8 +470,7 @@ resolve_net_events :: proc(
                 fx_proc      = cand.name,
                 game         = game_name,
                 anchor_index = anchor_index,
-                entity_names = entity_names,
-                entity_types = entity_types,
+                entity_refs  = refs,
                 arg_names    = arg_names,
                 arg_types    = arg_types,
                 arg_wires    = arg_wires,
@@ -449,8 +480,7 @@ resolve_net_events :: proc(
             }
 
             if anchor_index >= 0 {
-                info.anchor = entity_types[anchor_index]
-                info.anchor_param = entity_names[anchor_index]
+                info.anchor_param = refs[anchor_index].parameter
             }
 
             dup := false
@@ -480,8 +510,7 @@ resolve_net_events :: proc(
                 fx_proc      = cand.name,
                 game         = game_name,
                 anchor_index = anchor_index,
-                entity_names = entity_names,
-                entity_types = entity_types,
+                entity_refs  = refs,
                 arg_names    = arg_names,
                 arg_types    = arg_types,
                 arg_wires    = arg_wires,
@@ -492,8 +521,7 @@ resolve_net_events :: proc(
             }
 
             if anchor_index >= 0 {
-                info.anchor = entity_types[anchor_index]
-                info.anchor_param = entity_names[anchor_index]
+                info.anchor_param = refs[anchor_index].parameter
             }
 
             dup := false
@@ -525,9 +553,9 @@ resolve_net_events :: proc(
             continue
         }
 
-        name := fmt.tprintf("%s_event_routes", to_snake(s.struct_name))
+        name := fmt.tprintf("%s_event_routes", decl.snake_name(s.struct_name))
 
-        if site, hand := taken[name]; hand {
+        if site, hand := taken[name]; hand && dir_of(site.loc.path) == dir_of(s.path) {
             error_at(
                 site.loc,
                 "%s is generated by @(gd_event) declarations on %s; rename the hand-written proc",

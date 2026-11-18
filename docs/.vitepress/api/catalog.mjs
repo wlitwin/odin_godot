@@ -1,7 +1,7 @@
 export const layers = ['Odin and Godot', 'Kit', 'Replay', 'Box3D', 'Libraries']
 
 export const roots = {
-  godot: 'Odin and Godot', runtime: 'Odin and Godot',
+  godot: 'Odin and Godot', runtime: 'Odin and Godot', authoring: 'Odin and Godot',
   gdext: 'Odin and Godot', libgd: 'Odin and Godot',
   kit: 'Kit', replay: 'Replay', box3d: 'Box3D',
   events: 'Libraries', flow: 'Libraries', flowgd: 'Libraries', play: 'Libraries',
@@ -10,6 +10,7 @@ export const roots = {
 export const guides = {
   godot: ['scripting/index.md', 'Scripting guide'],
   runtime: ['authoring-guide.md', 'Script authoring'],
+  authoring: ['authoring-guide.md#baking-resources-into-game-values', 'Resource catalogs and mapping'],
   gdext: ['contributing/native-boundary.md', 'Native boundary'],
   libgd: ['contributing/native-boundary.md', 'Native boundary'],
   kit: ['kit/index.md', 'Kit guide'],
@@ -24,6 +25,7 @@ export const guides = {
 export const descriptions = {
   godot: 'Authored engine helpers, typed signals, strings, and Variants.',
   runtime: 'Script registration, typed script access, and runtime contracts.',
+  authoring: 'Typed Resource catalogs, checked field mapping, and copied authoring diagnostics.',
   gdext: 'GDExtension ABI types and engine function pointers. Advanced.',
   libgd: 'Binding support and native engine integration. Advanced.',
   'kit/net': 'Entity fields, codecs, commands, and replication.',
@@ -31,6 +33,7 @@ export const descriptions = {
   'kit/sim': 'Fixed ticks, input history, prediction, and reconciliation.',
   'kit/boot': 'Lobby-to-game lifecycle and generated networking integration.',
   'kit/netcfg': 'Named network profiles and configuration validation.',
+  'kit/godot/physics': 'Owned authored Kit physics setup, callback leases, and checked shutdown.',
   'kit/physics': 'Complete Box3D state for Kit simulation.',
   replay: 'Frames, timelines, history, pools, RNG, and occurrences.',
   'replay/net': 'Authoritative models, controls, actions, and correction.',
@@ -39,7 +42,10 @@ export const descriptions = {
   'replay/physics': 'Complete Box3D checkpoints and Replay codecs.',
   'replay/play': 'Value-based gameplay helpers for restorable Worlds.',
   box3d: 'Worlds, bodies, shapes, queries, characters, joints, and snapshots.',
-  'box3d/authoring': 'Definitions, baking, construction, catalogs, and artifacts.',
+  'box3d/authoring': 'Pure definitions, baking, validation, artifacts, and previews.',
+  'box3d/godot/scene': 'Local authored world ownership, reset, and automatic visual binding.',
+  'box3d/authoring/runtime': 'Native construction, catalogs, mappings, and runtime draw ownership.',
+  'box3d/types': 'Shared physics values without native domain registration.',
   'box3d/presentation': 'Copied physics frames and presentation values.',
   events: 'Typed event subscriptions and direct callback dispatch.',
   flow: 'Timed, sequential, and parallel action trees.',

@@ -8,12 +8,14 @@ import "core:fmt"
 import gd "godot:godot"
 import b "godot:box3d"
 import p "godot:kit/physics"
+import owned "godot:kit/godot/physics"
 import k "godot:kit/sim"
 import s "godot:kit/session"
 import ng "godot:kit/netgd"
 
 KitAuthoringDemo :: struct {
     owner: gd.Node3d,
+    owned: Demo_Owner,
     rt:    ^Demo,
     last:  Result,
 }
@@ -33,11 +35,11 @@ kit_authoring_demo_ready :: proc(self: ^KitAuthoringDemo) {
     context = base.default_context()
     temp := base.default_temp_allocator_temp_begin()
     defer base.default_temp_allocator_temp_end(temp)
-    self.rt = demo_create(self.owner)
+    self.rt = demo_create(self.owner,&self.owned)
 
     if self.rt == nil {
         self.last.ok = false
-        self.last.errors[0] = {"sdk_context_create", .Allocation_Failed}
+        self.last.errors[0] = {"physics.owner.open", self.owned.report.error}
         self.last.error_count = 1
 
         if gd.env_int("BOX3D_SAMPLE_SCRIPTED", 0) == 1 {
@@ -99,15 +101,17 @@ kit_authoring_demo_presentation :: proc(self: ^KitAuthoringDemo) -> gd.String {
     }
 
     context.allocator = rt.allocator
-    checkpoint, error := k.lane_world_checkpoint(&rt.lane, rt.lane.ticker.tick)
+    checkpoint, error := owned.authored_checkpoint(&self.owned, rt.lane.ticker.tick)
 
     if error != .Ok {
         return gd.new_string_odin("{\"version\":1,\"bodies\":[]}")
     }
 
-    defer k.world_checkpoint_destroy(&checkpoint)
+    defer {
+        if error := owned.authored_checkpoint_release(&self.owned); error != .Ok { fail(rt,"presentation.checkpoint_release",error) }
+    }
     states: [35]b.Body_State
-    count, ce := p.checkpoint_body_states(&checkpoint, states[:], Side)
+    count, ce := p.checkpoint_body_states(checkpoint, states[:], Side)
 
     if ce != .Ok {
         return gd.new_string_odin("{\"version\":1,\"bodies\":[]}")
@@ -190,24 +194,17 @@ kit_authoring_demo_close :: proc(self: ^KitAuthoringDemo) -> bool {
     temp := base.default_temp_allocator_temp_begin()
     defer base.default_temp_allocator_temp_end(temp)
 
-    if self.rt == nil {
-        return true
-    }
-
-    result: Result
-    consumed := demo_close(self.rt, &result)
+    if self.rt == nil && self.owned.storage.memory == nil { return true }
+    consumed := demo_close(&self.owned,&self.last)
     context = base.default_context()
-    self.last = result
-
-    if consumed {
-        self.rt = nil
-    }
+    self.rt = self.owned.storage.data
+    result := self.last
 
     print_result(result)
     return consumed && result.ok
 }
 
-@(gd_method = "borrowed_args")
+@(gd_method)
 kit_authoring_demo_on_packet :: proc(self: ^KitAuthoringDemo, id: gd.Int, packet: gd.Packed_Byte_Array) {
     context = base.default_context()
     temp := base.default_temp_allocator_temp_begin()
@@ -277,12 +274,11 @@ kit_authoring_demo_on_net_down :: proc(self: ^KitAuthoringDemo) {
     }
 }
 
-kit_authoring_demo_exit_tree :: proc(self: ^KitAuthoringDemo) {
+kit_authoring_demo_finalize :: proc(self: ^KitAuthoringDemo) {
     context = base.default_context()
     temp := base.default_temp_allocator_temp_begin()
     defer base.default_temp_allocator_temp_end(temp)
 
-    if self.rt != nil {
-        _ = kit_authoring_demo_close(self)
-    }
+    _ = kit_authoring_demo_close(self)
+    if self.owned.storage.memory != nil { gd.print_str("SAMPLE_CLOSE_ERROR Kit owner remains retained") }
 }

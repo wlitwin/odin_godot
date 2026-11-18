@@ -90,48 +90,21 @@ actual native/browser exports, corruption, recomputed-checksum state mismatches
 and invalid-input preflight. This is evidence for the recorded workloads, not
 universal floating-point determinism across operating systems or all scenarios.
 
-## Older network recordings
+## Recording schema changes
 
-Recorded authority observations add a field to `Batch`. This changes diagnostic
-input fingerprints even for models with the authority policy disabled. Gameplay
-packet/checkpoint formats remain separate. Normal decode rejects older input
-schemas; it does not silently assume missing observations.
+A recording binds its state, input and event schemas plus application content and
+build identity. Normal decoding requires those current contracts; it does not
+silently fill missing authority observations or other fields.
 
-For an unchanged model with its authority policy disabled,
-`net.recording_upgrade_without_authority` explicitly converts the prior Batch
-schema, retaining recording context, complete frames, controls, action decisions
-and events. Enabled authority policies are refused because the old data cannot
-supply the required observations. Structural conversion does not certify replay
-agreement; run the verifier on the resulting file.
+When migrating owned recordings, preserve their base frame, retained expected
+frames, input decisions, event IDs/payloads and slice boundaries. Validate the
+source, map only explicitly reviewed semantics, then replay the candidate with
+the target model. Do not regenerate expected frames or events to hide divergence.
+An unknown authority observation remains unknown; a file does not establish
+permissions that its original producer never recorded.
 
-Scrapyard provides a bounded converter that requires a new destination:
-
-```sh
-nix develop --command odin run examples/replay_scrapyard/tools/upgrade_recording \
-  -collection:godot="$PWD" -- old.rplrec converted.rplrec
-nix develop --command odin run examples/replay_scrapyard/tools/verify_recording \
-  -collection:godot="$PWD" -- converted.rplrec
-```
-
-The converter leaves its source intact and refuses to replace existing files
-or symlinks. It publishes the destination through a temporary file in the same
-directory and a hard link. Three earlier native/browser recordings have been
-converted and verified against their complete recorded
-state/event sequences.
-
-### Scrapyard content 48 recordings
-
-The Scrapyard format-only `upgrade_recording` tool remains specific to content 48.
-It adds the formerly absent authority-observation field with an unknown value;
-it does not relabel historical gameplay as content 49. Verify its output with:
-
-```sh
-/path/to/verify_recording /path/to/converted.rplrec --content48
-```
-
-The explicit legacy model retains the old world schema and disabled authority
-policy. Its ordinary gameplay callbacks are unchanged between contents 48 and 49;
-future gameplay revisions must preserve that historical implementation separately.
-Current content-49 recordings use the verifier without this flag. Checkpoint
-conversion is a different operation: it seeds the prior authority epoch so future
-recovery can apply the new timer policy.
+Scrapyard's retained native/browser recordings were migrated this way and are
+verified by `tests/replay_network_recording/fixtures.sh` in native code and WASM.
+Original bytes and [receipts](../../docs/replay/results/usability-legacy-2026-11-16/scrapyard/receipt.json)
+remain historical evidence. The current verifier takes only the recording path;
+game-specific old models and format-upgrade helpers are no longer shipped.

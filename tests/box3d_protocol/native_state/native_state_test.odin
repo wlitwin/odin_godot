@@ -105,7 +105,7 @@ view :: proc(w: b.World, game: Game, observations: Observations) -> View {
     // exact build/target identity and registered asset/profile contract.
     identity := d.Identity {
         solver_format      = b.STATE_DUMP_VERSION,
-        recovery_format    = 1,
+        recovery_format    = 3,
         game_format        = 1,
         observation_format = 1,
         profile            = 0x44494147,

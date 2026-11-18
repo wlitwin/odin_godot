@@ -12,7 +12,7 @@ def main():
  shutil.copytree(Path(__file__).parent/'project',project)
  shutil.copytree(ROOT/'addons/box3d_authoring',project/'addons/box3d_authoring')
  # Existing Core supports this standard modules directory only. No load bypass.
- shutil.copytree(ROOT/'addons/box3d_authoring/tool_module',project/'modules/box3d_authoring_tools')
+ shutil.copytree(ROOT/'addons/box3d_authoring/tool_module',project/'modules/box3d_authoring_tools', ignore=shutil.ignore_patterns(".gdignore"))
  (project/'data').mkdir();frames={}
  for role,source in [('kit',a.kit_frame_json),('replay',a.replay_frame_json)]:
   target=project/'data'/(role+'-frame.json');shutil.copyfile(source,target)

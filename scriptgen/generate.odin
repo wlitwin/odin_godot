@@ -51,6 +51,22 @@ field_offset_expr :: proc(cls: string, path: []string) -> string {
     return strings.to_string(b)
 }
 
+// Infer container types from the actual field. This also works for private
+// element types in another package, without exporting their implementation.
+backup_type_exprs :: proc(cls, snake: string, backup: Backup_Info) -> (key, elem: string) {
+    field := field_type_expr(cls, backup.path)
+    switch backup.kind {
+    case .Map:
+        pair := fmt.tprintf("_%s_backup_map_types(%s)", snake, field)
+        return fmt.tprintf("type_of(%s.key)", pair), fmt.tprintf("type_of(%s.value)", pair)
+    case .Dyn:
+        return "", fmt.tprintf("intrinsics.type_elem_type(%s)", field)
+    case .Pod:
+        return "", field
+    }
+    return
+}
+
 // gd:"backup" — the host-local migration/save codec (Backup_Info). A
 // version-hashed <class>_backup_write/_read pair over the tagged fields, so a
 // takeover or a resume restores the campaign with no hand-matched write/read
@@ -64,7 +80,7 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
     }
 
     cls := s.struct_name
-    snake := to_snake(cls)
+    snake := decl.snake_name(cls)
     upper := strings.to_upper(snake)
     w :: strings.write_string
 
@@ -73,7 +89,7 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
     ver := decl.FNV32_OFFSET
 
     for bk in s.backups {
-        sig := fmt.tprintf("%s|%v|%s|%s;", join_path(bk.path), bk.kind, bk.key, bk.elem)
+        sig := fmt.tprintf("%s|%v|%s|%s;", join_path(bk.path), bk.kind, bk.key_name, bk.elem_name)
         ver = decl.fnv1a32_acc(ver, sig)
     }
 
@@ -89,6 +105,23 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
     w(b, "// ---- gd:\"backup\": host-local migration + save codec ----\n")
 
     for bk in s.backups {
+        if bk.kind != .Map {continue}
+        fmt.sbprintf(
+            b,
+            "@(private = \"file\")\n_%s_Backup_Map_Types :: struct($K, $V: typeid) {{key: K, value: V}}\n",
+            snake,
+        )
+        fmt.sbprintf(
+            b,
+            "@(private = \"file\")\n_%s_backup_map_types :: proc($M: typeid/map[$K]$V) -> _%s_Backup_Map_Types(K, V) {{return {{}}}}\n\n",
+            snake,
+            snake,
+        )
+        break
+    }
+
+    for bk in s.backups {
+        key, elem := backup_type_exprs(cls, snake, bk)
         switch bk.kind {
         case .Pod:
             fmt.sbprintf(
@@ -99,17 +132,11 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
                 bk.field,
             )
         case .Map:
-            fmt.sbprintf(
-                b,
-                "#assert(%s, \"%s.%s: gd:\\\"backup\\\" map key must be POD\")\n",
-                pod(bk.key),
-                cls,
-                bk.field,
-            )
+            fmt.sbprintf(b, "#assert(%s, \"%s.%s: gd:\\\"backup\\\" map key must be POD\")\n", pod(key), cls, bk.field)
             fmt.sbprintf(
                 b,
                 "#assert(%s, \"%s.%s: gd:\\\"backup\\\" map value must be POD\")\n",
-                pod(bk.elem),
+                pod(elem),
                 cls,
                 bk.field,
             )
@@ -117,7 +144,7 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
             fmt.sbprintf(
                 b,
                 "#assert(%s, \"%s.%s: gd:\\\"backup\\\" element must be POD\")\n",
-                pod(bk.elem),
+                pod(elem),
                 cls,
                 bk.field,
             )
@@ -156,6 +183,7 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
 
     for bk in s.backups {
         acc := fmt.tprintf("self.%s", join_path(bk.path))
+        key, elem := backup_type_exprs(cls, snake, bk)
 
         switch bk.kind {
         case .Pod:
@@ -165,8 +193,8 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
                 b,
                 "\t{{\n\t\tn := knet.read_u32(r)\n\t\tif r.err {{return false}}\n\t\tclear(&%s)\n\t\tfor _ in 0 ..< n {{\n\t\t\tk := knet.read_pod(r, %s)\n\t\t\tv := knet.read_pod(r, %s)\n\t\t\tif r.err {{return false}}\n\t\t\t%s[k] = v\n\t\t}}\n\t}}\n",
                 acc,
-                bk.key,
-                bk.elem,
+                key,
+                elem,
                 acc,
             )
         case .Dyn:
@@ -174,7 +202,7 @@ emit_backup :: proc(b: ^strings.Builder, s: ^Script) {
                 b,
                 "\t{{\n\t\tn := knet.read_u32(r)\n\t\tif r.err {{return false}}\n\t\tclear(&%s)\n\t\tfor _ in 0 ..< n {{\n\t\t\te := knet.read_pod(r, %s)\n\t\t\tif r.err {{return false}}\n\t\t\tappend(&%s, e)\n\t\t}}\n\t}}\n",
                 acc,
-                bk.elem,
+                elem,
                 acc,
             )
         }
@@ -224,6 +252,9 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
         len(s.messages) > 0 ||
         len(s.net_events) > 0
     n.intrinsics = len(s.replicates) > 0 || len(s.backups) > 0
+    for e in s.entities {
+        if e.binding != nil && e.binding.tick.input_code != "" {n.intrinsics = true}
+    }
     // @(gd_tick) generates the sim-lane thunk + Sim_Set (kit/sim) — and an
     // entity TABLE references a target's Sim_Set when that class ticks.
     ticked_entities := false
@@ -257,7 +288,7 @@ script_needs :: proc(s: ^Script) -> (n: Gen_Needs) {
         s.step_boot ||
         len(s.event_halves) > 0 ||
         has_succ ||
-        s.profile_type != "" ||
+        s.profile_code != "" ||
         len(s.messages) > 0 ||
         coop_commands ||
         len(s.net_events) > 0
@@ -393,6 +424,15 @@ emit_imports :: proc(b: ^strings.Builder, sections: []Gen_Section) {
     for sec in sections {
         s := sec.script
 
+        for alias, path in s.code_imports {import_add(&t, alias, path)}
+        for alias, path in s.tick.input_imports {import_add(&t, alias, path)}
+        for ic in s.input_classes {
+            for alias, path in ic.imports {import_add(&t, alias, path)}
+        }
+        for e in s.entities {
+            if e.pkg_path != "" {import_add(&t, e.pkg_alias, e.pkg_path)}
+        }
+
         for c in s.commands {
             if c.pkg_path != "" {
                 import_add(&t, c.pkg_alias, c.pkg_path)
@@ -508,7 +548,7 @@ emit_ctors :: proc(b: ^strings.Builder, sections: []Gen_Section) {
 // generate_all — the whole consolidated artifact for one scripts dir. `sections` is
 // already in its final (source-filename) order; the caller owns the sorting so the
 // same inputs always produce a byte-identical file.
-generate_all :: proc(pkg: string, sections: []Gen_Section) -> string {
+generate_all :: proc(pkg: string, sections: []Gen_Section, bridges: []Package_Bridge) -> string {
     b := strings.builder_make()
     w :: strings.write_string
 
@@ -516,8 +556,23 @@ generate_all :: proc(pkg: string, sections: []Gen_Section) -> string {
     fmt.sbprintf(&b, "// One artifact per scripts dir: %d script section(s), banner-marked below.\n", len(sections))
     fmt.sbprintf(&b, "package %s\n\n", pkg)
 
-    emit_imports(&b, sections)
-    emit_ctors(&b, sections)
+    if len(sections) > 0 {
+        emit_imports(&b, sections)
+        emit_ctors(&b, sections)
+    }
+    for bridge in bridges {
+        if bridge.value {
+            fmt.sbprintf(
+                &b,
+                "%s :: proc \"contextless\" () -> type_of(%s) {{return %s}}\n",
+                bridge.name,
+                bridge.procedure,
+                bridge.procedure,
+            )
+        } else {
+            fmt.sbprintf(&b, "%s :: proc {{%s}}\n", bridge.name, bridge.procedure)
+        }
+    }
 
     for sec in sections {
         // The editor's deletion probe (core/reload.odin SECTION_BANNER) parses this
@@ -533,9 +588,9 @@ generate_all :: proc(pkg: string, sections: []Gen_Section) -> string {
 // Emit the callback-free half of every generated action descriptor. Immediate
 // and scheduled execution tables both embed this exact shape; only their
 // callback-bearing outer structs differ.
-emit_action_metadata :: proc(b: ^strings.Builder, s: ^Script) {
+emit_action_metadata :: proc(b: ^strings.Builder, s: ^Script, prefix: string = "") {
     w :: strings.write_string
-    snake := to_snake(s.struct_name)
+    snake := prefix != "" ? prefix : decl.snake_name(s.struct_name)
 
     for c in s.commands {
         if len(c.args) > 0 {
@@ -576,8 +631,8 @@ emit_action_metadata :: proc(b: ^strings.Builder, s: ^Script) {
     }
 }
 
-emit_action_desc :: proc(b: ^strings.Builder, s: ^Script, c: ^Command_Info, model: string) {
-    snake := to_snake(s.struct_name)
+emit_action_desc :: proc(b: ^strings.Builder, s: ^Script, c: ^Command_Info, model: string, prefix: string = "") {
+    snake := prefix != "" ? prefix : decl.snake_name(s.struct_name)
     upper := strings.to_upper(snake)
     fmt.sbprintf(
         b,
@@ -612,23 +667,25 @@ emit_action_desc :: proc(b: ^strings.Builder, s: ^Script, c: ^Command_Info, mode
 
 // One script's section: everything below the shared header/imports/ctors.
 emit_script :: proc(b: ^strings.Builder, s: ^Script) {
+    emit_kit_bridges(b, s)
+    emit_owner_bindings(b, s)
     emit_replay_view(b, s)
     w :: strings.write_string
     cls := s.struct_name
-    snake := to_snake(cls)
+    snake := decl.snake_name(cls)
 
     // The recursive canonical ABI was computed before emission. Pin the consumer
     // compiler to those exact widths/alignments: native and wasm may share a
     // fingerprint only when their concrete raw layouts share the bytes too.
-    if s.tick.input_type != "" && s.tick.input_abi_size > 0 {
+    if s.tick.input_code != "" && s.tick.input_abi_size > 0 {
         fmt.sbprintf(
             b,
             "#assert(size_of(%s) == %d && align_of(%s) == %d, \"%s: target layout differs from NET_SCHEMA_CANONICAL; use fixed-width, padding-free fields\")\n",
-            s.tick.input_type,
+            s.tick.input_code,
             s.tick.input_abi_size,
-            s.tick.input_type,
+            s.tick.input_code,
             s.tick.input_abi_align,
-            s.tick.input_type,
+            s.tick.input_code,
         )
     }
 
@@ -648,15 +705,15 @@ emit_script :: proc(b: ^strings.Builder, s: ^Script) {
         )
     }
 
-    if s.profile_type != "" && s.profile_abi_size > 0 {
+    if s.profile_code != "" && s.profile_abi_size > 0 {
         fmt.sbprintf(
             b,
             "#assert(size_of(%s) == %d && align_of(%s) == %d, \"%s: target layout differs from NET_SCHEMA_CANONICAL; use fixed-width, padding-free fields\")\n",
-            s.profile_type,
+            s.profile_code,
             s.profile_abi_size,
-            s.profile_type,
+            s.profile_code,
             s.profile_abi_align,
-            s.profile_type,
+            s.profile_code,
         )
     }
 
@@ -668,11 +725,11 @@ emit_script :: proc(b: ^strings.Builder, s: ^Script) {
         fmt.sbprintf(
             b,
             "#assert(size_of(%s) == %d && align_of(%s) == %d, \"%s: target layout differs from NET_SCHEMA_CANONICAL; use fixed-width, padding-free fields\")\n",
-            m.payload_type,
+            m.payload_code,
             m.abi_size,
-            m.payload_type,
+            m.payload_code,
             m.abi_align,
-            m.payload_type,
+            m.payload_code,
         )
     }
 
@@ -682,6 +739,10 @@ emit_script :: proc(b: ^strings.Builder, s: ^Script) {
 
     // ---- lifecycle wrappers (plain proc -> rt.Lifecycle `proc \"c\"`) ----
     for lc in s.lifecycles {
+        if lc.keyword == "finalize" {
+            continue
+        }
+
         fname := fmt.tprintf("_%s_lc_%s", snake, lc.keyword)
 
         if lc.keyword == "process" || lc.keyword == "physics_process" {
@@ -697,7 +758,7 @@ emit_script :: proc(b: ^strings.Builder, s: ^Script) {
             fmt.sbprintf(b, "@(private = \"file\")\n%s :: proc \"c\" (self_raw: rawptr) {{\n", fname)
             w(b, "\tcontext = rt.script_context()\n")
 
-            if lc.keyword == "ready" && s.profile_type != "" {
+            if lc.keyword == "ready" && s.profile_code != "" {
                 // gd:"profile=T" — the declaration form of session_profile_install:
                 // wired BEFORE the game's ready so a ready that *_starts (role
                 // launches do) already has the row type installed. The install's
@@ -707,12 +768,51 @@ emit_script :: proc(b: ^strings.Builder, s: ^Script) {
                     "\tksess.session_profile_install(&(cast(^%s)self_raw).%s, %s) // gd:\"profile\"\n",
                     cls,
                     s.profile_ses,
-                    s.profile_type,
+                    s.profile_code,
                 )
             }
 
             fmt.sbprintf(b, "\t%s(cast(^%s)self_raw)\n}}\n\n", lc.proc_name, cls)
         }
+    }
+
+    // Final cleanup is independent of tree exit and of facade overrides.
+    has_finalizer := s.kit_stack && !s.kit_cleanup_manual
+    final_hook := ""
+
+    for lc in s.lifecycles {
+        if lc.keyword == "finalize" {
+            has_finalizer = true
+            final_hook = lc.proc_name
+        }
+    }
+
+    if has_finalizer {
+        fmt.sbprintf(b, "@(private = \"file\")\n_%s_lc_finalize :: proc \"c\" (raw: rawptr) {{\n", snake)
+        w(b, "\tcontext = rt.script_context()\n")
+        fmt.sbprintf(b, "\tself := cast(^%s)raw\n", cls)
+
+        if final_hook != "" {
+            fmt.sbprintf(b, "\t%s(self)\n", final_hook)
+        }
+
+        if s.kit_stack && !s.kit_cleanup_manual {
+            fmt.sbprintf(
+                b,
+                "\tkboot.boot_net_destroy(&self.%s, &self.%s, &self.%s",
+                s.boot_field,
+                s.session_field,
+                s.comms_field,
+            )
+
+            if s.lane_fields == 1 {
+                fmt.sbprintf(b, ", &self.%s", s.lane_field)
+            }
+
+            w(b, ")\n")
+        }
+
+        w(b, "}\n\n")
     }
 
     // ---- method trampolines ----
@@ -750,6 +850,10 @@ collect_ctors :: proc(s: ^Script) -> (to_set: [dynamic]string, from_set: [dynami
 
     for m in s.methods {
         for a in m.args {
+            if a.variant {
+                continue
+            }
+
             add(&to_set, ctor_tag(a.vi.enum_name))
         }
 
@@ -776,7 +880,7 @@ collect_ctors :: proc(s: ^Script) -> (to_set: [dynamic]string, from_set: [dynami
 emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) {
     w :: strings.write_string
     cls := s.struct_name
-    snake := to_snake(cls)
+    snake := decl.snake_name(cls)
     fname := fmt.tprintf("_%s_m_%s", snake, m.gd_name)
 
     fmt.sbprintf(b, "// %s(", m.gd_name)
@@ -817,6 +921,19 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
     call_args := make([dynamic]string)
 
     for a, i in m.args {
+        if a.variant {
+            fmt.sbprintf(
+                b,
+                "\t_a%d: gd.Variant\n\tgdext.variant_new_copy(&_a%d, args[%d])\n\tdefer gd.variant_destroy(&_a%d)\n",
+                i,
+                i,
+                i,
+                i,
+            )
+            append(&call_args, fmt.tprintf("_a%d", i))
+            continue
+        }
+
         tag := ctor_tag(a.vi.enum_name)
 
         switch a.vi.kind {
@@ -838,7 +955,7 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
             } else {
                 fmt.sbprintf(b, "\t_a%d: %s\n\t_to_%s(&_a%d, args[%d])\n", i, a.type_text, tag, i, i)
 
-                if m.borrowed_args && method_builtin_destructor(a.vi.enum_name) {
+                if method_builtin_destructor(a.vi.enum_name) {
                     emit_method_release(b, a.vi.enum_name, fmt.tprintf("_a%d", i))
                 }
 
@@ -907,18 +1024,15 @@ emit_method_trampoline :: proc(b: ^strings.Builder, s: ^Script, m: Method_Info) 
 emit_accessor_wrappers :: proc(b: ^strings.Builder, s: ^Script, ex: Export_Info) {
     w :: strings.write_string
     cls := s.struct_name
-    snake := to_snake(cls)
+    snake := decl.snake_name(cls)
     tag := ctor_tag(ex.vi.enum_name)
-    getter_owned, getter_refcounted, setter_borrowed: bool
+    getter_owned, getter_refcounted: bool
 
     for method in s.methods {
         if method.proc_name == ex.getter {
             getter_owned, getter_refcounted = method.owned_return, method.return_refcounted
         }
 
-        if method.proc_name == ex.setter {
-            setter_borrowed = method.borrowed_args
-        }
     }
 
     if ex.getter != "" {
@@ -1012,7 +1126,7 @@ emit_accessor_wrappers :: proc(b: ^strings.Builder, s: ^Script, ex: Export_Info)
         case .Other:
             fmt.sbprintf(b, "\t_v: %s\n\t_to_%s(&_v, value)\n", ex.type_text, tag)
 
-            if setter_borrowed && method_builtin_destructor(ex.vi.enum_name) {
+            if method_builtin_destructor(ex.vi.enum_name) {
                 emit_method_release(b, ex.vi.enum_name, "_v")
             }
 
@@ -1032,7 +1146,7 @@ emit_accessor_wrappers :: proc(b: ^strings.Builder, s: ^Script, ex: Export_Info)
 emit_signal_helpers :: proc(b: ^strings.Builder, s: ^Script) {
     w :: strings.write_string
     cls := s.struct_name
-    snake := to_snake(cls)
+    snake := decl.snake_name(cls)
 
     w(b, "// ---- typed signal emit helpers (over gd.emit/gd.emit_args) ----\n")
 
@@ -1081,7 +1195,7 @@ emit_signal_helpers :: proc(b: ^strings.Builder, s: ^Script) {
 emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
     w :: strings.write_string
     cls := s.struct_name
-    snake := to_snake(cls)
+    snake := decl.snake_name(cls)
 
     w(b, "// ---- registration ----\n")
 
@@ -1231,466 +1345,20 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
         w(b, "}\n\n")
     }
 
-    // kit/net replication descriptor. The recursive ABI walk already rejected
-    // target-sensitive leaves and padding. These #asserts pin its expected
-    // size/alignment where the field TYPE is actually known (the consumer compile).
-    // `type_of(Cls{}.f)` is unevaluated: no instance is constructed.
-    if len(s.replicates) > 0 {
-        for r in s.replicates {
-            // nearly_simple_compare = memcmp-safe layout INCLUDING floats (plain
-            // simple_compare excludes them over NaN semantics — for shadow diffing,
-            // bitwise is exactly right). Pointers are memcmp-safe but meaningless on
-            // the wire, hence the explicit exclusion.
-            te := field_type_expr(cls, r.path)
-            fmt.sbprintf(
-                b,
-                "#assert(intrinsics.type_is_nearly_simple_compare(%s) && !intrinsics.type_is_pointer(%s) && !intrinsics.type_is_multi_pointer(%s), \"%s.%s: gd:\\\"replicate\\\" fields must be POD (ints/floats/bools/enums/vectors/fixed arrays — no strings, slices, maps, or pointers)\")\n",
-                te,
-                te,
-                te,
-                cls,
-                join_path(r.path),
-            )
-            fmt.sbprintf(
-                b,
-                "#assert(size_of(%s) == %d && align_of(%s) == %d, \"%s.%s: target layout differs from NET_SCHEMA_CANONICAL; use fixed-width, padding-free fields\")\n",
-                te,
-                r.abi_size,
-                te,
-                r.abi_align,
-                cls,
-                join_path(r.path),
-            )
-        }
+    emit_entity_replication(b, s, cls, snake)
 
-        fmt.sbprintf(b, "@(private = \"file\")\n_%s_net_fields := [?]knet.Field_Desc {{\n", snake)
-
-        for r in s.replicates {
-            flags := ""
-
-            switch {
-            case r.interp && r.owner:
-                flags = "{.Interp, .Owner_Stream}"
-            case r.interp && r.predict:
-                flags = "{.Interp, .Predicted}"
-            case r.interp:
-                flags = "{.Interp}"
-            case r.owner:
-                flags = "{.Owner_Stream}"
-            case r.predict:
-                flags = "{.Predicted}"
-            case:
-                flags = "{}"
-            }
-
-            lerp := len(r.lerp) > 0 ? fmt.tprintf(", lerp = %s", r.lerp) : ""
-
-            if len(r.blend) > 0 {
-                lerp = fmt.tprintf(", lerp = .Custom, blend = %s", r.blend)
-            }
-
-            wire := len(r.wire) > 0 ? fmt.tprintf(", wire = %s", r.wire) : ""
-
-            if len(r.codec) > 0 {
-                wire = fmt.tprintf(", wire = .Custom, codec = %s", r.codec)
-            }
-
-            slack := len(r.slack) > 0 ? fmt.tprintf(", slack = %s", r.slack) : ""
-            glide := len(r.glide) > 0 ? fmt.tprintf(", glide = %s", r.glide) : ""
-            cut := len(r.cut) > 0 ? fmt.tprintf(", cut = %s", r.cut) : ""
-            fmt.sbprintf(
-                b,
-                "\t{{offset = %s, size = size_of(%s), name = %q, flags = %s%s%s%s%s%s}},\n",
-                field_offset_expr(cls, r.path),
-                field_type_expr(cls, r.path),
-                join_path(r.path),
-                flags,
-                lerp,
-                wire,
-                slack,
-                glide,
-                cut,
-            )
-        }
-
-        w(b, "}\n\n")
-        fmt.sbprintf(
-            b,
-            "// kit/net replication descriptor for %s — consumed by the toolkit session layer.\n%s_net_desc := knet.Entity_Desc{{fields = _%s_net_fields[:], name = %q}}\n\n",
-            cls,
-            snake,
-            snake,
-            cls,
-        )
-    }
-
-    // @(gd_command) dispatch + typed issue wrappers (friendslop toolkit).
-    // Three artifacts per class: decode thunks (client and host execute a command
-    // from byte-identical args — the thunk decodes, checks the reader, THEN calls
-    // the author's proc), the Command_Desc table, and one `<proc>_cmd` wrapper per
-    // command. The wrapper holds the ONLY role branch in the entire feature:
-    // authority runs the proc directly (and fires the game's command hook, the
-    // same cross-entity path client commands take); clients predict (iff
-    // declared) and send. A name-paired `<wrapper>_then` consequence, when the
-    // game declares one, fires on the authority right after the verb applies —
-    // in the thunk for received commands, in the wrapper for the host's own —
-    // with the issuer, the wire args, and the verb's returned payload.
-    upper := strings.to_upper(snake)
-    // A class that TICKS executes its verbs inside the tick pipeline instead
-    // (kit/sim command scheduling) — the knet command loop's optimistic-apply
-    // and the lane's resim would otherwise fight over one baseline. Its knet
-    // command table and ctx-shaped wrappers are skipped whole; the sim block
-    // below emits the tick-scheduled equivalents.
-    is_sim := s.tick.proc_name != "" || len(s.block_ticks) > 0
-
-    if len(s.commands) > 0 {
-        emit_action_metadata(b, s)
-    }
-
-    if len(s.commands) > 0 && !is_sim {
-        w(b, "// ---- @(gd_command) dispatch + typed issue wrappers ----\n\n")
-        w(b, "// Command wire ids — a stable FNV-1a hash of each verb's name, NOT a\n")
-        w(b, "// position: reordering (or adding/removing) procs never renumbers the\n")
-        w(b, "// wire, and a version-skewed peer's unknown id rejects instead of\n")
-        w(b, "// misdispatching. Typed knet.Cmd_Id so a coop id can't be handed to a\n")
-        w(b, "// sim verb's proc (it still crosses the wire as a plain u16).\n")
-
-        for c in s.commands {
-            fmt.sbprintf(b, "%s_CMD_%s :: knet.Cmd_Id(0x%x)\n", upper, strings.to_upper(c.name), cmd_wire_id(c.name))
-            fmt.sbprintf(b, "%s_POLICY_%s :: %s\n", upper, strings.to_upper(c.name), c.policy_expr)
-        }
-
-        w(b, "\n")
-
-        for c in s.commands {
-            // A composed command routes into the embedded field (`&self.gun`) and qualifies the
-            // proc with its package (`play.gun_fire`); a direct one runs `runner_fire(self, …)`.
-            recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
-            qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
-            fmt.sbprintf(
-                b,
-                "@(private = \"file\")\n_%s_cmd_%s :: proc(entity: rawptr, r: ^knet.Reader, env: ^knet.Command_Env) -> bool {{\n",
-                snake,
-                c.name,
-            )
-            fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
-
-            for a, i in c.args {
-                fmt.sbprintf(b, "\t_a%d := knet.read_%s(r)\n", i, a.wire)
-            }
-
-            w(b, "\tif r.err {return false}\n")
-
-            // The verb call — payload returns are captured for the consequence
-            // (or blanked when nothing consumes them).
-            if c.then_proc == "" && c.payload_count == 0 {
-                fmt.sbprintf(b, "\treturn %s%s(%s", qual, c.proc_name, recv)
-
-                if c.owner {
-                    w(b, ", self")
-                } // the block asked for its wielder — pass the entity
-
-                if c.wants_by {
-                    w(b, ", env.by")
-                } // the declared issuer — ctx.me predicting, the sender on the host
-
-                for _, i in c.args {
-                    fmt.sbprintf(b, ", _a%d", i)
-                }
-
-                w(b, ")\n}\n\n")
-                continue
-            }
-
-            w(b, "\t_ok")
-
-            for i in 0 ..< c.payload_count {
-                if c.then_proc != "" {
-                    fmt.sbprintf(b, ", _p%d", i)
-                } else {
-                    w(b, ", _") // payload declined — the block offered, nobody consumes
-                }
-            }
-
-            fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
-
-            if c.owner {
-                w(b, ", self")
-            }
-
-            if c.wants_by {
-                w(b, ", env.by")
-            }
-
-            for _, i in c.args {
-                fmt.sbprintf(b, ", _a%d", i)
-            }
-
-            w(b, ")\n")
-
-            if c.then_proc != "" {
-                // The consequence: authority-only, once, after the verb applied —
-                // predictions and replays run this same thunk with authority=false.
-                w(b, "\tif _ok && env.authority {\n")
-
-                if c.then_game != "" {
-                    fmt.sbprintf(
-                        b,
-                        "\t\tassert(env.user != nil, \"%s needs the game pointer — session_set_factory's user is what consequences receive (tests: set ctx.game_user)\")\n",
-                        c.then_proc,
-                    )
-                    fmt.sbprintf(b, "\t\t%s(cast(^%s)env.user, self, env.by", c.then_proc, c.then_game)
-                } else {
-                    fmt.sbprintf(b, "\t\t%s(self, env.by", c.then_proc)
-                }
-
-                for _, i in c.args {
-                    fmt.sbprintf(b, ", _a%d", i)
-                }
-
-                for i in 0 ..< c.payload_count {
-                    fmt.sbprintf(b, ", _p%d", i)
-                }
-
-                w(b, ")\n\t}\n")
-            }
-
-            w(b, "\treturn _ok\n}\n\n")
-        }
-
-        fmt.sbprintf(b, "@(private = \"file\")\n_%s_commands := [?]knet.Command_Desc {{\n", snake)
-
-        for &c in s.commands {
-            w(b, "\t{")
-            emit_action_desc(b, s, &c, "Immediate")
-            fmt.sbprintf(b, ", invoke = _%s_cmd_%s},\n", snake, c.name)
-        }
-
-        w(b, "}\n\n")
-    }
-
-    // ---- `<field>_edge` halves: delta-lane change presentation ----
-    // One thunk per declared half (cast, deref old, call the author's proc —
-    // the new value is the field itself at fire time) plus the Edge_Desc
-    // table wired into the command set; the session's per-frame edge pass
-    // (knet.registry_edges_tick) does the rest — mirror, net diff, resync
-    // silence — so no seen_* scratch and no re-seed handling exist to forget.
-    has_edges := false
-
-    for r in s.replicates {
-        if r.edge_proc != "" {
-            has_edges = true
-            break
-        }
-    }
-
-    if has_edges {
-        for r in s.replicates {
-            if r.edge_proc == "" {
-                continue
-            }
-
-            leaf := join_snake(r.path)
-            fmt.sbprintf(
-                b,
-                "@(private = \"file\")\n_%s_edge_%s :: proc(entity: rawptr, game: rawptr, old: rawptr) {{\n",
-                snake,
-                leaf,
-            )
-            fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
-
-            // The old-value cast derives its type from the field itself
-            // (type_of) — no spelled type, so an imported block's field needs
-            // no qualifier and no import here.
-            if r.edge_game != "" {
-                fmt.sbprintf(
-                    b,
-                    "\tassert(game != nil, \"%s needs the game pointer — session_set_factory's user is what edge halves receive\")\n",
-                    r.edge_proc,
-                )
-                fmt.sbprintf(
-                    b,
-                    "\t%s(cast(^%s)game, self, (cast(^type_of(self.%s))old)^, self.%s)\n",
-                    r.edge_proc,
-                    r.edge_game,
-                    join_path(r.path),
-                    join_path(r.path),
-                )
-            } else {
-                fmt.sbprintf(
-                    b,
-                    "\t%s(self, (cast(^type_of(self.%s))old)^, self.%s)\n",
-                    r.edge_proc,
-                    join_path(r.path),
-                    join_path(r.path),
-                )
-            }
-
-            w(b, "}\n\n")
-        }
-
-        fmt.sbprintf(b, "@(private = \"file\")\n_%s_edges := [?]knet.Edge_Desc {{\n", snake)
-
-        for r, i in s.replicates {
-            if r.edge_proc == "" {
-                continue
-            }
-
-            fmt.sbprintf(b, "\t{{field = %d, fire = _%s_edge_%s}},\n", i, snake, join_snake(r.path))
-        }
-
-        w(b, "}\n\n")
-    }
-
-    // The command set is emitted for EVERY entity with a descriptor — desc-only
-    // entities (no commands) used to force a hand-built set in the game. A
-    // ticking class's set stays desc-only: its verbs ride the lane.
-    if len(s.replicates) > 0 || len(s.commands) > 0 {
-        cmds := len(s.commands) > 0 && !is_sim ? fmt.tprintf(", commands = _%s_commands[:]", snake) : ""
-        net_id := s.net_id_type != "" ? fmt.tprintf(", net_id_offset = int(offset_of(%s, net_id))", cls) : ""
-        edges := has_edges ? fmt.tprintf(", edges = _%s_edges[:]", snake) : ""
-        fmt.sbprintf(
-            b,
-            "// kit/net command set for %s — the command table + the replicated-field descriptor.\n%s_command_set := knet.Command_Set{{entity_desc = &%s_net_desc%s%s%s}}\n\n",
-            cls,
-            snake,
-            snake,
-            cmds,
-            net_id,
-            edges,
-        )
-    }
-
-    if len(s.commands) > 0 && !is_sim {
-        for c in s.commands {
-            // A composed command routes into the block and qualifies the proc; its wrapper is
-            // named per-entity (`runner_gun_fire_cmd`) so two blocks of the same type never collide.
-            recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
-            qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
-            wrapper := len(c.path) > 0 ? fmt.tprintf("%s_%s", snake, c.name) : c.proc_name
-            fmt.sbprintf(b, "// Issue `%s` — the SAME call on every peer AND on both models, zero role\n", c.name)
-            w(b, "// branches. Authority: runs the proc directly. Client: applies the generated\n")
-            w(b, "// typed action policy, optionally predicts, and sends when admitted.\n")
-            w(b, "// Returns a knet.Action_Outcome — .state is Applied/Predicted/Rejected,\n")
-            w(b, "// .reason names a synchronous refusal, and .seq correlates the final callback.\n")
-            w(b, "// `knet.command_ok(r)` is the \"applied on my screen?\" check. The boot is the\n")
-            w(b, "// game's one handle: promoting this class to the sim lane re-routes the verb\n")
-            w(b, "// without touching a single issue site.\n")
-            fmt.sbprintf(b, "%s_cmd :: proc(b: ^kboot.Boot, self: ^%s", wrapper, cls)
-
-            for a in c.args {
-                fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
-            }
-
-            w(b, ") -> knet.Action_Outcome {\n")
-            w(b, "\tctx := &b.ses.ctx\n")
-            fmt.sbprintf(
-                b,
-                "\tif _reason := ksess.session_action_rejection(b.ses, self.net_id, %s_POLICY_%s); _reason != .None {{return knet.action_outcome(.Rejected, _reason)}}\n",
-                upper,
-                strings.to_upper(c.name),
-            )
-            w(b, "\tif ctx.is_authority {\n")
-            w(b, "\t\t_ok")
-
-            for i in 0 ..< c.payload_count {
-                if c.then_proc != "" {
-                    fmt.sbprintf(b, ", _p%d", i)
-                } else {
-                    w(b, ", _")
-                }
-            }
-
-            fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
-
-            if c.owner {
-                w(b, ", self")
-            }
-
-            if c.wants_by {
-                w(b, ", ctx.me")
-            } // the authority's own issue: the host player IS the issuer
-
-            for a in c.args {
-                fmt.sbprintf(b, ", %s", a.name)
-            }
-
-            w(b, ")\n")
-
-            if c.then_proc != "" {
-                // The host's own issue takes the same consequence path a client's
-                // command does (fired in the receive thunk there).
-                w(b, "\t\tif _ok {\n")
-
-                if c.then_game != "" {
-                    fmt.sbprintf(
-                        b,
-                        "\t\t\tassert(ctx.game_user != nil, \"%s needs the game pointer — session_set_factory's user is what consequences receive (tests: set ctx.game_user)\")\n",
-                        c.then_proc,
-                    )
-                    fmt.sbprintf(b, "\t\t\t%s(cast(^%s)ctx.game_user, self, ctx.me", c.then_proc, c.then_game)
-                } else {
-                    fmt.sbprintf(b, "\t\t\t%s(self, ctx.me", c.then_proc)
-                }
-
-                for a in c.args {
-                    fmt.sbprintf(b, ", %s", a.name)
-                }
-
-                for i in 0 ..< c.payload_count {
-                    fmt.sbprintf(b, ", _p%d", i)
-                }
-
-                w(b, ")\n\t\t}\n")
-            }
-
-            fmt.sbprintf(
-                b,
-                "\t\tknet.command_hook_local(ctx, self.net_id, %s_CMD_%s, _ok) // same cross-entity path client commands take\n",
-                upper,
-                strings.to_upper(c.name),
-            )
-            w(
-                b,
-                "\t\tif _ok {return knet.action_outcome(.Applied)}\n\t\treturn knet.action_outcome(.Rejected, .Predicate)\n\t}\n",
-            )
-            fmt.sbprintf(b, "\tknet.command_begin(ctx, self.net_id, %s_CMD_%s)\n", upper, strings.to_upper(c.name))
-
-            for a in c.args {
-                fmt.sbprintf(b, "\tknet.write_%s(&ctx.msg, %s)\n", a.wire, a.name)
-            }
-
-            fmt.sbprintf(
-                b,
-                "\t_issue := knet.command_issue(ctx, self, &%s_command_set, %s_CMD_%s)\n",
-                snake,
-                upper,
-                strings.to_upper(c.name),
-            )
-            w(b, "\tif !_issue.sent {return knet.action_outcome(.Rejected, _issue.reason)}\n")
-            w(
-                b,
-                "\tif _issue.prediction_attempted && !_issue.prediction_applied {return knet.action_outcome(.Rejected, _issue.reason, u32(_issue.seq))}\n",
-            )
-            w(b, "\treturn knet.action_outcome(.Predicted, seq = u32(_issue.seq))\n}\n\n")
-        }
-    }
+    emit_entity_commands(b, s, cls, snake)
 
     // ---- @(gd_message): typed app-message routes, written by nobody ----
-    // The runtime (ksess.Typed_Route + session_app_listen + session_app_send_typed)
-    // already decodes a POD payload for the handler; generated here is the WIRING:
-    // one game-owned route per message, a `<class>_messages` proc the generated
+    // Each Session stores this instance as the callback context. The generated
+    // decoder checks the exact payload size; no mutable route is shared across games.
+    // Wiring provides one route per message, a `<class>_messages` proc the generated
     // net facade calls (custom shells call it once), and the send doors. NOT
     // lane-scoped — a coop game and a sim game get these identically
     // (messages ride the session's app router, not a lane).
     if len(s.messages) > 0 {
         w(b, "// ---- @(gd_message) typed app-message routes ----\n\n")
 
-        for m in s.messages {
-            fmt.sbprintf(b, "@(private = \"file\")\n_%s_route: ksess.Typed_Route(%s)\n", m.proc_name, m.payload_type)
-        }
-
-        w(b, "\n")
         w(b, "// Register every @(gd_message) route on this class. The generated net facade\n")
         fmt.sbprintf(b, "// calls this; a custom shell calls `%s_messages(self, &self.ses)` once\n", snake)
         w(b, "// after boot_attach. Routes survive *_start.\n")
@@ -1699,13 +1367,22 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
         for m in s.messages {
             fmt.sbprintf(
                 b,
-                "\tksess.session_app_listen(s, %s, &_%s_route, self, proc(user: rawptr, from: knet.Player_Id, msg: %s) {{\n",
-                m.tag_ident,
+                "\t#assert(%d < ksess.MAX_APP_TAGS, \"%s: message tag exceeds ksess.MAX_APP_TAGS\")\n",
+                m.tag_value,
                 m.proc_name,
-                m.payload_type,
             )
-            fmt.sbprintf(b, "\t\t%s(cast(^%s)user, from, msg)\n", m.proc_name, cls)
-            w(b, "\t})\n")
+            fmt.sbprintf(
+                b,
+                "\tksess.session_app_route(s, u8(%d), self, proc(user: rawptr, from: knet.Player_Id, _: ksess.Peer_Id, r: ^knet.Reader) {{\n",
+                m.tag_value,
+            )
+            fmt.sbprintf(
+                b,
+                "\t\tif r.err || len(knet.reader_remaining(r)) != size_of(%s) {{r.err = true; return}}\n",
+                m.payload_code,
+            )
+            fmt.sbprintf(b, "\t\tmsg := knet.read_pod(r, %s)\n", m.payload_code)
+            fmt.sbprintf(b, "\t\t%s(cast(^%s)user, from, msg)\n\t})\n", m.proc_name, cls)
         }
 
         w(b, "}\n\n")
@@ -1714,7 +1391,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
             fmt.sbprintf(
                 b,
                 "// Send a %s under the %q route to `to_peer` (ksess.HOST_PEER, a seated\n",
-                m.payload_type,
+                m.payload_code,
                 m.name,
             )
             w(b, "// peer, or ksess.BROADCAST_PEER); .Reliable unless you pass otherwise.\n")
@@ -1722,21 +1399,29 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 b,
                 "%s_send :: proc(s: ^ksess.Session, msg: %s, to_peer: ksess.Peer_Id, channel := ksess.Channel.Reliable) {{\n",
                 m.proc_name,
-                m.payload_type,
+                m.payload_code,
             )
-            fmt.sbprintf(b, "\tksess.session_app_send_typed(s, %s, msg, to_peer, channel)\n}}\n\n", m.tag_ident)
+            fmt.sbprintf(
+                b,
+                "\tksess.session_app_send_typed(s, %s, msg, to_peer, channel)\n}}\n\n",
+                fmt.tprintf("u8(%d)", m.tag_value),
+            )
             fmt.sbprintf(
                 b,
                 "// Send a %s to a specific PLAYER (the seat is resolved on the authority).\n",
-                m.payload_type,
+                m.payload_code,
             )
             fmt.sbprintf(
                 b,
                 "%s_send_to :: proc(s: ^ksess.Session, player: knet.Player_Id, msg: %s) {{\n",
                 m.proc_name,
-                m.payload_type,
+                m.payload_code,
             )
-            fmt.sbprintf(b, "\tksess.session_app_send_typed_to(s, player, %s, msg)\n}}\n\n", m.tag_ident)
+            fmt.sbprintf(
+                b,
+                "\tksess.session_app_send_typed_to(s, player, %s, msg)\n}}\n\n",
+                fmt.tprintf("u8(%d)", m.tag_value),
+            )
         }
     }
 
@@ -1761,7 +1446,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 e.name,
             )
             fmt.sbprintf(b, "\tself := cast(^%s)user\n\t_ = ses\n", cls)
-            non_anchor_refs := len(e.entity_names)
+            non_anchor_refs := len(e.entity_refs)
 
             if e.anchor_index >= 0 {
                 non_anchor_refs -= 1
@@ -1770,7 +1455,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
             if non_anchor_refs > 0 || len(e.arg_names) > 0 {
                 w(b, "\tr := knet.reader_make(args)\n")
 
-                for _, i in e.entity_names {
+                for _, i in e.entity_refs {
                     if i == e.anchor_index {
                         continue
                     }
@@ -1784,10 +1469,11 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
                 w(b, "\tif r.err || len(knet.reader_remaining(&r)) != 0 {return}\n")
             } else {
-                w(b, "\t_ = args\n")
+                w(b, "\tif len(args) != 0 {return}\n")
             }
 
-            for entity_type, i in e.entity_types {
+            for ref, i in e.entity_refs {
+                entity_type := ref.type_code
                 id_expr := i == e.anchor_index ? "anchor" : fmt.tprintf("_entity_id%d", i)
                 fmt.sbprintf(
                     b,
@@ -1796,7 +1482,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     i,
                     s.boot_field,
                     id_expr,
-                    strings.to_upper(to_snake(entity_type)),
+                    strings.to_upper(entity_helper(ref.binding^)),
                     i,
                 )
             }
@@ -1807,7 +1493,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
             fmt.sbprintf(b, "\t%s(self", e.fx_proc)
 
-            for entity_type, i in e.entity_types {
+            for ref, i in e.entity_refs {
+                entity_type := ref.type_code
                 fmt.sbprintf(b, ", cast(^%s)_entity%d_raw", entity_type, i)
             }
 
@@ -1821,8 +1508,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
             fmt.sbprintf(b, "%s :: proc(b: ^kboot.Boot", e.name)
 
-            for entity_name, i in e.entity_names {
-                fmt.sbprintf(b, ", %s: ^%s", entity_name, e.entity_types[i])
+            for ref, i in e.entity_refs {
+                entity_name := ref.parameter
+                fmt.sbprintf(b, ", %s: ^%s", entity_name, ref.type_code)
             }
 
             for arg_name, i in e.arg_names {
@@ -1832,14 +1520,17 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
             w(b, ") {\n")
             w(b, "\tif b.ses == nil || !b.ses.is_host {return}\n")
 
-            for entity_name in e.entity_names {
+            for ref, i in e.entity_refs {
+                entity_name := ref.parameter
                 fmt.sbprintf(b, "\tif %s == nil {{return}}\n", entity_name)
+                emit_event_kind_guard(b, ref, "b", fmt.tprintf("%s.net_id", entity_name), entity_name, i)
             }
 
-            if len(e.entity_names) - (e.anchor_index >= 0 ? 1 : 0) > 0 || len(e.arg_names) > 0 {
+            if len(e.entity_refs) - (e.anchor_index >= 0 ? 1 : 0) > 0 || len(e.arg_names) > 0 {
                 w(b, "\tw := knet.writer_make(64, context.temp_allocator)\n")
 
-                for entity_name, i in e.entity_names {
+                for ref, i in e.entity_refs {
+                    entity_name := ref.parameter
                     if i == e.anchor_index {
                         continue
                     }
@@ -1854,7 +1545,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
             anchor_expr := e.anchor_index >= 0 ? fmt.tprintf("%s.net_id", e.anchor_param) : "knet.NET_ID_INVALID"
             args_expr :=
-                len(e.entity_names) - (e.anchor_index >= 0 ? 1 : 0) > 0 || len(e.arg_names) > 0 ? "knet.writer_bytes(&w)" : "nil"
+                len(e.entity_refs) - (e.anchor_index >= 0 ? 1 : 0) > 0 || len(e.arg_names) > 0 ? "knet.writer_bytes(&w)" : "nil"
             fmt.sbprintf(
                 b,
                 "\t_ = ksess.session_net_event_emit(b.ses, EVENT_%s, %s, %s)\n}}\n\n",
@@ -1890,469 +1581,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
         )
     }
 
-    // ---- @(gd_tick): the sim-lane step thunk + Sim_Set (kit/sim) ----
-    // The thunk is the whole bridge: the lane drives entities through rawptrs
-    // (live ticks AND resim replays take the identical path), the author's
-    // proc stays typed and single-player-shaped. The input struct crosses the
-    // wire raw, so the same POD contract as replicated fields is #asserted at
-    // the consumer compile, naming the type.
-    if s.tick.proc_name != "" || len(s.block_ticks) > 0 {
-        w(b, "// ---- @(gd_tick) sim-lane step ----\n\n")
-
-        if s.tick.input_type != "" {
-            fmt.sbprintf(
-                b,
-                "#assert(intrinsics.type_is_nearly_simple_compare(%s) && !intrinsics.type_is_pointer(%s) && !intrinsics.type_is_multi_pointer(%s), \"%s: @(gd_tick) input structs must be POD (they cross the wire raw — no strings, slices, maps, or pointers)\")\n\n",
-                s.tick.input_type,
-                s.tick.input_type,
-                s.tick.input_type,
-                s.tick.input_type,
-            )
-        }
-
-        fmt.sbprintf(
-            b,
-            "@(private = \"file\")\n_%s_tick_step :: proc(entity: rawptr, input: rawptr, lane: ^ksim.Lane, owner: knet.Player_Id) {{\n",
-            snake,
-        )
-
-        if s.tick.proc_name != "" && s.tick.input_type != "" {
-            w(b, "\tif input == nil {return} // no input drives this entity here this tick: coast\n")
-        }
-
-        consumed := s.tick.then_proc != "" || s.tick.fx_proc != ""
-        need_self := consumed || len(s.block_ticks) > 0
-
-        if need_self {
-            fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
-        }
-
-        if s.tick.proc_name != "" {
-            if s.tick.payload_count > 0 {
-                w(b, "\t")
-
-                for i in 0 ..< s.tick.payload_count {
-                    if i > 0 {
-                        w(b, ", ")
-                    }
-
-                    if consumed {
-                        fmt.sbprintf(b, "_p%d", i)
-                    } else {
-                        w(b, "_") // payload offered, nobody consumes (warned at build)
-                    }
-                }
-
-                w(b, " := ")
-            } else {
-                w(b, "\t")
-            }
-
-            if need_self {
-                fmt.sbprintf(b, "%s(self", s.tick.proc_name)
-            } else {
-                fmt.sbprintf(b, "%s(cast(^%s)entity", s.tick.proc_name, cls)
-            }
-
-            if s.tick.input_type != "" {
-                fmt.sbprintf(b, ", (cast(^%s)input)^", s.tick.input_type)
-            }
-
-            if s.tick.wants_lane {
-                w(b, ", lane")
-            }
-
-            w(b, ")\n")
-        }
-
-        // Composed block ticks, AFTER the entity's own step in field order —
-        // the entity writes intent first, blocks integrate.
-        for bt in s.block_ticks {
-            qual := bt.pkg_alias != "" ? fmt.tprintf("%s.", bt.pkg_alias) : ""
-            fmt.sbprintf(b, "\t%s%s(&self.%s", qual, bt.proc_name, join_path(bt.path))
-
-            if bt.wants_owner {
-                w(b, ", self")
-            }
-
-            if bt.wants_lane {
-                w(b, ", lane")
-            }
-
-            w(b, ")\n")
-        }
-
-        // The role gates the game used to hand-write, held HERE: the
-        // consequence on the authority (which never resims), the fx on the
-        // owning peer's live pass only — a replay re-runs the tick, never
-        // the presentation, and never double-fires a consequence.
-        if s.tick.then_proc != "" {
-            // in_auth marks the authority-only context for lane_fact's
-            // provenance-aware owner skip: a fact door announced from a `_then`
-            // must INCLUDE the anchor's owner — their screen never ran this half.
-            w(b, "\tif ksim.lane_is_authority(lane) {\n\t\tlane.in_auth = true\n\t\t")
-
-            if s.tick.then_game != "" {
-                fmt.sbprintf(
-                    b,
-                    "assert(ksim.lane_game(lane) != nil, \"%s needs the game pointer — lane_set_sim's user is what tick consequences receive\")\n\t\t",
-                    s.tick.then_proc,
-                )
-                fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self, owner", s.tick.then_proc, s.tick.then_game)
-            } else {
-                fmt.sbprintf(b, "%s(self, owner", s.tick.then_proc)
-            }
-
-            for i in 0 ..< s.tick.payload_count {
-                fmt.sbprintf(b, ", _p%d", i)
-            }
-
-            w(b, ")\n\t\tlane.in_auth = false\n\t}\n")
-        }
-
-        if s.tick.fx_proc != "" && !s.tick.fx_mine {
-            w(b, "\tif owner == ksim.lane_me(lane) && !lane.resimming {\n\t\t")
-
-            if s.tick.fx_game != "" {
-                fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self", s.tick.fx_proc, s.tick.fx_game)
-            } else {
-                fmt.sbprintf(b, "%s(self", s.tick.fx_proc)
-            }
-
-            for i in 0 ..< s.tick.payload_count {
-                fmt.sbprintf(b, ", _p%d", i)
-            }
-
-            w(b, ")\n\t}\n")
-        }
-
-        if s.tick.fx_proc != "" && s.tick.fx_mine {
-            // The EVERY-SCREEN form: on an event tick (any bool fact true) the
-            // authority broadcasts the fact tuple (watchers fire it from the
-            // watch clock — lane_fact), and the screens whose live pass just
-            // simulated it fire inline: the owner's (mine=true) and the
-            // authority's own view of everyone else (mine=false, live truth).
-            w(b, "\tif ")
-            first := true
-
-            for wire, i in s.tick.payload_wires {
-                if wire != "bool" {
-                    continue
-                }
-
-                if !first {
-                    w(b, " || ")
-                }
-
-                fmt.sbprintf(b, "_p%d", i)
-                first = false
-            }
-
-            w(b, " { // an event tick: the facts present\n")
-            w(b, "\t\tif ksim.lane_is_authority(lane) {\n")
-            w(b, "\t\t\t_fw := knet.writer_make(64, context.temp_allocator)\n")
-
-            for wire, i in s.tick.payload_wires {
-                fmt.sbprintf(b, "\t\t\tknet.write_%s(&_fw, _p%d)\n", wire, i)
-            }
-
-            w(b, "\t\t\tksim.lane_fact(lane, entity, knet.writer_bytes(&_fw))\n")
-            w(b, "\t\t}\n")
-            w(b, "\t\tif !lane.resimming {\n")
-            w(b, "\t\t\t_mine := owner == ksim.lane_me(lane)\n")
-            w(b, "\t\t\tif _mine || ksim.lane_is_authority(lane) {\n\t\t\t\t")
-
-            if s.tick.fx_game != "" {
-                fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self, _mine", s.tick.fx_proc, s.tick.fx_game)
-            } else {
-                fmt.sbprintf(b, "%s(self, _mine", s.tick.fx_proc)
-            }
-
-            for i in 0 ..< s.tick.payload_count {
-                fmt.sbprintf(b, ", _p%d", i)
-            }
-
-            w(b, ")\n\t\t\t}\n\t\t}\n\t}\n")
-        }
-
-        w(b, "}\n\n")
-
-        if s.tick.fx_proc != "" && s.tick.fx_mine {
-            // The fx DECODE thunk (Sim_Set.fx): SIM_FACT bytes → typed facts →
-            // the presentation half. The lane fires it on WATCHING screens when
-            // the watch clock reaches the fact's tick; the live pass above
-            // called the half directly.
-            fmt.sbprintf(
-                b,
-                "@(private = \"file\")\n_%s_fx :: proc(entity: rawptr, lane: ^ksim.Lane, mine: bool, args: []u8) {{\n",
-                snake,
-            )
-            fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
-            w(b, "\tr := knet.reader_make(args)\n")
-
-            for wire, i in s.tick.payload_wires {
-                fmt.sbprintf(b, "\t_p%d := knet.read_%s(&r)\n", i, wire)
-            }
-
-            w(b, "\tif r.err {return}\n\t")
-
-            if s.tick.fx_game != "" {
-                fmt.sbprintf(b, "%s(cast(^%s)ksim.lane_game(lane), self, mine", s.tick.fx_proc, s.tick.fx_game)
-            } else {
-                fmt.sbprintf(b, "%s(self, mine", s.tick.fx_proc)
-            }
-
-            for i in 0 ..< s.tick.payload_count {
-                fmt.sbprintf(b, ", _p%d", i)
-            }
-
-            w(b, ")\n}\n\n")
-        }
-
-        // ---- @(gd_command) on a ticking class: tick-scheduled verbs ----
-        // The verb executes INSIDE the tick pipeline on both ends (kit/sim
-        // command.odin): the client speculates at its next tick and resims
-        // re-apply the captured patch; the authority executes at the stamped
-        // tick and its `_then` fires there — the exec thunk holds that gate.
-        if len(s.commands) > 0 {
-            w(b, "// Command wire ids — a stable FNV-1a hash of each verb's name, NOT a\n")
-            w(b, "// position: reordering procs never renumbers the wire. Typed ksim.Cmd_Id\n")
-            w(b, "// so a sim verb id can't be handed to a coop command (still a plain u16\n")
-            w(b, "// on the wire).\n")
-
-            for c in s.commands {
-                fmt.sbprintf(
-                    b,
-                    "%s_CMD_%s :: ksim.Cmd_Id(0x%x)\n",
-                    upper,
-                    strings.to_upper(c.name),
-                    cmd_wire_id(c.name),
-                )
-                fmt.sbprintf(b, "%s_POLICY_%s :: %s\n", upper, strings.to_upper(c.name), c.policy_expr)
-            }
-
-            w(b, "\n")
-
-            for c in s.commands {
-                recv := len(c.path) > 0 ? fmt.tprintf("&self.%s", join_path(c.path)) : "self"
-                qual := c.pkg_alias != "" ? fmt.tprintf("%s.", c.pkg_alias) : ""
-                fmt.sbprintf(
-                    b,
-                    "@(private = \"file\")\n_%s_simcmd_%s :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane, by: knet.Player_Id) -> knet.Action_Reject_Reason {{\n",
-                    snake,
-                    c.name,
-                )
-                fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
-                w(b, "\tr := knet.reader_make(args)\n")
-
-                if len(c.args) > 0 {
-                    for a, i in c.args {
-                        fmt.sbprintf(b, "\t_a%d := knet.read_%s(&r)\n", i, a.wire)
-                    }
-                }
-
-                w(b, "\tif r.err || len(knet.reader_remaining(&r)) != 0 {return .Malformed}\n")
-                w(b, "\t_ok")
-
-                for i in 0 ..< c.payload_count {
-                    if c.then_proc != "" {
-                        fmt.sbprintf(b, ", _p%d", i)
-                    } else {
-                        w(b, ", _")
-                    }
-                }
-
-                fmt.sbprintf(b, " := %s%s(%s", qual, c.proc_name, recv)
-
-                if c.owner {
-                    w(b, ", self")
-                }
-
-                if c.wants_by {
-                    w(b, ", by")
-                } // the declared issuer — the lane resolved it (me speculating, the seat on the host)
-
-                for _, i in c.args {
-                    fmt.sbprintf(b, ", _a%d", i)
-                }
-
-                w(b, ")\n")
-
-                if c.apply_proc != "" {
-                    // The predicted-effect half, on the live pass — resims
-                    // re-run it alone, with the ledgered args.
-                    fmt.sbprintf(b, "\tif _ok {{%s(self", c.apply_proc)
-
-                    for _, i in c.args {
-                        fmt.sbprintf(b, ", _a%d", i)
-                    }
-
-                    w(b, ")}\n")
-                }
-
-                if c.then_proc != "" {
-                    // in_auth: a fact door announced from this authority-only
-                    // half must include the anchor's owner in the broadcast.
-                    w(b, "\tif _ok && ksim.lane_is_authority(lane) {\n\t\tlane.in_auth = true\n")
-
-                    if c.then_game != "" {
-                        fmt.sbprintf(
-                            b,
-                            "\t\tassert(ksim.lane_game(lane) != nil, \"%s needs the game pointer — lane_set_sim's user is what consequences receive\")\n",
-                            c.then_proc,
-                        )
-                        fmt.sbprintf(b, "\t\t%s(cast(^%s)ksim.lane_game(lane), self, by", c.then_proc, c.then_game)
-                    } else {
-                        fmt.sbprintf(b, "\t\t%s(self, by", c.then_proc)
-                    }
-
-                    for _, i in c.args {
-                        fmt.sbprintf(b, ", _a%d", i)
-                    }
-
-                    for i in 0 ..< c.payload_count {
-                        fmt.sbprintf(b, ", _p%d", i)
-                    }
-
-                    w(b, ")\n\t\tlane.in_auth = false\n\t}\n")
-                }
-
-                w(b, "\treturn _ok ? .None : .Predicate\n}\n\n")
-
-                if c.apply_proc != "" {
-                    // The resim's door into the apply half: decode the
-                    // LEDGERED args, re-run the effect against corrected
-                    // pre-state — never the verb, never its delta writes.
-                    fmt.sbprintf(
-                        b,
-                        "@(private = \"file\")\n_%s_simcmd_%s_apply :: proc(entity: rawptr, args: []u8, lane: ^ksim.Lane) {{\n",
-                        snake,
-                        c.name,
-                    )
-                    fmt.sbprintf(b, "\tself := cast(^%s)entity\n", cls)
-
-                    if len(c.args) > 0 {
-                        w(b, "\tr := knet.reader_make(args)\n")
-
-                        for a, i in c.args {
-                            fmt.sbprintf(b, "\t_a%d := knet.read_%s(&r)\n", i, a.wire)
-                        }
-
-                        w(b, "\tif r.err {return}\n")
-                    }
-
-                    fmt.sbprintf(b, "\t%s(self", c.apply_proc)
-
-                    for _, i in c.args {
-                        fmt.sbprintf(b, ", _a%d", i)
-                    }
-
-                    w(b, ")\n}\n\n")
-                }
-            }
-
-            fmt.sbprintf(b, "@(private = \"file\")\n_%s_sim_cmds := [?]ksim.Sim_Cmd {{\n", snake)
-
-            for &c in s.commands {
-                w(b, "\t{")
-                emit_action_desc(b, s, &c, "Scheduled")
-
-                if c.apply_proc != "" {
-                    fmt.sbprintf(
-                        b,
-                        ", exec = _%s_simcmd_%s, apply = _%s_simcmd_%s_apply},\n",
-                        snake,
-                        c.name,
-                        snake,
-                        c.name,
-                    )
-                } else {
-                    fmt.sbprintf(b, ", exec = _%s_simcmd_%s},\n", snake, c.name)
-                }
-            }
-
-            w(b, "}\n\n")
-
-            for c in s.commands {
-                wrapper := len(c.path) > 0 ? fmt.tprintf("%s_%s", snake, c.name) : c.proc_name
-                fmt.sbprintf(
-                    b,
-                    "// Issue `%s` — tick-scheduled on the sim lane: the SAME call on every peer\n",
-                    c.name,
-                )
-                w(b, "// AND on both models, zero role branches. Your own entity speculates at your\n")
-                w(b, "// next tick; the authority executes at the stamped tick and answers with a\n")
-                w(b, "// verdict — a rejection unwinds the delta-lane writes and the reconcile\n")
-                w(b, "// scrubs the predicted ones. Returns a knet.Action_Outcome: .Predicted =\n")
-                w(b, "// scheduled and in flight on my screen (even the authority's own issue runs\n")
-                w(b, "// at the stamped tick, never inline — .Applied is a coop-loop word); the\n")
-                w(b, "// verdict is state. `knet.command_ok(r)` reads it, same as any coop verb.\n")
-                fmt.sbprintf(b, "%s_cmd :: proc(b: ^kboot.Boot, self: ^%s", wrapper, cls)
-
-                for a in c.args {
-                    fmt.sbprintf(b, ", %s: %s", a.name, a.type_text)
-                }
-
-                w(b, ") -> knet.Action_Outcome {\n")
-                fmt.sbprintf(
-                    b,
-                    "\tassert(b.lane != nil, \"%s_cmd rides the sim lane — kboot.boot_lane(&boot, &lane) installs it\")\n",
-                    wrapper,
-                )
-
-                if len(c.args) > 0 {
-                    w(b, "\t_w := knet.writer_make(64, context.temp_allocator)\n")
-
-                    for a in c.args {
-                        fmt.sbprintf(b, "\tknet.write_%s(&_w, %s)\n", a.wire, a.name)
-                    }
-
-                    fmt.sbprintf(
-                        b,
-                        "\t_issue := ksim.lane_command(b.lane, self.net_id, %s_CMD_%s, knet.writer_bytes(&_w))\n",
-                        upper,
-                        strings.to_upper(c.name),
-                    )
-                } else {
-                    fmt.sbprintf(
-                        b,
-                        "\t_issue := ksim.lane_command(b.lane, self.net_id, %s_CMD_%s, nil)\n",
-                        upper,
-                        strings.to_upper(c.name),
-                    )
-                }
-
-                w(
-                    b,
-                    "\tif _issue.scheduled {return knet.action_outcome(.Predicted, seq = u32(_issue.seq), model = .Scheduled)}\n",
-                )
-                w(b, "\treturn knet.action_outcome(.Rejected, _issue.reason, model = .Scheduled)\n}\n\n")
-            }
-        }
-
-        in_size := s.tick.input_type != "" ? fmt.tprintf("size_of(%s)", s.tick.input_type) : "0"
-        // The wire class the input rides (resolve_sim assigned it package-wide);
-        // 0 for the primary or an inputless tick, emitted only when it differs.
-        in_class :=
-            s.tick.input_type != "" && s.tick.input_class != 0 ? fmt.tprintf(", input_class = %d", s.tick.input_class) : ""
-        contested := s.tick.contested ? ", contested = true" : ""
-        sim_cmds := len(s.commands) > 0 ? fmt.tprintf(", commands = _%s_sim_cmds[:]", snake) : ""
-        fx := s.tick.fx_mine ? fmt.tprintf(", fx = _%s_fx", snake) : ""
-        fmt.sbprintf(
-            b,
-            "// kit/sim set for %s — ksim.lane_track_set(&lane, id, self, &%s_sim_set, owner)\n%s_sim_set := ksim.Sim_Set{{entity_desc = &%s_net_desc, tick = _%s_tick_step, input_size = %s%s%s%s%s}}\n\n",
-            cls,
-            snake,
-            snake,
-            snake,
-            snake,
-            in_size,
-            in_class,
-            contested,
-            sim_cmds,
-            fx,
-        )
-    }
+    emit_entity_sim(b, s, cls, snake)
 
     // ---- the standard transport forwards (a kboot.Boot field declares them) ----
     // Bodies for the Method_Info entries resolve_boot_forwards synthesized:
@@ -2477,17 +1706,16 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                         if rule.array_len > 0 {
                             fmt.sbprintf(
                                 b,
-                                "\tfor component in value.%s {{if component & ~%s(%s) != 0 {{return false}}}}\n",
+                                "\tfor component in value.%s {{if component & ~type_of(component)(%s) != 0 {{return false}}}}\n",
                                 rule.field,
-                                rule.type_text[strings.index_byte(rule.type_text, ']') + 1:],
                                 rule.mask,
                             )
                         } else {
                             fmt.sbprintf(
                                 b,
-                                "\tif value.%s & ~%s(%s) != 0 {{return false}}\n",
+                                "\tif value.%s & ~type_of(value.%s)(%s) != 0 {{return false}}\n",
                                 rule.field,
-                                rule.type_text,
+                                rule.field,
                                 rule.mask,
                             )
                         }
@@ -2632,7 +1860,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 w(b, "// clock, beside the delayed avatar), the causer's live pass fires now\n")
                 w(b, "// (mine=true), a resim replay never re-fires, and screens with no part\n")
 
-                if f.anchor != "" {
+                if f.anchor_index >= 0 {
                     w(b, "// in it stay silent. Announced on a CORPSE (an anchor the game already\n")
                     w(b, "// despawned/untracked) it shows nowhere — not on the wire, not here, not\n")
                     w(b, "// later on a watcher: a fact meant to be seen is announced BEFORE the despawn.\n")
@@ -2642,8 +1870,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
                 fmt.sbprintf(b, "%s :: proc(b: ^kboot.Boot", f.name)
 
-                for entity_name, i in f.entity_names {
-                    fmt.sbprintf(b, ", %s: ^%s", entity_name, f.entity_types[i])
+                for ref, i in f.entity_refs {
+                    entity_name := ref.parameter
+                    fmt.sbprintf(b, ", %s: ^%s", entity_name, ref.type_code)
                 }
 
                 for a, i in f.arg_names {
@@ -2653,7 +1882,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 w(b, ") {\n")
                 w(b, "\tif b.lane == nil {return}\n\tl := b.lane\n")
 
-                if f.anchor != "" {
+                if f.anchor_index >= 0 {
                     // The corpse gate, FIRST: lane_fact skips the wire for an untracked
                     // anchor and fire_facts drops a filed fact whose anchor died, but the
                     // authority clause below would still present it on the host's own
@@ -2665,7 +1894,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     )
                 }
 
-                for entity_name, i in f.entity_names {
+                for ref, i in f.entity_refs {
+                    entity_name := ref.parameter
                     if i == f.anchor_index {
                         continue
                     }
@@ -2681,7 +1911,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 w(b, "\tif ksim.lane_is_authority(l) {\n")
                 w(b, "\t\t_fw := knet.writer_make(64, context.temp_allocator)\n")
 
-                for _, i in f.entity_names {
+                for _, i in f.entity_refs {
                     if i == f.anchor_index {
                         continue
                     }
@@ -2693,7 +1923,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     fmt.sbprintf(b, "\t\tknet.write_%s(&_fw, %s)\n", f.arg_wires[i], a)
                 }
 
-                anchor_ref := f.anchor != "" ? f.anchor_param : "nil"
+                anchor_ref := f.anchor_index >= 0 ? f.anchor_param : "nil"
                 fmt.sbprintf(
                     b,
                     "\t\tksim.lane_fact(l, %s, knet.writer_bytes(&_fw), EVENT_%s)\n",
@@ -2702,7 +1932,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 )
                 w(b, "\t}\n")
 
-                if f.anchor != "" {
+                if f.anchor_index >= 0 {
                     w(b, "\tif ksim.lane_live(l) {\n")
                     fmt.sbprintf(b, "\t\t_owner := ksim.lane_owner_of(l, %s)\n", f.anchor_param)
                     w(
@@ -2721,7 +1951,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     fmt.sbprintf(b, "\t\tif %s {{\n", local_condition)
                     fmt.sbprintf(b, "\t\t\t%s(cast(^%s)ksim.lane_game(l)", f.fx_proc, cls)
 
-                    for entity_name in f.entity_names {
+                    for ref in f.entity_refs {
+                        entity_name := ref.parameter
                         fmt.sbprintf(b, ", %s", entity_name)
                     }
 
@@ -2739,7 +1970,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     w(b, "\tif ksim.lane_is_authority(l) && ksim.lane_live(l) {\n")
                     fmt.sbprintf(b, "\t\t%s(cast(^%s)ksim.lane_game(l)", f.fx_proc, cls)
 
-                    for entity_name in f.entity_names {
+                    for ref in f.entity_refs {
+                        entity_name := ref.parameter
                         fmt.sbprintf(b, ", %s", entity_name)
                     }
 
@@ -2761,7 +1993,8 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     snake,
                     f.name,
                 )
-                non_anchor_refs := len(f.entity_names)
+                fmt.sbprintf(b, "\tself := cast(^%s)ksim.lane_game(lane)\n\tif self == nil {{return}}\n", cls)
+                non_anchor_refs := len(f.entity_refs)
 
                 if f.anchor_index >= 0 {
                     non_anchor_refs -= 1
@@ -2770,7 +2003,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 if non_anchor_refs > 0 || len(f.arg_names) > 0 {
                     w(b, "\tr := knet.reader_make(args)\n")
 
-                    for _, i in f.entity_names {
+                    for _, i in f.entity_refs {
                         if i == f.anchor_index {
                             continue
                         }
@@ -2782,10 +2015,12 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                         fmt.sbprintf(b, "\t_a%d := knet.read_%s(&r)\n", i, wr)
                     }
 
-                    w(b, "\tif r.err {return}\n")
+                    w(b, "\tif r.err || len(knet.reader_remaining(&r)) != 0 {return}\n")
+                } else {
+                    w(b, "\tif len(args) != 0 {return}\n")
                 }
 
-                for _, i in f.entity_names {
+                for _, i in f.entity_refs {
                     if i == f.anchor_index {
                         continue
                     }
@@ -2798,13 +2033,23 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     )
                 }
 
+                if f.anchor_index >= 0 && f.entity_refs[f.anchor_index].binding != nil {
+                    w(b, "\t_anchor_id, _anchor_ok := ksim.lane_entity_id(lane, entity)\n\tif !_anchor_ok {return}\n")
+                }
+                for ref, i in f.entity_refs {
+                    id := i == f.anchor_index ? "_anchor_id" : fmt.tprintf("_entity_id%d", i)
+                    raw := i == f.anchor_index ? "entity" : fmt.tprintf("_entity%d", i)
+                    emit_event_kind_guard(b, ref, fmt.tprintf("&self.%s", s.boot_field), id, raw, i)
+                }
+
                 if f.anchor_index < 0 {
                     w(b, "\t_ = entity\n")
                 }
 
                 fmt.sbprintf(b, "\t%s(cast(^%s)ksim.lane_game(lane)", f.fx_proc, cls)
 
-                for entity_type, i in f.entity_types {
+                for ref, i in f.entity_refs {
+                    entity_type := ref.type_code
                     if i == f.anchor_index {
                         fmt.sbprintf(b, ", cast(^%s)entity", entity_type)
                     } else {
@@ -2926,7 +2171,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     continue
                 }
 
-                tsnake := to_snake(e.target)
+                tsnake := entity_helper(e)
 
                 if !emitted_switch {
                     w(b, "\t\t\tswitch e.type {\n")
@@ -2940,7 +2185,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     s.boot_field,
                     strings.to_upper(tsnake),
                     e.born,
-                    e.target,
+                    entity_type(e),
                 )
             }
 
@@ -2960,7 +2205,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                         w(&cond, " || ")
                     }
 
-                    fmt.sbprintf(&cond, "e.type == %s_TYPE", strings.to_upper(to_snake(e.target)))
+                    fmt.sbprintf(&cond, "e.type == %s_TYPE", strings.to_upper(entity_helper(e)))
                 }
 
                 fmt.sbprintf(
@@ -3158,19 +2403,36 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
         w(b, "// The stable wire ids, named like the hand-kept consts they replace.\n")
 
         for e in s.entities {
-            fmt.sbprintf(b, "%s_TYPE :: ksess.Entity_Type(%d)\n", strings.to_upper(to_snake(e.target)), e.type_id)
+            fmt.sbprintf(b, "%s_TYPE :: ksess.Entity_Type(%d)\n", strings.to_upper(entity_helper(e)), e.type_id)
         }
 
         w(b, "\n")
 
         for e in s.entities {
-            tsnake := to_snake(e.target)
+            tsnake := entity_helper(e)
+            if len(e.scenes) > 1 {
+                fmt.sbprintf(b, "%s :: enum u32 {{\n", entity_variant_type(e))
+                for scene in e.scenes {fmt.sbprintf(b, "\t%s = 0x%x,\n", scene.name, scene.id)}
+                w(b, "}\n\n")
+            }
+            fmt.sbprintf(b, "@(private = \"file\")\n_%s_ent_scenes_%s := [?]kboot.Entity_Scene {{\n", snake, tsnake)
+            for scene in e.scenes {
+                fmt.sbprintf(
+                    b,
+                    "\t{{variant = ksess.Scene_Variant(0x%x), name = %q, scene_offset = offset_of(%s, %s)}},\n",
+                    scene.id,
+                    scene.name,
+                    cls,
+                    scene.field,
+                )
+            }
+            w(b, "}\n\n")
             fmt.sbprintf(
                 b,
                 "@(private = \"file\")\n_%s_ent_make_%s :: proc(node: gd.Node) -> rawptr {{\n\treturn rt.script_of(node, %s)\n}}\n\n",
                 snake,
                 tsnake,
-                e.target,
+                entity_type(e),
             )
 
             if e.spawned != "" {
@@ -3181,7 +2443,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     tsnake,
                     e.spawned,
                     cls,
-                    e.target,
+                    entity_type(e),
                 )
             }
 
@@ -3193,7 +2455,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     tsnake,
                     e.freed,
                     cls,
-                    e.target,
+                    entity_type(e),
                 )
             }
         }
@@ -3203,17 +2465,17 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
         fmt.sbprintf(b, "%s_entity_kinds := [?]kboot.Entity_Kind {{\n", snake)
 
         for e in s.entities {
-            tsnake := to_snake(e.target)
+            tsnake := entity_helper(e)
             fmt.sbprintf(
                 b,
-                "\t{{type = %s_TYPE, name = %q, set = &%s_command_set, script_of = _%s_ent_make_%s, scene_offset = offset_of(%s, %s)",
+                "\t{{type = %s_TYPE, name = %q, set = &%s_command_set, script_of = _%s_ent_make_%s, scenes = _%s_ent_scenes_%s[:]",
                 strings.to_upper(tsnake),
                 e.target,
+                entity_descriptor_prefix(e),
+                snake,
                 tsnake,
                 snake,
                 tsnake,
-                cls,
-                e.field,
             )
 
             if e.spawned != "" {
@@ -3227,7 +2489,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
             if e.has_tick {
                 // The class ticks: the row carries its Sim_Set, so boot_lane's
                 // factory puts every spawn on the sim lane — no game code.
-                fmt.sbprintf(b, ", sim_set = &%s_sim_set", tsnake)
+                fmt.sbprintf(b, ", sim_set = &%s_sim_set", entity_descriptor_prefix(e))
             }
 
             if e.stream_hz > 0 {
@@ -3296,13 +2558,13 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
         // hand-written proc of the same name suppresses that accessor
         // (resolve_census) and keeps its own meaning.
         for e in s.entities {
-            tsnake := to_snake(e.target)
+            tsnake := entity_helper(e)
 
             if e.gen_ref || e.gen_of || e.gen_owned || e.gen_mine || e.gen_all || e.gen_despawn || e.gen_teleport {
                 fmt.sbprintf(
                     b,
                     "// Census for %s: typed refs, lookup, ownership, and one-pass iteration —\n// no game-side maps or registry casts for the common shape.\n",
-                    e.target,
+                    entity_type(e),
                 )
             }
 
@@ -3311,7 +2573,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     b,
                     "%s_ref :: proc(id: knet.Net_Id) -> knet.Net_Ref(%s) {{\n\treturn {{id = id}}\n}}\n\n",
                     tsnake,
-                    e.target,
+                    entity_type(e),
                 )
             }
 
@@ -3322,14 +2584,14 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     "@(private = \"file\")\n_%s_of_ref :: proc(b: ^kboot.Boot, ref: knet.Net_Ref(%s)) -> (^%s, bool) {{\n\te, ok := kboot.boot_entity(b, ref.id, %s_TYPE)\n\treturn cast(^%s)e, ok\n}}\n\n" +
                     "%s_of :: proc {{_%s_of_id, _%s_of_ref}}\n\n",
                     tsnake,
-                    e.target,
+                    entity_type(e),
                     strings.to_upper(tsnake),
-                    e.target,
+                    entity_type(e),
                     tsnake,
-                    e.target,
-                    e.target,
+                    entity_type(e),
+                    entity_type(e),
                     strings.to_upper(tsnake),
-                    e.target,
+                    entity_type(e),
                     tsnake,
                     tsnake,
                     tsnake,
@@ -3341,20 +2603,20 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     b,
                     "%s_owned_by :: proc(b: ^kboot.Boot, owner: knet.Player_Id) -> (^%s, bool) {{\n\te, _, ok := kboot.boot_owned_entity(b, %s_TYPE, owner)\n\treturn cast(^%s)e, ok\n}}\n\n",
                     tsnake,
-                    e.target,
+                    entity_type(e),
                     strings.to_upper(tsnake),
-                    e.target,
+                    entity_type(e),
                 )
             }
 
             if e.gen_mine {
                 mine_body :=
-                    e.gen_owned ? fmt.tprintf("return %s_owned_by(b, b.ses.me)", tsnake) : fmt.tprintf("e, _, ok := kboot.boot_owned_entity(b, %s_TYPE, b.ses.me)\n\treturn cast(^%s)e, ok", strings.to_upper(tsnake), e.target)
+                    e.gen_owned ? fmt.tprintf("return %s_owned_by(b, b.ses.me)", tsnake) : fmt.tprintf("e, _, ok := kboot.boot_owned_entity(b, %s_TYPE, b.ses.me)\n\treturn cast(^%s)e, ok", strings.to_upper(tsnake), entity_type(e))
                 fmt.sbprintf(
                     b,
                     "%s_mine :: proc(b: ^kboot.Boot) -> (^%s, bool) {{\n\t%s\n}}\n\n",
                     tsnake,
-                    e.target,
+                    entity_type(e),
                     mine_body,
                 )
             }
@@ -3364,9 +2626,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     b,
                     "%s_all :: proc(b: ^kboot.Boot, allocator := context.temp_allocator) -> []knet.Net_Entity(%s) {{\n\treturn kboot.boot_entity_rows(b, %s_TYPE, %s, allocator)\n}}\n\n",
                     tsnake,
-                    e.target,
+                    entity_type(e),
                     strings.to_upper(tsnake),
-                    e.target,
+                    entity_type(e),
                 )
             }
 
@@ -3381,7 +2643,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     tsnake,
                     strings.to_upper(tsnake),
                     tsnake,
-                    e.target,
+                    entity_type(e),
                     tsnake,
                 )
 
@@ -3391,7 +2653,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                         "@(private = \"file\")\n_%s_despawn_ptr :: proc(b: ^kboot.Boot, self: ^%s) -> bool {{return self != nil && _%s_despawn_id(b, self.net_id)}}\n\n" +
                         "%s_despawn :: proc {{_%s_despawn_id, _%s_despawn_ref, _%s_despawn_ptr}}\n\n",
                         tsnake,
-                        e.target,
+                        entity_type(e),
                         tsnake,
                         tsnake,
                         tsnake,
@@ -3420,7 +2682,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                     tsnake,
                     strings.to_upper(tsnake),
                     tsnake,
-                    e.target,
+                    entity_type(e),
                     tsnake,
                 )
 
@@ -3430,7 +2692,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                         "@(private = \"file\")\n_%s_teleport_ptr :: proc(b: ^kboot.Boot, self: ^%s) -> bool {{return self != nil && _%s_teleport_id(b, self.net_id)}}\n\n" +
                         "%s_teleport :: proc {{_%s_teleport_id, _%s_teleport_ref, _%s_teleport_ptr}}\n\n",
                         tsnake,
-                        e.target,
+                        entity_type(e),
                         tsnake,
                         tsnake,
                         tsnake,
@@ -3449,6 +2711,9 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
             }
 
             if e.gen_spawn {
+                variant_param :=
+                    len(e.scenes) > 1 ? fmt.tprintf(", variant: %s = .Default", entity_variant_type(e)) : ""
+                variant_arg := len(e.scenes) > 1 ? ", ksess.Scene_Variant(variant)" : ""
                 // The typed spawn — the tag already knows the struct, so the
                 // TYPE const and the rawptr cast stop existing at spawn sites.
                 // Set the returned entity's fields, then boot_spawn_send(b, id).
@@ -3459,32 +2724,36 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                         "// entity, a client a PREDICTED one flying this instant (a fired\n" +
                         "// projectile; the authority's spawn rekeys it). Set the spawn fields,\n" +
                         "// then kboot.boot_spawn_send(b, id).\n" +
-                        "%s_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^%s, knet.Net_Id) {{\n" +
-                        "\te, id := kboot.boot_fire_spawn(b, %s_TYPE, owner)\n" +
+                        "%s_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID%s) -> (^%s, knet.Net_Id) {{\n" +
+                        "\te, id := kboot.boot_fire_spawn(b, %s_TYPE, owner%s)\n" +
                         "\treturn cast(^%s)e, id\n" +
                         "}}\n\n",
-                        e.target,
+                        entity_type(e),
                         tsnake,
-                        e.target,
+                        variant_param,
+                        entity_type(e),
                         strings.to_upper(tsnake),
-                        e.target,
+                        variant_arg,
+                        entity_type(e),
                     )
                 } else {
                     fmt.sbprintf(
                         b,
                         "// Typed spawn for %s — authority code (clients hear the result as\n" +
                         "// Ev_Spawned). Set the spawn fields, then kboot.boot_spawn_send(b, id).\n" +
-                        "%s_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID) -> (^%s, knet.Net_Id) {{\n" +
+                        "%s_spawn :: proc(b: ^kboot.Boot, owner := knet.PLAYER_ID_INVALID%s) -> (^%s, knet.Net_Id) {{\n" +
                         "\tassert(b.ses != nil && b.ses.is_host, \"%s_spawn mints a REAL entity — only the authority spawns\")\n" +
-                        "\te, id := ksess.session_spawn_make(b.ses, %s_TYPE, owner)\n" +
+                        "\te, id := ksess.session_spawn_make(b.ses, %s_TYPE, owner%s)\n" +
                         "\treturn cast(^%s)e, id\n" +
                         "}}\n\n",
-                        e.target,
+                        entity_type(e),
                         tsnake,
-                        e.target,
+                        variant_param,
+                        entity_type(e),
                         tsnake,
                         strings.to_upper(tsnake),
-                        e.target,
+                        variant_arg,
+                        entity_type(e),
                     )
                 }
             }
@@ -3527,7 +2796,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 "// Attach the complete generated stack. `net_cfg` is a named, validated\n" +
                 "// network profile plus any explicit field overrides; zero is Friends_Coop.\n" +
                 "// Call once from ready.\n" +
-                "%s :: proc(self: ^%s, opts: kboot.Options, net_cfg := kboot.Network_Config{{}}) {{\n",
+                "@(require_results)\n%s :: proc(self: ^%s, opts: kboot.Options, net_cfg := kboot.Network_Config{{}}) -> bool {{\n",
                 net_attach_name,
                 cls,
             )
@@ -3552,7 +2821,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
             fmt.sbprintf(
                 b,
-                "\tkboot.boot_attach(&self.%s, cast(gd.Node)self.owner, &self.%s, &self.%s, opts)\n",
+                "\tif !kboot.boot_attach(&self.%s, cast(gd.Node)self.owner, &self.%s, &self.%s, opts) {{return false}}\n",
                 s.boot_field,
                 s.session_field,
                 s.comms_field,
@@ -3587,7 +2856,7 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
                 fmt.sbprintf(b, "\tkboot.boot_migration(&self.%s, self, %s_succ_hooks)\n", s.boot_field, snake)
             }
 
-            w(b, "}\n\n")
+            w(b, "\treturn true\n}\n\n")
         }
 
         if s.net_pump {
@@ -3727,23 +2996,26 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
     // gd:"backup" host-local migration/save codec (version-hashed write/read).
     emit_backup(b, s)
 
-    // lifecycle literal
+    // Lifecycle literal includes a generated finalizer even without authored hooks.
     lc_lit := strings.builder_make()
     defer strings.builder_destroy(&lc_lit)
+    strings.write_string(&lc_lit, "rt.Lifecycle{")
+    has_finalizer := s.kit_stack && !s.kit_cleanup_manual
 
-    if len(s.lifecycles) > 0 {
-        strings.write_string(&lc_lit, "rt.Lifecycle{")
-
-        for lc, i in s.lifecycles {
-            if i > 0 {
-                strings.write_string(&lc_lit, ", ")
-            }
-
-            fmt.sbprintf(&lc_lit, "%s = _%s_lc_%s", lc.keyword, snake, lc.keyword)
+    for lc in s.lifecycles {
+        if lc.keyword == "finalize" {
+            has_finalizer = true
+            continue
         }
 
-        strings.write_string(&lc_lit, "}")
+        fmt.sbprintf(&lc_lit, "%s = _%s_lc_%s, ", lc.keyword, snake, lc.keyword)
     }
+
+    if has_finalizer {
+        fmt.sbprintf(&lc_lit, "finalize = _%s_lc_finalize", snake)
+    }
+
+    strings.write_string(&lc_lit, "}")
 
     // @(init) registration. rt.register_class walks the struct's TYPE INFO (field
     // offsets/sizes/types + the gd:"..." tags) to build the Export/Onready tables at
@@ -3760,8 +3032,12 @@ emit_registration :: proc(b: ^strings.Builder, s: ^Script) {
 
     fmt.sbprintf(b, "\t\t\tbase = %q,\n", s.base)
 
-    if len(s.lifecycles) > 0 {
+    if len(s.lifecycles) > 0 || has_finalizer {
         fmt.sbprintf(b, "\t\t\tlifecycle = %s,\n", strings.to_string(lc_lit))
+    }
+
+    if s.kit_stack {
+        w(b, "\t\t\towns_state = true,\n")
     }
 
     // C-shaped member tables: pointer + count into the static backing arrays above.

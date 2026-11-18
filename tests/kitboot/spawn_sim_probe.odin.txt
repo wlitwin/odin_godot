@@ -1,0 +1,62 @@
+package hello_sim
+
+import kboot "godot:kit/boot"
+import knet "godot:kit/net"
+import ksess "godot:kit/session"
+import ksim "godot:kit/sim"
+
+@(private)
+spawn_probe_owner_seen: bool
+
+@(private)
+spawn_probe_events :: proc(game: rawptr, events: []ksess.Event) {
+    self := cast(^HelloSim)game
+    for ev in events {
+        if born, ok := ev.(ksess.Ev_Spawned); ok {
+            if entity, live := ksim.lane_entity(&self.lane, born.id); live {
+                spawn_probe_owner_seen = ksim.lane_owner_of(&self.lane, entity) == born.owner
+            }
+        }
+    }
+    hello_sim_events(self, events)
+}
+
+@(gd_method)
+hello_sim_test_spawn_transaction :: proc(self: ^HelloSim) -> bool {
+    defer hello_sim_entities(self, &self.boot)
+    for immediate in ([2]bool{true, false}) {
+        kboot.boot_entities(
+            &self.boot, self, hello_sim_entity_kinds[:],
+            immediate ? spawn_probe_events : nil,
+        )
+        spawn_probe_owner_seen = false
+        player, id := player_spawn(&self.boot, owner = 101)
+        if ksim.lane_owner_of(&self.lane, player) != 101 {return false}
+        player.pid, player.x, player.y = 3, 196, 140
+        ksess.session_set_owner(&self.ses, id, 202)
+        // Even the raw Session commit must synchronize Boot's lane before
+        // returning, with or without a generated presentation dispatcher.
+        ksess.session_spawn_send(&self.ses, id)
+        if ksim.lane_owner_of(&self.lane, player) != 202 {return false}
+        if immediate && !spawn_probe_owner_seen {return false}
+        queued := 0
+        for {
+            ev, ok := ksess.session_poll(&self.ses)
+            if !ok {break}
+            if born, is_born := ev.(ksess.Ev_Spawned); is_born && born.id == id {
+                if born.owner != 202 {return false}
+                queued += 1
+            }
+        }
+        if queued != (immediate ? 0 : 1) {return false}
+        if kboot.boot_spawn_cancel(&self.boot, id) {return false}
+        if !player_despawn(&self.boot, id) {return false}
+        if _, live := ksim.lane_entity(&self.lane, id); live {return false}
+
+        _, draft := player_spawn(&self.boot, owner = 101)
+        ksess.session_set_owner(&self.ses, draft, knet.Player_Id(202))
+        if !kboot.boot_spawn_cancel(&self.boot, draft) {return false}
+        if _, live := ksim.lane_entity(&self.lane, draft); live {return false}
+    }
+    return true
+}

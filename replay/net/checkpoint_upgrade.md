@@ -1,133 +1,61 @@
 # Explicit checkpoint conversion
 
-Use an explicit checkpoint converter when a saved archive's protocol or game
-schema differs from the current model. `checkpoint_decode` and `server_restore`
-require the current protocol, archive layout, schemas, model and
-application-supplied content ID. If these do not match, loading fails without
-inferring a conversion or changing the source bytes.
-
-`checkpoint_upgrade_v6(bytes, model, content, allocator)` converts protocol 6
-archives to the current protocol.
-It accepts gameplay protocol 6 / checkpoint layout 4 and returns owned protocol-7
-archive bytes, or an error and no output. Free a successful result with the same
-allocator. The input is borrowed, remains unchanged and can be released after
-conversion. This routine performs no I/O and opens no session.
-
-```odin
-converted, err := net.checkpoint_upgrade_v6(old_bytes, game.model(), game.CONTENT)
-defer delete(converted)
-if err != .None {return err}
-// Decode and apply the application's identity, dependency and recovery policy
-// before publishing or restoring the result.
-```
-
-Protocol 7 changes scheduled input packet framing. Its logical schemas, archive
-layout and model semantics remain compatible with protocol 6. The converter:
-
-1. Validates the original envelope, exact bounded section lengths, layout version,
-   model values, roster, pending work and old protocol's complete contract hash.
-2. Computes the current contract from the same model and archived configuration.
-3. Changes the protocol/contract stamps and canonically re-encodes the archive.
-
-The authority frame, tick, epoch, roster, held/future controls, queued actions,
-settled outcomes, bans and opaque admission-policy bytes are preserved. Scheduled
-and latest-observation models retain distinct contracts. Passing the wrong control
-timing fails. Passing an already-current archive also fails; this is a specific
-converter for protocol 6, not a generic loader that accepts repeated conversion.
-
-The bridge only applies while the current protocol is 7. It does not convert older
-archive layouts, different state schemas, removed fields, changed gameplay content
-or application semantics. Those require explicit source-version types and a
-separately reviewed game conversion. Protocol-6 live peers still need a software
-update; a converted save does not let different protocol versions play together.
+Normal checkpoint decoding requires the current protocol and layout, matching
+schemas, model policy and application content identity. It does not infer a
+conversion. The generic conversion APIs support deliberate application schema
+changes within the current protocol; source-specific historical protocol readers
+are not shipped.
 
 ## Authority and assets
 
-Conversion grants no authority and does not advance the epoch. Permit requirements
-and custom policy IDs remain present. `server_restore` still needs a newer epoch,
-a valid permit when required and the application's admission callback. Converting
-bytes changes their digest: an existing coordinator-approved checkpoint point or
-sealed handoff cannot be replaced by these bytes. Coordinated upgrade needs
-its own approved transition and publication under the new contract.
+Conversion validates the complete source archive before calling a mapper,
+produces owned bytes, and leaves the source unchanged. It grants no authority and
+does not advance the epoch. Restore still needs the appropriate identity, newer
+epoch, permit and admission callback. A converted digest cannot replace an already
+approved coordinator checkpoint or sealed handoff without its publication policy.
 
-For a bundle, validate its old container, convert its root, then call
-`assets.bundle_replace_root(original, converted, content)`. This preserves the
-asset records and payloads byte for byte and rebuilds the container's lengths and
-body digest. Check the root's content/epoch/tick against the container and verify
-all application dependencies before publication. A generic converter cannot infer
-which external assets a game's pending actions require.
-
-The separate [Scrapyard tool](../../examples/replay_scrapyard/saves.md#converting-a-protocol-6-run)
-adds identity, complete current-frame spray dependencies, metadata and offline
-recovery checks. Its native regression gate uses genuine saves emitted by a retained
-protocol-6 game binary, with source hashes and exact resumed world hashes recorded
-in [the conversion evidence](../../docs/replay/results/protocol-upgrade-2026-09-06/README.md).
+Validate every external dependency before publication. For a bundle, validate the
+container and converted root, then use
+`assets.bundle_replace_root(original, root, source_content, target_content=target_content)`.
+That operation preserves asset bytes; it cannot infer which assets new gameplay
+requires. Game bundle readers require a bundle envelope. Explicit raw checkpoint
+APIs remain available for callers that own their storage/dependency policy.
 
 ## Action-schema changes
 
 `checkpoint_convert_actions(bytes, source_model, source_content, target_model,
-target_content, convert)` handles an explicit application change to the action
-schema while retaining the same state/control types, seat count and control
-timing. It requires a current-protocol source archive. For a protocol-6 source,
-first use `checkpoint_upgrade_v6` with the **source** model/content.
+target_content, action_mapper)` maps pending actions while state, control types,
+seat count and control timing remain shared. Event schemas may differ because a
+checkpoint has no serialized event history.
 
-The converter validates the original archive and contract, maps each pending action,
-then computes the target contract and validates/encodes the result. Common world,
-roster, control, outcome, ban and policy sections are preserved. The mapper returns
-`(new_action, ok)`; a false result or an invalid target accepted action fails the
-whole conversion without producing output. Missing required validation callbacks
-fail with `Invalid_Model`. Both models must provide an action handler when their
-archive contains accepted pending work.
-
-Already refused requests can contain application-invalid values. A mapper should
-preserve their representable fields; the archive retains their original refusal
-reason and settlement frontier. They are not promoted into accepted requests.
-The target still enforces canonical schema validity for every encoded value.
-
-The result is an owned byte buffer and the source is unchanged. This API does not
-convert world/control schemas, authorize a leader, advance epochs, reconstruct
-custom policy callbacks or infer which external assets the new content requires.
-Changing content also requires an explicitly updated bundle envelope; use
-`bundle_replace_root(..., target_content=new_content)` after checking application
-metadata and dependencies. Scrapyard's content-42 importer retains a frozen original
-action type and adds zeroed development payloads to the current action type. Event
-types may also differ: their schemas enter the target contract, but there is no
-serialized event history to transform. Scrapyard retains the content-42/43 event
-shape when importing into content 44.
+The mapper returns `(target_action, ok)`. Accepted pending work must be valid under
+the target model. Refused requests can contain application-invalid values: retain
+their representable payload, refusal reason and settlement frontier. Conversion
+must not re-admit them or rerun action scheduling. Missing validation callbacks,
+a rejected mapping or invalid target produces no output.
 
 ## World-schema changes
 
 `checkpoint_convert_state(bytes, source_model, source_content, target_model,
-target_content, convert)` maps a complete source world into a target world. The
-source must use the current protocol; controls, actions, events, seat count and
-control timing remain shared. Define explicit world types for each supported
-source version; normal decode does not infer older layouts.
+target_content, world_mapper)` maps the complete world. Controls, actions, events,
+seat count and control timing remain shared. The mapper returns `(target_world, ok)`.
+An invalid target or insufficient restored egress budget fails without output.
 
-The mapper returns `(target_world, ok)`. A refused mapping, invalid target world or
-insufficient restored egress budget fails without output. Full source validation
-precedes the mapper. Target contract/schema validation follows it. The frame tick,
-epoch, roster, held and future controls, pending actions, outcomes, bans and policy
-bytes remain intact. Output is owned; the borrowed source is unchanged. This
-conversion has the same authority and external-asset limitations described above.
-
-[Cavecrawl's explicit importer](../../examples/replay_cavecrawl/authoring.md)
-uses this converter to add two captured floor definitions to an older Replay world.
-Its fixture is a real save produced by the earlier game binary, then converted and
-resumed by the current game in a fresh process.
+Frame tick, epoch, roster, held/future controls, pending action identities,
+outcomes, bans and policy bytes are preserved. Define reviewed source types and
+explicit target defaults for each application conversion. Matching field names or
+layout sizes alone do not establish semantic compatibility.
 
 ## Combined world and action changes
 
 `checkpoint_convert(bytes, source_model, source_content, target_model,
-target_content, world_mapper, action_mapper)` changes both world and action schemas
-in one explicit conversion. Controls, seat count and control timing stay shared;
-event types may differ because the archive contains no event history. Both mappers
-return `(value, ok)` and run only after complete source validation. A failed mapper
-or invalid target produces no output. The target must fit the restored egress budget.
+target_content, world_mapper, action_mapper)` maps both world and action schemas.
+Controls, seat count and control timing remain shared; event types may differ.
+Both mappers run after complete source validation. The target contract is computed
+and validated before owned output is returned.
 
-The converter preserves frame tick, epoch, roster, held/future controls, pending
-action identities and refusal reasons, settled outcomes, bans and policy bytes.
-Rejected source actions can contain application-invalid fields; map their
-representable values without promoting them to accepted work. Source bytes are
-borrowed and unchanged; output is owned. The authority/asset limitations above still
-apply. Cavecrawl uses this path to add lobby state and commands while importing its
-two earlier Replay content versions. It does not attempt to import original Kit saves.
+A control-schema or gameplay-timing change needs an application-owned conversion
+that accounts for those semantics. Recordings also retain expected frames and
+events: verify them with the target model instead of regenerating expectations to
+hide divergence. [Evolution helpers](../evolution/README.md) provide explicit
+schema freezing, manifests, additive defaults and unchanged-field checks.

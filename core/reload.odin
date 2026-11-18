@@ -78,6 +78,9 @@ Reload_State :: struct {
     // (core/build_status.odin): a red badge must stay red, and Play must stay blocked,
     // until a build actually SUCCEEDS — not just until the failure has been printed once.
     last_build_failed:  bool,
+    // Compilation and admission are separate. An unrelated successful build
+    // cannot clear a module that still failed ABI/domain/collision checks.
+    admission_failures: [dynamic]string,
     // Worker-to-main one-shots. Scanning/hashing never calls Godot; the frame pump turns
     // these into editor Output messages.
     build_started:      bool,
@@ -90,6 +93,9 @@ Reload_State :: struct {
     // authored-source hash, so an unchanged module is skipped — which is ALSO the payoff:
     // a save in one module rebuilds only that module's dll. Missing key == never built.
     last_hashes:        map[string]u64,
+    // Unlike attempted hashes, this survives a failed build. An absent main
+    // package is optional only if this project never had one in this session.
+    main_package_seen:  bool,
     // Modules the next successful swap must hot-reload (heap-owned names, deduped).
     // Appended by reload_request for each module it kicks a rebuild of; drained by the
     // pump once swap_ready fires; cleared on build failure (never swap an unbuilt dll).
@@ -97,6 +103,8 @@ Reload_State :: struct {
 
     // One-time "odin not found" warning guard (don't spam on every save).
     warned_no_odin:     bool,
+    missing_compiler:   bool, // persistent setup failure, also visible before Play
+    setup_build_pending: bool, // a saved edit still needs compilation after setup repair
 
     // THE DELETION PROBE (worker-owned, always touched under mutex): a names-only
     // fingerprint of the script tree,
@@ -211,7 +219,7 @@ reload_job_scope_source :: proc(job: ^Reload_Job, source_path: string) {
 }
 
 // Absolute filesystem path of `res://` for the open project (globalized, trailing-/ trimmed).
-@(private = "file")
+@(private)
 reload_project_dir :: proc(allocator := context.allocator) -> string {
     gres := godot.new_string_odin("res://")
     global := godot.project_settings_globalize_path(godot.singleton_project_settings(), gres)
@@ -350,6 +358,13 @@ reload_request :: proc(force := false, probe := false, reconcile := false, sourc
     odin_bin, found := resolve_odin_bin()
 
     if !found {
+        sync.lock(&g_reload.mutex)
+        g_reload.missing_compiler = true
+        if !probe {
+            g_reload.setup_build_pending = true
+            g_reload.last_build_failed = true
+        }
+        sync.unlock(&g_reload.mutex)
         if probe {
             return // a periodic probe must not warn before the user has tried to build
         }
@@ -371,6 +386,13 @@ reload_request :: proc(force := false, probe := false, reconcile := false, sourc
         return
     }
 
+    sync.lock(&g_reload.mutex)
+    retry_setup := g_reload.setup_build_pending
+    g_reload.setup_build_pending = false
+    g_reload.missing_compiler = false
+    g_reload.warned_no_odin = false
+    sync.unlock(&g_reload.mutex)
+
     root := odin_collection_root()
     proj := reload_project_dir()
     scripts := reload_scripts_dir(proj)
@@ -381,11 +403,13 @@ reload_request :: proc(force := false, probe := false, reconcile := false, sourc
     job.root = root
     job.proj = proj
     job.scripts = scripts
-    job.force = force
+    job.force = force || retry_setup
     job.probe = probe
     job.reconcile = reconcile
 
-    if probe || source_path == "" {
+    // Failed saves may have touched several modules while no compiler existed.
+    // Reconcile all of them before clearing the global failure/Play gate.
+    if probe || source_path == "" || retry_setup {
         reload_job_set_scan_all(job)
     } else {
         reload_job_scope_source(job, source_path)
@@ -637,8 +661,19 @@ prepare_reload_command :: proc(job: ^Reload_Job, force: bool, baseline := false)
         state.last_hashes = make(map[string]u64, core_allocator())
     }
 
+    main_binary_exists := os.exists(strings.concatenate({job.proj, "/bin/libodinscripts", SCRIPTS_DLL_EXT}, context.temp_allocator))
     for c in cands {
         prev, seen := state.last_hashes[c.name]
+        if c.name == "" && (c.hash != 0 || main_binary_exists) {
+            state.main_package_seen = true
+        }
+
+        // A module-only project has no main scripts package. Do not invent a
+        // failing main build during bulk requests or periodic reconciliation.
+        // A previously observed package disappearing still needs diagnosis.
+        if job.scan_all && c.name == "" && c.hash == 0 && !state.main_package_seen {
+            continue
+        }
 
         if baseline && !seen {
             state.last_hashes[strings.clone(c.name, core_allocator())] = c.hash
@@ -812,7 +847,7 @@ build_worker_entry :: proc(data: rawptr) {
     force := job.force
     baseline := false
 
-    if job.probe {
+    if job.probe && !job.force {
         probe_prepare, probe_force, probe_baseline := reload_probe_worker(job)
 
         if !probe_prepare {
@@ -1069,6 +1104,26 @@ reload_probe_fs :: proc() {
 }
 
 @(private)
+reload_note_admission :: proc(module: string, accepted: bool) {
+    sync.lock(&g_reload.mutex)
+    defer sync.unlock(&g_reload.mutex)
+    for name, i in g_reload.admission_failures {
+        if name != module { continue }
+        if accepted {
+            delete(name, core_allocator())
+            unordered_remove(&g_reload.admission_failures, i)
+        }
+        return
+    }
+    if !accepted {
+        if g_reload.admission_failures == nil {
+            g_reload.admission_failures = make([dynamic]string, core_allocator())
+        }
+        append(&g_reload.admission_failures, strings.clone(module, core_allocator()))
+    }
+}
+
+@(private)
 reload_pump_main_thread :: proc() {
     if bool(godot.engine_is_editor_hint(godot.singleton_engine())) {
         reload_probe_fs()
@@ -1139,19 +1194,22 @@ reload_pump_main_thread :: proc() {
     swapped := 0
 
     if len(swap_names) == 0 {
-        if odin_scripts_reload() {
-            swapped += 1
-        }
+        accepted := odin_scripts_reload()
+        reload_note_admission("", accepted)
+        if accepted { swapped += 1 }
     } else {
         for name in swap_names {
-            if odin_scripts_reload(name) {
-                swapped += 1
-            }
+            accepted := odin_scripts_reload(name)
+            reload_note_admission(name, accepted)
+            if accepted { swapped += 1 }
 
             delete(name) // heap-owned clone from reload_request
         }
     }
 
+    if swapped != max(1, len(swap_names)) {
+        editor_msg_error("odin_godot: compiled scripts could not be loaded. See the reload diagnostic in Output; your change is not fully live.")
+    }
     if swapped > 0 {
         // Real (tool) instances are already re-bound by the swap; placeholders (the common
         // non-tool editor case) still hold the OLD property list, so re-push their exports.
@@ -1159,6 +1217,13 @@ reload_pump_main_thread :: proc() {
         os.write_string(os.stderr, "odin reload: scripts dll swapped + exports refreshed (RELOAD_SWAPPED)\n")
         // Editor-Output confirmation (with the build time) so the user knows their save is now
         // live — the visible bookend to the "rebuilding…" message from reload_request.
-        godot.print_str(fmt.tprintf("odin_godot: scripts reloaded — your change is live (%.1fs)", build_ms / 1000))
+        sync.lock(&g_reload.mutex)
+        fully_live := !g_reload.last_build_failed && len(g_reload.admission_failures) == 0
+        sync.unlock(&g_reload.mutex)
+        if fully_live {
+            godot.print_str(fmt.tprintf("odin_godot: scripts reloaded — your change is live (%.1fs)", build_ms / 1000))
+        } else {
+            godot.print_str("odin_godot: some scripts reloaded; unresolved errors remain in Output.")
+        }
     }
 }

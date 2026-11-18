@@ -2,18 +2,19 @@
 set -euo pipefail
 ROOT="${ODIN_GODOT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 export ODIN_GODOT_ROOT="$ROOT"
-PROJ="$ROOT/examples/replay_scrapyard"
-work="$(mktemp -d)"; producer=""
+PROJ="${REPLAY_SCRAPYARD_PROJECT:-$ROOT/examples/replay_scrapyard}"
+work="${REPLAY_SAVE_OUT:-$(mktemp -d)}"; mkdir -p "$work"; producer=""
 cleanup() {
+  local status=$?
   if [[ -n "$producer" ]]; then kill "$producer" 2>/dev/null || true; wait "$producer" 2>/dev/null || true; fi
-  if [[ "${REPLAY_KEEP_LOGS:-0}" == 1 ]]; then echo "Scrapyard save logs: $work"; else rm -rf "$work"; fi
+  if [[ "$status" != 0 || "${REPLAY_KEEP_LOGS:-0}" == 1 || -n "${REPLAY_SAVE_OUT:-}" ]]; then echo "Scrapyard save logs: $work"; else rm -rf "$work"; fi
 }
 trap cleanup EXIT
 if [[ "${REPLAY_PREBUILT:-0}" != 1 ]]; then bash "$ROOT/build/build_scripts.sh" "$PROJ"; fi
 case "$(uname -s)" in Darwin) ext=dylib ;; Linux) ext=so ;; *) ext=dll ;; esac
 export ODIN_SCRIPTS_DLL="$PROJ/bin/libodinscripts.$ext"
-"$GODOT" --headless --path "$PROJ" --editor --quit-after 120 >"$work/import.log" 2>&1
-if rg -q 'SCRIPT ERROR|ERROR:' "$work/import.log"; then cat "$work/import.log"; exit 1; fi
+bash "$ROOT/build/import_project.sh" "$PROJ" "$work/import.log"
+python3 "$ROOT/tests/replay_comparison/wait_builds.py" "$PROJ" "$work/wait.json"
 export RSY_ROLE=solo RSY_PERSIST=1 RSY_PROFILE_DIR="$work" RSY_SAVE="$work/run.replay" RSY_RESULT_DIR="$work" RSY_RUN=0 RSY_ENCOUNTER=migration
 unset RSY_TOKEN
 export RSY_SPRAY="$work/no-spray.png"
@@ -30,19 +31,20 @@ if ! RSY_RESUME=1 "$GODOT" --headless --path "$PROJ" --script save_test.gd >"$wo
 cat "$work/save.log" "$work/resume.log"
 rg -q '^RSY_SAVE_RESUME_OK' "$work/resume.log"
 if rg -q 'SCRIPT ERROR|ERROR:|REPLAY_SCRAPYARD_FAIL|ObjectDB instances were leaked' "$work/save.log" "$work/resume.log"; then exit 1; fi
-# Existing checkpoint-only files are still readable when their world has no
-# external dependencies. Extract the untouched root to exercise that entry path.
-python3 - "$work/run.replay" "$work/legacy.replay" <<'PYLEGACY'
+# Raw checkpoint access is explicit; the game save reader requires a bundle.
+python3 - "$work/run.replay" "$work/raw.checkpoint" <<'PYRAW'
 from pathlib import Path
 import struct,sys
-data=Path(sys.argv[1]).read_bytes();size=struct.unpack_from('<I',data,56)[0]
-assert struct.unpack_from('<H',data,54)[0]==0
-Path(sys.argv[2]).write_bytes(data[96:96+size])
-PYLEGACY
-if ! RSY_RESUME=1 RSY_SAVE="$work/legacy.replay" "$GODOT" --headless --path "$PROJ" --script save_test.gd >"$work/legacy.log" 2>&1; then cat "$work/legacy.log"; exit 1; fi
-cat "$work/legacy.log"; rg -q '^RSY_SAVE_RESUME_OK' "$work/legacy.log"
-if rg -q 'SCRIPT ERROR|ERROR:|ObjectDB instances were leaked' "$work/legacy.log"; then exit 1; fi
-echo RSY_LEGACY_CHECKPOINT_RESUME_OK
+payload=Path(sys.argv[1]).read_bytes();size=struct.unpack_from('<I',payload,56)[0]
+assert struct.unpack_from('<H',payload,54)[0]==0
+Path(sys.argv[2]).write_bytes(payload[96:96+size])
+PYRAW
+set +e
+RSY_RESUME=1 RSY_SAVE="$work/raw.checkpoint" "$GODOT" --headless --path "$PROJ" --script save_test.gd >"$work/raw.log" 2>&1
+result=$?
+set -e
+((result != 0)); rg -q 'RSY_SAVE_ERROR load=Codec' "$work/raw.log"
+echo RSY_RAW_CHECKPOINT_REFUSED
 # A fresh token must not silently claim the saved local seat.
 set +e
 RSY_RESUME=1 RSY_TOKEN=wrong-save-owner RSY_PERSIST=0 "$GODOT" --headless --path "$PROJ" --script save_test.gd >"$work/identity.log" 2>&1
@@ -66,4 +68,15 @@ import hashlib,sys
 p=Path(sys.argv[1]); assert hashlib.sha256(p.read_bytes()).hexdigest()==Path(str(p)+'.sha256').read_text()
 print('RSY_SAVE_CORRUPTION_PRESERVED')
 PY
+set +e
+RSY_RESUME=0 RSY_PORT=0 "$GODOT" --headless --path "$PROJ" --script save_test.gd >"$work/setup.log" 2>&1
+result=$?
+set -e
+((result != 0)); rg -q 'REPLAY_SCRAPYARD_FAIL port' "$work/setup.log"
+for name in raw identity corrupt setup; do
+  rg -q RSY_FAILURE_CLEANUP_OK "$work/$name.log"
+  if rg -q 'SCRIPT ERROR|ERROR:|leaked at exit|resources still in use|REPLAY_SCRAPYARD_READY' "$work/$name.log"; then
+    cat "$work/$name.log"; exit 1
+  fi
+done
 echo REPLAY_SCRAPYARD_SAVE_OK

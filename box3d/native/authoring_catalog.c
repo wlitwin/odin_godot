@@ -6,28 +6,28 @@
 #include <string.h>
 
 #if UINTPTR_MAX == UINT64_MAX
-_Static_assert(sizeof(ogb3_recovery_asset_v2) == 72 &&
-               _Alignof(ogb3_recovery_asset_v2) == 8 &&
-               offsetof(ogb3_recovery_asset_v2, vertices) == 48 &&
-               offsetof(ogb3_recovery_asset_v2, indices) == 56 &&
-               offsetof(ogb3_recovery_asset_v2, vertex_count) == 64,
+_Static_assert(sizeof(ogb3_recovery_authored_asset) == 72 &&
+               _Alignof(ogb3_recovery_authored_asset) == 8 &&
+               offsetof(ogb3_recovery_authored_asset, vertices) == 48 &&
+               offsetof(ogb3_recovery_authored_asset, indices) == 56 &&
+               offsetof(ogb3_recovery_authored_asset, vertex_count) == 64,
                "authoring asset v2 foreign layout");
 #endif
 
 ogb3_status ogb3_authoring_asset_layout(uint32_t field, uint32_t *size,
                                        uint32_t *alignment, uint32_t *offset) {
   static const uint32_t offsets[] = {
-      offsetof(ogb3_recovery_asset_v2, version),
-      offsetof(ogb3_recovery_asset_v2, struct_bytes),
-      offsetof(ogb3_recovery_asset_v2, base),
-      offsetof(ogb3_recovery_asset_v2, vertices),
-      offsetof(ogb3_recovery_asset_v2, indices),
-      offsetof(ogb3_recovery_asset_v2, vertex_count),
-      offsetof(ogb3_recovery_asset_v2, triangle_count)};
+      offsetof(ogb3_recovery_authored_asset, version),
+      offsetof(ogb3_recovery_authored_asset, struct_bytes),
+      offsetof(ogb3_recovery_authored_asset, base),
+      offsetof(ogb3_recovery_authored_asset, vertices),
+      offsetof(ogb3_recovery_authored_asset, indices),
+      offsetof(ogb3_recovery_authored_asset, vertex_count),
+      offsetof(ogb3_recovery_authored_asset, triangle_count)};
   if (!size || !alignment || !offset || field >= sizeof(offsets)/sizeof(offsets[0]))
     return OGB3_INVALID_ARGUMENT;
-  *size = sizeof(ogb3_recovery_asset_v2);
-  *alignment = _Alignof(ogb3_recovery_asset_v2);
+  *size = sizeof(ogb3_recovery_authored_asset);
+  *alignment = _Alignof(ogb3_recovery_authored_asset);
   *offset = offsets[field];
   return OGB3_OK;
 }
@@ -46,8 +46,8 @@ static int nonzero(const double a[3]) { return a[0]!=0 || a[1]!=0 || a[2]!=0; }
 
 /* Validate trusted call data before the engine sees it. Counts/byte products
  * are bounded before any caller array is traversed. Primitive semantics are
- * checked by the unchanged legacy validator in recovery_codec.c. */
-ogb3_status ogb3_authoring_asset_validate(const ogb3_recovery_asset_v2 *a,
+ * checked by the shared primitive validator in recovery_codec.c. */
+ogb3_status ogb3_authoring_asset_validate(const ogb3_recovery_authored_asset *a,
                                          uint64_t *input_bytes) {
   if (!a || !input_bytes || a->version != OGB3_AUTHORING_ASSET_VERSION ||
       a->struct_bytes != sizeof(*a) || !a->base.id || a->base.reserved)

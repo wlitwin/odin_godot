@@ -5,8 +5,10 @@ import "godot:gdext"
 import "godot:godot"
 
 import "diag"
+import source_info "editor_source"
 
 import "base:runtime"
+import "core:fmt"
 
 // ----------------------------------------------------------------------------
 // `_validate` — REAL Odin compiler diagnostics surfaced as editor squiggles.
@@ -207,5 +209,23 @@ lv_validate :: proc "c" (instance: gdext.ExtensionClassInstancePtr, args: [^]gde
 
     vd_set_bool(&result, "valid", n == 0)
     vd_set_arr(&result, "errors", &errors)
+    // Godot consumes name:line entries for its method outline and navigation.
+    // This uses the live source even when no external compiler is available.
+    info := source_info.inspect(source, context.temp_allocator)
+    functions := godot.new_packed_string_array()
+    for fn in info.functions {
+        name := source_info.outline_name(info, fn)
+        entry := godot.new_string_odin(fmt.tprintf("%s:%d", name, fn.line))
+        godot.packed_string_array_append(&functions, entry)
+        godot.free_string(entry)
+    }
+    key := godot.new_string_cstring("functions")
+    kv := godot.variant_from_string(&key)
+    fv := godot.variant_from_packed_string_array(&functions)
+    godot.dictionary_set(&result, kv, fv)
+    godot.variant_destroy(&kv)
+    godot.variant_destroy(&fv)
+    godot.free_string(key)
+    godot.free_packed_string_array(functions)
     (cast(^godot.Dictionary)ret)^ = result
 }

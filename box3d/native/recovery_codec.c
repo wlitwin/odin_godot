@@ -197,6 +197,9 @@ typedef struct Codec {
   uint8_t *data;
   uint64_t size, pos, allocated, external, section_end;
   int reading;
+#ifdef OGB3_TESTING
+  int test_mutation_writer; /* Invalid scalar fixtures only; never a public codec. */
+#endif
   ogb3_status status;
   Block *blocks;
   uint32_t section, record, field;
@@ -294,6 +297,9 @@ static void scalar(Codec *c, void *p, unsigned n, int kind) {
     return;
   }
   c->pos += n;
+#ifdef OGB3_TESTING
+  if (c->test_mutation_writer && !c->reading) return;
+#endif
   if (kind == 1 || kind == 3 || kind == 4) {
     float x;
     memcpy(&x, p, 4);
@@ -446,7 +452,7 @@ static void f_b3RevoluteJoint(Codec* d, b3RevoluteJoint* v) {
     F(d, v->upperImpulse);
     F(d, v->hertz);
     F(d, v->dampingRatio);
-    scalar(d,&v->maxMotorTorque,4,d->catalog->identity.recovery_format>=3?4:1);
+    scalar(d,&v->maxMotorTorque,4,4);
     F(d, v->motorSpeed);
     F(d, v->targetAngle);
     F(d, v->lowerAngle);
@@ -742,10 +748,6 @@ static void f_b3ManifoldPoint(Codec* d, b3ManifoldPoint* v) {
 
 static void f_joint(Codec *c, b3JointSim *v) {
   f_b3JointSim_base(c, v);
-  if (v->type != b3_revoluteJoint && c->catalog->identity.recovery_format < OGB3_MOTION_RECOVERY_FORMAT) {
-    reject(c, c->reading ? OGB3_CORRUPT : OGB3_UNSUPPORTED, 20);
-    return;
-  }
   switch(v->type) {
   case b3_revoluteJoint:f_b3RevoluteJoint(c,&v->revoluteJoint);break;
   case b3_distanceJoint:f_b3DistanceJoint(c,&v->distanceJoint);break;
@@ -1088,10 +1090,6 @@ static void wire_world(Codec *c, b3World *w) {
       continue;
     f_b3Contact_base(c, v);
     int mesh = (v->flags & b3_simMeshContact) != 0;
-    if (mesh && c->catalog->identity.recovery_format < OGB3_AUTHORING_RECOVERY_FORMAT) {
-      reject(c, c->reading ? OGB3_CORRUPT : OGB3_UNSUPPORTED, 31);
-      break;
-    }
     uint32_t m = count(c, (uint32_t)v->manifoldCount, mesh ? l->max_manifolds : 1);
     if (c->reading) {
       v->manifoldCount = (int)m;
@@ -1316,20 +1314,17 @@ static int hinge_settings_ok(const b3JointSim *v) {
          (!q->enableLimit || q->lowerAngle <= q->upperAngle) &&
          vec_bound(v->localFrameA.p, 1e8f) && vec_bound(v->localFrameB.p, 1e8f);
 }
-static int joint_type_ok(const Codec *c,b3JointType type) {
+static int joint_type_ok(b3JointType type) {
   if(type==b3_revoluteJoint)return 1;
-  return c->catalog->identity.recovery_format>=OGB3_MOTION_RECOVERY_FORMAT &&
-    (type==b3_distanceJoint||type==b3_motorJoint||type==b3_prismaticJoint||
+  return (type==b3_distanceJoint||type==b3_motorJoint||type==b3_prismaticJoint||
      type==b3_sphericalJoint||type==b3_weldJoint||type==b3_wheelJoint);
 }
 /* All union scalars, impulses, local/cache frames, softness and matrices are
  * encoded by the generated dump-derived visitors above. These are the extra
  * operational settings/range constraints before native reconstruction. Cache
  * indices may legitimately be stale between preparations (same legacy rule). */
-static int joint_settings_ok(const Codec *c,const b3JointSim *v) {
-  if(!joint_type_ok(c,v->type))return 0;
-  if(c->catalog->identity.recovery_format<OGB3_MOTION_RECOVERY_FORMAT)
-    return hinge_settings_ok(v);
+static int joint_settings_ok(const b3JointSim *v) {
+  if(!joint_type_ok(v->type))return 0;
   if(v->constraintHertz<0||v->constraintDampingRatio<0||v->forceThreshold<0||v->torqueThreshold<0||
      v->invMassA<0||v->invMassB<0||!vec_bound(v->localFrameA.p,1e8f)||!vec_bound(v->localFrameB.p,1e8f))return 0;
   switch(v->type) {
@@ -1675,7 +1670,7 @@ static int validate_world(Codec *c, const b3World *w) {
       VERIFY(shape_links[i] && live_body(w, s->bodyId) &&
                  (s->type == b3_sphereShape || s->type == b3_capsuleShape ||
                   s->type == b3_hullShape ||
-                  (c->catalog->identity.recovery_format >= OGB3_AUTHORING_RECOVERY_FORMAT && s->type == b3_meshShape)) &&
+                  s->type == b3_meshShape) &&
                  s->materialCount == 1 && !s->materials &&
                  shape_asset(c->catalog, s),
              159);
@@ -1747,8 +1742,7 @@ static int validate_world(Codec *c, const b3World *w) {
       const b3Shape *sa = w->shapes.data + v->shapeIdA,
                     *sb = w->shapes.data + v->shapeIdB;
       if (mesh) {
-        VERIFY(c->catalog->identity.recovery_format >= OGB3_AUTHORING_RECOVERY_FORMAT &&
-                   sa->type == b3_meshShape && endpointA->type == b3_staticBody &&
+        VERIFY(sa->type == b3_meshShape && endpointA->type == b3_staticBody &&
                    (sb->type == b3_hullShape || sb->type == b3_sphereShape || sb->type == b3_capsuleShape) &&
                    v->manifoldCount >= 0 && (uint32_t)v->manifoldCount <= l->max_manifolds &&
                    (v->manifoldCount > 0) == touching, 170);
@@ -1881,7 +1875,7 @@ static int validate_world(Codec *c, const b3World *w) {
   for (int i = 0; i < nj; i++)
     if (jm[i]) {
       const b3Joint *v = w->joints.data + i;
-      VERIFY(joint_type_ok(c,v->type) && live_body(w, v->edges[0].bodyId) &&
+      VERIFY(joint_type_ok(v->type) && live_body(w, v->edges[0].bodyId) &&
                  live_body(w, v->edges[1].bodyId) &&
                  v->edges[0].bodyId != v->edges[1].bodyId &&
                  live_set(w, v->setIndex),
@@ -2126,20 +2120,20 @@ static int validate_world(Codec *c, const b3World *w) {
     for (int j = 0; j < w->solverSets.data[set].jointSims.count; j++) {
       const b3JointSim *v = w->solverSets.data[set].jointSims.data + j;
       const b3Joint *q = w->joints.data + v->jointId;
-      VERIFY(v->type == q->type && joint_type_ok(c,v->type) && v->bodyIdA == q->edges[0].bodyId &&
+      VERIFY(v->type == q->type && joint_type_ok(v->type) && v->bodyIdA == q->edges[0].bodyId &&
                  v->bodyIdB == q->edges[1].bodyId &&
                  quat_ok(v->localFrameA.q, 0) && quat_ok(v->localFrameB.q, 0) &&
-                 joint_settings_ok(c,v),
+                 joint_settings_ok(v),
              216);
     }
   for (int col = 0; col < B3_GRAPH_COLOR_COUNT; col++)
     for (int j = 0; j < w->constraintGraph.colors[col].jointSims.count; j++) {
       const b3JointSim *v = w->constraintGraph.colors[col].jointSims.data + j;
       const b3Joint *q = w->joints.data + v->jointId;
-      VERIFY(v->type == q->type && joint_type_ok(c,v->type) && v->bodyIdA == q->edges[0].bodyId &&
+      VERIFY(v->type == q->type && joint_type_ok(v->type) && v->bodyIdA == q->edges[0].bodyId &&
                  v->bodyIdB == q->edges[1].bodyId &&
                  quat_ok(v->localFrameA.q, 0) && quat_ok(v->localFrameB.q, 0) &&
-                 joint_settings_ok(c,v),
+                 joint_settings_ok(v),
              216);
     }
   c->section = 12;
@@ -2551,76 +2545,6 @@ static void hash_asset(Hash *h, const ogb3_recovery_asset *a) {
   store_le(b + 36, 0, 4);
   hash_add(h, b, 40);
 }
-ogb3_status ogb3_recovery_catalog_create(const ogb3_recovery_config *config,
-                                         const ogb3_recovery_asset *assets,
-                                         uint32_t count_assets,
-                                         ogb3_recovery_catalog **out) {
-  if (!out)
-    return OGB3_INVALID_ARGUMENT;
-  *out = NULL;
-  if (!config || !assets || !count_assets ||
-      count_assets > OGB3_RECOVERY_MAX_ASSETS || !profile_limits_valid(config))
-    return OGB3_INVALID_ARGUMENT;
-  ogb3_recovery_config actual;
-  ogb3_status status = ogb3_recovery_config_default(&actual);
-  if (status)
-    return status;
-  if (memcmp(actual.build_target, config->build_target, 32))
-    return OGB3_INCOMPATIBLE;
-  for (uint32_t i = 0; i < count_assets; i++)
-    if (!asset_valid(assets + i) || (i && assets[i - 1].id >= assets[i].id))
-      return OGB3_INVALID_ARGUMENT;
-  if (!memory_admit(0, sizeof(ogb3_recovery_catalog)))
-    return OGB3_CAPACITY;
-  ogb3_recovery_catalog *p = ogb3_snapshot_internal_alloc(sizeof(*p));
-  if (!p)
-    return OGB3_OUT_OF_MEMORY;
-  memset(p, 0, sizeof(*p));
-  p->refs = 1;
-  p->limits = *config;
-  p->count = count_assets;
-  p->fingerprint = ogb3_build_fingerprint();
-  p->target = native_target();
-  p->identity.solver_format = OGB3_STATE_DUMP_VERSION;
-  p->identity.recovery_format = OGB3_RECOVERY_FORMAT;
-  p->identity.profile = config->profile;
-  memcpy(p->identity.build_target, actual.build_target, 32);
-  Hash h;
-  hash_init(&h);
-  static const char asset_domain[] = "ogb3-primitives-assets-v1";
-  hash_add(&h, asset_domain, sizeof(asset_domain));
-  for (uint32_t i = 0; i < count_assets; i++) {
-    p->assets[i].desc = assets[i];
-    hash_asset(&h, assets + i);
-    if (assets[i].kind == OGB3_RECOVERY_BOX)
-      p->assets[i].box =
-          b3MakeBoxHull(assets[i].a.x, assets[i].a.y, assets[i].a.z);
-  }
-  hash_finish(&h, p->identity.assets);
-  hash_init(&h);
-  static const char schema[] =
-      "ogb3-canonical-solver-v1/logical4/paired-tree-v2/"
-      "scalars35674fa92acd8462eef8965de488f13f0010147092c2eec343023954443480e9/"
-      "LE/sections12/primitives/revolute/live-u8/gen16-contact32/pool-order/"
-      "tree-free-probe/pending-ordered";
-  hash_add(&h, schema, sizeof(schema));
-  uint64_t limits[] = {config->max_bytes,           config->max_dto_bytes,
-                       config->max_bodies,          config->max_shapes,
-                       config->max_contacts,        config->max_joints,
-                       config->max_sensors,         config->max_sparse_slots,
-                       config->max_tree_nodes,      config->max_manifolds,
-                       config->max_visitors,        config->max_pending_sensors,
-                       config->max_pending_contacts};
-  uint8_t b[8];
-  for (unsigned i = 0; i < sizeof(limits) / sizeof(limits[0]); i++) {
-    store_le(b, limits[i], 8);
-    hash_add(&h, b, 8);
-  }
-  hash_finish(&h, p->identity.solver_schema);
-  *out = p;
-  return OGB3_OK;
-}
-/* V2 is separate from the byte-compatible primitive V1 constructor above. */
 static ogb3_trusted_geometry asset_geometry(const Asset *a) {
   if (a->desc.kind==OGB3_RECOVERY_BOX)
     return (ogb3_trusted_geometry){OGB3_TRUSTED_HULL,sizeof(a->box),&a->box};
@@ -2663,44 +2587,52 @@ static int asset_native_equal(const Asset *a,const Asset *b) {
             (!memcmp(&a->desc.a,&b->desc.b,sizeof(a->desc.a)) && !memcmp(&a->desc.b,&b->desc.a,sizeof(a->desc.b))));
   return 0;
 }
-static ogb3_status catalog_create_authored(uint32_t format, const ogb3_recovery_config *config,
-                                           const ogb3_recovery_asset_v2 *assets,
+static ogb3_status catalog_create(const ogb3_recovery_config *config,
+                                           const ogb3_recovery_asset *primitives,
+                                           const ogb3_recovery_authored_asset *assets,
                                            uint32_t count_assets,
                                            ogb3_recovery_catalog **out) {
   if (!out) return OGB3_INVALID_ARGUMENT;
   *out=NULL;
-  if (!config || !assets || !count_assets || count_assets>OGB3_RECOVERY_MAX_ASSETS || !profile_limits_valid(config))
+  if (!config || (!assets && !primitives) || !count_assets || count_assets>OGB3_RECOVERY_MAX_ASSETS || !profile_limits_valid(config))
     return OGB3_INVALID_ARGUMENT;
   ogb3_recovery_config actual;
   ogb3_status status=ogb3_recovery_config_default(&actual);
   if (status) return status;
   if (memcmp(actual.build_target,config->build_target,32)) return OGB3_INCOMPATIBLE;
-  uint64_t input_bytes=0,reserve=sizeof(ogb3_recovery_catalog)+RECOVERY_NATIVE_RESERVE;
+  uint64_t input_bytes=0,reserve=sizeof(ogb3_recovery_catalog);
   for (uint32_t i=0;i<count_assets;i++) {
     uint64_t bytes=0;
-    status=ogb3_authoring_asset_validate(assets+i,&bytes);
+    const ogb3_recovery_authored_asset input = assets ? assets[i] :
+      (ogb3_recovery_authored_asset){.version=OGB3_AUTHORING_ASSET_VERSION,
+        .struct_bytes=sizeof(input),.base=primitives[i]};
+    if (primitives && !asset_valid(&input.base)) return OGB3_INVALID_ARGUMENT;
+    status=ogb3_authoring_asset_validate(&input,&bytes);
     if (status) return status;
-    if ((i && assets[i-1].base.id>=assets[i].base.id) ||
-        (assets[i].base.kind<=OGB3_RECOVERY_CAPSULE && !asset_valid(&assets[i].base)))
+    if ((i && (assets ? assets[i-1].base.id : primitives[i-1].id)>=input.base.id) ||
+        (input.base.kind<=OGB3_RECOVERY_CAPSULE && !asset_valid(&input.base)))
       return OGB3_INVALID_ARGUMENT;
     if (bytes>config->max_dto_bytes || input_bytes>config->max_dto_bytes-bytes) return OGB3_CAPACITY;
     input_bytes+=bytes;
     /* Conservative construction reserve includes BVH/edge-table scratch,
      * native geometry, and copied call arrays; it is not an OOM guarantee. */
-    reserve+=bytes+(uint64_t)assets[i].vertex_count*64+(uint64_t)assets[i].triangle_count*1024;
+    reserve+=bytes+(uint64_t)input.vertex_count*64+(uint64_t)input.triangle_count*1024;
   }
+  if (input_bytes) reserve+=RECOVERY_NATIVE_RESERVE;
   if (!memory_admit(0,reserve)) return OGB3_CAPACITY;
   ogb3_recovery_catalog *p=ogb3_snapshot_internal_alloc(sizeof(*p));
   if (!p) return OGB3_OUT_OF_MEMORY;
   memset(p,0,sizeof(*p));p->refs=1;p->count=count_assets;p->limits=*config;
   p->fingerprint=ogb3_build_fingerprint();p->target=native_target();
   p->identity.solver_format=OGB3_STATE_DUMP_VERSION;
-  p->identity.recovery_format=format;
+  p->identity.recovery_format=OGB3_RECOVERY_FORMAT;
   p->identity.profile=config->profile;memcpy(p->identity.build_target,actual.build_target,32);
   Hash h;hash_init(&h);static const char asset_domain[]="ogb3-authored-assets-v2";
   hash_add(&h,asset_domain,sizeof(asset_domain));
   for (uint32_t i=0;i<count_assets;i++) {
-    const ogb3_recovery_asset_v2 *v=assets+i;Asset *a=p->assets+i;
+    const ogb3_recovery_authored_asset input = assets ? assets[i] :
+      (ogb3_recovery_authored_asset){.base=primitives[i]};
+    const ogb3_recovery_authored_asset *v=&input;Asset *a=p->assets+i;
     a->desc=v->base;a->vertex_count=v->vertex_count;a->triangle_count=v->triangle_count;
     if (v->base.kind==OGB3_RECOVERY_BOX) a->box=b3MakeBoxHull(v->base.a.x,v->base.a.y,v->base.a.z);
     if (v->vertex_count) {
@@ -2728,10 +2660,8 @@ static ogb3_status catalog_create_authored(uint32_t format, const ogb3_recovery_
     for (uint32_t j=0;j<a->triangle_count*3;j++) {store_le(bytes,a->indices[j],4);hash_add(&h,bytes,4);}
   }
   hash_finish(&h,p->identity.assets);hash_init(&h);
-  static const char schema[]="ogb3-canonical-solver-authored-v2/logical4/paired-tree-v2/LE/sections12/hull-mesh-trustedrefs/mesh-cache-manifolds/full-verify-reencode";
-  static const char motion_schema[]="ogb3-canonical-solver-motion-v3/logical4/paired-tree-v2/LE/sections12/hull-mesh-trustedrefs/mesh-cache-manifolds/all-seven-joint-unions/scalars35674fa92acd8462eef8965de488f13f0010147092c2eec343023954443480e9/full-verify-reencode";
-  if(format==OGB3_MOTION_RECOVERY_FORMAT)hash_add(&h,motion_schema,sizeof(motion_schema));
-  else hash_add(&h,schema,sizeof(schema));
+  static const char motion_schema[]="ogb3-canonical-solver-motion-v3/logical4/paired-tree-v2/LE/sections12/hull-mesh-trustedrefs/mesh-cache-manifolds/all-seven-joint-unions/scalars128cebf062681f2a546d99b7c37ff2a570bff01f8d91d887b4851bc7f336d752/full-verify-reencode";
+  hash_add(&h,motion_schema,sizeof(motion_schema));
   const uint64_t limits[]={config->max_bytes,config->max_dto_bytes,config->max_bodies,config->max_shapes,
     config->max_contacts,config->max_joints,config->max_sensors,config->max_sparse_slots,config->max_tree_nodes,
     config->max_manifolds,config->max_visitors,config->max_pending_sensors,config->max_pending_contacts};
@@ -2742,11 +2672,11 @@ static ogb3_status catalog_create_authored(uint32_t format, const ogb3_recovery_
 fail:
   ogb3_recovery_catalog_release(p);return status;
 }
-ogb3_status ogb3_recovery_catalog_create_v2(const ogb3_recovery_config *c,const ogb3_recovery_asset_v2 *a,uint32_t n,ogb3_recovery_catalog **out) {
-  return catalog_create_authored(OGB3_AUTHORING_RECOVERY_FORMAT,c,a,n,out);
+ogb3_status ogb3_recovery_catalog_create(const ogb3_recovery_config *c,const ogb3_recovery_asset *a,uint32_t n,ogb3_recovery_catalog **out) {
+  return catalog_create(c,a,NULL,n,out);
 }
-ogb3_status ogb3_recovery_catalog_create_v3(const ogb3_recovery_config *c,const ogb3_recovery_asset_v2 *a,uint32_t n,ogb3_recovery_catalog **out) {
-  return catalog_create_authored(OGB3_MOTION_RECOVERY_FORMAT,c,a,n,out);
+ogb3_status ogb3_recovery_catalog_create_authored(const ogb3_recovery_config *c,const ogb3_recovery_authored_asset *a,uint32_t n,ogb3_recovery_catalog **out) {
+  return catalog_create(c,NULL,a,n,out);
 }
 ogb3_status ogb3_catalog_asset_lookup(const ogb3_recovery_catalog *p,uint32_t id,
                                      ogb3_catalog_asset_view *out) {
@@ -2835,13 +2765,13 @@ static ogb3_status encode_world(const ogb3_recovery_catalog *p, b3World *w,
       b3Shape *s = w->shapes.data + i;
       if ((s->type != b3_sphereShape && s->type != b3_capsuleShape &&
            s->type != b3_hullShape &&
-           !(p->identity.recovery_format >= OGB3_AUTHORING_RECOVERY_FORMAT && s->type == b3_meshShape)) ||
+           s->type != b3_meshShape) ||
           s->materialCount != 1 || s->materials || !shape_asset(p, s))
         OGB3_OBS_RETURN(observe_canonical_validate, OGB3_UNSUPPORTED);
     }
   for (int i = 0; i < w->joints.count; i++)
     if (w->joints.data[i].jointId == i &&
-        !joint_type_ok(&(Codec){.catalog=p},w->joints.data[i].type))
+        !joint_type_ok(w->joints.data[i].type))
       OGB3_OBS_RETURN(observe_canonical_validate, OGB3_UNSUPPORTED);
   Codec check = {.catalog = p, .external = external, .diagnostic = diagnostic};
   if (!validate_world(&check, w)) {
@@ -3356,7 +3286,7 @@ ogb3_status ogb3_recovery_test_mutate(const ogb3_recovery_catalog *p,
     s = OGB3_INVALID_ARGUMENT;
   }
   if (!s && !c.status) {
-    Codec n = {.catalog = p};
+    Codec n = {.catalog = p, .test_mutation_writer = 1};
     wire_world(&n, &w);
     s = n.status;
     if (!s) {
@@ -3364,7 +3294,7 @@ ogb3_status ogb3_recovery_test_mutate(const ogb3_recovery_catalog *p,
       if (capacity < *required)
         s = OGB3_CAPACITY;
       else {
-        Codec writer = {.catalog = p,
+        Codec writer = {.catalog = p, .test_mutation_writer = 1,
                         .data = out + WIRE_HEADER,
                         .size = capacity - WIRE_HEADER};
         wire_world(&writer, &w);

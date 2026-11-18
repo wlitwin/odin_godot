@@ -72,9 +72,6 @@ The [audio/settings layer](audio.md) supplies volume, shake, fullscreen, and
 spray-preview controls. Full visual/listening parity and paired human review remain
 required work. This is not a claim of full Scrapyard feature parity.
 
-The action extension introduced content `...3043`; audio event details
-introduced `...3044`; [cast paths](cast_paths.md) introduced `...3046`, followed
-by [dash actions](controls.md) at `...3047`. Gameplay protocol 7 and checkpoint
-layout 4 were unchanged by these transitions. The explicit [save importer](saves.md#converting-a-protocol-6-run) maps
-content-42/43/44/45 archives, including pending accepted/refused requests, while preserving
-the complete world and image payloads.
+The [current saved fixtures](saves.md#current-saved-fixtures) preserve earlier
+captures' complete worlds, image payloads and action metadata after explicit
+migration. The running game no longer needs historical schema definitions.

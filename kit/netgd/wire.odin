@@ -223,49 +223,23 @@ wire_configure :: proc(wire: ^Session_Wire, options: Wire_Config) -> Wire_Error 
         return .Owner
     }
 
-    retained := !wire_owner_empty(cfg.owner)
-
+    // Record each retained capability before the next fallible operation.
+    // wire_detach preserves a refused final drop as cleanup-only state.
+    wire.owned = true
+    wire.config = cfg
+    wire.config.allocator_owner = {}
+    complete := false
+    defer if !complete { _ = wire_detach(wire) }
     if !wire_owner_empty(cfg.allocator_owner) && cfg.allocator_owner.retain(cfg.allocator_owner.user) != bg.OK {
-        if retained {
-            _ = cfg.owner.drop(cfg.owner.user)
-        }
-
         return .Owner
     }
-
-    queue, error := make([dynamic]Wire_Delayed, 0, cfg.max_delayed_packets, cfg.allocator)
-
-    if error != nil {
-        if !wire_owner_empty(cfg.allocator_owner) {
-            _ = cfg.allocator_owner.drop(cfg.allocator_owner.user)
-        }
-
-        if retained {
-            _ = cfg.owner.drop(cfg.owner.user)
-        }
-
-        return .Allocation_Failed
-    }
-
-    drops, drop_error := make([dynamic]Wire_Drop, 0, cfg.max_peers, cfg.allocator)
-
-    if drop_error != nil {
-        delete(queue)
-
-        if !wire_owner_empty(cfg.allocator_owner) {
-            _ = cfg.allocator_owner.drop(cfg.allocator_owner.user)
-        }
-
-        if retained {
-            _ = cfg.owner.drop(cfg.owner.user)
-        }
-
-        return .Allocation_Failed
-    }
-
-    wire.config = cfg
-    wire.delayed = queue
-    wire.dropping = drops
+    wire.config.allocator_owner = cfg.allocator_owner
+    error: mem.Allocator_Error
+    wire.delayed,error = make([dynamic]Wire_Delayed,0,cfg.max_delayed_packets,cfg.allocator)
+    if error != nil { return .Allocation_Failed }
+    wire.dropping,error = make([dynamic]Wire_Drop,0,cfg.max_peers,cfg.allocator)
+    if error != nil { return .Allocation_Failed }
+    complete = true
     wire.rng = cfg.seed
     wire.owned = true
     return .Ok

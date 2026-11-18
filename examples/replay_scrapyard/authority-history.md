@@ -20,12 +20,9 @@ geometry.
 Checkpoint capture uses the complete authority projection. Host migration,
 saves and offline conversion therefore retain the history needed for subsequent
 rewind queries. Tests compare complete restored history and continue simulation.
-The content-48 transition changed the projection/schema contract: content-47
-rooms required matching old clients, while content-48 clients used new rooms and
-databases. The converter paths for contents 42–48 retain those source contracts
-and seed the recorded takeover epoch. They verify full-world preservation and
-report the new public digest separately. Use the [current offline conversion
-procedure](saves.md#converting-older-replay-runs) for the complete accepted format list.
+Current saved-fixture tests retain the complete hit history and verify a
+roundtrip with pending actions and held controls. Earlier captures were migrated
+before their schema readers were removed; see [saved fixtures](saves.md#current-saved-fixtures).
 
 The loaded fixture checks public payload reduction and real compression support
 and delivery. Adaptive compression is allowed to choose sparse or ordinary LZ4

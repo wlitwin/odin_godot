@@ -5,6 +5,7 @@ import "core:mem"
 import "core:testing"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import p "godot:box3d/presentation"
 import k "godot:kit/sim"
 import ks "godot:kit/session"
@@ -21,7 +22,7 @@ State :: struct {
 }
 
 large_scene :: proc(t: ^testing.T, shapes_per_body: int = 1) -> a.Baked_Scene {
-    scene := a.scene_input_default("box3d.capacity.1000.100", 2)
+    scene := a.scene_input_default("box3d.capacity.1000.100")
     scene.gravity = {}
     bodies := make([]a.Body_Input, BODIES)
     joints := make([]a.Joint_Input, JOINTS)
@@ -88,7 +89,7 @@ authoring_and_presentation_accept_a_thousand_bodies_and_a_hundred_joints :: proc
     defer a.destroy(&scene)
     testing.expect_value(t, len(scene.data.bodies), BODIES)
     testing.expect_value(t, len(scene.data.joints), JOINTS)
-    built, problem := a.build(&scene, 0x4341504143495459)
+    built, problem := ar.build(&scene, 0x4341504143495459)
     testing.expect(
         t,
         problem.error == .None,
@@ -99,7 +100,7 @@ authoring_and_presentation_accept_a_thousand_bodies_and_a_hundred_joints :: proc
         return
     }
 
-    defer a.built_destroy(&built)
+    defer ar.built_destroy(&built)
     testing.expect_value(t, b.world_step_fixed(built.world), b.Status.Ok)
     counts, status := b.world_counters(built.world)
     testing.expect_value(t, status, b.Status.Ok)
@@ -160,7 +161,7 @@ replay_step :: proc(state: ^State, input: u8, ctx: ^r.Step(u8)) {
 replay_large_world_corrects_input_and_retains_a_full_history :: proc(t: ^testing.T) {
     scene := large_scene(t)
     defer a.destroy(&scene)
-    built, problem := a.build(&scene, 0x4341504143495459)
+    built, problem := ar.build(&scene, 0x4341504143495459)
     testing.expect(
         t,
         problem.error == .None,
@@ -171,7 +172,7 @@ replay_large_world_corrects_input_and_retains_a_full_history :: proc(t: ^testing
         return
     }
 
-    defer a.built_destroy(&built)
+    defer ar.built_destroy(&built)
     config, config_error := rp.authoring_config(&scene)
     testing.expect_value(t, config_error, r.Error.None)
     initial, initial_error := rp.authoring_checkpoint(&built, config, r.Frame(State){}, u8)

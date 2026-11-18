@@ -2,7 +2,7 @@
 class_name Box3DWorld3D
 extends Node3D
 
-@export var stable_key: String = "world"
+@export_storage var stable_key: String = Box3DIdentityKey.initial("world")
 @export var gravity: Vector3 = Vector3(0,-9.81,0)
 @export var enable_sleep: bool = true
 @export_group("Solver")
@@ -91,7 +91,7 @@ func _snapshot() -> Dictionary:
 			d.issue(errors,"characters["+character.stable_key+"].exclude_body","Reference","Self exclusion must name a body in this World, or be empty.")
 	joints.sort_custom(func(a,b):return a.stable_key<b.stable_key)
 	characters.sort_custom(func(a,b):return a.stable_key<b.stable_key)
-	# Shared bake alone deduplicates geometry and enforces the Native8-asset limit.
+	# Shared bake deduplicates geometry and enforces the selected catalog capacity.
 	bodies.sort_custom(func(a,b):return a.stable_key<b.stable_key)
 	for field in ["restitution_threshold","hit_event_threshold","contact_hertz","contact_damping_ratio","contact_speed","maximum_linear_speed"]:
 		d.scalar(get(field),"world."+field,errors,true)
@@ -104,11 +104,7 @@ func _snapshot() -> Dictionary:
 		"restitution_threshold":restitution_threshold,"hit_event_threshold":hit_event_threshold,"contact_hertz":contact_hertz,
 		"contact_damping_ratio":contact_damping_ratio,"contact_speed":contact_speed,"maximum_linear_speed":maximum_linear_speed,
 		"isotropic_inertia_tolerance":isotropic_inertia_tolerance,"restitution_iterations":restitution_iterations,
-		"enable_restitution_propagation":enable_restitution_propagation}
-	if not joints.is_empty() or not characters.is_empty():
-		definition.schema_version=d.MOTION_SCHEMA_VERSION
-		definition["joints"]=joints
-		definition["characters"]=characters
+		"enable_restitution_propagation":enable_restitution_propagation,"joints":joints,"characters":characters}
 	var encoded: String = ""
 	if errors.is_empty():
 		encoded=JSON.stringify(definition,"",true,true)

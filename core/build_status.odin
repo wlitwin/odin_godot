@@ -37,6 +37,7 @@ Status_Phase :: enum {
     Hidden,
     Building,
     Failed,
+    Missing_Compiler,
     Live, // transient success flash
 }
 
@@ -104,13 +105,16 @@ build_status_pump :: proc() {
 
     sync.lock(&g_reload.mutex)
     building := g_reload.build_running || g_reload.build_pending
-    failed := g_reload.last_build_failed
+    failed := g_reload.last_build_failed || len(g_reload.admission_failures) > 0
+    missing := g_reload.missing_compiler
     build_ms := g_reload.last_build_ms
     sync.unlock(&g_reload.mutex)
 
     desired := g_status.phase
 
     switch {
+    case missing:
+        desired = .Missing_Compiler
     case building:
         desired = .Building
     case failed:
@@ -123,7 +127,7 @@ build_status_pump :: proc() {
         if time.tick_since(g_status.live_started) > LIVE_FLASH {
             desired = .Hidden
         }
-    case g_status.phase == .Failed:
+    case g_status.phase == .Failed || g_status.phase == .Missing_Compiler:
         // `failed` cleared without a new build starting can't happen (only a build
         // result mutates it), but normalize anyway.
         desired = .Hidden
@@ -136,6 +140,13 @@ build_status_pump :: proc() {
     g_status.phase = desired
 
     switch desired {
+    case .Missing_Compiler:
+        status_apply(
+            "Odin: compiler not found",
+            godot.Color{1.0, 0.65, 0.30, 1.0},
+            "Set odin_godot/odin_bin to the compiler executable, or build once from " +
+            "the toolchain shell. Successful builds remember local tools for later editor launches.",
+        )
     case .Hidden:
         godot.canvas_item_set_visible(cast(godot.Canvas_Item)g_status.label, false)
     case .Building:
@@ -174,11 +185,17 @@ build_gate_before_play :: proc() -> bool {
     for {
         sync.lock(&g_reload.mutex)
         busy := g_reload.build_running || g_reload.build_pending
-        failed := g_reload.last_build_failed
+        failed := g_reload.last_build_failed || len(g_reload.admission_failures) > 0
+        missing := g_reload.missing_compiler
         sync.unlock(&g_reload.mutex)
 
         if !busy {
             if failed {
+                if missing {
+                    editor_msg_error("odin_godot: saved scripts could not be built because Odin was not found. " +
+                                     "Set odin_godot/odin_bin or build from the toolchain shell, then retry.")
+                    return false
+                }
                 editor_msg_error(
                     "odin_godot: not starting the game — the last scripts build FAILED, so it would run " +
                     "your OLD code. Fix the compiler errors (Output panel), save, and Play again.",

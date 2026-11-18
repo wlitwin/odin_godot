@@ -93,8 +93,8 @@ Input_Class :: struct {
     // The input struct's typeid, when the registrar knew it (the generated
     // <game>_lane_init always does; a hand-built lane may leave it nil). It is a
     // LOCAL resolver key only — never on the wire — so lane_input_of can name its
-    // class by TYPE instead of by size, which two input kinds can collide on
-    // after an innocent field add. nil = fall back to size (see class_for_type).
+    // class by TYPE instead of by size, which two input kinds can collide on.
+    // nil is valid only for callers using raw lane_input with a class ID.
     type:     typeid,
     sample:   Sample_Proc,
     validate: Input_Validate_Proc, // nil = structural checks only; generated
@@ -208,32 +208,35 @@ Lane_Peer :: struct {
 
 @(private) // command.odin's scheduler walks the track list too
 Tracked :: struct {
-    id:          knet.Net_Id,
-    entity:      rawptr,
-    desc:        ^knet.Entity_Desc,
-    owner:       knet.Player_Id, // whose inputs drive it (rewound queries spare the shooter's own)
-    hist:        ^History, // truth (host) / prediction (client-owned); nil = watched
-    watched:     bool, // client-side remote-owned: truth applies directly, no resim
-    tick:        Tick_Thunk, // nil = the game's Step_Proc moves this entity
-    has_in:      bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
-    in_class:    u16, // which input class drives it (Sim_Set.input_class) — the ring/buffer key
-    cmds:        []Sim_Cmd, // tick-scheduled verbs (nil = the class declares none)
-    set:         ^Sim_Set, // the class's set (lane_track_set) — nil for hand-tracked entities
-    err:         []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
-    contested:   bool, // predicted here but NOT mine: presentation follows `claim`
-    claim:       f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
+    id:            knet.Net_Id,
+    entity:        rawptr,
+    desc:          ^knet.Entity_Desc,
+    owner:         knet.Player_Id, // whose inputs drive it (rewound queries spare the shooter's own)
+    hist:          ^History, // truth (host) / prediction (client-owned); nil = watched
+    watched:       bool, // client-side remote-owned: truth applies directly, no resim
+    tick:          Tick_Thunk, // nil = the game's Step_Proc moves this entity
+    has_in:        bool, // the thunk wants its owner's input (Sim_Set.input_size > 0)
+    in_class:      u16, // which input class drives it (Sim_Set.input_class) — the ring/buffer key
+    cmds:          []Sim_Cmd, // tick-scheduled verbs (nil = the class declares none)
+    set:           ^Sim_Set, // the class's set (lane_track_set) — nil for hand-tracked entities
+    err:           []u8, // render-error blob (predict-subset layout), alloc'd on the first correction
+    contested:     bool, // predicted here but NOT mine: presentation follows `claim`
+    claim:         f32, // 1 = my sim drives it (present predicted), decaying to 0 (present the watched view)
     // Predicted-spawn bookkeeping (a client-fired projectile, command.odin's
     // lane_spawn_predicted). born = the spawn tick, so ticks before it are
     // gated out of the ledger/rewind/resim (Entry.born). A provisional entity is
     // unmatched until the authority's spawn arrives and rekeys it.
-    born:        u64,
-    provisional: bool, // spawned locally, not yet matched to an authoritative id
-    spawn_seq:   u32, // the firing command's seq — the match key (FIFO breaks on a rejected burst shot)
-    spawn_type:  ksess.Entity_Type, // what to match against on the authority's spawn
+    born:          u64,
+    provisional:   bool, // spawned locally, not yet matched to an authoritative id
+    spawn_seq:     u32, // the firing command's seq — the match key (FIFO breaks on a rejected burst shot)
+    spawn_type:    ksess.Entity_Type, // what to match against on the authority's spawn
+    spawn_variant: ksess.Scene_Variant,
 }
 
 Lane :: struct {
     world:                 ^World_History, // nil keeps the legacy engine-free/value-only path
+    world_cleanup:         [5]World_Owner, // capabilities retained after resource teardown
+    world_cleanup_active:  bool,
     ses:                   ^ksess.Session,
     tag:                   u8,
     snap_every:            int,
@@ -499,6 +502,7 @@ lane_init :: proc(
     cfg := Lane_Config{},
     allocator := context.allocator,
 ) {
+    assert(!world_cleanup_pending(l), "finish pending Lane cleanup before reinitializing")
     assert(
         l.ses == nil,
         "lane_init on a live lane — lane_destroy first (re-init without teardown leaks every container and keeps a stale anchor)",
@@ -617,7 +621,7 @@ lane_add_input_class :: proc(l: ^Lane, id: u16, size: int, sample: Sample_Proc, 
 // Record a registered class's input STRUCT TYPE, so lane_input_of can name its
 // class by type instead of by size (two kinds can share a size after a field
 // add). The generated <game>_lane_init stamps every class right after it
-// registers; a hand-built lane may stamp its own or leave them size-resolved.
+// registers; a hand-built lane must stamp types before using lane_input_of.
 // A `typeid` parameter can't carry a nil default in this Odin, which is why this
 // is a separate stamp rather than an argument on lane_init/lane_add_input_class
 // — and keeping it separate leaves the teaching signatures of those two clean.
@@ -746,8 +750,8 @@ lane_class :: proc(l: ^Lane, id: u16) -> ^Input_Class {
     return nil
 }
 
-// The class that registered exactly `type`, or nil — the exact-match half of
-// class_for_type, split out so lane_class_add can assert uniqueness with it.
+// The class that registered exactly `type`, or nil. Registration and typed
+// access share this lookup; equal byte sizes never imply equal input types.
 @(private = "file")
 class_for_type_exact :: proc(l: ^Lane, type: typeid) -> ^Input_Class {
     for &ic in l.inputs {
@@ -759,46 +763,15 @@ class_for_type_exact :: proc(l: ^Lane, type: typeid) -> ^Input_Class {
     return nil
 }
 
-// The class lane_input_of means when handed a typed T. Resolves by TYPE first —
-// scriptgen records every class's input typeid, so the common case is exact and
-// unambiguous even when two kinds share a size (the footgun this replaced: add a
-// field to one input struct until it matches another's size, and the old
-// size-keyed resolver asserted or, worse, silently picked the wrong class). A
-// hand-built lane that registered no type falls back to size, which is
-// unambiguous only if no two classes share it — the old behaviour, kept for
-// consumers who never gave a type to resolve by.
-@(private = "file")
-class_for_type :: proc(l: ^Lane, type: typeid, size: int) -> u16 {
-    if ic := class_for_type_exact(l, type); ic != nil {
-        return ic.id
-    }
-
-    id: u16
-    n := 0
-
-    for &ic in l.inputs {
-        if ic.size == size {
-            id = ic.id
-            n += 1
-        }
-    }
-
-    assert(
-        n == 1,
-        "lane_input_of: input size ambiguous across classes and no type recorded — use lane_input with an explicit class id, or register the class with its type (the generated lane_init does)",
-    )
-    return id
-}
-
-lane_destroy :: proc(l: ^Lane) {
-    if lane_world_busy(l) {
+lane_destroy :: proc(l: ^Lane) -> World_Error {
+    if l == nil {return .Ok}
+    if lane_cleanup_entered(l) {return .Busy}
+    if l.world != nil && (l.world.busy || l.world.presenting || l.world.detaching) {
         lane_world_refuse(l)
-        return
+        return .Busy
     }
 
-    if l.world != nil {
-        _ = lane_world_detach(l)
-    }
+    if error := world_detach_resources(l); error != .Ok {return error}
 
     // Context overrides are lexical: keep this selection in the whole cleanup
     // scope. A temporary if-block would restore the caller's allocator before
@@ -873,7 +846,11 @@ lane_destroy :: proc(l: ^Lane) {
     // story (a re-keyed authority, back-to-lobby). Without the wipe, stale
     // anchor/rx state would drop every batch from a fresh-tick authority
     // forever, and a double init would silently leak the first containers.
-    l^ = {}
+    pending := l.world_cleanup
+    l^ = {
+        world_cleanup = pending,
+    }
+    return world_cleanup_drop(l)
 }
 
 // The game procs. `sample` may be nil on a seat that plays nobody (a
@@ -1374,11 +1351,15 @@ lane_input :: proc(l: ^Lane, player: knet.Player_Id, class: u16 = 0) -> (input: 
 // real one, because driving through loss is the point; the raw lane_input's
 // ok is the FRESHNESS bit, for the rare caller that cares. The class is
 // resolved from T's TYPE (scriptgen records it at registration), so two input
-// kinds that happen to share a size no longer collide; a hand-built lane that
-// registered no type falls back to size and must call lane_input with an
-// explicit id if two kinds share one.
+// kinds that happen to share a size cannot collide. Hand-built lanes register
+// types with lane_class_set_type or use raw lane_input with explicit class IDs.
 lane_input_of :: proc(l: ^Lane, player: knet.Player_Id, $T: typeid) -> (input: T, drives: bool) {
-    bytes, _ := lane_input(l, player, class_for_type(l, T, size_of(T)))
+    ic := class_for_type_exact(l, T)
+    assert(
+        ic != nil,
+        "lane_input_of: input type is not registered; call lane_class_set_type or use lane_input with an explicit class ID",
+    )
+    bytes, _ := lane_input(l, player, ic.id)
 
     if bytes == nil {
         return {}, false
@@ -1500,6 +1481,7 @@ lane_live :: proc(l: ^Lane) -> bool {
 // many sim ticks ran. A client returns 0 until the first batch anchors it to
 // the server's timeline.
 lane_frame :: proc(l: ^Lane, dt: f64) -> int {
+    if world_cleanup_pending(l) {return 0}
     context.allocator = l.allocator // lane work rides the lane's allocator (see the field)
 
     if l.world != nil {

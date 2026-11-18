@@ -14,7 +14,7 @@ for impl in implementations():
  cast='accepted:=slot==0 ? bool(scrapyard_dev_cast_l(self,1,0)) : bool(scrapyard_dev_cast_r(self,1,0))' if baseline else 'accepted:=replay_scrapyard_dev_cast(self,gd.Int(slot),1,0,false)'
  capture='''
  for _,mob in self.mobs {if mob.health.hp>0 {for fx in mob.fx {if fx.kind==3 && fx.left>0 {compare_chilled+=1;break}}}}
- for i in 0..<2 {if player,ok:=runner_of(self,kn.Player_Id(i+1));ok {
+ for i in 0..<2 {if player,ok:=runner_owned_by(&self.boot,kn.Player_Id(i+1));ok {
   compare_people[i]={position={player.x,player.y},cooldowns={player.slime.cd,player.ignite.cd},abilities={player.ab_l,player.ab_r}}
   for fx in player.fx {if fx.kind==4 && fx.left>0 {compare_people[i].rally=true}}
  }}

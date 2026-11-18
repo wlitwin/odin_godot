@@ -33,33 +33,16 @@ values and event sequence; no external reset bookkeeping is needed.
 
 ## Compatibility
 
-C5 introduced these avatar rules. The server-motion profile uses content C9
-(`0x4341564552504c39`), retaining the [relic floor-lifetime rules](relic.md).
-Update game peers and service launchers together. Ordinary loads reject older
-content rather than converting it silently. C8 introduced authority observation
-fields; network/checkpoint protocol versions are unchanged.
+The server-motion profile uses content C9 (`0x4341564552504c39`). Update peers and
+service launchers together; normal loads require the current contract.
 
-The C1–C7 paths in `tools/upgrade_save` convert into a new file using frozen old
-descriptors. C8 imports retain their existing authority observation. See the
-[current save-conversion guide](authoring.md#existing-replay-saves) for accepted
-formats and the command. C4 conversion keeps
-every saved frame/session field. Future descents/restarts follow current rules. If an
-old save was already healed by a C4 descent, the converter cannot reconstruct its
-prior injury or cooldowns; it preserves the saved values. Conversion does not
-publish a Room save or grant authority. Keep the source archive and use the same
-owning profile when resuming.
+Retained fixtures preserve an injured party before descent, the already-healed
+state captured after an earlier descent, and an injured end-of-run checkpoint.
+Migration preserves saved values; it cannot reconstruct an injury or cooldown
+already lost before capture. [Originals and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain evidence.
 
-Three pre-change C4 fixtures capture an injured party before descent, the old
-healed state afterward, and an injured end-of-run checkpoint. Along with C1–C3,
-all nine fixture conversions resume exactly in fresh native processes. A separate
-Godot gate reads the actual retained frame immediately after descent/restart.
-
-The [acceptance runner](../../tests/replay_cave_floor/README.md) covers normal tick
-updates, restart effects/ledger, a disconnected respawn, corrected descent inputs,
-conversion, and complete normal/faulted campaigns. Browser handoff and durable
-checkpoint publication/restart have separate regression evidence.
-
-The comparison above covers avatar vitals and cooldowns across descent.
-Spawn-position policy, owner-streamed motion, and broader visual/human
-comparisons require separate work. C6 separately corrects relic
-descent/restart behavior.
+The [acceptance runner](../../tests/replay_cave_floor/README.md) checks exact
+current-frame resume, normal updates, restart effects, disconnected respawn and
+corrected descent inputs. Native Godot probes inspect the first transition frame.
+Spawn-position policy, owner motion and visual/human comparisons have separate
+qualification boundaries.

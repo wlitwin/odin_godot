@@ -5,6 +5,7 @@ import "core:testing"
 import "core:fmt"
 import b "godot:box3d"
 import ba "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bd "godot:box3d/diagnostics"
 import kn "godot:kit/net"
 import ks "godot:kit/session"
@@ -274,14 +275,14 @@ replay_network_family :: proc(t: ^testing.T, kind: string) {
         return
     }
 
-    built, problem := ba.build(&scene, PROFILE)
+    built, problem := ar.build(&scene, PROFILE)
     testing.expect_value(t, problem.error, ba.Error.None)
 
     if problem.error != .None {
         return
     }
 
-    defer ba.built_destroy(&built)
+    defer ar.built_destroy(&built)
     identity, status := b.recovery_catalog_identity(&built.catalog)
     testing.expect(t, status == .Ok && identity.recovery_format == 3)
     movement := built.characters[0].config

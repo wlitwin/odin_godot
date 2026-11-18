@@ -9,8 +9,12 @@ const sidebar: DefaultTheme.SidebarItem[] = [
     "text": "Tutorial",
     "items": [
       {
-        "text": "Knock down a tower",
+        "text": "Offline starter",
         "link": "/box3d/quickstart"
+      },
+      {
+        "text": "Procedural tower",
+        "link": "/box3d/procedural"
       }
     ]
   },

@@ -693,7 +693,7 @@ lane_world_export :: proc(l: ^Lane, tick: u64) -> ([]u8, World_Error) {
         return nil, .Rejected
     }
 
-    if w.busy || w.presenting {
+    if w.busy || w.presenting || world_is_closing(w) {
         return nil, .Busy
     }
 

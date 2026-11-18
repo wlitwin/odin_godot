@@ -136,8 +136,11 @@ authority_policy_is_optional_negotiated_and_rejected_when_misconfigured :: proc(
     }
     testing.expect(t, !runner.input_check(input, 1, runner.user))
     m.authority.id = 1
-    _, invalid := net.model_contract(m, net.DEFAULT_CONFIG)
-    testing.expect_value(t, invalid, net.Error.Invalid_Config)
+    report: net.Setup_Report
+    _, invalid := net.model_contract(m, net.DEFAULT_CONFIG, setup = &report)
+    testing.expect_value(t, invalid, net.Error.Invalid_Model)
+    testing.expect_value(t, report.error, invalid)
+    testing.expect_value(t, net.setup_path(&report), "model.authority.apply")
     testing.expect(t, net.recording_model(&m).step == nil)
 }
 

@@ -77,8 +77,10 @@ changes, derive movement constants from the same configured rate.
 Device access belongs in one `@(gd_sample)` proc on the game script:
 
 ```odin
+import actors "actors"
+
 @(gd_sample)
-hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^Player_Input) {
+hello_sample :: proc(self: ^HelloSim, tick: u64, input: ^actors.Player_Input) {
 	_ = tick
 	input^ = {}
 	if gd.is_action_pressed("ui_right") {input.move[0] += 1}
@@ -106,6 +108,11 @@ returning `false` then rejects the complete multi-class packet. Use
 
 ## 4. Attach the simulation lane
 
+The complete example also shows [scene variants](boot.md#scene-variants): the
+default square and a diamond share the same `actors.Player` gameplay type.
+Its extra scene field declares `variant=Diamond`; spawning selects it with
+`variant = .Diamond`. The setup below needs only the default scene.
+
 Add a lane beside the existing session components:
 
 ```odin
@@ -116,8 +123,7 @@ HelloSim :: struct {
 	boot:  kboot.Boot,
 	lane:  ksim.Lane,
 
-	player_scene: ^gd.Resource `gd:"entity=Player:1"`,
-	me: ^Player,
+	player_scene: ^gd.Resource `gd:"entity=actors.Player:1"`,
 }
 ```
 
@@ -126,10 +132,10 @@ lane. With the declarations in place, call the generated attach procedure from
 `_ready` to install the entity factory and initialize the lane through Boot:
 
 ```odin
-hello_sim_net_attach(self, kboot.Options{
+if !hello_sim_net_attach(self, kboot.Options{
 	title = "HELLO, SERVER AUTHORITY",
 	env = "HELLO",
-}, kboot.network_profile(.Listen_Server_Action))
+}, kboot.network_profile(.Listen_Server_Action)) {return}
 ```
 
 Under that call, `hello_sim_lane_init` is generated from the `@(gd_tick)` and
@@ -141,11 +147,11 @@ The third argument configures the session and lane together. To tune a profile,
 change fields on the value returned by `network_profile`:
 
 ```odin
-hello_sim_net_attach(
+if !hello_sim_net_attach(
 	self,
 	kboot.Options{/* ... */},
 	config,
-)
+) {return}
 ```
 
 Prepare `config` before the attach call:
@@ -182,12 +188,13 @@ factory tracks `Player` entities on the lane because their descriptor contains
 
 ```sh
 bash build/build_scripts.sh examples/hello_sim
-"$GODOT" --headless --editor --path examples/hello_sim --import
+"$GODOT" --editor --path examples/hello_sim
 $GODOT --path examples/hello_sim &
 HELLO_LATENCY=120 $GODOT --path examples/hello_sim
 ```
 
-Host in the first window and join in the second. In the joined window:
+Let the editor finish its initial import, then close it and run the two game
+commands. Host in the first window and join in the second. In the joined window:
 
 - the local square should respond immediately because it is predicted; and
 - the host's square should move smoothly on the delayed watched timeline.
@@ -198,11 +205,10 @@ The automated two-process test checks both behaviors under injected latency:
 bash examples/hello_sim/run.sh
 ```
 
-The simulation example pairs setup with `hello_sim_net_detach(self)` followed
-by `ksess.session_destroy(&self.ses)` in `hello_sim_exit_tree`. The generated
-detach destroys the lane before its Session. Follow the same
-[scene-exit rule](quickstart.md#8-release-the-stack-on-scene-exit) when replacing
-the game scene.
+The generated stack automatically destroys the lane before its Session when
+the script instance is finished. Use `hello_sim_net_detach(self)` for an
+explicit reset; use `hello_sim_finalize(self)` only for game-owned additions.
+Temporary reparenting preserves the existing stack.
 
 ## Run a dedicated authority
 

@@ -27,7 +27,9 @@ The file layout:
 [magic u32][format u16][game_version u16][saved_by u64][game blob][session snapshot]
 ```
 
-- `format` is the SDK's file-layout version, currently `FORMAT :: u16(3)`.
+- `format` is the SDK's file-layout version, currently `FORMAT :: u16(5)`.
+  Entity tuples include their scene variant, so a restored world chooses the
+  same authored scenes as the original run.
   It changes with the session snapshot layout: version 2 added entity blobs
   and wire codecs; version 3 added the roster's admission state, `locked` and
   `denied`. Files from incompatible SDK versions return `Bad_Envelope` before
@@ -54,7 +56,7 @@ platform, including web.
 
 Save the same host-local fields used for migration; see [session](session.md).
 Tag them `gd:"backup"` on the game class. Scriptgen generates
-`<class>_backup_write` / `_read` with a field-layout version hash. Both takeover
+`<class>_backup_write` / `_read` with a field-signature version hash. Both takeover
 and disk resume can use that pair, keeping the write and read field lists in
 sync:
 
@@ -87,7 +89,7 @@ build before interpreting it. For manually serialized fixed-layout state,
 
 ## Save, schema, and protocol versions
 
-The repository uses three version checks for different data lifetimes:
+The repository uses separate version checks for different data lifetimes:
 
 - Saved field data, including save files, `gd:"backup"` blobs, and succession
   payloads retained from an older build, uses a generated FNV field hash.
@@ -107,6 +109,11 @@ The repository uses three version checks for different data lifetimes:
   than a generated field set: magic, format, game version, saving player id,
   game blob, and snapshot. Its format and changelog must remain readable before
   any inner version checks can run.
+- Session packet recordings carry their own magic, recording format, wire
+  revisions and resolved schema fingerprint. Replay does not perform JOIN, so
+  `session_replay` checks this header before applying even WELCOME. It returns
+  zero for incompatible or headerless captures. Wire revisions remain checked
+  when a game deliberately uses `FINGERPRINT_NONE`.
 
 The [migration wire](session.md#backup-hosting-and-resume) wraps
 `session_snapshot` bytes as `[blob_len u32][game blob][snapshot]` without a
@@ -119,6 +126,14 @@ read the `FORMAT` of the file. `Wrong_Version` means the game's `game_version` d
 A content-version change should not be reported as corrupt file data.
 
 ## API by task
+
+Local settings and profile structs can use `record_encode`/`record_decode` or
+`record_write`/`record_read`. These POD records require an exact version, payload
+size and file length. A version or layout mismatch returns `.Skew`; malformed
+framing returns `.Corrupt`. Bump the version for every layout change, including
+appended fields, and migrate retained files explicitly before deleting the old
+layout. Padding can make different struct layouts the same size, so a size check
+does not replace the version gate.
 
 **Save** (host only):
 

@@ -7,6 +7,7 @@ import "core:mem"
 import gd "godot:godot"
 import b "godot:box3d"
 import a "godot:box3d/authoring"
+import ar "godot:box3d/authoring/runtime"
 import bd "godot:box3d/diagnostics"
 import bp "godot:box3d/presentation"
 import bg "godot:box3d/godot"
@@ -39,7 +40,7 @@ Runtime :: struct {
     codec:                Codec,
     catalog:              b.Recovery_Catalog,
     baked:                a.Baked_Scene,
-    built:                a.Built_Scene,
+    built:                ar.Built_Scene,
     image_owner, 
     codec_owner, 
     session_owner:        ph.Owner_Context,
@@ -236,13 +237,13 @@ close_runtime :: proc(self: ^DockyardDuo) -> bool {
             state.boost_route_ready = false
         }
 
-        if state.codec.ready || state.codec.catalog._handle != nil {
+        if state.codec.ready || state.codec.closing || state.codec.catalog._handle != nil {
             if ph.network_codec_destroy(&state.codec) != .None {
                 return false
             }
         }
 
-        if a.built_destroy(&state.built) != .Ok {
+        if ar.built_destroy(&state.built) != .Ok {
             return false
         }
 
