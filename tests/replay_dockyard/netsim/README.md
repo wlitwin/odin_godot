@@ -23,6 +23,18 @@ bash tests/replay_dockyard/netsim/build.sh /abs/libogb3.dylib /abs/definition.js
 python3 tests/replay_dockyard/netsim/matrix.py /tmp/netsim out.jsonl seconds=60 [delay=4]
 ```
 
+For the remote-turn workload, use the same seed and network conditions in both
+runs. `turn_ticks` makes the host alternate left/right every specified number of
+simulation ticks while the guest observes from its player seat with neutral input.
+
+```sh
+/tmp/netsim/netsim turn_ticks=60 rtt=100 jitter=5 loss=100 seed=1 seconds=30
+/tmp/netsim/netsim turn_ticks=8  rtt=100 jitter=5 loss=100 seed=1 seconds=30
+```
+
+Compare `client_corrections`, `client_replayed_ticks` and `remote_err_p95_m`
+alongside `equal_checks`, `unequal_checks`, `check_errors` and `errors`.
+
 `godot_pair.py` runs a scripted native host and client over real ENet in two
 Godot processes with Dockyard's `DOCKYARD_LATENCY/JITTER/LOSS` options and
 checks that both end on the same complete signature.

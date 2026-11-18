@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run production Dockyard input checks in an isolated Godot project, without Box3D binaries."""
 import argparse
+import gzip
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,8 @@ def main():
             shutil.copy2(SOURCE / name, project / name)
         for name in ['audio', 'content']:
             shutil.copytree(SOURCE / name, project / name)
+        trace = Path(__file__).with_name('remote-heading.csv.gz')
+        (project / 'heading-baseline.csv').write_bytes(gzip.decompress(trace.read_bytes()))
         shutil.copytree(ROOT / 'addons/box3d_authoring', project / 'addons/box3d_authoring',
                         ignore=shutil.ignore_patterns('.godot', '*.uid', '*.import'))
         commands = [

@@ -16,6 +16,7 @@ var retry_button: Button
 var next_button: Button
 var grabbed_cargo := ""
 var local_host := true
+var scripted_input := false
 var cargo_clamps: Dictionary = {}
 var bay_materials: Array[StandardMaterial3D] = []
 var debug_visible := false
@@ -150,6 +151,9 @@ func report_layout() -> void:
 
 func _ready() -> void:
 	sample = get_parent()
+	scripted_input = OS.get_environment("BOX3D_SAMPLE_SCRIPTED")=="1" or OS.get_environment("DOCKYARD_AUTOCAPTURE")=="1"
+	if OS.has_feature("web"):
+		scripted_input = scripted_input or str(JavaScriptBridge.eval("new URLSearchParams(location.search).get('scripted')||'0'",true))=="1"
 	feedback=preload("res://feedback.gd").new()
 	add_child(feedback)
 	if OS.has_feature("web"):
@@ -579,13 +583,21 @@ func magnet_target(value: Dictionary, held: bool) -> String:
 	# The simulation's Native ray still enforces magnet reach and obstruction.
 	return grabbed_cargo
 
+# Preserve the old 60 Hz turn response at any render rate. Below 0.2 m/s
+# (roughly the old 3 mm/frame threshold at 60 Hz), keep the last heading.
+static func robot_yaw(yaw: float, planar_velocity: Vector2, dt: float) -> float:
+	if planar_velocity.length_squared() <= 0.2 * 0.2:
+		return yaw
+	return lerp_angle(yaw, atan2(planar_velocity.x, planar_velocity.y), 1.0 - pow(0.75, 60.0 * dt))
+
 func _process(_dt: float) -> void:
 	if not pending_transition.is_empty():
 		return
 	if not is_instance_valid(sample) or not sample.has_method("status"):
 		return
-	var status: Variant = JSON.parse_string(sample.call("status"))
 	var value: Variant = JSON.parse_string(sample.call("presentation"))
+	var role := str(value.get("role", "")) if value is Dictionary else ""
+	local_host = role == "host"
 	var online: Variant = JSON.parse_string(sample.call("online_status"))
 	var in_menu:=false
 	if online is Dictionary and bool(online.get("enabled",false)):
@@ -606,17 +618,17 @@ func _process(_dt: float) -> void:
 		party_code.editable=can_start
 		if bool(online.get("connected",false)) and not in_menu:
 			crew.text=str(online.get("name","Crew"))+" · CREW CONNECTED"
-	if status is Dictionary:
-		var role := str(status.get("role","host"))
-		local_host=role=="host"
-		crew.text = ("P1 · MINT  /  Hosting" if role=="host" else "P2 · CORAL  /  Joined crew") + "   •   " + str(status.get("phase","Joining"))
-		if debug_visible:
+	if value is Dictionary:
+		crew.text = ("P1 · MINT  /  Hosting" if local_host else "P2 · CORAL  /  Joined crew") + "   •   " + str(value.get("session_phase","Joining"))
+	if debug_visible:
+		var status: Variant = JSON.parse_string(sample.call("status"))
+		if status is Dictionary:
 			debug.text = "REPLAY + BOX3D\nhead %s   confirmed %s\n%s" % [str(status.get("head","—")),str(status.get("confirmed","—")),str(status.get("error",""))]
 	if online is Dictionary and bool(online.get("enabled",false)):
 		if not bool(online.get("connected",false)):
 			crew.text="Choose a name, then host or join a crew."
 		elif not str(online.get("name","")).is_empty():
-			crew.text=str(online.name)+" · "+("OBSERVER" if str(status.get("role",""))=="observer" else "P1 / MINT" if local_host else "P2 / CORAL")
+			crew.text=str(online.name)+" · "+("OBSERVER" if role=="observer" else "P1 / MINT" if local_host else "P2 / CORAL")
 	if value is Dictionary:
 		for row in value.get("bodies",[]):
 			var key := str(row.get("key",""))
@@ -630,10 +642,12 @@ func _process(_dt: float) -> void:
 				proxy.position = at
 				if key.begins_with("robot_"):
 					# The Native sphere rolls; its cosmetic robot shell stays upright.
-					var before: Vector3=last_positions.get(key,at)
-					var motion := at-before
-					if motion.length_squared()>.00001:
-						proxy.rotation.y=lerp_angle(proxy.rotation.y,atan2(motion.x,motion.z),.25)
+					var seat := 1 if key=="robot_a" else 2
+					if seat == int(value.smoothed_seat):
+						var offset: Array = value.robot_visual_offset
+						proxy.position = at + Vector3(offset[0], offset[1], offset[2])
+					var velocity: Array = value.robot_planar_velocity[seat - 1]
+					proxy.rotation.y = robot_yaw(proxy.rotation.y, Vector2(velocity[0],velocity[1]), _dt)
 				else:
 					proxy.quaternion = Quaternion(q[0],q[1],q[2],q[3])
 				last_positions[key] = at
@@ -676,8 +690,8 @@ func _process(_dt: float) -> void:
 			var cargo: String = ["cargo_a","cargo_b","cargo_long"][target-1]
 			if not last_positions.has(cargo):
 				continue
-			var start: Vector3=last_positions[robot]+Vector3(0,.35,0)
-			var end: Vector3=last_positions[cargo]
+			var start: Vector3=proxies[robot].position+Vector3(0,.35,0)
+			var end: Vector3=proxies[cargo].position
 			var direction:=end-start
 			var length:=direction.length()
 			if length<.001:
@@ -688,9 +702,9 @@ func _process(_dt: float) -> void:
 			beam.look_at(end,up)
 			beam.scale=Vector3(.045,.045,length)
 			beam.visible=true
-	if OS.get_environment("BOX3D_SAMPLE_SCRIPTED")=="1" or OS.get_environment("DOCKYARD_AUTOCAPTURE")=="1" or (OS.has_feature("web") and str(JavaScriptBridge.eval("new URLSearchParams(location.search).get('scripted')||'0'",true))=="1"):
+	if scripted_input:
 		return
-	if in_menu or settings_box.get_parent().visible or (status is Dictionary and str(status.get("role",""))=="observer"):
+	if in_menu or settings_box.get_parent().visible or role=="observer":
 		grabbed_cargo=""
 		sample.call("control",0,0,0,0,0,false,false)
 		return

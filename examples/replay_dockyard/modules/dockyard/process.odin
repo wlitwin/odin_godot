@@ -239,7 +239,9 @@ dockyard_duo_process :: proc(self: ^DockyardDuo, dt: f64) {
     accepted(self)
 
     if self.hosting || s.client.phase == .Running {
-        publish_presentation(self)
+        publish_presentation(self, dt)
+    } else {
+        self.remote_robot = {}
     }
 
     if self.failed {

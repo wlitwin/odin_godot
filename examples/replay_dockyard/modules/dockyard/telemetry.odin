@@ -71,7 +71,7 @@ observe_recovery_scope :: proc(self: ^DockyardDuo) {
         return
     }
 
-    c := self.state.session.client
+    c := &self.state.session.client
 
     if !c.initialized || !c.has_world || c.phase != .Running || c.generation == 0 || c.serial == 0 {
         return
@@ -103,8 +103,14 @@ recovery_available :: proc(self: ^DockyardDuo) -> bool {
     )
 }
 
+session_phase_label :: proc(self: ^DockyardDuo) -> string {
+    if self.state == nil {return "closed"}
+    s := self.state.session
+    return !s.ready ? "Menu" : self.hosting ? "Host" : fmt.tprintf("%v", s.client.phase)
+}
+
 public_status_json :: proc(self: ^DockyardDuo) -> string {
-    phase := "closed"
+    phase := session_phase_label(self)
     head, confirmed, epoch: u64
     frontiers := false
     member, incarnation: u64
@@ -122,7 +128,6 @@ public_status_json :: proc(self: ^DockyardDuo) -> string {
 
     if self.state != nil {
         s := self.state.session
-        phase = !s.ready ? "Menu" : self.hosting ? "Host" : fmt.tprintf("%v", s.client.phase)
 
         if self.hosting && s.server.initialized {
             head = s.server.timeline.head

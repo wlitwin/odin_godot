@@ -112,6 +112,8 @@ DockyardDuo :: struct {
     owners_before_observed: bool,
     content: [32]u8,
     presentation_value: bp.Frame,
+    robot_planar_velocity: [2][2]f32,
+    remote_robot: Remote_Robot_View,
     have_presentation: bool,
     final_signature: bd.Signature,
     terminal_peer: tr.Peer_Id,
@@ -198,6 +200,7 @@ dockyard_duo_exit_tree :: proc(self: ^DockyardDuo) {
 }
 
 close_runtime :: proc(self: ^DockyardDuo) -> bool {
+    self.remote_robot = {}
     if self.state != nil {
         state := self.state
         allocator := meter.allocator(self.scope)

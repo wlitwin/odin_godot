@@ -48,6 +48,7 @@ Args :: struct {
     snapshot_every, frame_jitter_ms, layout, retry_ms:      int,
     window:                                                 int, // 0 = runner default
     delay, ping:                                            int, // input delay max ticks / ping threshold ms
+    turn_ticks:                                             int, // optional host direction changes; guest stays still
     label:                                                  string,
 }
 
@@ -129,6 +130,12 @@ args_parse :: proc() -> Args {
             out.delay = value
         case "ping":
             out.ping = value
+        case "turn_ticks":
+            if value < 1 {
+                fmt.eprintln("turn_ticks must be positive")
+                os.exit(2)
+            }
+            out.turn_ticks = value
         case:
             fmt.eprintln("unknown argument", arg)
             os.exit(2)
@@ -346,9 +353,13 @@ main :: proc() {
 
                     if ok {
                         previous := host.control
-                        host.control = game.canonical_control(
-                            game.suggest_control(cp.frame.state, frame, 1, &host.controller),
-                        )
+                        if args.turn_ticks > 0 {
+                            host.control = {x = (server.timeline.head / u64(args.turn_ticks)) % 2 == 0 ? 100 : -100}
+                        } else {
+                            host.control = game.canonical_control(
+                                game.suggest_control(cp.frame.state, frame, 1, &host.controller),
+                            )
+                        }
                         metrics.host_control_changes += previous == host.control ? 0 : 1
                     }
 
@@ -467,9 +478,11 @@ main :: proc() {
 
                     if ok {
                         previous := guest.control
-                        guest.control = game.canonical_control(
-                            game.suggest_control(cp.frame.state, frame, 2, &guest.controller),
-                        )
+                        if args.turn_ticks == 0 {
+                            guest.control = game.canonical_control(
+                                game.suggest_control(cp.frame.state, frame, 2, &guest.controller),
+                            )
+                        }
                         metrics.guest_control_changes += previous == guest.control ? 0 : 1
                         append(&shown_pose, poses)
                         append(&shown_tick, client.timeline.head)
@@ -565,11 +578,12 @@ main :: proc() {
     )
     fmt.sbprintf(
         &sb,
-        `"snapshot_every":%d,"window":%d,"seed":%d,"input_delay":%d,`,
+        `"snapshot_every":%d,"window":%d,"seed":%d,"input_delay":%d,"turn_ticks":%d,`,
         args.snapshot_every,
         cfg.max_prediction,
         args.seed,
         client.input_delay,
+        args.turn_ticks,
     )
     fmt.sbprintf(
         &sb,

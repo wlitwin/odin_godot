@@ -6,6 +6,7 @@ import b "godot:box3d"
 import a "godot:box3d/authoring"
 import ar "godot:box3d/authoring/runtime"
 import bd "godot:box3d/diagnostics"
+import limits "godot:box3d/limits"
 import ph "godot:replay/physics"
 import net "godot:replay/net"
 import r "godot:replay"
@@ -17,9 +18,10 @@ refused: r.Error
 
 @(test)
 legacy_native_producer_rejects_current_commands_before_private_table_access :: proc(t: ^testing.T) {
+    expected := u64(0x5245504c42334433) ~ u64(limits.MAX_SENSOR_EVENTS) ~ (u64(limits.MAX_ASSETS) << 32)
     if !check(
         t,
-        legacy.IDENTITY != ph.IDENTITY && ph.IDENTITY == 0x5245504c42334432,
+        legacy.IDENTITY != ph.IDENTITY && ph.IDENTITY == expected,
         "versioned private physics provider ABI",
     ) {
         return

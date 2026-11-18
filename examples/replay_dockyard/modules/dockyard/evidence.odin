@@ -1,6 +1,7 @@
 package dockyard_duo
 
 import physicsgd "godot:replay/godot/physics"
+import ph "godot:replay/physics"
 import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
@@ -430,7 +431,7 @@ export_final :: proc(self: ^DockyardDuo) -> bool {
     return true
 }
 
-publish_presentation :: proc(self: ^DockyardDuo) {
+publish_presentation :: proc(self: ^DockyardDuo, dt: f64) {
     if self.state == nil || (!self.hosting && self.state.session.client.phase != .Running) {
         return
     }
@@ -438,6 +439,7 @@ publish_presentation :: proc(self: ^DockyardDuo) {
     checkpoint, error := rgd.session_checkpoint(self.state.session, self.head)
 
     if error != .None {
+        self.remote_robot = {}
         return
     }
 
@@ -456,6 +458,23 @@ publish_presentation :: proc(self: ^DockyardDuo) {
         return
     }
 
+    // Upright shells face travel on the dock. Sample the same immutable physics
+    // image as their poses so reconciliation/teleport displacement is never a turn.
+    velocity: [2][2]f32
+    positions: [2][3]f32
+    for &planar, seat in velocity {
+        key := checkpoint.frame.state.bodies[seat + 1]
+        if key == 0 {continue}
+        body, err := ph.body_state(&checkpoint, key)
+        if err != .None {
+            error_set(self, "presentation.robot_velocity")
+            return
+        }
+        planar = {body.linear_velocity.x, body.linear_velocity.z}
+        positions[seat] = {body.pose.position.x, body.pose.position.y, body.pose.position.z}
+    }
+    remote_robot_present(self, &checkpoint.frame.state, checkpoint.epoch, checkpoint.frame.tick, positions, dt)
+    self.robot_planar_velocity = velocity
     self.presentation_value = frame
     self.have_presentation = true
 }
@@ -510,6 +529,10 @@ dockyard_duo_presentation :: proc(self: ^DockyardDuo) -> gd.String {
     return json_string(struct {
         version:                 u32,
         bodies:                  []Body_Value,
+        robot_planar_velocity:   [2][2]f32,
+        smoothed_seat:           u16,
+        robot_visual_offset:     [3]f32,
+        role, session_phase:     string,
         score:                   u8,
         delivered, lost:         [3]bool,
         dwell:                   [3]u16,
@@ -524,6 +547,11 @@ dockyard_duo_presentation :: proc(self: ^DockyardDuo) -> gd.String {
     } {
         1,
         bodies[:count],
+        self.robot_planar_velocity,
+        self.remote_robot.scope.seat,
+        self.remote_robot.smoother.error,
+        self.role,
+        session_phase_label(self),
         game.score,
         game.delivered,
         game.lost,

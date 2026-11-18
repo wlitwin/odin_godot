@@ -1,0 +1,486 @@
+{
+  "scope": "Local Apple M3 host and joining client. 100 ms added round trip, 5 ms receive jitter, 1% unreliable loss. Ordinary before/after browser comparisons use the real export and Room.frame. Phase probes run in isolated copies and enable additional clocks. Each peer pair checks complete state. Measurements are not a public WAN or device population benchmark.",
+  "visual_smoothing": {
+    "haul": {
+      "motion": {
+        "r": {
+          "residual_cm": {
+            "count": 1740,
+            "p50": 0.0409,
+            "p95": 0.5811,
+            "p99": 9.777,
+            "max": 21.8829
+          },
+          "jumps_cm": {
+            "count": 1740,
+            "p50": 2.6765,
+            "p95": 5.8439,
+            "p99": 9.0042,
+            "max": 21.9056
+          },
+          "residual_over_5_cm": 21
+        },
+        "s": {
+          "residual_cm": {
+            "count": 1740,
+            "p50": 0.0605,
+            "p95": 0.9644,
+            "p99": 1.5804,
+            "max": 2.9438
+          },
+          "jumps_cm": {
+            "count": 1740,
+            "p50": 2.7818,
+            "p95": 5.6987,
+            "p99": 6.3589,
+            "max": 6.6351
+          },
+          "residual_over_5_cm": 0
+        }
+      },
+      "offset_cm": {
+        "count": 1741,
+        "p50": 0.1641,
+        "p95": 6.1636,
+        "p99": 10.2596,
+        "max": 18.871
+      },
+      "max_local_offset": 0.0,
+      "max_beam_error": 6e-07,
+      "beam_frames": 1292,
+      "both_on_same_cargo": 1097.0,
+      "final_equal": true
+    },
+    "reverse": {
+      "motion": {
+        "r": {
+          "residual_cm": {
+            "count": 1740,
+            "p50": 0.0321,
+            "p95": 23.0099,
+            "p99": 30.2128,
+            "max": 34.177
+          },
+          "jumps_cm": {
+            "count": 1740,
+            "p50": 1.8764,
+            "p95": 24.3067,
+            "p99": 31.4563,
+            "max": 36.0669
+          },
+          "residual_over_5_cm": 218
+        },
+        "s": {
+          "residual_cm": {
+            "count": 1740,
+            "p50": 1.4657,
+            "p95": 2.6177,
+            "p99": 3.0899,
+            "max": 3.8767
+          },
+          "jumps_cm": {
+            "count": 1740,
+            "p50": 3.1418,
+            "p95": 4.0947,
+            "p99": 4.7959,
+            "max": 5.8168
+          },
+          "residual_over_5_cm": 0
+        }
+      },
+      "offset_cm": {
+        "count": 1741,
+        "p50": 9.2831,
+        "p95": 16.6638,
+        "p99": 19.7224,
+        "max": 24.7489
+      },
+      "max_local_offset": 0.0,
+      "max_beam_error": 0.0,
+      "beam_frames": 0,
+      "both_on_same_cargo": 0.0,
+      "final_equal": true
+    }
+  },
+  "alternating_chrome_runs": {
+    "old-1": {
+      "all_five_equal": true,
+      "client_Room_frame_ms": {
+        "ordinary": {
+          "n": 390,
+          "p50": 0.845,
+          "p95": 1.189,
+          "p99": 1.4,
+          "max": 1.924
+        },
+        "replayed_suffix": {
+          "n": 852,
+          "p50": 3.535,
+          "p95": 4.136,
+          "p99": 5.126,
+          "max": 6.56
+        }
+      },
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+      "browser": "Chrome/157.0.8103.79"
+    },
+    "new-1": {
+      "all_five_equal": true,
+      "client_Room_frame_ms": {
+        "ordinary": {
+          "n": 405,
+          "p50": 0.82,
+          "p95": 1.155,
+          "p99": 1.324,
+          "max": 1.45
+        },
+        "replayed_suffix": {
+          "n": 866,
+          "p50": 3.281,
+          "p95": 3.785,
+          "p99": 4.375,
+          "max": 5.344
+        }
+      },
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+      "browser": "Chrome/157.0.8103.79"
+    },
+    "new-2": {
+      "all_five_equal": true,
+      "client_Room_frame_ms": {
+        "ordinary": {
+          "n": 458,
+          "p50": 0.786,
+          "p95": 1.19,
+          "p99": 1.274,
+          "max": 1.589
+        },
+        "replayed_suffix": {
+          "n": 769,
+          "p50": 3.255,
+          "p95": 3.936,
+          "p99": 4.575,
+          "max": 7.225
+        }
+      },
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+      "browser": "Chrome/157.0.8103.79"
+    },
+    "old-2": {
+      "all_five_equal": true,
+      "client_Room_frame_ms": {
+        "ordinary": {
+          "n": 465,
+          "p50": 0.8,
+          "p95": 1.15,
+          "p99": 1.3,
+          "max": 1.671
+        },
+        "replayed_suffix": {
+          "n": 784,
+          "p50": 3.549,
+          "p95": 4.255,
+          "p99": 5.04,
+          "max": 7.149
+        }
+      },
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3, Unspecified Version)",
+      "browser": "Chrome/157.0.8103.79"
+    }
+  },
+  "diagnostic_normal_tick_us": {
+    "web_before": {
+      "elapsed_us": {
+        "n": 399,
+        "p50": 840,
+        "p95": 1195,
+        "p99": 1451,
+        "max": 1815
+      },
+      "pump_us": {
+        "n": 399,
+        "p50": 19,
+        "p95": 45,
+        "p99": 71,
+        "max": 84
+      },
+      "advance_us": {
+        "n": 399,
+        "p50": 625,
+        "p95": 960,
+        "p99": 1215,
+        "max": 1561
+      },
+      "external_total_us": {
+        "n": 399,
+        "p50": 620,
+        "p95": 956,
+        "p99": 1205,
+        "max": 1555
+      },
+      "open_us": {
+        "n": 399,
+        "p50": 144,
+        "p95": 340,
+        "p99": 520,
+        "max": 605
+      },
+      "model_us": {
+        "n": 399,
+        "p50": 156,
+        "p95": 411,
+        "p99": 565,
+        "max": 630
+      },
+      "solver_us": {
+        "n": 399,
+        "p50": 116,
+        "p95": 336,
+        "p99": 475,
+        "max": 531
+      },
+      "capture_us": {
+        "n": 399,
+        "p50": 125,
+        "p95": 251,
+        "p99": 334,
+        "max": 364
+      }
+    },
+    "web_after": {
+      "elapsed_us": {
+        "n": 398,
+        "p50": 845,
+        "p95": 1174,
+        "p99": 1370,
+        "max": 1524
+      },
+      "pump_us": {
+        "n": 398,
+        "p50": 20,
+        "p95": 45,
+        "p99": 60,
+        "max": 235
+      },
+      "advance_us": {
+        "n": 398,
+        "p50": 620,
+        "p95": 910,
+        "p99": 1080,
+        "max": 1205
+      },
+      "external_total_us": {
+        "n": 398,
+        "p50": 616,
+        "p95": 906,
+        "p99": 1075,
+        "max": 1199
+      },
+      "open_us": {
+        "n": 398,
+        "p50": 139,
+        "p95": 285,
+        "p99": 395,
+        "max": 480
+      },
+      "model_us": {
+        "n": 398,
+        "p50": 160,
+        "p95": 399,
+        "p99": 570,
+        "max": 626
+      },
+      "solver_us": {
+        "n": 398,
+        "p50": 130,
+        "p95": 340,
+        "p99": 480,
+        "max": 530
+      },
+      "capture_us": {
+        "n": 398,
+        "p50": 121,
+        "p95": 230,
+        "p99": 269,
+        "max": 340
+      }
+    },
+    "native_before": {
+      "elapsed_us": {
+        "n": 670,
+        "p50": 1003,
+        "p95": 1470,
+        "p99": 1999,
+        "max": 3494
+      },
+      "pump_us": {
+        "n": 670,
+        "p50": 8,
+        "p95": 30,
+        "p99": 77,
+        "max": 149
+      },
+      "advance_us": {
+        "n": 670,
+        "p50": 725,
+        "p95": 1081,
+        "p99": 1438,
+        "max": 2281
+      },
+      "external_total_us": {
+        "n": 670,
+        "p50": 723,
+        "p95": 1078,
+        "p99": 1435,
+        "max": 2277
+      },
+      "open_us": {
+        "n": 670,
+        "p50": 199,
+        "p95": 297,
+        "p99": 484,
+        "max": 1332
+      },
+      "model_us": {
+        "n": 670,
+        "p50": 170,
+        "p95": 266,
+        "p99": 411,
+        "max": 1297
+      },
+      "solver_us": {
+        "n": 670,
+        "p50": 104,
+        "p95": 172,
+        "p99": 267,
+        "max": 1233
+      },
+      "capture_us": {
+        "n": 670,
+        "p50": 151,
+        "p95": 233,
+        "p99": 436,
+        "max": 927
+      }
+    },
+    "native_after": {
+      "elapsed_us": {
+        "n": 484,
+        "p50": 1040,
+        "p95": 1488,
+        "p99": 1920,
+        "max": 2398
+      },
+      "pump_us": {
+        "n": 484,
+        "p50": 16,
+        "p95": 28,
+        "p99": 114,
+        "max": 414
+      },
+      "advance_us": {
+        "n": 484,
+        "p50": 730,
+        "p95": 995,
+        "p99": 1134,
+        "max": 1863
+      },
+      "external_total_us": {
+        "n": 484,
+        "p50": 728,
+        "p95": 994,
+        "p99": 1131,
+        "max": 1728
+      },
+      "open_us": {
+        "n": 484,
+        "p50": 191,
+        "p95": 291,
+        "p99": 384,
+        "max": 530
+      },
+      "model_us": {
+        "n": 484,
+        "p50": 169,
+        "p95": 259,
+        "p99": 338,
+        "max": 473
+      },
+      "solver_us": {
+        "n": 484,
+        "p50": 124,
+        "p95": 186,
+        "p99": 247,
+        "max": 408
+      },
+      "capture_us": {
+        "n": 484,
+        "p50": 169,
+        "p95": 224,
+        "p99": 276,
+        "max": 433
+      }
+    }
+  },
+  "native_domain_contract_check_ns": {
+    "before": [
+      76.74,
+      76.47,
+      75.18,
+      74.57,
+      75.19
+    ],
+    "after": [
+      5.45,
+      5.16,
+      5.21,
+      5.21,
+      5.29
+    ]
+  },
+  "phase_definitions": {
+    "elapsed_us": "entire client Room.frame on WebRTC or Session.frame on native ENet",
+    "solver_us": "managed ph.step, including fixed Box3D step, sensor reads and checked command bookkeeping",
+    "model_us": "entire game callback, includes managed ph.step",
+    "open_us": "open unpublished world from previous checkpoint",
+    "capture_us": "capture resulting image into staged history",
+    "advance_us": "timeline advance including transactional checks and publication",
+    "pump_us": "network pump, excludes other Room/transport operations"
+  },
+  "native_visual_smoother_us": {
+    "without_history_lookup": {
+      "n": 634,
+      "p50": 2,
+      "p95": 3,
+      "p99": 3,
+      "max": 5
+    },
+    "with_history_lookup": {
+      "n": 507,
+      "p50": 43,
+      "p95": 94,
+      "p99": 182,
+      "max": 390
+    }
+  },
+  "compatibility": {
+    "baseline_web_cohort": "5f761c918610a0dc",
+    "candidate_web_cohort": "f684134667f2955b"
+  },
+  "test_boundaries": {
+    "native_release_ctests": 14,
+    "round_and_smoothing_tests": 6,
+    "view_input_and_visual_checks": 56,
+    "domain_gate_positive_and_wrong_build": true,
+    "native_pairs_ticks": 1800,
+    "browser_timing_ticks": 1800
+  },
+  "final_export": {
+    "godot": "4.7.1",
+    "ticks": 1200,
+    "all_five_byte_equal": true,
+    "checked_cleanup": true,
+    "web_cohort": "f684134667f2955b",
+    "pck_sha256": "40c9b47d332adcbe5914d9181442f6ac61fec7c067cbcabbd75b3836f2a1f235"
+  }
+}

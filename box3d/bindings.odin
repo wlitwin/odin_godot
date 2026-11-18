@@ -130,9 +130,16 @@ Allocation_Stats :: struct {
 #assert(size_of(World_Counters) == 24 && size_of(Body_State) == 80)
 #assert(size_of(Body_Key) == 8 && size_of(Shape_Key) == 8 && size_of(Joint_Key) == 8)
 
+@(private)
+layout_verified: bool
+
 // Check all field offsets, sizes and alignments against C before passing any POD
 // to native code. A status failure leaves world creation unattempted.
 abi_check :: proc() -> Status {
+    // These layouts and version constants belong to this linked module/image
+    // for its whole lifetime. Concurrent first callers may verify independently.
+    // Handles still go through the current domain and owner guards on every use.
+    if intrinsics.atomic_load_explicit(&layout_verified, .Acquire) {return .Ok}
     if version_status := native_version_check(); version_status != .Ok {
         return version_status
     }
@@ -358,6 +365,7 @@ abi_check :: proc() -> Status {
         }
     }
 
+    intrinsics.atomic_store_explicit(&layout_verified, true, .Release)
     return .Ok
 }
 

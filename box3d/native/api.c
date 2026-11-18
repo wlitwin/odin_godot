@@ -23,6 +23,7 @@
 #include <limits.h>
 #include <math.h>
 #include <stddef.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -198,7 +199,17 @@ static int decode_build_hash(const char *s, uint8_t out[32]) {
   }
   return 1;
 }
+/* A loaded image's identity, target and ABI are immutable. Publish one copy
+ * without allocating or locking; concurrent discovery can compute its own
+ * result while the first caller publishes. Live owner checks remain separate. */
+enum { CONTRACT_EMPTY, CONTRACT_WRITING, CONTRACT_READY };
+static atomic_int contract_state;
+static ogb3_domain_contract image_contract;
 static ogb3_status domain_contract(ogb3_domain_contract *out) {
+  if (atomic_load_explicit(&contract_state, memory_order_acquire) == CONTRACT_READY) {
+    *out = image_contract;
+    return OGB3_OK;
+  }
   ogb3_domain_contract c = {0};
   c.cookie = domain_cookie();
   c.size = sizeof c;
@@ -219,6 +230,12 @@ static ogb3_status domain_contract(ogb3_domain_contract *out) {
   if (!decode_build_hash(OGB3_RECOVERY_BUILD_ID, c.build) ||
       !decode_build_hash(OGB3_NATIVE_TARGET_ID, c.target))
     return OGB3_INCOMPATIBLE;
+  int empty = CONTRACT_EMPTY;
+  if (atomic_compare_exchange_strong_explicit(&contract_state, &empty, CONTRACT_WRITING,
+                                               memory_order_relaxed, memory_order_relaxed)) {
+    image_contract = c;
+    atomic_store_explicit(&contract_state, CONTRACT_READY, memory_order_release);
+  }
   *out = c;
   return OGB3_OK;
 }
