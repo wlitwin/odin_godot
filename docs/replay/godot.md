@@ -98,7 +98,8 @@ schemas, ownership, and the authority's initial state/neutral input.
 
 In `_process`, it samples controls, submits discrete actions, calls
 `rgd.session_frame`, drains `rgd.session_changes`, and reads
-`rgd.session_state` to position nodes. It forwards occurrence changes to the
+one `rgd.session_render_sample` to position interacting nodes on a shared clock.
+It uses the locally predicted bag to anticipate a reversible pickup. It forwards occurrence changes to the
 pickup routes and advances the flash animation. The `finalize` hook closes the
 Session and destroys the effects when the script instance is released.
 

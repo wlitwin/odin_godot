@@ -58,7 +58,9 @@ defer its close in `_ready`, which would close it as soon as `_ready` returns.
 | --- | --- |
 | Direct local or authoritative game | `session_open`, `session_frame`, `session_close` |
 | Submit a discrete action | `session_issue`; add [input intents](input/intents.md) when retaining and tracking a pending action |
-| Read presentation | Drain `session_changes`, then read the copied `session_state` |
+| Draw interacting objects | Call `session_render_sample` once per draw and use the same bracket for every player, projectile and obstacle |
+| Show immediate input feedback | Read local predicted input for a reversible cue. Use `res://addons/replay_presentation/activation_preview.gd` to reconcile target previews with receipts |
+| Deliver effects and outcomes | Drain `session_changes` and route each occurrence according to its presentation policy |
 | Read presentation identity | `session_presentation` returns seat, admitted epoch/reset, roles and correction serial without copying World frames |
 | Read the latest correction | `session_correction` copies before/after frames for an exact nonzero presentation context; reads do not consume it |
 | Invitations and durable enrollment | `party_open`, `party_begin`, `party_frame`, `party_room_options`, `party_close` |
@@ -74,8 +76,9 @@ permission to act while fenced. Compare scopes with `presentation_same_scope`;
 compare the complete context to track an unseen correction. Keep tracking per
 Session and clear it on close/reopen. Corrections are latest-only, not queued,
 and complete-physics sessions do not synthesize value-prediction corrections.
-Choose display time, smoothing discontinuities and effect-retirement policy in
-game code. See the [presentation guide](../../docs/replay/presentation.md).
+For confirmed turns and contacts between snapshots, pass a cursor and event
+filter to `session_render_sample` and project the returned bracket with
+`session_render_events` and `replay/view.motion_path`. See the [presentation guide](../../docs/replay/presentation.md).
 
 ### Setup diagnostics
 
@@ -173,9 +176,9 @@ for {
 		present_change(change) // Application presentation callback.
 	}
 }
-frame, valid := replaygd.session_state(&session)
+sample, valid := replaygd.session_render_sample(&session)
 if valid {
-	present_state(frame.state) // Application presentation callback.
+	draw_world(sample.from, sample.to, sample.alpha) // Interpolate all interacting poses together.
 }
 ```
 

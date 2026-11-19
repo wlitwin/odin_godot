@@ -116,19 +116,32 @@ replay_starter_process :: proc(self: ^ReplayStarter, dt: f64) {
     effects_retire(self)
     if !effects_frame(&self.effects, dt) {gd.error("REPLAY_STARTER_ERROR effect presentation failed")}
 
-    frame, available := rgd.session_state(&self.session)
+    sample, available := rgd.session_render_sample(&self.session)
 
     if !available {
         gd.set_string(self.status, "text", "Connecting…")
         return
     }
 
+    frame := sample.alpha >= 1 ? sample.to : sample.from
     for node, i in self.players {
         gd.canvas_item_set_visible(node, frame.state.connected & (u8(1) << uint(i)) != 0)
-        gd.node2d_set_position(node, {f32(frame.state.positions[i]), 180})
+        x := f32(frame.state.positions[i])
+        bit := u8(1) << uint(i)
+        if sample.from.state.connected & sample.to.state.connected & bit != 0 {
+            x =
+                f32(sample.from.state.positions[i]) +
+                f32(sample.to.state.positions[i] - sample.from.state.positions[i]) * sample.alpha
+        }
+        gd.node2d_set_position(node, {x, 180})
     }
 
-    gd.canvas_item_set_visible(self.coin.owner, frame.state.coins != 0)
+    // Coin disappearance is reversible local feedback. Bags below display the
+    // shared frame; rollback automatically revises a denied local pickup.
+    seat := rgd.session_seat(&self.session)
+    predicted, has_prediction := rgd.session_state(&self.session)
+    local_take := has_prediction && seat > 0 && predicted.state.bags[seat - 1] > frame.state.bags[seat - 1]
+    gd.canvas_item_set_visible(self.coin.owner, frame.state.coins != 0 && !local_take)
     gd.set_string(
         self.status,
         "text",

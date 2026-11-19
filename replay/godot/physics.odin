@@ -133,8 +133,8 @@ session_open_complete :: proc(
     return .None
 }
 
-// These are explicitly game-value observations for presentation. Complete truth
-// and durable exports must use session_checkpoint, never this projection.
+// Latest projected simulation values, including player prediction. Draw interacting
+// objects from session_render_sample. Use session_checkpoint for durable exports.
 session_values :: proc(s: ^Session($S, $C, $A, $E, $N)) -> (r.Frame(S), bool) {
     if !s.ready {
         return {}, false

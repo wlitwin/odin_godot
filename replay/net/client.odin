@@ -948,6 +948,7 @@ client_outcomes :: proc(
 // an opponent's observed truth; interpolation stays entirely in presentation.
 client_observed :: proc(
     c: ^Client($State, $Control, $Action, $Event, $Seats),
+    through := max(u64),
 ) -> (
     a, b: r.Frame(State),
     alpha: f32,
@@ -961,6 +962,7 @@ client_observed :: proc(
         return
     }
 
+    clock := min(c.watch_clock, f64(through))
     lower, upper := -1, -1
 
     for frame, i in c.observed {
@@ -968,11 +970,11 @@ client_observed :: proc(
             continue
         }
 
-        if f64(frame.tick) <= c.watch_clock && (lower < 0 || frame.tick > c.observed[lower].tick) {
+        if f64(frame.tick) <= clock && (lower < 0 || frame.tick > c.observed[lower].tick) {
             lower = i
         }
 
-        if f64(frame.tick) >= c.watch_clock && (upper < 0 || frame.tick < c.observed[upper].tick) {
+        if f64(frame.tick) >= clock && (upper < 0 || frame.tick < c.observed[upper].tick) {
             upper = i
         }
     }
@@ -993,7 +995,7 @@ client_observed :: proc(
     b = c.observed[upper]
 
     if b.tick > a.tick {
-        alpha = f32(clamp((c.watch_clock - f64(a.tick)) / f64(b.tick - a.tick), 0, 1))
+        alpha = f32(clamp((clock - f64(a.tick)) / f64(b.tick - a.tick), 0, 1))
     }
 
     return a, b, alpha, true

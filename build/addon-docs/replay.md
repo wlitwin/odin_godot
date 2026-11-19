@@ -30,8 +30,12 @@ The ordinary Hello starter remains the simplest introduction to Odin scripts.
   The server/client runner handles admission, prediction, correction, action IDs,
   acknowledgements and bounded history. Validate your game-specific permissions.
 - `replay/godot.Session` owns a local or network runner and engine transport.
-  Pump it every frame and consume presentation changes once. Rendering reads the
-  simulation; smoothing never writes display positions back into saved state.
+  Pump it every frame and read one `session_render_sample` for everything that
+  can collide. The default shows all participants on the same observed clock.
+  Drain `session_changes` for effects and scores. For a reversible target cue
+  on the input frame, preload `res://addons/replay_presentation/activation_preview.gd`.
+  If installing individual addon folders, include `addons/replay_presentation`
+  from the distribution to use this helper.
 - Checkpoints preserve complete authority state and reconnect/action metadata.
   Recipient projections are separate from complete authority archives.
 - `replay/godot.Room` adds coordinator-approved recovery and host migration.

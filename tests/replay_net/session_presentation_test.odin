@@ -212,3 +212,60 @@ session_context_and_corrections_follow_admission_and_resets :: proc(t: ^testing.
     }
     testing.expect(t, changed)
 }
+
+@(test)
+render_sample_defaults_to_one_observed_clock_and_preserves_a_contact_tick :: proc(t: ^testing.T) {
+    f := new(Presentation_Fixture)
+    defer free(f)
+    presentation_fixture_init(f)
+    defer presentation_fixture_destroy(f)
+    s := &f.sessions[1]
+    _, ready := rgd.session_render_sample(s)
+    testing.expect(t, !ready)
+    for _ in 0 ..< 60 {presentation_fixture_step(f)}
+    _, err := net.client_issue(&s.client, Action{take = true})
+    testing.expect(t, err == .None)
+    at: u64
+    pinned := false
+    for _ in 0 ..< 80 {
+        presentation_fixture_step(f)
+        authority, ok := rgd.session_render_sample(&f.sessions[0])
+        testing.expect(t, ok && authority.from.tick == authority.to.tick)
+        batch: [2]Event
+        n, found := rgd.session_render_events(&f.sessions[0], &authority, authority.tick, batch[:])
+        if found && n == 1 {at = authority.tick}
+        sample, visible := rgd.session_render_sample(s)
+        predictive, pok := rgd.session_render_sample(s, .Predicted)
+        if !visible || !pok {continue}
+        testing.expect(t, sample.to.tick <= s.client.timeline.confirmed && predictive.tick == s.client.timeline.head)
+        testing.expect(
+            t,
+            s.client.presented.from_tick == sample.from.tick && s.client.presented.to_tick == sample.to.tick,
+        )
+        if at == 0 || sample.tick < at + 2 {continue}
+        all_events := proc(_: Event) -> bool {return true}
+        cursor := rgd.Render_Cursor{true, sample.scope, at - 1}
+        contact, hit := rgd.session_render_sample(s, .Observed, &cursor, all_events)
+        testing.expect(t, hit && contact.tick == at && contact.fraction == 0)
+        var_seen: Event
+        rgd.session_render_events(s, &contact, &var_seen, proc(dst: ^Event, _: u64, e: Event) {dst^ = e})
+        testing.expect_value(t, var_seen.seat, s.client.seat)
+        synthetic := contact
+        synthetic.clock = .Predicted
+        _, mixed := rgd.session_render_events(s, &synthetic, at, batch[:])
+        testing.expect(t, !mixed)
+        needed, short := rgd.session_render_events(s, &contact, at, batch[:0])
+        testing.expect(t, !short && needed == 1)
+        count, has := rgd.session_render_events(s, &contact, at, batch[:])
+        testing.expect(t, has && count == 1 && batch[0].seat == s.client.seat)
+        next, advanced := rgd.session_render_sample(s, .Observed, &cursor, all_events)
+        testing.expect(t, advanced && next.tick > at)
+        invalid := contact
+        invalid.scope.reset += 1
+        _, stale := rgd.session_render_events(s, &invalid, at, batch[:])
+        testing.expect(t, !stale)
+        pinned = true
+        break
+    }
+    testing.expect(t, pinned, "expected a real accepted pickup and a later watched frame")
+}

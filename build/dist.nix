@@ -68,6 +68,10 @@ stdenvNoCC.mkDerivation ({
     # One active copy at the canonical resource path. The optional plugin is
     # enabled in Project Settings; its Odin source template stays unscanned.
     cp -r addons/box3d_authoring $out/addons/box3d_authoring
+    # The collection itself is ignored by Godot. Ship the render-frame helper
+    # at its importable resource path for script consumers and HTML5 exports.
+    mkdir -p $out/addons/replay_presentation
+    cp replay/godot/scene/activation_preview.gd $out/addons/replay_presentation/
 
     # Prebuilt core dll(s).
     cp -r out/bin $A/bin

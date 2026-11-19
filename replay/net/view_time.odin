@@ -31,8 +31,20 @@ Sent_View :: struct {
 // Sample the observed presentation and bind exactly that bracket to subsequent
 // input samples. Compute aim from these same returned frames/alpha. Reading a
 // newer network snapshot later in the frame does not rewrite an earlier aim.
-client_present :: proc(c: ^Client($S, $C, $A, $E, $N)) -> (a, b: r.Frame(S), alpha: f32, ok: bool) {
-    first, second, fraction, available := client_observed(c)
+client_present :: proc(
+    c: ^Client($S, $C, $A, $E, $N),
+    through := max(u64),
+) -> (
+    a, b: r.Frame(S),
+    alpha: f32,
+    ok: bool,
+) {
+    first, second, fraction, available := client_observed(c, through)
+    // A retained contact cannot revive an obsolete interpolation bracket
+    // after the watched clock has skipped an oversized gap.
+    if available && through != max(u64) && second.tick - first.tick > u64(c.cfg.max_view_span) {
+        first, second, fraction, available = client_observed(c)
+    }
     a = first
     b = second
     alpha, ok = fraction, available

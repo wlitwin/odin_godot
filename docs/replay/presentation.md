@@ -6,14 +6,79 @@ This guide assumes the [Session starter](godot.md).
 
 ## Draw the selected frame
 
-Call `session_frame`, then drain changes and read `session_state`. The returned
-state supplies values to display; changing a node transform does not change
-the World. Keep device sampling before the frame call and rendering after it.
+Call `session_frame`, drain the change journal, and call
+`session_render_sample(&session)` once for everything that can make contact.
+The default returns two received authority frames and an interpolation fraction
+on clients, or the authority's current frame on a host. All players, projectiles,
+and moving obstacles in that interaction use this sample. Ownership of a projectile
+does not give it a separate display time. A guest drawing its own boomerang from
+prediction while an opponent is drawn from past snapshots can see it pass straight
+through a live opponent. A guest drawing its body ahead of an incoming boomerang
+can see itself eliminated before the ring arrives.
 
-For interpolation, historical views, and custom scheduling, use
-[`replay/view`](https://github.com/wlitwin/odin_godot/blob/main/replay/view/README.md).
-Choose the display time deliberately: predicted local state and confirmed
-remote observations may use different times.
+```odin
+sample, ready := rgd.session_render_sample(&session)
+if ready {
+    // Blend continuous poses at sample.alpha. Select discrete state from the
+    // lower endpoint until the upper tick, respecting spawn/lifetime boundaries.
+    draw_world(sample.from, sample.to, sample.alpha)
+}
+```
+
+`session_state` and `session_values` remain simulation-head reads. Use that head
+for local hand readiness, a reticle or wind-up, and reversible input feedback.
+An immediate local cue can respond directly to the input edge. For an explicitly
+predicted whole-scene presentation use `session_render_sample(&session, .Predicted)`.
+Its contacts can change during repair. An observed render sample also binds its
+quantized viewing bracket to the next control for games that judge historical aim.
+Keep the bracket used at the input edge until Session consumes that control.
+
+### Throws, turns and terminal contacts
+
+Linear interpolation across an outbound and a returning pose cuts off the tip of
+the turn. Emit a stable flight ID, the ring's contact position, and the other
+body's contact position in the gameplay event. These are the positions from the
+collision calculation. A view can use the existing accepted facts as intermediate
+motion keys without sending additional snapshots.
+
+```odin
+// Store the cursor per Session. is_contact selects the accepted events for
+// which the whole scene should spend one draw update on the contact tick.
+sample, ready := rgd.session_render_sample(&session, .Observed, &cursor, is_contact)
+if ready {
+    picture := begin_paths(sample.from, sample.to, sample.tick, sample.fraction)
+    rgd.session_render_events(&session, &sample, &picture, add_contact_keys)
+    paint_picture(picture)
+}
+```
+
+Build each path with `view.motion_path` using the two snapshot endpoints. In
+the projector, call `view.motion_key` for a launch, impact, turn or final catch.
+Apply the two contact coordinates to the two participating paths. Draw
+`view.motion_sample(path)` for each object. Include its lifetime and visibility
+in each key. A final visible contact can be followed by a hidden key on the next
+tick. These copied values affect presentation only. Use the occurrence journal
+for sounds and one-shot particles; the same motion key can be read on several draws.
+
+The cursor skips old backlog beyond the configured maximum view span after a
+stall. Gaps in retained history and fresh baselines have no guaranteed contact
+frame. Reset game-side FX and clip buffers on a change of presentation scope.
+Measure what was actually drawn, including missed frames, and check both accepted
+contacts and apparent crossings that received no verdict.
+
+### A local action that hides a shared target
+
+For a pickup or switch, the game can often project a locally predicted value
+directly and let rollback revise it. When the input must react in the same render
+frame, `res://addons/replay_presentation/activation_preview.gd` provides a per-stream tracker for Godot
+views. Call `begin(sequence, now_us, actor, observed_life)` at the input edge.
+Use `active(actor, observed_life)` while painting the target. On the local
+receipt, `settle(sequence, accepted_actor)` returns the ticket once. A matching
+preview survives until the observed activation retires, and a denial releases
+only the originating preview. Use `expire(now_us, timeout_us)` for unanswered
+inputs. Give a newly opened Session or changed epoch/reset a fresh tracker.
+Keep score, payouts and final victory cues on the confirmed result. The starter
+shows the state-based pickup case; Parallax uses the tracker for its range targets.
 
 ## Give gameplay results identities
 

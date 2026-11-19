@@ -93,6 +93,7 @@ require({'Session', 'Room', 'Party', 'session_open', 'session_close'} <= root_na
 session_additions = {
     'session_options_check', 'session_setup_message', 'session_setup_report',
     'Presentation_Context', 'session_presentation', 'presentation_same_scope', 'session_correction',
+    'Render_Clock', 'Render_Sample', 'Render_Cursor', 'session_render_sample', 'session_render_events',
 }
 require(session_additions <= root_names,
         f'Missing public Session declarations: {sorted(session_additions - root_names)}')

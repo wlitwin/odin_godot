@@ -853,6 +853,8 @@ session_issue :: proc(
     return net.client_issue(&s.client, action)
 }
 
+// Latest simulation frame, including client prediction. For drawing a shared world,
+// read one session_render_sample and use its bracket for all interacting objects.
 session_state :: proc(s: ^Session($State, $Control, $Action, $Event, $Seats)) -> (frame: r.Frame(State), ok: bool) {
     if r.owner_retains_access(&s.retained, .Execute) != .None {
         return {}, false
