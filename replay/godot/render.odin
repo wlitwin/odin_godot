@@ -48,6 +48,8 @@ render_fact :: proc(s: ^Session($S, $C, $A, $E, $N), tick: u64) -> ([]r.Occurren
 // configured maximum view span; admission/reset never plays an old backlog.
 session_render_sample :: proc {
     render_current,
+    render_contact_frame,
+    render_embedded_contacts,
     render_with_events,
 }
 
@@ -67,6 +69,24 @@ render_with_events :: proc(
     sample: Render_Sample(S),
     ok: bool,
 ) {
+    filter := must_show
+    selected :: proc(fn: ^proc(_: E) -> bool, e: E) -> bool {return fn^(e)}
+    test: proc(_: ^proc(_: E) -> bool, _: E) -> bool
+    if filter != nil {test = selected}
+    return render_filtered(s, clock, cursor, &filter, test)
+}
+
+@(private)
+render_filtered :: proc(
+    s: ^Session($S, $C, $A, $E, $N),
+    clock: Render_Clock,
+    cursor: ^Render_Cursor,
+    policy: ^$T,
+    selected: proc(_: ^T, _: E) -> bool,
+) -> (
+    sample: Render_Sample(S),
+    ok: bool,
+) {
     scope, ready := session_presentation(s)
     if !ready || clock > Render_Clock.Predicted {return}
     sample.scope, sample.clock = scope, clock
@@ -74,7 +94,7 @@ render_with_events :: proc(
     if clock == .Predicted && s.client.spectator && !s.authority {return}
     pin := max(u64)
     if cursor != nil &&
-       must_show != nil &&
+       selected != nil &&
        clock == .Observed &&
        cursor.ready &&
        presentation_same_scope(cursor.scope, scope) {
@@ -91,7 +111,8 @@ render_with_events :: proc(
                 batch, found := render_fact(s, t)
                 if found {
                     for occurrence in batch {
-                        if occurrence.value.kind == .Gameplay && must_show(occurrence.value.value) {pin = t; break}
+                        if occurrence.value.kind == .Gameplay &&
+                           selected(policy, occurrence.value.value) {pin = t; break}
                     }
                 }
                 if pin != max(u64) || t == max(u64) {break}

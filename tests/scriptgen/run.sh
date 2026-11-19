@@ -207,12 +207,14 @@ import knet "godot:kit/net"
 import kcombat "godot:kit/combat"
 import kitems "godot:kit/items"
 
+Base_Count :: 3
+Slot_Count :: (Base_Count + 2) * 2 - 2
 HeroB :: struct {
 	owner:    gd.Node,
 	net_id:   knet.Net_Id,
 	hp:       u8 `gd:"replicate"`,     // game-owned, stays flat
 	using cd:  kcombat.Cooldowns(3),   // cds:[3]u16 replicate (imported generic bundle)
-	using bag: kitems.Inventory(8),    // slots:[8]Slot replicate (imported generic bundle)
+	using bag: kitems.Inventory(Slot_Count), // slots:[8]Slot replicate (imported generic bundle)
 }
 @(gd_command = knet.ACTION_OWNER_PREDICTED)
 herob_fire :: proc(self: ^HeroB, slot: i32) -> bool { return kcombat.cd_try(&self.cd, int(slot), {cooldown = 10}) }

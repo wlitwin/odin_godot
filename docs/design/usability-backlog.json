@@ -1609,5 +1609,24 @@
         "Final docs/API/link/site checks and git diff --check pass. Independent completed-task audit confirms all referenced evidence exists, all16 API/schema cleanup inventory items are complete, removed compatibility files are absent, and intentionally retained low-level APIs are distinguished from obsolete shims."
       ]
     }
+  ],
+  "follow_ups": [
+    {
+      "id": "Replay-contact-presentation",
+      "title": "Make confirmed contact presentation the standard Replay render path",
+      "status": "complete",
+      "task_id": "t_f57041b40c92499e",
+      "acceptance": "A normal render read consumes declared contacts, preserving identities, contact turns, visibility and game-owned outcomes. A delayed guest sees both sides of a hit.",
+      "files": [
+        "replay/view/contacts.odin",
+        "replay/godot/contact_view.odin",
+        "docs/replay/presentation.md",
+        "../second_helping/shared/table_view/flight.odin"
+      ],
+      "validation": [
+        "186 Replay network tests, 35 view tests, scriptgen fixtures, native/WASM package inventory and 10 game rules tests passed.",
+        "Packaged SDK passed the game rules and browser-target contact fixture. Two native WAN matches showed 33/33 guest and 248/248 shared-view contact observations in reach. The Web export over public TURN showed 17/17 on the guest. See ../second_helping/tests/contact-presentation.json."
+      ]
+    }
   ]
 }

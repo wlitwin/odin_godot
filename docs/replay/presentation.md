@@ -33,38 +33,63 @@ Its contacts can change during repair. An observed render sample also binds its
 quantized viewing bracket to the next control for games that judge historical aim.
 Keep the bracket used at the input edge until Session consumes that control.
 
-### Throws, turns and terminal contacts
+### Draw projectiles and their contacts
 
-Linear interpolation across an outbound and a returning pose cuts off the tip of
-the turn. Emit a stable flight ID, the ring's contact position, and the other
-body's contact position in the gameplay event. These are the positions from the
-collision calculation. A view can use the existing accepted facts as intermediate
-motion keys without sending additional snapshots.
+Emit the positions your collision check already computed. A game can use
+`view.Contact(2)` or `view.Contact(3)` as its event, or embed one with `using`
+in its own event type. Each point identifies a zero-based body slot, its current
+lifetime and the body's center at contact. A 3D event for a boomerang striking
+a player carries both centers in this example.
 
 ```odin
-// Store the cursor per Session. is_contact selects the accepted events for
-// which the whole scene should spend one draw update on the contact tick.
-sample, ready := rgd.session_render_sample(&session, .Observed, &cursor, is_contact)
+Hit :: struct {
+    using contact: view.Contact(3),
+    damage: u8,
+}
+// Inside the simulation, once the game accepts the hit:
+hit := Hit{damage = 1}
+hit.contact = {
+    kind    = .Hit,
+    subject = {peel_slot, flight_id, peel_center},
+    other   = view.Contact_Point(3){player_slot, player_life, player_center},
+}
+r.emit(step, event_id, event_kind, hit)
+```
+
+Keep a `rgd.Contact_View(3, BODY_COUNT)` in the game's view. Map each existing
+body's position, visibility and lifetime to the same slots once in a callback.
+Reuse a slot with a new lifetime when the next projectile spawns. Read those poses in the draw callback.
+
+```odin
+sample, ready := rgd.session_render_sample(&session, &contacts, read_bodies)
 if ready {
-    picture := begin_paths(sample.from, sample.to, sample.tick, sample.fraction)
-    rgd.session_render_events(&session, &sample, &picture, add_contact_keys)
-    paint_picture(picture)
+    for pose, slot in contacts.poses {
+        draw_body(slot, pose.position, pose.visible)
+    }
 }
 ```
 
-Build each path with `view.motion_path` using the two snapshot endpoints. In
-the projector, call `view.motion_key` for a launch, impact, turn or final catch.
-Apply the two contact coordinates to the two participating paths. Draw
-`view.motion_sample(path)` for each object. Include its lifetime and visibility
-in each key. A final visible contact can be followed by a hidden key on the next
-tick. These copied values affect presentation only. Use the occurrence journal
-for sounds and one-shot particles; the same motion key can be read on several draws.
+Replay samples the shared clock and inserts the two accepted contact positions
+between the received snapshots. A `.Hit` gets a draw update when its tick would
+otherwise be skipped within retained history. Use `.Motion` for a launch or
+change of direction. A retiring subject sets `retires = true` and stays visible
+through its final tick. A snapshot can also provide a body's
+`last_visible_tick` when it retains the terminal position. Set the same
+`group` on the snapshot and event for cuts such as a new round. Its default
+value is zero. Read `contacts.changed_scope` to clear a game's clip or FX cache
+after a session epoch/reset.
 
-The cursor skips old backlog beyond the configured maximum view span after a
-stall. Gaps in retained history and fresh baselines have no guaranteed contact
-frame. Reset game-side FX and clip buffers on a change of presentation scope.
-Measure what was actually drawn, including missed frames, and check both accepted
-contacts and apparent crossings that received no verdict.
+Games with an existing event schema can declare a
+`view.Contact_Model(World, Event, 2, BODY_COUNT){read_bodies, describe_contact}`
+once and pass it as the third argument. Second Helping maps a tag to the peel
+and food, a block to the peel and lid, and a catch to the outgoing flight's end.
+This path consumes its existing receipts. The low-level render cursor,
+`session_render_events` and motion paths remain available for custom views.
+
+The render history bounds catch-up after a stall. A fresh baseline or a gap in
+retained history can skip a contact. Several impacts on one body in a single
+tick share one displayed pose. Sounds and single-use effects consume the event
+journal. Scores and eliminations use the game's accepted rules.
 
 ### A local action that hides a shared target
 

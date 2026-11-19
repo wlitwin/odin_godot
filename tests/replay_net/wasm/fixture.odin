@@ -3,6 +3,8 @@ package replay_net_wasm
 import r "godot:replay"
 import net "godot:replay/net"
 import tr "godot:replay/transport"
+import rg "godot:replay/godot"
+import view "godot:replay/view"
 import game "../../../examples/replay_hello/shared/hello"
 import d "godot:replay/diagnostic"
 
@@ -67,4 +69,12 @@ import d "godot:replay/diagnostic"
     tr.close(&wa)
     tr.close(&wb)
     tr.memory_destroy(&m)
+}
+
+// Compile the same portable hit declaration and ordinary view read on browser targets.
+@(require)
+contact_view :: proc(s: ^rg.Session(game.World, game.Controls, game.Action, view.Contact(3), 2)) {
+    bodies :: proc(_: ^game.World, _: ^view.Contact_Bodies(3, 2)) {}
+    display: rg.Contact_View(3, 2)
+    rg.session_render_sample(s, &display, bodies)
 }

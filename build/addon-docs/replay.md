@@ -32,7 +32,8 @@ The ordinary Hello starter remains the simplest introduction to Odin scripts.
 - `replay/godot.Session` owns a local or network runner and engine transport.
   Pump it every frame and read one `session_render_sample` for everything that
   can collide. The default shows all participants on the same observed clock.
-  Drain `session_changes` for effects and scores. For a reversible target cue
+  Supply a `Contact_View` and a body mapping for projectile hits and turns.
+  Its poses include the impact and terminal frame. Drain `session_changes` for effects and scores. For a reversible target cue
   on the input frame, preload `res://addons/replay_presentation/activation_preview.gd`.
   If installing individual addon folders, include `addons/replay_presentation`
   from the distribution to use this helper.

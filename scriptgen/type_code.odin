@@ -19,8 +19,9 @@ Code_Type :: struct {
 
 code_type_cache: map[string]Code_Type
 
-code_type :: proc(text: string) -> (Code_Type, bool) {
-    if found, ok := code_type_cache[text]; ok {return found, found.kind != ""}
+code_type :: proc(text: string, integer := false) -> (Code_Type, bool) {
+    cache_key := integer ? fmt.tprintf("integer:%s", text) : text
+    if found, ok := code_type_cache[cache_key]; ok {return found, found.kind != ""}
     prefix :: "package type_code\nType :: "
     source := strings.concatenate({prefix, text}, context.temp_allocator)
     file := ast.File {
@@ -43,6 +44,18 @@ code_type :: proc(text: string) -> (Code_Type, bool) {
     for decl in file.decls {
         vd, ok := decl.derived.(^ast.Value_Decl)
         if !ok || len(vd.values) != 1 {continue}
+        if integer {
+            #partial switch n in vd.values[0].derived {
+            case ^ast.Paren_Expr:
+                result.kind = "group"
+                add(&result, source, n.expr)
+            case ^ast.Binary_Expr:
+                result.kind = n.op.text
+                add(&result, source, n.left)
+                add(&result, source, n.right)
+            }
+            continue
+        }
         #partial switch n in vd.values[0].derived {
         case ^ast.Pointer_Type:
             result.kind = "pointer"; add(&result, source, n.elem)
@@ -71,7 +84,7 @@ code_type :: proc(text: string) -> (Code_Type, bool) {
             continue
         }
     }
-    code_type_cache[text] = result
+    code_type_cache[cache_key] = result
     return result, result.kind != ""
 }
 

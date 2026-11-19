@@ -76,9 +76,9 @@ permission to act while fenced. Compare scopes with `presentation_same_scope`;
 compare the complete context to track an unseen correction. Keep tracking per
 Session and clear it on close/reopen. Corrections are latest-only, not queued,
 and complete-physics sessions do not synthesize value-prediction corrections.
-For confirmed turns and contacts between snapshots, pass a cursor and event
-filter to `session_render_sample` and project the returned bracket with
-`session_render_events` and `replay/view.motion_path`. See the [presentation guide](../../docs/replay/presentation.md).
+For a projectile or contact game, pass a retained `Contact_View` and the
+body mapping to the same `session_render_sample` call. Its poses include turns,
+both contact participants and the final visible tick. See the [presentation guide](../../docs/replay/presentation.md).
 
 ### Setup diagnostics
 

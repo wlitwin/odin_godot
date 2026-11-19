@@ -1,5 +1,6 @@
 package scriptgen
 
+import "base:intrinsics"
 import "core:fmt"
 import "core:strconv"
 import "core:strings"
@@ -36,7 +37,24 @@ type_integer :: proc(value: Type_Use, depth: int = 0) -> (int, bool) {
     if named, found := wire_named_lookup(value.from, value.text); found && named.kind == .Alias {
         return type_integer({named.underlying, Struct_Def{dir = named.dir, imports = named.imports}, nil}, depth + 1)
     }
-    return 0, false
+    // Fixed body/pool capacities often use a named count from another package.
+    // Use the Odin parser for precedence and keep evaluating in the caller's scope.
+    if strings.index_any(value.text, "+-*(") < 0 {return 0, false}
+    expr, parsed := code_type(value.text, true)
+    if !parsed || len(expr.parts) == 0 {return 0, false}
+    lhs, ok := type_integer({expr.parts[0].text, value.from, value.bindings}, depth+1)
+    if !ok || expr.kind == "group" {return lhs, ok}
+    rhs, valid := type_integer({expr.parts[1].text, value.from, value.bindings}, depth+1)
+    if !valid {return 0, false}
+    result: int
+    overflow: bool
+    switch expr.kind {
+    case "+": result, overflow = intrinsics.overflow_add(lhs, rhs)
+    case "-": result, overflow = intrinsics.overflow_sub(lhs, rhs)
+    case "*": result, overflow = intrinsics.overflow_mul(lhs, rhs)
+    case: return 0, false
+    }
+    return result, !overflow
 }
 
 type_array :: proc(value: Type_Use) -> (count: int, elem: Type_Use, ok: bool) {

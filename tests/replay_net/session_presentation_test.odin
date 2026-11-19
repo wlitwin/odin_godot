@@ -250,6 +250,29 @@ render_sample_defaults_to_one_observed_clock_and_preserves_a_contact_tick :: pro
         var_seen: Event
         rgd.session_render_events(s, &contact, &var_seen, proc(dst: ^Event, _: u64, e: Event) {dst^ = e})
         testing.expect_value(t, var_seen.seat, s.client.seat)
+        // The ordinary body-aware read pins the same contact without a separate
+        // event filter, event replay loop, or special case for either participant.
+        bodies :: proc(w: ^World, dst: ^view.Contact_Bodies(3, 2)) {
+            for player, i in w.players {dst.bodies[i] = {
+                    position = {f32(player.x), 0, 0},
+                    visible  = player.active,
+                }}
+        }
+        describe :: proc(_: Event) -> view.Contact(3) {
+            return {kind = .Hit, subject = {0, 0, {1, 2, 3}}, other = view.Contact_Point(3){1, 0, {4, 5, 6}}}
+        }
+        display := rgd.Contact_View(3, 2) {
+            cursor      = {true, sample.scope, at - 1},
+            initialized = true,
+        }
+        model := view.Contact_Model(World, Event, 3, 2){bodies, describe}
+        picture, drawn := rgd.session_render_sample(s, &display, model)
+        testing.expect(t, drawn && picture.tick == at && !display.changed_scope)
+        testing.expect_value(t, display.poses[0].position, [3]f32{1, 2, 3})
+        testing.expect_value(t, display.poses[1].position, [3]f32{4, 5, 6})
+        display.cursor.scope.reset += 1
+        _, again := rgd.session_render_sample(s, &display, model)
+        testing.expect(t, again && display.changed_scope)
         synthetic := contact
         synthetic.clock = .Predicted
         _, mixed := rgd.session_render_events(s, &synthetic, at, batch[:])
@@ -268,4 +291,57 @@ render_sample_defaults_to_one_observed_clock_and_preserves_a_contact_tick :: pro
         break
     }
     testing.expect(t, pinned, "expected a real accepted pickup and a later watched frame")
+}
+
+
+@(test)
+contact_model_reads_require_no_event_adapter :: proc(t: ^testing.T) {
+    Strike :: struct {
+        using detail: view.Contact(3),
+        damage:       u8,
+    }
+    bodies :: proc(_: ^World, _: ^view.Contact_Bodies(3, 2)) {}
+    display: rgd.Contact_View(3, 2)
+    raw := new(rgd.Session(World, Control, Action, view.Contact(3), 2))
+    defer free(raw)
+    _, raw_ready := rgd.session_render_sample(raw, &display, bodies)
+    testing.expect(t, !raw_ready)
+
+    session := new(rgd.Session(World, Control, Action, Strike, 2))
+    defer free(session)
+    s := &session.server
+    memory: tr.Memory
+    testing.expect(t, tr.memory_init(&memory, seed = 4))
+    defer tr.memory_destroy(&memory)
+    endpoint: tr.Memory_Endpoint
+    testing.expect(t, tr.memory_open(&memory, &endpoint, 1))
+    wire := tr.memory_transport(&endpoint)
+    defer tr.close(&wire)
+    model := net.Model(World, Control, Action, Strike, 2) {
+        control_valid = control_valid,
+        hold = hold,
+        state_valid = state_valid,
+        step = proc(_: ^World, _: [2]Control, _, _: u64, step: ^r.Step(Strike)) {
+            if step.tick == 2 {
+                hit := Strike {
+                    damage = 1,
+                }
+                hit.detail = {
+                    kind    = .Hit,
+                    subject = {0, 77, {4, 5, 6}},
+                }
+                r.emit(step, 1, 1, hit)
+            }
+        },
+    }
+    assert(net.server_init(s, r.Frame(World){state = {chest = 5}}, model, wire) == .None)
+    defer net.server_destroy(s)
+    session.ready, session.authority = true, true
+    _, before := rgd.session_render_sample(session, &display, bodies)
+    testing.expect(t, before && !display.poses[0].visible)
+    for _ in 0 ..< 3 {assert(net.server_step(s) == .None)}
+    sample, ok := rgd.session_render_sample(session, &display, bodies)
+    testing.expect(t, ok && sample.tick == 2 && display.poses[0].visible)
+    testing.expect_value(t, display.poses[0].position, [3]f32{4, 5, 6})
+    testing.expect_value(t, display.poses[0].life, u64(77))
 }
