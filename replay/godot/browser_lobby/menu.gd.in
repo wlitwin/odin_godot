@@ -1,0 +1,33 @@
+extends Node
+
+var invite := Button.new()
+var code := ""
+var entry: Node
+
+func attach(field: LineEdit, hud: Control) -> void:
+	entry=preload("web_text_entry.gd").new()
+	add_child(entry)
+	add_child(preload("web_runtime.gd").new())
+	field.text=""
+	field.placeholder_text="Five-character room code"
+	field.tooltip_text="Enter the code shown in the host's game"
+	field.max_length=5
+	field.virtual_keyboard_enabled=false
+	field.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed:
+			field.accept_event()
+			entry.edit(field))
+	hud.add_child(invite)
+	invite.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	invite.offset_left=-218
+	invite.offset_right=-20
+	invite.offset_top=70
+	invite.offset_bottom=110
+	invite.pressed.connect(func(): entry.copy_code(code))
+	invite.hide()
+
+func show_code(value: String) -> void:
+	if code==value: return
+	code=value
+	invite.text="Room %s   ·   Copy"%code
+	invite.visible=not code.is_empty()

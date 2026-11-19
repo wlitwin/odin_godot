@@ -529,9 +529,9 @@ party_room_options :: proc(o: ^Party, session: Session_Options) -> (Room_Options
 }
 
 party_close :: proc(o: ^Party) {
-    if o.allocator.procedure != nil {
-        context.allocator = o.allocator
-    }
+    // Context overrides are lexical. The stored allocator must also cover
+    // every nested connection/profile close and the owned strings below.
+    context.allocator = o.allocator.procedure != nil ? o.allocator : context.allocator
 
     provision_disconnect(&o.connection)
     relay_close(&o.relay)

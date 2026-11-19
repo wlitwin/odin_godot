@@ -1,6 +1,7 @@
 package enrollment_test
 
 import "core:testing"
+import "core:mem"
 import p "godot:replay/provision"
 import rgd "godot:replay/godot"
 import auth "godot:replay/authority"
@@ -227,4 +228,16 @@ revoked_invite_does_not_revoke_a_stored_creator_credential :: proc(t: ^testing.T
     grant, ready := rgd.party_grant(&o)
     testing.expect(t, ready && grant == g && !o.failed && !o.invited && o.invite_error == .Denied)
     testing.expect(t, l.writes == 0 && s.bundle.invites[0].revoked)
+}
+
+@(test)
+party_close_uses_the_allocator_selected_at_open :: proc(t: ^testing.T) {
+    tracking: mem.Tracking_Allocator
+    mem.tracking_allocator_init(&tracking,context.allocator)
+    defer mem.tracking_allocator_destroy(&tracking)
+    ledger: Party_Ledger
+    party: rgd.Party
+    testing.expect(t,rgd.party_open(&party,party_config(&ledger),mem.tracking_allocator(&tracking)))
+    rgd.party_close(&party)
+    testing.expect(t,len(tracking.allocation_map)==0)
 }

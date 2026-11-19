@@ -19,13 +19,13 @@ import rgd "godot:replay/godot"
 // storage; borrowed Session/codec pointers expire only after successful close.
 Authored_Session :: struct($S, $C, $A, $E: typeid, $N: int) {
     storage: meter.Storage(Authored_Data(S,C,A,E,N)),
-    ready, closing, opening: bool,
+    ready, closing, opening, room_mode: bool,
     content: bd.Digest,
     report: net.Setup_Report,
 }
 
 Authored_Data :: struct($S, $C, $A, $E: typeid, $N: int) {
-    session: rgd.Session(S,C,A,E,N),
+    using room: rgd.Room(S,C,A,E,N),
     codec: ph.Network_Codec(S,C,A,E,N),
     _baked: a.Baked_Scene,
     _built: ar.Built_Scene,
@@ -52,6 +52,27 @@ authored_open :: proc(
     profile: u64 = 0,
     ownership: rgd.Session_Ownership = {},
 ) -> (report: net.Setup_Report) {
+    return authored_open_impl(owned,source,model,initial,rules,options,profile,ownership,nil)
+}
+
+// Open the same authored world under a provisioned Room. rtc_ice owns the
+// borrowed relay credential source, if present, until Room cleanup completes.
+authored_room_open :: proc(
+    owned: ^Authored_Session($S,$C,$A,$E,$N), source: gd.Object,
+    model: net.Model(S,C,A,E,N), initial: proc(^a.Baked_Scene,^ar.Built_Scene) -> (S,bool),
+    rules: bd.Digest, options: rgd.Room_Options, rtc_ice: r.Owned_Context = {}, profile:u64=0,
+) -> net.Setup_Report {
+    opts:=options
+    return authored_open_impl(owned,source,model,initial,rules,opts.session,profile,{rtc_ice=rtc_ice},&opts)
+}
+
+@(private)
+authored_open_impl :: proc(
+    owned: ^Authored_Session($S,$C,$A,$E,$N), source: gd.Object,
+    model: net.Model(S,C,A,E,N), initial: proc(^a.Baked_Scene,^ar.Built_Scene) -> (S,bool),
+    rules: bd.Digest, options: rgd.Session_Options, profile:u64,
+    ownership:rgd.Session_Ownership, room_options:^rgd.Room_Options,
+) -> (report:net.Setup_Report) {
     if owned == nil { return net.setup_problem(.Invalid_Config,"owner","provide an authored Session owner") }
     if owned.storage.memory != nil || owned.ready || owned.closing {
         return net.setup_problem(.Wrong_Phase,"owner","finish closing the previous authored Session")
@@ -59,8 +80,8 @@ authored_open :: proc(
     if source == nil || initial == nil || rules == (bd.Digest{}) {
         return net.setup_problem(.Invalid_Model,"authoring","provide a World, initial-state mapping and game rules identity")
     }
-    if options.role == .Solo || (options.backend != .Enet && options.backend != .Rtc) {
-        return net.setup_problem(.Invalid_Config,"options.role/backend","managed complete physics requires a network role with Enet or Rtc")
+    if options.role != .Solo && options.backend != .Enet && options.backend != .Rtc {
+        return net.setup_problem(.Invalid_Config,"options.role/backend","choose Solo or a network role with Enet or Rtc")
     }
     if model.complete_codec.catalog != nil || model.complete_codec.encode != nil {
         return net.setup_problem(.Invalid_Model,"model.complete_codec","the authored owner supplies its own complete physics codec")
@@ -69,6 +90,7 @@ authored_open :: proc(
         return net.setup_problem(.Invalid_Model,"ownership","the authored owner supplies allocator/container storage; pass only additional callback contexts")
     }
     complete := false
+    owned.room_mode = room_options != nil
     owned.opening = true
     defer {
         owned.opening = false
@@ -86,8 +108,13 @@ authored_open :: proc(
     image_owner := ph.Owner_Context{owner=owned.storage.allocator_owner,allocator_data=allocator.data}
     codec_owner, cs := meter.storage_bind(&owned.storage,&data.codec)
     if cs != bg.OK { return net.setup_problem(.Invalid_Model,"codec.owner",fmt.tprintf("cannot bind codec storage (%v)",cs)) }
-    session_owner, ss := meter.storage_bind(&owned.storage,&data.session)
-    if ss != bg.OK { return net.setup_problem(.Invalid_Model,"session.owner",fmt.tprintf("cannot bind Session storage (%v)",ss)) }
+    session_owner: bg.Owner
+    // Room creates the lease for its embedded Session during room_open_complete.
+    if !owned.room_mode {
+        status: bg.Status
+        session_owner,status = meter.storage_bind(&owned.storage,&data.session)
+        if status != bg.OK { return net.setup_problem(.Invalid_Model,"session.owner",fmt.tprintf("cannot bind Session storage (%v)",status)) }
+    }
 
     extracted: ga.Diagnostic
     data._baked, extracted = ga.extract(source,allocator)
@@ -120,16 +147,26 @@ authored_open :: proc(
     effective_owner.allocation_base = data
     effective_owner.allocation_bytes = size_of(data^)
     result: net.Error
-    if options.role == .Host || options.role == .Server {
+    if owned.room_mode || options.role == .Solo || options.role == .Host || options.role == .Server {
         cp_error: r.Error
         data._checkpoint, cp_error = ph.authoring_checkpoint(&data._built,config,r.Frame(S){state=game},net.Net_Event(E),epoch=options.network.epoch,allocator=allocator,ownership=image_owner)
         if cp_error != .None { return net.setup_problem(.Invalid_Checkpoint,"initial.checkpoint",fmt.tprintf("%v",cp_error)) }
-        result = rgd.session_open_complete(&data.session,&data._checkpoint,effective_model,options,allocator,effective_owner)
+        if owned.room_mode {
+            owner,status:=meter.storage_bind(&owned.storage,&data.room)
+            if status!=bg.OK {return net.setup_problem(.Invalid_Model,"room.owner","cannot bind Room storage")}
+            result=rgd.room_open_complete(&data.room,&data._checkpoint,effective_model,room_options^,allocator,{
+                allocator=effective_owner.allocator,container={owner,&data.room},rtc_ice=ownership.rtc_ice,
+                allocation_base=data,allocation_bytes=size_of(data^),
+            },&report)
+        } else {
+            result = rgd.session_open_complete(&data.session,&data._checkpoint,effective_model,options,allocator,effective_owner)
+        }
     } else {
         result = rgd.session_open(&data.session,r.Frame(S){},effective_model,options,allocator,effective_owner)
     }
     if owned.closing { return net.setup_problem(.Wrong_Phase,"owner.cancelled","close was requested during Session initialization") }
     if result != .None {
+        if owned.room_mode {return report}
         report = data.session.setup_report
         net.setup_finish(&report,result,"session.open","could not open the complete physics Session")
         return
@@ -193,7 +230,9 @@ authored_close :: proc(owned: ^Authored_Session($S,$C,$A,$E,$N)) -> net.Error {
     owned.closing = true
     owned.ready = false
     if data := owned.storage.data; data != nil {
-        if error := rgd.session_close(&data.session); error != .None { return authored_close_error(owned,"session.close",error) }
+        if owned.room_mode {
+            if error:=rgd.room_try_close(&data.room); error!=.None {return authored_close_error(owned,"room.close",error)}
+        } else if error:=rgd.session_close(&data.session); error!=.None {return authored_close_error(owned,"session.close",error)}
         if r.complete_checkpoint_destroy(&data._checkpoint) != .None { return authored_close_error(owned,"initial.close",.Wrong_Phase) }
         if error := ph.network_codec_destroy(&data.codec); error != .None { return authored_close_error(owned,"codec.close",error) }
         if ar.built_destroy(&data._built) != .Ok { return authored_close_error(owned,"authoring.close",.Wrong_Phase) }

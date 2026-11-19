@@ -460,6 +460,8 @@ session_connect :: proc(
     s.role = options.role
     s.authority = options.role == .Solo || options.role == .Host || options.role == .Server
 
+    if options.role == .Solo {return .None}
+
     if !r.owner_is_nil(s.ownership.container.owner) {
         if options.backend != .Enet && options.backend != .Rtc {
             return session_setup_fail(
@@ -1050,12 +1052,12 @@ session_begin :: proc(
         return .None
     }
 
-    if (options.backend != .Enet && options.backend != .Rtc) || options.role == .Solo {
+    if options.role != .Solo && options.backend != .Enet && options.backend != .Rtc {
         return session_setup_fail(
             setup,
             .Invalid_Config,
             "options.role/backend",
-            "managed Sessions require a network role with Enet or Rtc",
+            "choose Solo or a network role with Enet or Rtc",
         )
     }
 

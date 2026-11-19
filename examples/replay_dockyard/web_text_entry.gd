@@ -13,7 +13,7 @@ const INSTALL := """
             const dialog = document.createElement('dialog');
             dialog.id = 'dockyard-room-entry';
             dialog.style.cssText = 'width:min(26rem,80vw);padding:24px;border:2px solid #4ce4cf;border-radius:14px;background:#102631;color:#fff2d6;font:18px system-ui;';
-            const form = document.createElement('form');
+            const controls = document.createElement('div');
             const label = document.createElement('label');
             label.textContent = 'Room code';
             const input = document.createElement('input');
@@ -32,9 +32,9 @@ const INSTALL := """
             hint.textContent = options.copy ? 'Copy this code for your crewmate.' : 'Type the code, or paste with Cmd/Ctrl+V.';
             hint.style.fontSize = '14px';
             const use = document.createElement('button');
-            use.type = 'submit'; use.textContent = options.copy ? 'Copy code' : 'Use code';
+            use.type = 'button'; use.dataset.action = 'apply'; use.textContent = options.copy ? 'Copy code' : 'Use code';
             const cancel = document.createElement('button');
-            cancel.type = 'button'; cancel.textContent = options.copy ? 'Done' : 'Cancel';
+            cancel.type = 'button'; cancel.dataset.action = 'dismiss'; cancel.textContent = options.copy ? 'Done' : 'Cancel';
             for (const button of [use, cancel]) button.style.cssText = 'padding:10px 16px;margin:4px 8px 0 0;font:16px system-ui;cursor:pointer;';
             const remove = () => {
                 input.value = ''; dialog.remove();
@@ -45,7 +45,8 @@ const INSTALL := """
                 dialog.close();
                 remove();
             };
-            form.addEventListener('submit', event => {
+            // Sandboxed game embeds can allow scripts and disallow form submission.
+            const apply = event => {
                 event.preventDefault();
                 if (!options.copy) {finish(true); return;}
                 // A direct user gesture on a selected native input works even
@@ -54,6 +55,10 @@ const INSTALL := """
                 let copied = false;
                 try {copied = document.execCommand('copy');} catch (_) {}
                 hint.textContent = copied ? 'Copied.' : 'Press Cmd/Ctrl+C to copy the selected code.';
+            };
+            use.addEventListener('click', apply);
+            input.addEventListener('keydown', event => {
+                if (event.key === 'Enter' && !event.isComposing) apply(event);
             });
             cancel.addEventListener('click', () => finish(false));
             dialog.addEventListener('cancel', event => {event.preventDefault(); finish(false);});
@@ -63,7 +68,7 @@ const INSTALL := """
                 remove();
                 if (!this.result) this.result = {accepted:false,value:''};
             });
-            form.append(label, hint, use, cancel); dialog.appendChild(form);
+            controls.append(label, hint, use, cancel); dialog.appendChild(controls);
             document.body.appendChild(dialog); this.dialog = dialog;
             dialog.showModal(); input.focus(); input.select();
             return true;

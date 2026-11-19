@@ -67,8 +67,16 @@ complete_owner_probe_replay_cases :: proc(self:^CompleteOwnerProbe,source:gd.Obj
     rules:=bd.hash_bytes(transmute([]u8)string("owner-test"))
     options:=rpg.authored_options(.Solo)
     report:=rpg.authored_open(&self.replay_a,source,model(),initial,rules,options)
-    if report.error!=.Invalid_Config || self.replay_a.storage.memory!=nil {return false}
+    if report.error!=.None {fmt.println(rn.setup_describe(&report));return false}
+    solo:=rpg.authored_session(&self.replay_a)
+    if solo==nil || solo.connection!=nil || rg.session_frame(solo,1.0/60.0,Control{})!=.None {return false}
+    if rpg.authored_close(&self.replay_a)!=.None || !complete_owner_probe_zero(self) {return false}
     options=rpg.authored_options(.Host);options.port=45931;options.network.epoch=7
+    room_options:=rg.Room_Options{session=options,identity={1,1},room=1,coordinator="127.0.0.1",control_port=45939}
+    room_options.key[0]=1
+    report=rpg.authored_room_open(&self.replay_a,source,model(),initial,rules,room_options)
+    if report.error!=.None {fmt.println("OWNER_ROOM_OPEN",rn.setup_describe(&report));return false}
+    if !rpg.authored_data(&self.replay_a).room.ready || rpg.authored_close(&self.replay_a)!=.None || !complete_owner_probe_zero(self) {return false}
     report=rpg.authored_open(&self.replay_a,source,model(),invalid_initial,rules,options)
     if report.error!=.Invalid_Model || report.cleanup_error!=.None || self.replay_a.storage.memory!=nil {return false}
     if !complete_owner_probe_zero(self) {return false}

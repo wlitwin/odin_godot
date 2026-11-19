@@ -33,7 +33,7 @@ async function key(page,frame,firefox,name){
 try{
  server=http.createServer((req,res)=>{
   res.setHeader('Content-Type','text/html');res.setHeader('Cross-Origin-Opener-Policy','same-origin');res.setHeader('Cross-Origin-Embedder-Policy','require-corp');res.setHeader('Cross-Origin-Resource-Policy','cross-origin');
-  if(req.url==='/parent')res.end(`<iframe width="900" height="600" allow="cross-origin-isolated" src="http://127.0.0.1:${server.address().port}/child"></iframe>`);
+  if(req.url==='/parent')res.end(`<iframe width="900" height="600" sandbox="allow-scripts allow-same-origin" allow="cross-origin-isolated" src="http://127.0.0.1:${server.address().port}/child"></iframe>`);
   else res.end('<!doctype html><html><body><script>'+javascript+'</script></body></html>');
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -63,7 +63,7 @@ try{
   write('before copy');await frame.evaluate(()=>window.dockyardTextEntry.open({value:'VGP3G',maxLength:85,copy:true}));
   await key(page,frame,firefox,'Enter');
   await frame.waitForFunction(()=>document.querySelector('#dockyard-room-entry p').textContent!=='Copy this code for your crewmate.',{timeout:5000});
-  item.copy_method='native form submit';
+  item.copy_method='native input Enter';
   if(read()!=='VGP3G'){
    await frame.focus('#dockyard-room-code');
    if(firefox)await frame.browsingContext.performActions([{type:'key',id:'native-paste',actions:[{type:'keyDown',value:'\uE03D'},{type:'keyDown',value:'c'},{type:'keyUp',value:'c'},{type:'keyUp',value:'\uE03D'}]}]);

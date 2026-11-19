@@ -31,7 +31,11 @@ room_open_complete :: proc(
     options: Room_Options,
     allocator := context.allocator,
     ownership: Room_Ownership = {},
-) -> net.Error {
+    setup: ^net.Setup_Report = nil,
+) -> (result: net.Error) {
+    if setup != nil {setup^ = {}}
+    stage := "room.options"
+    defer net.setup_finish(setup,result,stage,"could not initialize the complete-physics Room")
     if room == nil ||
        room.ready ||
        room.cleanup ||
@@ -52,18 +56,18 @@ room_open_complete :: proc(
         return .Invalid_Config
     }
 
+    stage = "room.ownership.allocator"
     if r.owner_is_nil(ownership.allocator.owner) ||
-       r.owner_is_nil(ownership.container.owner) ||
-       r.owner_contexts_check(
-           {owner = ownership.allocator.owner, owner_allocator_data = ownership.allocator.data},
-           allocator,
-       ) !=
-           .None ||
-       r.owned_context_access(ownership.container, room, true, .Execute) != .None ||
-       net.model_ownership_check(model, true) != .None {
+       r.owner_contexts_check({owner=ownership.allocator.owner,owner_allocator_data=ownership.allocator.data},allocator)!=.None {
         return .Invalid_Model
     }
-
+    stage = "room.ownership.container"
+    if r.owner_is_nil(ownership.container.owner) || r.owned_context_access(ownership.container,room,true,.Execute)!=.None {
+        return .Invalid_Model
+    }
+    stage = "room.model.ownership"
+    if net.model_ownership_check(model,true)!=.None {return .Invalid_Model}
+    stage = "room.ownership.rtc_ice"
     if options.session.rtc.ice_source != nil &&
        r.owned_context_access(ownership.rtc_ice, options.session.rtc.ice_user, true, .Execute) != .None {
         return .Invalid_Model
@@ -81,6 +85,7 @@ room_open_complete :: proc(
     // RPC schemas have many independently owned metadata allocations. Keep their
     // bookkeeping in a distinct real Core context; all contexts still charge the
     // same domain ledger/admission limit. The physics allocator remains unchanged.
+    stage = "room.rpc_meter"
     rpc_meter, status := meter.create(bg.service_get(), bg.CATEGORY_REPLAY_CORE)
 
     if status != bg.OK {
@@ -96,11 +101,13 @@ room_open_complete :: proc(
         model.complete_codec.ownership.data_context.owner,
     }
 
+    stage = "room.retain"
     if r.owner_retains_acquire(&room.retained, owners[:]) != .None ||
        net.model_ownership_retain(&room.retained, model) != .None {
         return .Invalid_Model
     }
 
+    stage = "room.codec.acquire"
     if model.complete_codec.acquire != nil {
         if error := model.complete_codec.acquire(model.complete_codec.catalog); error != .None {
             return error
@@ -109,6 +116,7 @@ room_open_complete :: proc(
         room.codec_retained = true
     }
 
+    stage = "room.initial.clone"
     copied, error := r.complete_checkpoint_clone(initial, allocator)
 
     if error != .None {
@@ -117,6 +125,7 @@ room_open_complete :: proc(
 
     room.initial_complete = copied
     room.complete_initial = true
+    stage = "room.session.alias"
     session_owner, se := session_block_owner(
         allocator,
         ownership.allocation_base,
@@ -130,6 +139,7 @@ room_open_complete :: proc(
     }
 
     room.aliases[0] = session_owner
+    stage = "room.rtc_authorization.alias"
     authorization, ae := session_block_owner(
         allocator,
         ownership.allocation_base,
@@ -144,6 +154,7 @@ room_open_complete :: proc(
 
     room.aliases[1] = authorization
 
+    stage = "room.control"
     if opened := room_open(room, initial.frame, model, options); opened != .None {
         return opened
     }

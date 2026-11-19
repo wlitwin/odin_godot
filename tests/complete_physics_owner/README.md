@@ -7,7 +7,7 @@ default backend. Outputs remain in the printed temporary evidence directories.
 
 The gate runs metered-storage tests, Replay codec refusal/rollback regressions,
 Kit provider/codec/Lane/network cleanup regressions, then a real Core SDK build
-and Godot runtime. The runtime covers unsupported-role and rejected-initializer
+and Godot runtime. The runtime covers socket-free Solo startup, an authored Room, and rejected-initializer
 rollback, a non-default Replay epoch, concurrent sources, detached checkpoints
 surviving source close, another source opening while an old checkpoint survives,
 managed temporary checkpoints, Kit busy-close retry, and script removal during

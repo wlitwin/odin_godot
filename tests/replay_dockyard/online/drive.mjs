@@ -21,11 +21,11 @@ async function readClipboard(a){return a.browser_name==='firefox'?execFileSync('
 async function writeClipboard(a,value){if(a.browser_name==='firefox'){execFileSync('/usr/bin/pbcopy',{input:value});}else await a.page.evaluate(value=>navigator.clipboard.writeText(value),value);}
 async function finishCopyDialog(actor){
  if(!await actor.page.$('#dockyard-room-entry input[readonly]'))return;
- await actor.page.click('#dockyard-room-entry button[type=submit]');
+ await actor.page.click('#dockyard-room-entry button[data-action=apply]');
  if(await actor.page.$eval('#dockyard-room-entry p',p=>!p.textContent.includes('Copied.'))){
   await actor.page.focus('#dockyard-room-code');await actor.page.keyboard.down('Meta');await actor.page.keyboard.press('KeyC');await actor.page.keyboard.up('Meta');
  }
- await actor.page.click('#dockyard-room-entry button[type=button]');await delay(100);
+ await actor.page.click('#dockyard-room-entry button[data-action=dismiss]');await delay(100);
 }
 const validInvite=code=>/^[A-HJ-NP-Z2-9]{5}$/.test(code)||/^RP1\.[0-9a-f]{16}\.[0-9a-f]{64}$/.test(code);
 const invalidInviteMessage=text=>/complete invitation|5-character room code/.test(text||'');
@@ -120,7 +120,7 @@ async function typeAt(actor,x,y,text){
  const nativeEntry=Boolean(await actor.page.$('#dockyard-room-code:not([readonly])'));
  await actor.page.keyboard.down('Meta');await actor.page.keyboard.press('KeyA');await actor.page.keyboard.up('Meta');
  await actor.page.keyboard.type(text,{delay:40});await delay(100);
- if(nativeEntry){await actor.page.click('#dockyard-room-entry button[type=submit]');await delay(100);}
+ if(nativeEntry){await actor.page.click('#dockyard-room-entry button[data-action=apply]');await delay(100);}
 }
 async function controlPoint(actor,key,x,y){
  const until=Date.now()+500;

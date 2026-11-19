@@ -26,8 +26,9 @@ The game's model leaves `complete_codec` empty. `initial_game` synchronously map
 the borrowed bake/build to pointer-free game values; do not retain either input
 pointer. The catalog profile defaults to the baked content ID, with an explicit
 `profile` override when the game's persistence policy needs one. Rules, role,
-transport and network choices stay explicit. Managed complete physics currently
-requires Enet/Rtc and a network role; Solo/Steam are rejected before allocation.
+transport and network choices stay explicit. Solo runs the local authority without opening a socket. Network sessions use
+Enet or Rtc. Use `authored_room_open` with granted Room options for online play,
+then pump the owned Room via `room_frame`.
 
 Raw model users, permits, RTC authorization and other application callback
 contexts still require their existing explicit ownership. The wrapper supplies
