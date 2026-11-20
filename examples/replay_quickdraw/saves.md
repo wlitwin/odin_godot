@@ -34,7 +34,7 @@ process-crash save boundary, not a new portable power-loss durability guarantee.
 Native identity and display-name preferences remain separate; do not share an identity
 file as a game-save export.
 
-The game content/schema remains D2; this feature does not add gameplay fields. D1
+The current content ID is D3. The contact event schema changed while the saved gameplay fields stayed the same. D1
 archives still have no implicit conversion. Browser IndexedDB slots and identity
 persistence have their own [browser-local flow](browser-saves.md); they do not use native file paths.
 

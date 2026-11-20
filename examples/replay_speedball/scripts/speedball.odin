@@ -603,20 +603,21 @@ paint :: proc(self: ^ReplaySpeedball, frame: r.Frame(game.World), dt: f64) {
     }
 
     if !self.session.authority && self.session.client.spectator {
-        a, b, alpha, ok := net.client_observed(&self.session.client)
+        sample, ok := rgd.session_render_sample(self.session)
 
         if ok {
+            a, b, alpha := sample.from, sample.to, sample.alpha
             w = alpha >= 1 ? b.state : a.state
 
             for &player, i in w.players {
-                if a.state.players[i].connected == b.state.players[i].connected {
+                if a.state.round == b.state.round && a.state.players[i].connected == b.state.players[i].connected {
                     player.motion.position =
                         a.state.players[i].motion.position +
                         (b.state.players[i].motion.position - a.state.players[i].motion.position) * alpha
                 }
             }
 
-            if a.state.ball.reset == b.state.ball.reset {
+            if a.state.round == b.state.round && a.state.ball.reset == b.state.ball.reset {
                 w.ball.motion.position =
                     a.state.ball.motion.position +
                     (b.state.ball.motion.position - a.state.ball.motion.position) * alpha

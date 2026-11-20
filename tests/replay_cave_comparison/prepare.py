@@ -28,7 +28,7 @@ for variant in ['kit','server','owner']:
  assert marker in s
  s=s.replace(marker,marker+'\n bench_start:=bench_active ? gd.time_get_ticks_usec(gd.singleton_time()) : u64(0)\n defer if bench_start!=0 {bench_note(bench_start)}',1);p.write_text(s)
  adapter=(root/'tests/replay_cave_comparison'/('kit.odin' if variant=='kit' else 'replay.odin')).read_text()
- if variant=='owner':adapter=adapter.replace('"../shared/cave"','"godot:examples/replay_cavecrawl/shared/owner_cave"')
+ if variant=='owner':adapter=adapter.replace('"../shared/cave"','"../shared/owner_cave"')
  (project/'scripts/comparison.odin').write_text(adapter)
  if variant!='kit':shutil.copy2(root/'tests/replay_cave_comparison/packets.odin',project/'scripts/packet_meter.odin')
  (out/variant/'prepared.json').write_text(json.dumps({str(p.relative_to(project)):sha(p) for p in project.rglob('*') if p.is_file()},indent=2)+'\n')

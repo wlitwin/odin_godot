@@ -18,7 +18,7 @@ open_session :: proc(
 ) -> (
     result: net.Error,
 ) {
-    defer if result == .None {self.presentation, self.smoothing = {}, {}}
+    defer if result == .None {self.render_cursor = {}}
     if self.online.launch {
         if self.resume_requested {
             return .Invalid_Config

@@ -7,7 +7,7 @@ import h "godot:replay/history"
 import net "godot:replay/net"
 import lb "godot:replay/lobby"
 
-CONTENT :: u64(0x52515549434b4432)
+CONTENT :: u64(0x52515549434b4433)
 SEATS :: 4
 HZ :: u32(60)
 RUN_SPEED :: f32(2.2)
@@ -79,7 +79,7 @@ Event_Kind :: enum u8 {
 
 Event :: struct {
     kind:             Event_Kind,
-    seat, target:     u8,
+    seat, target, slot: u8,
     position:         [2]f32,
     aim:              u16,
     key, judged_tick: u64,

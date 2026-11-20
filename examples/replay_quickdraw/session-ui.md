@@ -33,7 +33,7 @@ Browser identity/name persistence and service-backed party invitations use the
 shared [Party integration](online.md). Public deployment remains separate work.
 
 Names, start policy, and their actions use experimental content ID
-`0x52515549434b4432` (D2) because they change the complete state/action schema. D1 peers and
+`0x52515549434b4433` (D3). D3 also carries the projectile slot in launch and landing receipts. D1 peers and
 archives are intentionally incompatible; there is no implicit old-save conversion.
 Original Kit Quickdraw remains separately runnable with its original content and
 protocol. Host migration still requires a compatible prepared checkpoint; changing

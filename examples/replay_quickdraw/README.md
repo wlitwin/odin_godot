@@ -44,6 +44,11 @@ one coin for the shop scenario. Test bots are `strafer`, `deadeye`, `orbit` and
 `lobber`; set `RQ_BOT` to select one. `RQ_NOREWIND=1` on the authority is the live
 collision A/B control. `RQ_NOLOB=1` isolates hitscan.
 
+Gunners and drones use the same sampled world as flying lobs. The gun’s local
+muzzle cue responds immediately. Each launch and landing identifies the flight
+and its pool slot so even a lob retired between snapshots can show its landing.
+Hitscan continues to validate the target poses bound to the shooter’s input.
+
 ## Authored rule correspondence
 
 The port preserves the 640×360 arena, 12-pixel walls, two crates, four spawn points,
@@ -85,8 +90,8 @@ a paired old/new benchmark remain pending. This is not full Quickdraw or M6 comp
 - Three-process ENet: two 30-second hitscan phases at 120 ms injected delay per
   network leg, followed by a lob/purchase phase. The gate requires a clear
   historical/live hit gap, matching authoritative totals, one shot effect per
-  authoritative shot on the shooter/observer, every lob predicted before authority
-  acknowledgement, and the corresponding Godot node visible in less than 120 ms.
+  authoritative shot on the shooter/observer, immediate local throw feedback before authority
+  acknowledgement, every accepted lob displayed on the shared timeline, and the local muzzle cue visible in less than 120 ms.
 - Four-process migration: coordinator, host, successor and surviving shooter at
   240 ms gameplay RTT. Planned handoff and a killed host both restore an exact
   approved combat frame, including projectile flight and respawn/cooldown/history
@@ -94,7 +99,7 @@ a paired old/new benchmark remain pending. This is not full Quickdraw or M6 comp
   digests at a common tick. The planned source rejoins with its original seat.
 
 `RQ_METRICS` prints simulation correction/replay counts, application bytes and lob
-input-to-node latency. That latency measures input sampling to scene-node presence;
+input-to-projectile and input-to-muzzle-cue latency. These measure input sampling to scene-node presence;
 it does not measure display scanout. Corrections are snapshot applications, not
 necessarily visible positional errors. Detailed correction magnitude, CPU percentiles,
 partial prediction, and broader competitive migration/fault scenarios remain acceptance work.

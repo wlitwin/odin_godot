@@ -180,8 +180,8 @@ Project name, custom user-data directory and port are separate from the original
 
 The reducer applies input to gameplay values: roster/profile actions, readiness,
 start/drop-in, movement, dash, gun mechanisms, enemies, projectiles, drops, and
-events. The server computes accepted state, the local player predicts, and remote
-characters display on the observed view clock. This differs from the original's
+events. The server computes accepted state. The local player predicts inputs and muzzle
+feedback. Players, projectiles, turrets and enemies share one displayed world. This differs from the original's
 owner-streamed movement. The model never calls Godot. Arena rendering and
 collision use the same saved cover list; camera movement, animation, and
 smoothing do not modify it.

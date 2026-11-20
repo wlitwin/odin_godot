@@ -124,9 +124,8 @@ preserving seat/node identity for camera and UI references. Their lifetimes
 therefore differ from the entity-generation lifetimes used by enemies and loot.
 
 Movement/held controls and discrete actions retain their existing admission paths.
-Scene/UI signals can request actions; they do not mutate World. Local player poses
-use prediction and smoothing, remote actors use observed presentation, and permission
-checks use authority state. Camera following preserves the authoritative roster and
+Scene/UI signals can request actions; they do not mutate World. The local player, remote actors, projectiles and turrets share one observed render
+sample. Local input cues can respond immediately. Permission checks use authority state. Camera following preserves the authoritative roster and
 matches the displayed body's generation.
 
 Client wound effects use exact retained public event-tick frames because ordinary

@@ -32,7 +32,7 @@ come from `RQ_ICE_JSON`, or `RQ_ROOM_RELAY=1` requests authenticated relay crede
 Do not combine both ICE sources. Public deployment and non-loopback routing need their
 own acceptance; localhost success does not establish reachability across the internet.
 
-The bundled room service recognizes Quickdraw content D2 when selected by the operator
+The bundled room service recognizes Quickdraw content D3 when selected by the operator
 and supplies its typed checkpoint backend. A live online authority's Save/F5 publishes
 through Room rather than writing a local file. `RQ_ROOM_CHECKPOINT_MS` optionally sets
 the shared publication interval; zero keeps it manual. Native file resume still refuses

@@ -2,7 +2,7 @@
   {
     "profile": "server",
     "path": "tests/replay_cave_impact/fixtures/current/server.rplrec",
-    "sha256": "48c9b2d3e584f1a115443bd525b7ab5713fedebb92d7dd4dbe5e53ac04d1fc24",
+    "sha256": "02c55a70da23838b3c08e37fc051073d1f13566c07e2a7acbb157d5c1f9add11",
     "origin": "New current-model capture after restoring the migrated checkpoint; not converted historical event expectations.",
     "epoch": 2,
     "first": 1,
@@ -14,7 +14,7 @@
   {
     "profile": "owner",
     "path": "tests/replay_cave_impact/fixtures/current/owner.rplrec",
-    "sha256": "defe782f81490f6d1fb0bed3a983dde7b6a8d974b7cc0d1e910bcffe255b5b9d",
+    "sha256": "a9536f380ded5a0aa919c8813497a9caf8b9d5b50f18b09808f115554b01eb44",
     "origin": "New current-model capture after restoring the migrated checkpoint; not converted historical event expectations.",
     "epoch": 2,
     "first": 1,

@@ -19,7 +19,7 @@ From the repository root, create a private data directory and start the service:
 
 ```sh
 mkdir -m 700 -p .replay-room-data
-REPLAY_ROOM_CONTENT=0x4341564552504c39 \
+REPLAY_ROOM_CONTENT=0x4341564552504c3a \
 REPLAY_ROOM_DB="$PWD/.replay-room-data/rooms.sqlite3" \
 REPLAY_ROOM_CREATE_DB=1 REPLAY_ROOM_LOCAL_DEVELOPMENT=1 \
 nix develop --command bash examples/replay_room_service/run.sh
@@ -115,11 +115,11 @@ selects a different compatibility contract. Current compiled models are:
 
 | Model | Content ID |
 | --- | --- |
-| Cavecrawl | `0x4341564552504c39` |
-| Cavecrawl with owner observations | `0x434156454f574e33` |
+| Cavecrawl | `0x4341564552504c3a` |
+| Cavecrawl with owner observations | `0x434156454f574e34` |
 | Speedball | `0x5253504545444234` |
 | Scrapyard | `0x525343524150304b` |
-| Quickdraw | `0x52515549434b4432` |
+| Quickdraw | `0x52515549434b4433` |
 | Claimball | `0x52434c41494d4233` |
 | Slopball | `0x52534c4f50423234` |
 | Slopball3D | `0x52534c4f50334434` |

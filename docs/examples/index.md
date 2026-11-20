@@ -12,7 +12,9 @@ through input, gameplay state, and presentation.
 | Game | Play in the browser | What to study next |
 | --- | --- | --- |
 | `examples/replay_dockyard` | [Dockyard on itch.io](https://itchyitches.itch.io/dockyard) | Shared cargo, cooperative hauling, and [physics simulation](../box3d/concepts/simulation-and-rollback.md) |
-| `examples/replay_scrapyard` | [Scrapyard on itch.io](https://itchyitches.itch.io/scrapyard) | Combat, pickups, and [feature walkthroughs](../multiplayer/recipes/index.md) |
+| Parallax | [Parallax on itch.io](https://itchyitches.itch.io/parallax) | First-person aim, reversible target feedback and historical hit validation |
+| Second Helping | [Second Helping on itch.io](https://itchyitches.itch.io/second-helping) | Boomerang turns, moving obstacles and shared hit presentation |
+| Standalone Kit Scrapyard | [Scrapyard on itch.io](https://itchyitches.itch.io/scrapyard) | Compare combat and pickups with the Replay port’s [feature walkthroughs](../multiplayer/recipes/index.md) |
 
 The [multiplayer concepts](../multiplayer/concepts/index.md) explain the design
 problems behind those features. Use the smaller projects below to learn each
@@ -65,6 +67,26 @@ The [Scrapyard contributor guide](https://github.com/wlitwin/odin_godot/blob/mai
 traces a feature through its files. Its
 [code guide](https://github.com/wlitwin/odin_godot/blob/main/examples/replay_scrapyard/code-guide.md)
 maps responsibilities for larger changes.
+
+## Choose a Replay presentation example
+
+| Example | What drives its visible world |
+| --- | --- |
+| Replay starter and Hello | The starter samples the Session once and previews a local pickup. Hello demonstrates the lower-level network runner, including interpolation between received frames for spectators. |
+| Cavecrawl and Cavecrawl Owned | Characters, enemies and rocks share a contact timeline. Rock launches and impacts identify pool slots and lifetimes. Local owner physics still supplies the owned variant’s action origins. |
+| Quickdraw | Gunners, drones and lob flights share one sample. The muzzle responds locally. Hitscan judges the displayed target bracket and lobs show their accepted landing point. |
+| Replay Scrapyard | Runners, enemies, shots, ability lobs and turrets share a render sample. Muzzle and input cues can anticipate the result. Damage notices may aggregate multiple hits in a tick. |
+| Speedball and Claimball | Speedball demonstrates whole-pitch prediction with an interpolated observer. Claimball deliberately demonstrates a smaller prediction group and a local ball claim that blends back to the watched ball. |
+| Slopball and Slopball3D | Local owners run the engine body. Other participants interpolate the authoritative poses with ownership, revision and handoff checks. |
+| Dockyard Duo, Replay Box3D and Box3D Authoring | The actors and cargo come from one complete physics checkpoint. Dockyard smooths a remote robot’s visible correction. A value-only snapshot cannot supply native body poses. |
+| Replay Duel | Deterministic peers draw both fighters and projectiles from the same predicted P2P frame. |
+| Loot, Recipes, Duel Service and Room Service | Loot demonstrates engine-free resimulation. Recipes demonstrate integration. The two services have no rendered game world. |
+| Parallax | The FPS camera responds to local movement. Remote hitboxes use the exact quantized bracket consumed by rewind. Life changes cut interpolation, and score changes take effect on their displayed tick. |
+| Second Helping | All fruit, moving lids and boomerangs share a contact view. Local wind-up and aim respond immediately. |
+
+The public Scrapyard page runs the standalone Kit game. The Replay port is the
+source example in this repository. See the [Replay presentation guide](../replay/presentation.md)
+for the APIs used by these examples.
 
 ## Engine interop examples
 

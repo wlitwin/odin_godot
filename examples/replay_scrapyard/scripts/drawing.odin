@@ -6,8 +6,6 @@ import gd "godot:godot"
 import rgd "godot:replay/godot"
 import "godot:gdext"
 import r "godot:replay"
-import net "godot:replay/net"
-import v "godot:replay/view"
 import game "../shared/game"
 import arena "../shared/arena"
 import content "../shared/content"
@@ -157,7 +155,10 @@ runner_scenes_init :: proc(self: ^ReplayScrapyard) -> bool {
 }
 
 paint :: proc(self: ^ReplayScrapyard, predicted, truth: ^r.Frame(game.World), dt: f64) {
-    w := truth.state
+    sample, ready := rgd.session_render_sample(self.session, .Observed, &self.render_cursor, combat_contact)
+    if !ready {return}
+    observed := interpolate_observation(&sample)
+    w := &observed
 
     if !self.arena_built || self.built_key != w.layout.key {
         build_arena(self, w.layout)
@@ -165,17 +166,11 @@ paint :: proc(self: ^ReplayScrapyard, predicted, truth: ^r.Frame(game.World), dt
     }
 
     seat := rgd.session_seat(self.session)
-    scope_info, scope_ready := rgd.session_presentation(self.session)
-    if !scope_ready {return}
-    epoch := scope_info.epoch
-    observed := w
-    interpolate_observation(self, &observed)
+    epoch := sample.scope.epoch
     self.bot_scene[0] = observed
-    // Turrets use the local predicted shared simulation; spectators observe authority.
-    turret_world := seat > 0 ? &predicted.state : &observed
-    turret_bridge_paint(self, turret_world^)
-    paint_runner_views(self, &observed, predicted.state.players, turret_world, seat, epoch, dt)
-    camera_paint(self, &w, seat)
+    turret_bridge_paint(self, observed)
+    paint_runner_views(self, &observed, epoch)
+    camera_paint(self, &observed, seat)
     inside := seat > 0 && w.players[seat - 1].in_yard
 
     if seat == 0 {
@@ -186,75 +181,59 @@ paint :: proc(self: ^ReplayScrapyard, predicted, truth: ^r.Frame(game.World), dt
 
     gd.canvas_item_set_visible(self.world_node, inside)
     gd.canvas_item_set_visible(self.lobby, !inside)
-    muster_paint(self, &w, seat, inside)
+    muster_paint(self, w, seat, inside)
     combat_paint(self, observed, predicted.state, seat, dt)
-    abilities_paint(self, observed, predicted.state, seat, dt)
-    paint_ability_cooldowns(self, &w, predicted.state.players[seat > 0 ? seat - 1 : 0], seat, inside)
+    abilities_paint(self, &observed, seat, dt)
+    paint_ability_cooldowns(self, w, predicted.state.players[seat > 0 ? seat - 1 : 0], seat, inside)
     hud_present(
         self.hud,
-        display.hud(turret_world^, predicted.state.players[seat > 0 ? seat - 1 : 0], predicted.tick, seat, inside),
+        display.hud(observed, predicted.state.players[seat > 0 ? seat - 1 : 0], predicted.tick, seat, inside),
         gd.control_get_size(self.shop).y,
     )
-    status := gameplay_status(&w, predicted.state.players[seat > 0 ? seat - 1 : 0], seat, inside)
-    shop_paint(self, &w, predicted.state.players[seat > 0 ? seat - 1 : 0], inside && seat > 0)
-    scenery_gate_paint(self, &w, seat, dt)
-    transitions_paint(self.transitions, inside ? flow.derive(&w, truth.tick, seat) : flow.View{})
-    status = session_status(self, &w, seat, inside, status)
+    status := gameplay_status(w, predicted.state.players[seat > 0 ? seat - 1 : 0], seat, inside)
+    shop_paint(self, &truth.state, predicted.state.players[seat > 0 ? seat - 1 : 0], inside && seat > 0)
+    scenery_gate_paint(self, w, seat, dt)
+    transitions_paint(self.transitions, inside ? flow.derive(w, sample.tick, seat) : flow.View{})
+    status = session_status(self, w, seat, inside, status)
     gd.set_string(self.status, "text", status)
     paint_profile_status(self)
-    flow_paint(self, &w)
+    flow_paint(self, w)
 }
 
-interpolate_observation :: proc(self: ^ReplayScrapyard, observed: ^game.World) {
-    if !self.session.authority {
-        a, b, alpha, ok := net.client_present(&self.session.client)
+combat_contact :: proc(e: game.Event) -> bool {
+    return e.kind == .Wall || e.kind == .Blast || e.kind == .Hit || e.kind == .Hurt
+}
 
-        if ok {
-            observed^ = a.state
-
-            for &player, i in observed.players {
-                if player.generation == b.state.players[i].generation && player.warp == b.state.players[i].warp {
-                    player.position = player.position + (b.state.players[i].position - player.position) * alpha
-                }
-            }
-
-            for alive, i in observed.mobs.alive {
-                if alive && b.state.mobs.alive[i] && observed.mobs.generations[i] == b.state.mobs.generations[i] {
-                    observed.mobs.values[i].position +=
-                        (b.state.mobs.values[i].position - observed.mobs.values[i].position) * alpha
-                }
-            }
-
-            for alive, i in observed.drops.alive {
-                if alive && b.state.drops.alive[i] && observed.drops.generations[i] == b.state.drops.generations[i] {
-                    observed.drops.values[i].position +=
-                        (b.state.drops.values[i].position - observed.drops.values[i].position) * alpha
-                }
+interpolate_observation :: proc(sample: ^rgd.Render_Sample(game.World)) -> (world: game.World) {
+    a, b := &sample.from.state, &sample.to.state
+    world = sample.alpha >= 1 ? b^ : a^
+    if sample.from.tick == sample.to.tick || sample.alpha >= 1 ||
+       a.run != b.run || a.floor != b.floor || a.layout.key != b.layout.key {return}
+    for &player, i in world.players {
+        next := b.players[i]
+        if player.connected && next.connected && player.generation == next.generation && player.warp == next.warp {
+            player.position += (next.position - player.position) * sample.alpha
+        }
+    }
+    blend_positions :: proc(from, to: ^r.Pool($T,$N), alpha: f32) {
+        for &entity, i in from.values {
+            if from.alive[i] && to.alive[i] && from.generations[i] == to.generations[i] {
+                entity.position += (to.values[i].position - entity.position) * alpha
             }
         }
     }
+    blend_positions(&world.mobs, &b.mobs, sample.alpha)
+    blend_positions(&world.drops, &b.drops, sample.alpha)
+    blend_positions(&world.shots, &b.shots, sample.alpha)
+    blend_positions(&world.lobs, &b.lobs, sample.alpha)
+    return
 }
 
-paint_runner_views :: proc(
-    self: ^ReplayScrapyard,
-    observed: ^game.World,
-    predicted_players: [game.SEATS]game.Player,
-    turret_world: ^game.World,
-    seat: u16,
-    epoch: u64,
-    dt: f64,
-) {
-    for view, i in self.rigs {
-        player := observed.players[i]
-
-        if u16(i + 1) == seat {
-            player = predicted_players[i]
-        }
-
-        pose := v.smooth_present(&self.smoothing[i], {position = player.position}, dt)
+paint_runner_views :: proc(self: ^ReplayScrapyard, world: ^game.World, epoch: u64) {
+    for player, i in world.players {
         scenegd.script_present(
             &self.runner_bindings[i],
-            display.runner(turret_world^, player, pose.position, epoch, u16(i + 1)),
+            display.runner(world^, player, player.position, epoch, u16(i+1)),
         )
     }
 }

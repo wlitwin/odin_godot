@@ -13,6 +13,46 @@ replay_cave_rock_probe :: proc(self: ^ReplayCave, key: string, wanted: gd.Int = 
         return -1
     }
 
+    rock_slot := len(self.contacts.poses) - len(frame.state.rocks.values)
+    index := int(u32(wanted)) - 1
+    if key == "visible" {
+        if index < 0 || index >= 64 {return 0}
+        pose := self.contacts.poses[rock_slot + index]
+        return pose.visible && pose.life == u64(wanted) >> 32 ? 1 : 0
+    }
+    if !self.session.authority && self.session.client.phase == .Running {
+        client := &self.session.client
+        stamp := client.presented
+        if !stamp.valid {return -1}
+        a := &client.observed[stamp.from_tick % u64(len(client.observed))]
+        b := &client.observed[stamp.to_tick % u64(len(client.observed))]
+        if a.tick != stamp.from_tick || b.tick != stamp.to_tick {return -1}
+        if key == "tick" {return gd.Float(a.tick)}
+        if key == "fraction" {return gd.Float(stamp.fraction) / 65535}
+        if key == "key" {
+            for pose, i in self.contacts.poses[rock_slot:] {
+                if pose.visible {return gd.Float(pose.life << 32 | u64(i + 1))}
+            }
+            return 0
+        }
+        if index < 0 || index >= len(a.state.rocks.alive) {return -1}
+        lower, upper := &a.state.rocks, &b.state.rocks
+        comparable :=
+            lower.alive[index] &&
+            upper.alive[index] &&
+            lower.generations[index] == u32(u64(wanted) >> 32) &&
+            upper.generations[index] == lower.generations[index]
+        switch key {
+        case "comparable":
+            return comparable ? 1 : 0
+        case "x", "y":
+            return gd.Float(lower.values[index].position[key == "x" ? 0 : 1])
+        case "vx", "vy":
+            axis := key == "vx" ? 0 : 1
+            return gd.Float(upper.values[index].position[axis] - lower.values[index].position[axis])
+        }
+        return drawn_rock_value(self, key, u64(wanted))
+    }
     w := &frame.state
 
     switch key {
@@ -35,7 +75,7 @@ replay_cave_rock_probe :: proc(self: ^ReplayCave, key: string, wanted: gd.Int = 
     }
 
     identity := u64(wanted)
-    index := int(u32(identity)) - 1
+    index = int(u32(identity)) - 1
 
     if index < 0 ||
        index >= len(w.rocks.alive) ||
@@ -59,6 +99,10 @@ replay_cave_rock_probe :: proc(self: ^ReplayCave, key: string, wanted: gd.Int = 
         return gd.Float(rock.left)
     }
 
+    return drawn_rock_value(self, key, identity)
+}
+
+drawn_rock_value :: proc(self: ^ReplayCave, key: string, identity: u64) -> gd.Float {
     node, found := scenegd.nodes_get(&self.rocks, identity)
 
     if !found {

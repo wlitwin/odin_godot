@@ -21,7 +21,7 @@ for mode in simultaneous guest_first;do
  folder="$work/$mode";mkdir -p "$folder"
  control=$((30000+RANDOM%9000));gameport=$((41000+RANDOM%8000))
  start_service(){
-  REPLAY_ROOM_CONTENT=0x4341564552504c39 REPLAY_ROOM_PORT="$control" REPLAY_ROOM_DB="$folder/service.sqlite3" REPLAY_ROOM_CREATE_DB="$1" REPLAY_ROOM_CERT="$work/cert.pem" REPLAY_ROOM_KEY="$work/key.pem" ODIN_SCRIPTS_DLL="$SERVICE/bin/libodinscripts.$ext" "$GODOT" --headless --max-fps 120 --path "$SERVICE" >"$folder/service-$1.log" 2>&1 &server=$!
+  REPLAY_ROOM_CONTENT=0x4341564552504c3a REPLAY_ROOM_PORT="$control" REPLAY_ROOM_DB="$folder/service.sqlite3" REPLAY_ROOM_CREATE_DB="$1" REPLAY_ROOM_CERT="$work/cert.pem" REPLAY_ROOM_KEY="$work/key.pem" ODIN_SCRIPTS_DLL="$SERVICE/bin/libodinscripts.$ext" "$GODOT" --headless --max-fps 120 --path "$SERVICE" >"$folder/service-$1.log" 2>&1 &server=$!
   for _ in {1..150};do if rg -q REPLAY_ROOM_SERVICE_READY "$folder/service-$1.log";then return;fi;if ! kill -0 "$server" 2>/dev/null;then return 1;fi;sleep .1;done;return 1
  }
  launch(){

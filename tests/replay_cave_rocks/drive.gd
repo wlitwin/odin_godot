@@ -28,8 +28,8 @@ func run():
   game.throw(1,0)
  if not await wait_for(func():return p("key")>0,"rock spawn"):return
  key=int(p("key"));var start:=Time.get_ticks_usec()
- while p("x")!=-1:
-  rows.append({"us":Time.get_ticks_usec()-start,"tick":int(p("tick")),"x":p("x"),"y":p("y"),"draw_x":p("draw_x"),"draw_y":p("draw_y"),"vx":p("vx"),"vy":p("vy"),"fraction":p("fraction"),"center_x":p("center_x"),"center_y":p("center_y")})
+ while p("visible")==1:
+  rows.append({"us":Time.get_ticks_usec()-start,"tick":int(p("tick")),"x":p("x"),"y":p("y"),"draw_x":p("draw_x"),"draw_y":p("draw_y"),"vx":p("vx"),"vy":p("vy"),"fraction":p("fraction"),"comparable":p("comparable")==1,"center_x":p("center_x"),"center_y":p("center_y")})
   if not check(Time.get_ticks_usec()-start<5000000,"rock lifetime"):return
   await process_frame
  if not check(game.rock_view(key)==null,"expired membership leaves no ghost"):return

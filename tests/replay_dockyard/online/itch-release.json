@@ -1,0 +1,31 @@
+{
+  "itch_page": "https://itchyitches.itch.io/dockyard",
+  "channel": "html5",
+  "itch_build": 2443101,
+  "upload": 20559761,
+  "zip_sha256": "165ff27000e75633299186c71c1e25335b6a4b407e78c479c3f4dcecfeec8ce3",
+  "fetched_files_identical": 15,
+  "engine": "Godot 4.7.1 Web release",
+  "framework_base": "d387c899",
+  "web_archive_sha256": "e4a7ffde6570b0fb635ba7219363fdd2401213694454a9daf4ecc69a0f6171f4",
+  "cohort": "f684134667f2955b",
+  "previous_cohort_also_admitted": "d2904f8ea7f26f58",
+  "room_deployment_commit": "375bb4d",
+  "host_guest": {
+    "source": "Local release bytes, public production lobby, two isolated Chrome contexts",
+    "code_length": 5,
+    "transport": [
+      {
+        "type": "relay",
+        "sent": 58197,
+        "received": 5914
+      },
+      {
+        "type": "relay",
+        "sent": 5914,
+        "received": 58197
+      }
+    ]
+  },
+  "storefront_check": "itch returned HTTP 429 to this workstation. The completed channel was downloaded and compared byte for byte. The public storefront player target still needs confirmation."
+}

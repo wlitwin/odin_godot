@@ -101,40 +101,24 @@ combat_paint :: proc(self: ^ReplayScrapyard, observed, predicted: game.World, se
         )
     }
 
-    // Predicted shots for my seat; observed shots for other seats. Slot choices
-    // can differ after correction, so pack the view independently of world slots.
     count := 0
+    for shot, i in shown.shots.values {
+        if !shown.shots.alive[i] || shot.kind == .Spit || count >= len(self.shot_rigs) {continue}
+        line := self.shot_rigs[count]
+        shell := self.shell_rigs[count]
+        count += 1
+        gd.canvas_item_set_visible(shell, shot.kind == .Grenade)
 
-    for pass in 0 ..< 2 {
-        world := pass == 0 ? &forecast : &shown
-
-        for alive, i in world.shots.alive {
-            if alive {
-                shot := world.shots.values[i]
-
-                if shot.kind == .Spit ||
-                   (seat != 0 && shot.seat == seat) != (pass == 0) ||
-                   count >= len(self.shot_rigs) {
-                    continue
-                }
-
-                line := self.shot_rigs[count]
-                shell := self.shell_rigs[count]
-                count += 1
-                gd.canvas_item_set_visible(shell, shot.kind == .Grenade)
-
-                if shot.kind == .Grenade {
-                    gd.node2d_set_position(shell, shot.position)
-                }
-
-                gd.canvas_item_set_visible(line, shot.kind != .Grenade)
-                gd.node2d_set_position(line, shot.position)
-                gd.node2d_set_rotation(line, gd.Float(math.atan2(shot.velocity[1], shot.velocity[0])))
-                gd.line2d_set_width(line, 2)
-                gd.line2d_set_default_color(line, {1, 0.85, 0.4, 1})
-                gd.line2d_set_point_position(line, 1, shot.kind != .Ballistic ? gd.Vector2{-4, 0} : gd.Vector2{-12, 0})
-            }
+        if shot.kind == .Grenade {
+            gd.node2d_set_position(shell, shot.position)
         }
+
+        gd.canvas_item_set_visible(line, shot.kind != .Grenade)
+        gd.node2d_set_position(line, shot.position)
+        gd.node2d_set_rotation(line, gd.Float(math.atan2(shot.velocity[1], shot.velocity[0])))
+        gd.line2d_set_width(line, 2)
+        gd.line2d_set_default_color(line, {1, 0.85, 0.4, 1})
+        gd.line2d_set_point_position(line, 1, shot.kind != .Ballistic ? gd.Vector2{-4, 0} : gd.Vector2{-12, 0})
     }
 
     for i in count ..< len(self.shot_rigs) {
@@ -142,8 +126,8 @@ combat_paint :: proc(self: ^ReplayScrapyard, observed, predicted: game.World, se
         gd.canvas_item_set_visible(self.shell_rigs[i], false)
     }
 
-    cast_paths_paint(self, &shown, &forecast, seat)
-    area_paint(self, &shown, &forecast, seat)
+    cast_paths_paint(self, &shown, seat)
+    area_paint(self, &shown, seat)
     flash_count := 0
 
     for pass in 0 ..< 2 {
@@ -342,15 +326,13 @@ status_tint :: proc(w: game.World, effects: []p.Effect) -> gd.Color {
     return color
 }
 
-abilities_paint :: proc(self: ^ReplayScrapyard, observed, predicted: game.World, seat: u16, dt: f64) {
-    shown := observed
-    forecast := predicted
+abilities_paint :: proc(self: ^ReplayScrapyard, shown: ^game.World, seat: u16, dt: f64) {
     scope_info, scope_ready := rgd.session_presentation(self.session)
     if !scope_ready {return}
     epoch := scope_info.epoch
 
     for pass in 0 ..< 2 {
-        world := pass == 0 ? &forecast : &shown
+        world := shown
 
         for &rig, i in self.lob_rigs[pass] {
             lob := world.lobs.values[i]
@@ -385,5 +367,5 @@ abilities_paint :: proc(self: ^ReplayScrapyard, observed, predicted: game.World,
         }
     }
 
-    area_zones(self, &shown)
+    area_zones(self, shown)
 }

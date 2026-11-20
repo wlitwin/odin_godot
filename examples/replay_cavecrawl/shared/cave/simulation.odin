@@ -1,6 +1,7 @@
 package cave
 
 import r "godot:replay"
+import v "godot:replay/view"
 import p "godot:replay/play"
 import lb "godot:replay/lobby"
 
@@ -126,7 +127,7 @@ step_motion :: proc(
             if player.respawn_at != 0 && w.clock >= player.respawn_at {
                 player.hp, player.stamina, player.respawn_at = MAX_HP, MAX_STAMINA, 0
                 player.position = {80, 120}
-                r.emit(ctx, u64(i + 1), 2, Event{.Respawned, player.position, u16(i + 1), MAX_HP})
+                r.emit(ctx, u64(i + 1), 2, Event{kind=.Respawned,position=player.position,seat=u16(i+1),amount=MAX_HP})
             }
 
             continue
@@ -202,7 +203,7 @@ step_motion :: proc(
     }
 }
 
-hurt_player :: proc(w: ^World, victim: int, damage: i32, shooter: u16, chill: bool, cause: u64, ctx: ^r.Step(Event)) {
+hurt_player :: proc(w: ^World, victim: int, damage: i32, shooter: u16, chill: bool, cause: u64, ctx: ^r.Step(Event), contact := v.Contact(2){}) {
     player := &w.players[victim]
 
     if player.hp <= 0 {
@@ -214,7 +215,7 @@ hurt_player :: proc(w: ^World, victim: int, damage: i32, shooter: u16, chill: bo
     }
 
     player.hp = max(player.hp - damage, 0)
-    r.emit(ctx, cause, 1, Event{.Hit, player.position, u16(victim + 1), damage})
+    r.emit(ctx, cause, 1, Event{contact=contact, kind=.Hit, position=player.position, seat=u16(victim+1), amount=damage})
 
     if player.hp == 0 {
         player.deaths += 1
@@ -225,7 +226,7 @@ hurt_player :: proc(w: ^World, victim: int, damage: i32, shooter: u16, chill: bo
 
         spill(w, player)
         player.respawn_at = w.clock + 60
-        r.emit(ctx, cause, 2, Event{.Died, player.position, u16(victim + 1), 0})
+        r.emit(ctx, cause, 2, Event{kind=.Died, position=player.position, seat=u16(victim+1)})
     } else if chill {
         player.chill = 40
     }
@@ -261,7 +262,13 @@ step_rocks :: proc(w: ^World, ctx: ^r.Step(Event)) {
             }
         }
 
+        contact := v.Contact(2){
+            kind=.Hit, group=contact_group(w),
+            subject={ROCK_SLOT+i32(i),u64(w.rocks.generations[i]),from+(to-from)*closest}, retires=true,
+        }
         if victim >= 0 {
+            player := w.players[victim]
+            contact.other = v.Contact_Point(2){i32(victim),player_life(player),player.position}
             hurt_player(
                 w,
                 victim,
@@ -269,7 +276,7 @@ step_rocks :: proc(w: ^World, ctx: ^r.Step(Event)) {
                 rock.shooter,
                 true,
                 u64(1) << 60 | u64(w.rocks.generations[i]) << 16 | u64(i),
-                ctx,
+                ctx, contact,
             )
         }
 
@@ -278,12 +285,13 @@ step_rocks :: proc(w: ^World, ctx: ^r.Step(Event)) {
 
             // The projectile identifies this occurrence; its key retains the
             // victim's exact generation even if the pool slot is recycled.
+            contact.other = v.Contact_Point(2){DWELLER_SLOT+i32(dweller),u64(w.dwellers.generations[dweller]),target.position}
             target_key := u64(w.dwellers.generations[dweller]) << 32 | u64(dweller + 1)
             r.emit(
                 ctx,
                 u64(1) << 60 | u64(w.rocks.generations[i]) << 16 | u64(i),
                 target_key,
-                Event{.Hit, target.position, 0, ROCK_DAMAGE},
+                Event{contact=contact, kind=.Hit, position=target.position, amount=ROCK_DAMAGE},
             )
 
             target.hp = max(target.hp - ROCK_DAMAGE, 0)
@@ -299,7 +307,7 @@ step_rocks :: proc(w: ^World, ctx: ^r.Step(Event)) {
                     ctx,
                     2000 + u64(dweller),
                     u64(w.dwellers.generations[dweller]),
-                    Event{.Slain, position, rock.shooter, 1},
+                    Event{kind=.Slain, position=position, seat=rock.shooter, amount=1},
                 )
             }
         }

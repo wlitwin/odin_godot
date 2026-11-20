@@ -89,6 +89,7 @@ ReplayCave :: struct {
     ready, walking:                                        bool,
     motion:                                                Cave_Motion,
     feedback:                                              Cave_Feedback,
+    contacts: rgd.Contact_View(2,game.BODY_COUNT),
     rock_phase:                                            v.Tick_Phase,
     walk_target:                                           [2]f32,
     aim:                                                   [2]f32,
@@ -604,15 +605,20 @@ replay_cave_issue :: proc(self: ^ReplayCave, action: game.Action) {
 }
 
 replay_cave_paint :: proc(self: ^ReplayCave) {
-    frame, ok := rgd.session_state(self.session)
-
+    sample, ok := rgd.session_render_sample(self.session, &self.contacts, game.CONTACTS)
     if !ok {
         gd.set_text(cast(gd.Object)self.status, "Joining the cave…")
         return
     }
-
+    frame := sample.alpha >= 1 ? sample.to : sample.from
     w := frame.state
-    cave_motion_present(self, &w)
+    for &player,i in w.players {player.position=self.contacts.poses[i].position}
+    for &dweller,i in w.dwellers.values {dweller.position=self.contacts.poses[game.DWELLER_SLOT+i].position}
+    if sample.from.state.depth == sample.to.state.depth && sample.from.state.seed == sample.to.state.seed &&
+       sample.from.state.relic.version == sample.to.state.relic.version {
+        a,b := sample.from.state.relic.position,sample.to.state.relic.position
+        w.relic.position=a+(b-a)*sample.alpha
+    }
 
     if w.lobby.phase == .Waiting {
         gd.set_string(self.status, "text", "Waiting for the party")
@@ -724,13 +730,13 @@ replay_cave_paint :: proc(self: ^ReplayCave) {
 
     n = 0
 
-    for entity, i in w.rocks.values {
-        if !w.rocks.alive[i] {
-            continue
+    for pose,i in self.contacts.poses[game.ROCK_SLOT:] {
+        if !pose.visible {continue}
+        position := pose.position
+        if self.session.authority && w.rocks.alive[i] && u64(w.rocks.generations[i]) == pose.life {
+            position = cave_rock_position(&w, i, self.rock_phase.fraction)
         }
-
-        position := cave_rock_position(&w, i, self.rock_phase.fraction)
-        instances[n] = instance(u64(w.rocks.generations[i]) << 32 | u64(i + 1), position, {1, 1, 1, 1})
+        instances[n] = instance(pose.life << 32 | u64(i + 1), position, {1, 1, 1, 1})
         n += 1
     }
 

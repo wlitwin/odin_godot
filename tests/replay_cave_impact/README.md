@@ -17,8 +17,7 @@ Historical checkpoint/recording bytes and migration receipts remain under
 `docs/replay/results/usability-legacy-2026-11-16/cavecrawl`; no historical reducer
 or converter is used by the active gate.
 
-Full C9 normal/faulted
-and O3 campaigns retain gameplay/world-hash checks and require at least 24 dweller
+The server-motion and owner-motion campaigns retain gameplay/world-hash checks and require at least 24 dweller
 impacts alongside player hits and deaths. Read-only authority history proves the
 accepted heal's exact 25-HP gain after same-tick damage, five stamina cost and
 60-tick cooldown. This handles live bites between the revive and heal phases;

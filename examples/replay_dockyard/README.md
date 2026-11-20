@@ -4,7 +4,12 @@ Two salvage robots haul awkward cargo onto an escape barge. Odin owns the game
 rules, Replay owns prediction/recovery, Box3D owns physics, and Godot owns
 editor authoring and presentation.
 
-**Unreleased review candidate.** Actual native/browser multiplayer, full state,
+**[Play Dockyard Duo on itch.io](https://itchyitches.itch.io/dockyard).** The browser release
+draws cargo and robots from the same complete physics checkpoint and smooths the
+remote robot’s visual correction. Both the previous and current browser cohorts
+are admitted by the live lobby. [Browser release checks](../../tests/replay_dockyard/online/itch-release.json).
+
+**Earlier performance qualification.** Actual native/browser multiplayer, full state,
 recovery, rendered play and audio work in the recorded local cases. Both final
 610-second browser arrangements meet the original normal-frame limits. Firefox
 had one 45.92 ms eight-step correction against a 25 ms maximum; qualification remains

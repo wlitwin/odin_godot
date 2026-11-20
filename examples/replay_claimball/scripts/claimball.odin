@@ -702,9 +702,10 @@ paint :: proc(self: ^ReplayClaimball, frame: r.Frame(game.World), dt: f64) {
     observed := w
 
     if !self.session.authority {
-        a, b, alpha, ok := net.client_observed(&self.session.client)
+        sample, ok := rgd.session_render_sample(self.session)
 
         if ok {
+            a, b, alpha := sample.from, sample.to, sample.alpha
             observed = alpha >= 1 ? b.state : a.state
 
             for &player, i in observed.players {

@@ -4,8 +4,12 @@ import hashlib,json,shutil,subprocess,sys
 root=Path(__file__).resolve().parents[2]
 
 def apply_profile(project):
+    shared = project / 'shared'
+    if not shared.exists():
+        shutil.copytree(root/'examples/replay_cavecrawl/shared', shared, ignore=shutil.ignore_patterns('*.uid'))
+
     for p in (project/'scripts').glob('*.odin'):
-        s=p.read_text().replace('"../shared/cave"','"godot:examples/replay_cavecrawl/shared/owner_cave"')
+        s=p.read_text().replace('"../shared/cave"','"../shared/owner_cave"')
         s=s.replace('replay-cavecrawl-rooms','replay-cavecrawl-owned-rooms').replace('"replay-cavecrawl"','"replay-cavecrawl-owned"').replace('"REPLAY_CAVE_PORT", 49422','"REPLAY_CAVE_PORT", 49585').replace('"REPLAY_CAVE_PORT",49422','"REPLAY_CAVE_PORT",49585')
         p.write_text(s)
     p=project/'project.godot';s=p.read_text().replace('config/name="Replay Cavecrawl"','config/name="Replay Cavecrawl Owned"\nconfig/use_custom_user_dir=true\nconfig/custom_user_dir_name="ReplayCavecrawlOwned"');p.write_text(s)

@@ -10,7 +10,7 @@ def port():
 control=port();ports={role:port() for role in ('host','deputy','rider','watch')};children=[];files=[];events=[];serial=0
 
 def service_start(create):
- env=os.environ.copy();env.update(REPLAY_ROOM_CONTENT='0x52515549434b4432',REPLAY_ROOM_CHECKPOINT_MODEL='quickdraw',REPLAY_ROOM_PORT=str(control),REPLAY_ROOM_DB=str(out/'service.sqlite3'),REPLAY_ROOM_CREATE_DB=str(create),REPLAY_ROOM_CERT=str(out/'cert.pem'),REPLAY_ROOM_KEY=str(out/'key.pem'),REPLAY_ROOM_LOCAL_DEVELOPMENT='0',ODIN_SCRIPTS_DLL=str(service/('bin/libodinscripts.'+ext)))
+ env=os.environ.copy();env.update(REPLAY_ROOM_CONTENT='0x52515549434b4433',REPLAY_ROOM_CHECKPOINT_MODEL='quickdraw',REPLAY_ROOM_PORT=str(control),REPLAY_ROOM_DB=str(out/'service.sqlite3'),REPLAY_ROOM_CREATE_DB=str(create),REPLAY_ROOM_CERT=str(out/'cert.pem'),REPLAY_ROOM_KEY=str(out/'key.pem'),REPLAY_ROOM_LOCAL_DEVELOPMENT='0',ODIN_SCRIPTS_DLL=str(service/('bin/libodinscripts.'+ext)))
  log=(out/('service-'+str(create)+'.log')).open('w');files.append(log);p=subprocess.Popen([env['GODOT'],'--headless','--max-fps','120','--path',str(service)],env=env,stdout=log,stderr=subprocess.STDOUT);children.append(p)
  end=time.monotonic()+15
  while 'REPLAY_ROOM_SERVICE_READY' not in (out/('service-'+str(create)+'.log')).read_text():assert p.poll() is None and time.monotonic()<end,'service startup';time.sleep(.05)

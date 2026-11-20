@@ -316,9 +316,10 @@ replay_slopball_process :: proc(self: ^ReplaySlopball, dt: f64) {
         presentation := frame.state
 
         if !self.session.authority {
-            a, b, alpha, ok := net.client_observed(&self.session.client)
+            sample, ok := rgd.session_render_sample(self.session)
 
             if ok {
+                a, b, alpha := sample.from, sample.to, sample.alpha
                 for &player, i in presentation.players {
                     player.body = blended(a.state.players[i].body, b.state.players[i].body, alpha)
                 }

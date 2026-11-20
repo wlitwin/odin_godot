@@ -308,9 +308,18 @@ replay_network_frame :: proc(self: ^ReplayNetwork) -> r.Frame(game.World) {
 replay_network_paint :: proc(self: ^ReplayNetwork) {
     frame := replay_network_frame(self)
 
+    // This scene drives the raw network runner. A participant predicts the whole
+    // board; a spectator draws all live actor slots on one received bracket.
     if self.spectating {
-        if a, _, _, ok := net.client_observed(&self.client); ok {
-            frame = a
+        a, b, alpha, ready := net.client_present(&self.client)
+        if !ready {return}
+        frame = alpha >= 1 ? b : a
+        for &actor, i in frame.state.actors.values {
+            if a.state.actors.alive[i] && b.state.actors.alive[i] &&
+               a.state.actors.generations[i] == b.state.actors.generations[i] {
+                start := a.state.actors.values[i].body.position
+                actor.body.position = start + (b.state.actors.values[i].body.position - start) * alpha
+            }
         }
     }
 

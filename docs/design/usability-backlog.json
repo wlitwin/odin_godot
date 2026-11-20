@@ -1627,6 +1627,18 @@
         "186 Replay network tests, 35 view tests, scriptgen fixtures, native/WASM package inventory and 10 game rules tests passed.",
         "Packaged SDK passed the game rules and browser-target contact fixture. Two native WAN matches showed 33/33 guest and 248/248 shared-view contact observations in reach. The Web export over public TURN showed 17/17 on the guest. See ../second_helping/tests/contact-presentation.json."
       ]
+    },
+    {
+      "id": "Replay-example-presentation",
+      "title": "Migrate Replay game views and publish the browser games",
+      "status": "complete",
+      "task_id": "t_0267cfad2d924c06",
+      "acceptance": "Choose a coherent render policy per example, migrate the stored contracts needed by the new contact events, document and publish the playable browser updates.",
+      "validation": [
+        "Native host/player/observer checks for Hello, Cavecrawl, Replay Scrapyard, Quickdraw, Claimball, Speedball and both Slopball variants.",
+        "Retained checkpoint frame digests and pending state survived migration. Recaptured impact recordings validated.",
+        "Cavecrawl rock views were measured at 30, 60 and 144 FPS. See docs/examples/index.md for per-example policies and tests/replay_dockyard/online/itch-release.json for the current Dockyard build."
+      ]
     }
   ]
 }

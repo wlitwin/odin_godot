@@ -47,10 +47,8 @@ area_flash :: proc(world: ^game.World, flash: ^game.Flash) -> bool {
     )
 }
 
-area_paint :: proc(self: ^ReplayScrapyard, observed, predicted: ^game.World, seat: u16) {
+area_paint :: proc(self: ^ReplayScrapyard, world: ^game.World, seat: u16) {
     for pass in 0 ..< 2 {
-        world := pass == 0 ? predicted : observed
-
         for node, i in self.disc_rigs[pass] {
             f := &world.flashes.values[i]
             local := f.kind == .Boom && seat != 0 && f.seat == seat

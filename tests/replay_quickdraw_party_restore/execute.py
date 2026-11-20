@@ -7,7 +7,7 @@ for _ in range(2):
 control,http=ports;children=[];logs=[];server=None
 
 def start_service(create):
- env=os.environ.copy();env.update(REPLAY_ROOM_CONTENT='0x52515549434b4432',REPLAY_ROOM_CHECKPOINT_MODEL='quickdraw',REPLAY_ROOM_PORT=str(control),REPLAY_ROOM_DB=str(out/'service.sqlite3'),REPLAY_ROOM_CREATE_DB=str(create),REPLAY_ROOM_LOCAL_DEVELOPMENT='1',ODIN_SCRIPTS_DLL=str(service/('bin/libodinscripts.'+ext)))
+ env=os.environ.copy();env.update(REPLAY_ROOM_CONTENT='0x52515549434b4433',REPLAY_ROOM_CHECKPOINT_MODEL='quickdraw',REPLAY_ROOM_PORT=str(control),REPLAY_ROOM_DB=str(out/'service.sqlite3'),REPLAY_ROOM_CREATE_DB=str(create),REPLAY_ROOM_LOCAL_DEVELOPMENT='1',ODIN_SCRIPTS_DLL=str(service/('bin/libodinscripts.'+ext)))
  log=(out/('service-'+str(create)+'.log')).open('w');logs.append(log);child=subprocess.Popen([env['GODOT'],'--headless','--max-fps','120','--path',str(service)],env=env,stdout=log,stderr=subprocess.STDOUT);children.append(child)
  deadline=time.monotonic()+15
  while 'REPLAY_ROOM_SERVICE_READY' not in (out/('service-'+str(create)+'.log')).read_text():assert child.poll() is None and time.monotonic()<deadline,'service startup';time.sleep(.05)

@@ -11,7 +11,8 @@ loopback49740, which hosts several games (`REPLAY_ROOM_GAMES`, see the
 [room service](../../replay_room_service/README.md#hosting-several-games)):
 `/replay-room/dockyard` reaches Dockyard's cohorts, `/replay-room/golf` the
 minigolf game's. In pi-nix the games and their cohorts are listed in
-`services/replay-room.nix`. Nginx terminates TLS with the existing ACME
+`services/replay-room.nix`. Dockyard accepts `d2904f8ea7f26f58` and `f684134667f2955b` so players
+with either browser build can still create and join compatible rooms. Nginx terminates TLS with the existing ACME
 certificate. The Elixir `SIGNAL_LOCAL_PROXY=1` option explicitly binds its
 private listener to loopback; the ordinary direct-TLS default is retained.
 No new authority protocol implementation or router port is required.

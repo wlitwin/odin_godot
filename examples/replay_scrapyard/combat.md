@@ -46,8 +46,8 @@ Feedback aggregates hit damage, kills, received damage, pickups, healing and bla
 once per player/kind/tick; exact target state remains in the world. Together with shots,
 jams, dashes and roster events this fits the runner's 32-gameplay-event limit.
 
-Rendering reads observed enemy/drop state, predicted local shots and observed
-remote shots. Original runner/zombie strips and scrap geometry are retained.
+Rendering samples the runners, enemies, drops and shots together. A round, warp
+or entity-generation change cuts the previous path. Local muzzle cues remain immediate. Original runner/zombie strips and scrap geometry are retained.
 Weapon names/regions and enemy scale come from the received catalog. Beams and
 blast rings are bounded value-owned visuals, so correction/checkpoint restoration
 preserves their lifetime. At saturation the oldest visual is replaced and a counter

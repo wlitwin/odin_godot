@@ -8,9 +8,8 @@ start partway through that curve, and expiration/correction removes the view.
 
 The original uses a 0.28-second local announcement clock. Replay retains its
 existing 17-tick flash lifetime (about 0.283 seconds at 60 Hz), deriving progress
-from displayed state. Nova and reaction discs use observed state; grenade blasts
-retain predicted local / observed remote selection. Separate bounded banks keep
-predicted and observed effect lifetimes independent. This is presentation
+from displayed state. Nova, reaction and grenade blast discs use the shared displayed world. Separate
+bounded banks retain local and remote visual lifetimes. This is presentation
 metadata only: the simulation's flash, action/event, content and checkpoint formats are unchanged.
 
 Standing zones are filled 24-point discs, radius from their catalog row and alpha

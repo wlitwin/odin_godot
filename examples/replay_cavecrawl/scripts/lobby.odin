@@ -413,6 +413,7 @@ replay_cave_on_leave :: proc(self: ^ReplayCave) {
     self.moderation.roster = 0
     gd.canvas_item_set_visible(self.moderation.panel, false)
     self.motion = {}
+    self.contacts = {}
     self.rock_phase = {}
     gd.canvas_item_set_visible(self.score_panel, false)
     gd.set_string(self.chat_lines, "text", "")

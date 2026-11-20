@@ -215,7 +215,7 @@ validated slot read. Public provisioning remains separate work.
 
 Run `nix develop --command bash examples/replay_cavecrawl/lobby_run.sh` for actual
 menu, readiness, renaming, named chat/scoreboard, leave/reopen and native preference
-reload checks. The current game content is `0x4341564552504c39`; see
+reload checks. The current game content is `0x4341564552504c3a`; see
 [authoring.md](authoring.md) for explicit conversion of earlier Replay saves.
 
 

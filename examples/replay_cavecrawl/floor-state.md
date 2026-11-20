@@ -33,7 +33,7 @@ values and event sequence; no external reset bookkeeping is needed.
 
 ## Compatibility
 
-The server-motion profile uses content C9 (`0x4341564552504c39`). Update peers and
+The server-motion profile uses content C10 (`0x4341564552504c3a`). Update peers and
 service launchers together; normal loads require the current contract.
 
 Retained fixtures preserve an injured party before descent, the already-healed

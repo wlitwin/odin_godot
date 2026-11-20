@@ -34,7 +34,7 @@ comparison boundaries.
 
 ## Compatibility and acceptance
 
-Current content is C9. Current checkpoint fixtures preserve carrier identity,
+Current content is C10. Current checkpoint fixtures preserve carrier identity,
 relic version/position and the peer ledger through death or disconnection. They
 were migrated once; [originals and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain evidence. Loading
 cannot recover ownership already discarded by an earlier game.

@@ -14,7 +14,7 @@ with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as sock:sock.bind(('127.0.
 with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
 children=[];logs=[];exits={}
 try:
- env=os.environ.copy();env.update(REPLAY_ROOM_CONTENT='0x52515549434b4432',REPLAY_ROOM_PORT=str(control),REPLAY_ROOM_DB=str(out/'service.sqlite3'),REPLAY_ROOM_CREATE_DB='1',REPLAY_ROOM_LOCAL_DEVELOPMENT='1',ODIN_SCRIPTS_DLL=str(service/('bin/libodinscripts.'+ext)))
+ env=os.environ.copy();env.update(REPLAY_ROOM_CONTENT='0x52515549434b4433',REPLAY_ROOM_PORT=str(control),REPLAY_ROOM_DB=str(out/'service.sqlite3'),REPLAY_ROOM_CREATE_DB='1',REPLAY_ROOM_LOCAL_DEVELOPMENT='1',ODIN_SCRIPTS_DLL=str(service/('bin/libodinscripts.'+ext)))
  log=(out/'service.log').open('w');logs.append(log);server=subprocess.Popen([env['GODOT'],'--headless','--max-fps','120','--path',str(service)],env=env,stdout=log,stderr=subprocess.STDOUT);children.append(('service',server))
  deadline=time.monotonic()+10
  while 'REPLAY_ROOM_SERVICE_READY' not in (out/'service.log').read_text():assert server.poll() is None and time.monotonic()<deadline;time.sleep(.05)

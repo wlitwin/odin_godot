@@ -11,7 +11,7 @@ flag. Shot and hurt journal changes drive short visual cues. Confirmation/update
 does not restart a cue, cancellation only clears its current identity, and old
 epoch/tick events cannot replace a newer cue. Generation/warp/epoch boundaries
 reset transient state. The reload flag and downed pose derive from the displayed
-player state, including local prediction and remote presentation.
+player state on the shared render timeline.
 
 Enemies use attack animation rows while stopped near a living target or
 preparing a boss slam. They face nearby targets and use the original frame

@@ -16,7 +16,7 @@ REPLAY_CAVE_ROLE=observer nix develop --command bash examples/replay_cavecrawl_o
 
 The default port is **49585**. The native user directory is `ReplayCavecrawlOwned`;
 browser profile and Party namespaces also differ from the server-simulated port.
-Content `0x434156454f574e33` and the latest-observation contract are incompatible
+Content `0x434156454f574e34` and the latest-observation contract are incompatible
 with server-motion peers/saves. There is no implicit cross-profile conversion.
 Both Replay profiles and the original Kit game remain independently runnable.
 
@@ -59,7 +59,7 @@ deterministic Godot physics.
 ## Recovery and acceptance
 
 The existing Room path supports this model. A provision/checkpoint service can use
-`REPLAY_ROOM_CONTENT=0x434156454f574e33` and
+`REPLAY_ROOM_CONTENT=0x434156454f574e34` and
 `REPLAY_ROOM_CHECKPOINT_MODEL=cavecrawl-owned`; see the
 [service configuration](../replay_room_service/README.md). Service state must be
 separate from deployments of the other content IDs.
@@ -109,7 +109,7 @@ runner's existing ordering and deduplication; contexts do not consume or rewind
 pose-stream sequences. A preserved pending context from a previous authority epoch
 is refused normally; a fresh command needs the newly observed scope.
 
-Current owner content is O3. Retained O1/O2 checkpoints were migrated before
+Current owner content is O4. Retained O1/O2 checkpoints were migrated before
 retiring old readers. Saved accepted-pose commands keep that meaning; migration
 does not invent an issue-time origin. [Originals and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain
 separate evidence. The current fixture gate checks exact frame installation,

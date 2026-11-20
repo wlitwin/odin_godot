@@ -25,6 +25,7 @@ ReplayQuickdraw :: struct {
     ui:                                                           [1]Quickdraw_UI,
     comms:                                                        co.Comms,
     diagnostics:                                                  dg.Diagnostics,
+    contacts: rgd.Contact_View(2, game.BODY_COUNT),
     views_ready, keyboard_captured, name_submitted:               bool,
     display_name:                                                 lb.Name,
     name_sequence:                                                u64,
@@ -62,6 +63,8 @@ ReplayQuickdraw :: struct {
     gunners, drones, bullets, rings:                              scenegd.Nodes2,
     feedback:                                                     [1]flow.Feedback,
     drawn:                                                        [game.SEATS]game.Player,
+    local_aim: u16,
+    beam_origin: [game.SEATS][2]f32,
     beam_time:                                                    [game.SEATS]f64,
     beam_aim:                                                     [game.SEATS]u16,
     beam_id:                                                      [game.SEATS]r.Event_Id,
@@ -71,6 +74,9 @@ ReplayQuickdraw :: struct {
     local_shots, watched_shots, local_lobs, speculative_lobs:     u32,
     last_lob:                                                     u64,
     lob_held:                                                     bool,
+    lob_cue_ttl: f64,
+    lob_cue_pending, lob_cue_max_ms: u64,
+    lob_cues_drawn: u32,
     lob_waiting:                                                  bool,
     lob_requested_ms, lob_pending_key, lob_visible_max_ms:        u64,
     lob_visible_count:                                            u32,
@@ -418,6 +424,7 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
     }
 
     control := sample(self, frame.tick + 1, seat)
+    self.local_aim = control.aim
     lob := control.buttons & game.LOB != 0
 
     if lob &&
@@ -453,6 +460,7 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
         scenegd.nodes_clear(&self.gunners)
         scenegd.nodes_clear(&self.drones)
         scenegd.nodes_clear(&self.bullets)
+        self.lob_cue_ttl, self.lob_cue_pending = 0, 0
         self.beam_time, self.beam_id, self.last_lob, self.lob_pending_key, self.lob_waiting = {}, {}, 0, 0, false
     }
 
@@ -511,12 +519,14 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
 
             if change.kind == .Update && self.beam_id[event.seat - 1] == change.occurrence.id {
                 self.beam_aim[event.seat - 1] = event.aim
+                self.beam_origin[event.seat - 1] = event.position
             }
 
             if change.kind != .Begin {
                 continue
             }
 
+            self.beam_origin[event.seat - 1] = event.position
             self.beam_time[event.seat - 1], self.beam_aim[event.seat - 1] = 0.09, event.aim
             self.beam_id[event.seat - 1] = change.occurrence.id
 
@@ -554,8 +564,12 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
             gd.print_str(fmt.tprintf("RQ_HIT by=%d on=%d", event.seat, event.target))
         }
 
+        if event.kind == .Lobbed && change.kind == .Cancel && event.key == self.last_lob {
+            self.lob_cue_ttl, self.lob_cue_pending = 0, 0
+        }
         if event.kind == .Lobbed && change.kind == .Begin && u16(event.seat) == seat && event.key != self.last_lob {
             self.local_lobs += 1
+            self.lob_cue_ttl, self.lob_cue_pending = .10, event.key
             self.last_lob = event.key
             self.lob_pending_key = event.key
             predicted, _ := rgd.session_state(self.session)
@@ -578,6 +592,15 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
         observe_recovery(self)
     }
 
+    if self.lob_cue_pending != 0 && seat > 0 {
+        if node, exists := scenegd.nodes_get(&self.gunners, u64(seat)); exists &&
+           gd.canvas_item_is_visible(cast(gd.Canvas_Item)gd.get_node(node,"Gun/LobCue")) {
+            self.lob_cues_drawn += 1
+            self.lob_cue_max_ms = max(self.lob_cue_max_ms, now - self.lob_requested_ms)
+            self.lob_cue_pending = 0
+        }
+    }
+    self.lob_cue_ttl = max(0, self.lob_cue_ttl - dt)
     if self.lob_pending_key != 0 {
         if _, exists := scenegd.nodes_get(&self.bullets, self.lob_pending_key); exists {
             self.lob_visible_count += 1
@@ -624,8 +647,8 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
             stats := self.session.authority ? self.session.server.stats : self.session.client.stats
             gd.print_str(
                 fmt.tprintf(
-                    "RQ_METRICS visible_lobs=%d lob_visible_max_ms=%d corrections=%d replay_ticks=%d rx_bytes=%d tx_bytes=%d rejected_views=%d expired_views=%d resyncs=%d stalls=%d",
-                    self.lob_visible_count,
+                    "RQ_METRICS throw_cues=%d throw_cue_max_ms=%d visible_lobs=%d lob_visible_max_ms=%d corrections=%d replay_ticks=%d rx_bytes=%d tx_bytes=%d rejected_views=%d expired_views=%d resyncs=%d stalls=%d",
+                    self.lob_cues_drawn, self.lob_cue_max_ms, self.lob_visible_count,
                     self.lob_visible_max_ms,
                     stats.corrections,
                     stats.replayed_ticks,
@@ -644,62 +667,28 @@ replay_quickdraw_process :: proc(self: ^ReplayQuickdraw, dt: f64) {
 }
 
 paint :: proc(self: ^ReplayQuickdraw) {
-    frame, ok := rgd.session_state(self.session)
-
+    sample, ok := rgd.session_render_sample(self.session, &self.contacts, game.CONTACTS)
     if !ok {
         gd.set_text(cast(gd.Object)self.status, "Riding into town…")
         return
     }
-
     seat := rgd.session_seat(self.session)
-
-    if !frame.state.started {
+    w := sample.alpha >= 1 ? sample.to.state : sample.from.state
+    if !w.started {
         scenegd.nodes_clear(&self.gunners)
         scenegd.nodes_clear(&self.drones)
         scenegd.nodes_clear(&self.bullets)
         gd.set_string(self.status, "text", "Waiting for the match leader to start.")
         return
     }
-
-    w := frame.state
-    observed := w
-    next_observed := w
-    observed_alpha := f32(0)
-    watched_available := self.session.authority
     self.drawn = w.players
-
-    if !self.session.authority {
-        a, b, alpha, available := net.client_present(&self.session.client)
-
-        if available {
-            watched_available = true
-            observed = alpha >= 1 ? b.state : a.state
-            next_observed, observed_alpha = b.state, alpha
-
-            for &player, i in self.drawn {
-                if i + 1 == int(seat) {
-                    continue
-                }
-
-                old, next := a.state.players[i], b.state.players[i]
-                player = alpha >= 1 ? next : old
-
-                if old.life == next.life && old.connected == next.connected {
-                    player.position = old.position + (next.position - old.position) * alpha
-                    player.drone = old.drone + (next.drone - old.drone) * alpha
-                    difference := game.angle(next.aim) - game.angle(old.aim)
-
-                    for difference > math.PI {
-                        difference -= 2 * math.PI
-                    }
-
-                    for difference < -math.PI {
-                        difference += 2 * math.PI
-                    }
-
-                    player.aim = game.aim(game.angle(old.aim) + difference * alpha)
-                }
-            }
+    for &player, i in self.drawn {
+        player.position = self.contacts.poses[i].position
+        player.drone = self.contacts.poses[game.SEATS+i].position
+        old, next := sample.from.state.players[i], sample.to.state.players[i]
+        if old.connected && next.connected && old.life == next.life {
+            delta := v.angle_delta(game.angle(old.aim), game.angle(next.aim))
+            player.aim = game.aim(game.angle(old.aim) + delta * sample.alpha)
         }
     }
 
@@ -723,29 +712,20 @@ paint :: proc(self: ^ReplayQuickdraw) {
     }
 
     scenegd.nodes_present(&self.gunners, instances[:n])
-    authority, authority_ok := rgd.session_authority_state(self.session)
-
     for player, i in self.drawn {
-        health := player
-
-        if i + 1 == int(seat) && authority_ok {
-            health = authority.state.players[i]
-        }
-
-        if self.session.authority ||
-           (i + 1 == int(seat) && authority_ok) ||
-           (i + 1 != int(seat) && watched_available) {
-            flow.health(&self.feedback[0], i, health.life, health.hp, health.connected)
-        }
+        flow.health(&self.feedback[0], i, player.life, player.hp, player.connected)
 
         if node, present := scenegd.nodes_get(&self.gunners, u64(i + 1)); present {
-            gd.node2d_set_rotation(cast(gd.Node2d)gd.get_node(node, "Gun"), f64(game.angle(player.aim)))
+            aim := i+1 == int(seat) ? self.local_aim : player.aim
+            gd.node2d_set_rotation(cast(gd.Node2d)gd.get_node(node, "Gun"), f64(game.angle(aim)))
+            gd.canvas_item_set_visible(cast(gd.Canvas_Item)gd.get_node(node, "Gun/LobCue"), i+1 == int(seat) && self.lob_cue_ttl>0)
             beam := gd.get_node(node, "Beam")
             gd.set_bool(cast(gd.Object)beam, "visible", self.beam_time[i] > 0)
+            gd.node2d_set_position(cast(gd.Node2d)beam, self.beam_origin[i] - player.position)
             gd.node2d_set_rotation(cast(gd.Node2d)beam, f64(game.angle(self.beam_aim[i])))
             gd.node2d_set_scale(
                 cast(gd.Node2d)beam,
-                {game.wall_limit(player.position, game.direction(self.beam_aim[i])) / 100, 1},
+                {game.wall_limit(self.beam_origin[i], game.direction(self.beam_aim[i])) / 100, 1},
             )
         }
     }
@@ -774,41 +754,15 @@ paint :: proc(self: ^ReplayQuickdraw) {
 
     n = 0
 
-    for bullet, i in w.bullets.values {
-        if w.bullets.alive[i] && (self.session.authority || int(bullet.owner) == int(seat)) {
-            bullet_colors[n] = colors[bullet.owner - 1]
-            instances[n] = {
-                key = bullet.key,
-                pose = {position = bullet.position},
-                scale = {1, 1},
-                color = {1, 1, 1, 1},
-            }
-            n += 1
-        }
-    }
-
-    if !self.session.authority {
-        for bullet, i in observed.bullets.values {
-            if observed.bullets.alive[i] && int(bullet.owner) != int(seat) && n < len(instances) {
-                position := bullet.position
-
-                for next, j in next_observed.bullets.values {
-                    if next_observed.bullets.alive[j] && next.key == bullet.key {
-                        position += (next.position - position) * observed_alpha
-                        break
-                    }
-                }
-
-                bullet_colors[n] = colors[bullet.owner - 1]
-                instances[n] = {
-                    key = bullet.key,
-                    pose = {position = position},
-                    scale = {1, 1},
-                    color = {1, 1, 1, 1},
-                }
-                n += 1
-            }
-        }
+    for pose in self.contacts.poses[game.LOB_SLOT:] {
+        if !pose.visible {continue}
+        // spawn_key packs the firing seat in bits 4..7, including terminal
+        // contacts already absent from both snapshot pools.
+        owner := int((pose.life >> 4) & 15)
+        if owner < 1 || owner > game.SEATS {continue}
+        bullet_colors[n] = colors[owner-1]
+        instances[n] = {key = pose.life, pose = {position = pose.position}, scale = {1,1}, color = {1,1,1,1}}
+        n += 1
     }
 
     scenegd.nodes_present(&self.bullets, instances[:n])

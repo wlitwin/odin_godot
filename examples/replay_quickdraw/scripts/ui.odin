@@ -174,6 +174,8 @@ replay_quickdraw_on_leave :: proc(self: ^ReplayQuickdraw) {
     dg.init(&self.diagnostics)
     self.ready, self.stopping, self.seated, self.name_submitted = false, false, false, false
     self.name_sequence, self.view_epoch, self.painted_epoch, self.last_receipt = 0, 0, 0, 0
+    self.lob_cue_ttl, self.lob_cue_pending, self.lob_cue_max_ms, self.lob_cues_drawn = 0, 0, 0, 0
+    self.contacts = {}
     self.drawn = {}
     self.beam_time = {}
     self.beam_id = {}

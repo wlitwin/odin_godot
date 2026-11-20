@@ -1,11 +1,9 @@
 package replay_scrapyard
 
-import net "godot:replay/net"
 
 import "core:fmt"
 import gd "godot:godot"
 import rgd "godot:replay/godot"
-import v "godot:replay/view"
 import game "../shared/game"
 import debuggd "godot:replay/godot/debug"
 
@@ -107,31 +105,6 @@ advance_gameplay_session :: proc(self: ^ReplayScrapyard, dt: f64, control: game.
     }
 
     return true
-}
-
-update_prediction_smoothing :: proc(self: ^ReplayScrapyard) {
-    current, ready := rgd.session_presentation(self.session)
-    if !ready {
-        self.presentation, self.smoothing = {}, {}
-        return
-    }
-    same_scope := rgd.presentation_same_scope(current, self.presentation)
-    if !same_scope {self.smoothing = {}}
-    unchanged := same_scope && current.correction_serial == self.presentation.correction_serial
-    self.presentation = current
-    if current.authority || unchanged || current.correction_serial == 0 {return}
-    correction: net.State_Correction(game.World)
-    if !rgd.session_correction(self.session, current, &correction) {return}
-    for i in 0 ..< game.SEATS {
-        v.smooth_correct(
-            &self.smoothing[i],
-            correction.before.state.players[i].position,
-            correction.after.state.players[i].position,
-            discontinuity = correction.before.state.players[i].generation !=
-                correction.after.state.players[i].generation ||
-            correction.before.state.players[i].warp != correction.after.state.players[i].warp,
-        )
-    }
 }
 
 present_session_frame :: proc(self: ^ReplayScrapyard, dt: f64) {

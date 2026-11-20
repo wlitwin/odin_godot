@@ -1,11 +1,12 @@
 package cave
 
 import r "godot:replay"
+import v "godot:replay/view"
 import p "godot:replay/play"
 import net "godot:replay/net"
 import lb "godot:replay/lobby"
 
-CONTENT :: u64(0x4341564552504c39)
+CONTENT :: u64(0x4341564552504c3a)
 OWNER_MOTION :: false
 SEATS :: 4
 MAX_WAVES :: 8
@@ -124,6 +125,7 @@ Event_Kind :: enum u8 {
 }
 
 Event :: struct {
+    contact: v.Contact(2),
     kind:     Event_Kind,
     position: [2]f32,
     seat:     u16,

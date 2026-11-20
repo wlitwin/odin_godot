@@ -6,10 +6,16 @@ import net "godot:replay/net"
 import o "godot:replay/owned"
 import p "godot:replay/play"
 import base "../cave"
+import v "godot:replay/view"
 
 OWNER_MOTION :: true
-CONTENT :: u64(0x434156454f574e33)
+CONTENT :: u64(0x434156454f574e34)
 SEATS :: base.SEATS
+BODY_COUNT :: base.BODY_COUNT
+DWELLER_SLOT :: base.DWELLER_SLOT
+ROCK_SLOT :: base.ROCK_SLOT
+CONTACTS :: v.Contact_Model(World,Event,2,BODY_COUNT){contact_bodies, base.read_contact}
+contact_bodies :: proc(w:^World, out:^v.Contact_Bodies(2,BODY_COUNT)) {base.contact_bodies(&w.cave,out)}
 HZ :: base.HZ
 REACH :: base.REACH
 BODY_RADIUS :: base.BODY_RADIUS

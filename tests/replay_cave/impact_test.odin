@@ -47,6 +47,12 @@ dweller_hits_keep_projectile_identity_target_generation_and_detached_pose :: pro
         hit.value.amount == 35 &&
         hit.value.position == ([2]f32{200, 120}),
     )
+    contact := hit.value.contact
+    testing.expect(t, contact.kind == .Hit && contact.retires)
+    testing.expect_value(t, contact.subject.slot, i32(cave.ROCK_SLOT))
+    testing.expect_value(t, contact.subject.position, [2]f32{186,120})
+    target, has_target := contact.other.?
+    testing.expect(t, has_target && target.position == hit.value.position && target.life == u64(generation))
     testing.expect_value(t, hit.id.key, u64(generation) << 32 | 1)
     impact_rock(&w)
     ctx = context_for(events[:], 3)

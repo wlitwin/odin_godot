@@ -143,16 +143,17 @@ step :: proc(
 
             dir := direction(player.aim)
 
-            if _, added := r.pool_insert(
+            handle, added := r.pool_insert(
                 &w.bullets,
                 Bullet{key, player.position + dir * 13, dir * 2.6, LOB_LIFE, u8(i + 1)},
-            ); !added {
+            )
+            if !added {
                 r.abort(ctx)
                 return
             }
 
             w.lobs += 1
-            r.emit(ctx, u64(i + 1), 2, Event{kind = .Lobbed, seat = u8(i + 1), position = player.position, key = key})
+            r.emit(ctx, u64(i + 1), 2, Event{kind = .Lobbed, seat = u8(i + 1), position = w.bullets.values[handle.index].position, key = key, slot = u8(handle.index)})
         }
     }
 }
@@ -313,7 +314,7 @@ step_bullets :: proc(w: ^World, ctx: ^r.Step(Event)) {
                 ctx,
                 bullet.key,
                 100,
-                Event{kind = .Landed, seat = bullet.owner, position = bullet.position, key = bullet.key},
+                Event{kind = .Landed, seat = bullet.owner, position = bullet.position, key = bullet.key, slot = u8(i)},
             )
 
             for player, victim in w.players {

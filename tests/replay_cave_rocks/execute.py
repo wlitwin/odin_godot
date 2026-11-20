@@ -26,11 +26,18 @@ try:
   text=(out/(role+'.log')).read_text();assert 'REPLAY_CAVE_ROCK_PROCESS_OK' in text and not re.search(r'instances were leaked|resources still in use',text),text
   data=json.loads((out/(role+'.json')).read_text());rows=data['rows'];assert data['pass'] and len(rows)>=12
   moving=0;opportunities=0;largest=0
+  if role!='host': assert sum(r['comparable'] for r in rows)>=8, (role,rows)
   for row in rows:
-   assert abs(row['y']-row['draw_y'])<.01 and abs(row['vy'])<.01
-   assert -.01<=row['draw_x']-row['x']<=row['vx']+.01,row
+   if role=='host':
+    assert abs(row['y']-row['draw_y'])<.01 and abs(row['vy'])<.01
+    assert -.01<=row['draw_x']-row['x']<=row['vx']+.01,row
+   elif row['comparable']:
+    for coord in ('x','y'):
+     expected=row[coord]+row['v'+coord]*row['fraction']
+     assert abs(row['draw_'+coord]-expected)<.02,(role,row,expected)
    assert abs(row['center_x'])<.01 and abs(row['center_y'])<.01,row
   for a,b in zip(rows,rows[1:]):
+   if role!='host' and not (a['comparable'] and b['comparable']): continue
    if b['tick']>a['tick'] and b['x']>=a['x']:assert b['draw_x']>=a['draw_x']-.01,(role,a,b)
    if a['tick']==b['tick'] and abs(a['x']-b['x'])<.001:
     opportunities+=1

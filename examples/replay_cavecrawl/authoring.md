@@ -40,7 +40,7 @@ they do not consume gameplay RNG or enter collision state.
 
 ## Existing Replay saves
 
-Cavecrawl uses content `0x4341564552504c39` (C9). Normal loads require the current
+Cavecrawl uses content `0x4341564552504c3a` (C10). Normal loads require the current
 schema/content contract. Retained C1–C8 checkpoints were migrated once before
 removing their readers. Current fixtures preserve floor definitions, player and
 relic values, membership and pending actions. [Original bytes and receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json)
@@ -67,5 +67,5 @@ versus native/WASM scatter coordinates. The broader campaign and migration gates
 exercise the same expanded world schema.
 
 Current checkpoint fixtures include the authority observation and retain full
-world state. Current C9/O3 recording fixtures are new captures with generation-bound
+world state. Current C10/O4 recording fixtures are new captures with generation-bound
 impact events; their old event histories remain historical evidence only.

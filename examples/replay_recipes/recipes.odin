@@ -53,8 +53,8 @@ session_frame :: proc(
         }
     }
 
-    // Present the detached session_state after draining changes; do not modify
-    // session.server/client timeline values to smooth a scene transform.
+    // The scene can now read session_render_sample(session) once and draw all
+    // interacting bodies at the returned fraction.
     return .None
 }
 

@@ -42,8 +42,8 @@ These actions use receipt timing alongside dash. Held aim/fire remain controls.
 
 Rollback restores turret state with the rest of World. Correcting a predicted
 claim also corrects its shots and ammo. The scene pool follows that state through
-generation handles and scope changes. Seated clients use the predicted turret
-world; spectators use the delayed observed world, including its despawn timing.
+generation handles and scope changes. Players and spectators draw the same sampled turret, operator and ammo state,
+including its despawn timing.
 The scene handles barrel rotation, color and text; it has no gameplay authority.
 
 Recovery carries occupancy, ammo and the next-shot deadline in the checkpoint.

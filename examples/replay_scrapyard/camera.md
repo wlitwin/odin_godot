@@ -14,8 +14,7 @@ seat. A generation number distinguishes a new body in a reused seat. Keeping
 an eligible target makes selection stable; filtering disconnected bodies
 prevents following a departed player.
 
-The camera follows the displayed rig position, including remote interpolation and
-local correction smoothing. Ordinary target changes use the authored Camera2D
+The camera follows the displayed rig position, on the same interpolated timeline as the other bodies. Ordinary target changes use the authored Camera2D
 smoothing. A rendered floor warp or body replacement resets camera smoothing so
 it does not sweep across the arena. The camera's lifetime stays with the game
 root, so deleting a watched runner cannot delete the camera. No simulation fields,

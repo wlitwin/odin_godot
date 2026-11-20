@@ -95,7 +95,6 @@ ReplayScrapyard :: struct {
     disc_rigs: [2][game.MAX_FLASHES]gd.Mesh_Instance2d,
     bot_scene: [1]game.World,
     choices: [1]game.Profile,
-    smoothing: [game.SEATS]v.Smoother2,
     buttons: r.Buttons,
     selected, declared, ready, manual, dash_next, arena_built: bool,
     failing: bool,
@@ -110,7 +109,7 @@ ReplayScrapyard :: struct {
     development_sequence: u64,
     development_result, development_reason: gd.Int,
     shot_effects, shot_cancels: u32,
-    presentation: rgd.Presentation_Context,
+    render_cursor: rgd.Render_Cursor,
     built_key: u32,
     dash_effects, dash_cancels: u32,
 }
@@ -189,7 +188,6 @@ replay_scrapyard_process :: proc(self: ^ReplayScrapyard, dt: f64) {
         return
     }
 
-    update_prediction_smoothing(self)
     dispatch_session_changes(self)
     present_session_frame(self, dt)
 }

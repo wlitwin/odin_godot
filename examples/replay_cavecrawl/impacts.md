@@ -1,4 +1,4 @@
-# Dweller impacts: C9 and O3
+# Dweller impacts: C10 and O4
 
 Every rock contact emits a recorded occurrence for its dweller, including the
 nonlethal first hit. An occurrence pairs an event payload with an identity used
@@ -15,13 +15,13 @@ the existing Slain occurrence, so yellow impact sparks and purple death sparks
 both survive entity removal. Correction/cancellation use the visual cue ledger.
 
 The event layout is unchanged, but the replayed event sequence has changed.
-Current content IDs are **C9 `0x4341564552504c39`** for server motion and
-**O3 `0x434156454f574e33`** for owner motion. Old peers and saves are not silently
-admitted under the new content. Session/checkpoint schemas and gameplay world
-layout remain unchanged.
+Current content IDs are **C10 `0x4341564552504c3a`** for server motion and
+**O4 `0x434156454f574e34`** for owner motion. Old peers and saves are not silently
+admitted under the new content. The event schema and negotiated checkpoint
+contract changed. The saved world and pending action layouts are the same.
 
 Retained checkpoints were migrated with frames, controls, membership and pending
-actions preserved. The active fixtures use C9/O3 directly. [Original bytes and
+actions preserved. The active fixtures use C10/O4 directly. [Original bytes and
 migration receipts](../../docs/replay/results/usability-legacy-2026-11-16/cavecrawl/receipt.json) remain separate evidence; old readers and the
 impact-suppression entry points have been removed.
 

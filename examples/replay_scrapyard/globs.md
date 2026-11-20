@@ -9,15 +9,11 @@ phase at 14 radians per second of local render time.
 The original `Glob_View` follows a straight constant-velocity path from its local
 announce time. It has no visual arc or trail; older port-ledger wording was
 incorrect on that point. Replay places each disc at the displayed simulation
-position. Local lobs use prediction, remote lobs and enemy spit use observed
-state. It does not invent a separate path or delay removal after landing, impact,
-expiry or correction. This retains Replay's presentation timing difference from
-the original; paired feel/timing review remains required.
+position. Local and remote lobs and enemy spit use the same observed sample as
+the runners and mobs. Pool-slot generations prevent blending across a replacement.
 
-The bounded view pools have one spit disc per shot slot and separate predicted
-and observed lob banks. That avoids sharing a pulse with unrelated ballistic
-views and avoids dropping remote lobs when predicted and observed pool occupancy
-differ. A pulse resets when hidden, reused, rewound or replaced under a new epoch.
+The bounded view pools have one spit disc per shot slot and separate local and
+remote lob banks for their authored visual effects. A pulse resets when hidden, reused, rewound or replaced under a new epoch.
 These are local view values and add no simulation or checkpoint fields. Current
 game-content compatibility is tracked in [cast paths](cast_paths.md).
 

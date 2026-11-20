@@ -2,6 +2,7 @@ package cave
 
 import "core:math"
 import r "godot:replay"
+import v "godot:replay/view"
 import p "godot:replay/play"
 import lb "godot:replay/lobby"
 
@@ -52,6 +53,7 @@ act_at :: proc(w: ^World, seat: u16, action: Action, origin: [2]f32, ctx: ^r.Ste
     }
 
     def := world_floor(w)
+    contact: v.Contact(2)
     kind := Event_Kind.None
     amount := i32(0)
 
@@ -118,7 +120,7 @@ act_at :: proc(w: ^World, seat: u16, action: Action, origin: [2]f32, ctx: ^r.Ste
             return false
         }
 
-        _, spawned := r.pool_insert(
+        rock, spawned := r.pool_insert(
             &w.rocks,
             Rock{position = origin, velocity = action.aim * (ROCK_SPEED / length), left = ROCK_TTL, shooter = seat},
         )
@@ -128,6 +130,7 @@ act_at :: proc(w: ^World, seat: u16, action: Action, origin: [2]f32, ctx: ^r.Ste
         }
 
         player.rock_cd, player.stamina = 20, player.stamina - 3
+        contact = {kind=.Motion, group=contact_group(w), subject={ROCK_SLOT+i32(rock.index),u64(rock.generation),origin}}
         kind = .Thrown
     case .Heal:
         if player.hp >= MAX_HP || player.heal_cd != 0 || player.stamina < 5 {
@@ -181,7 +184,7 @@ act_at :: proc(w: ^World, seat: u16, action: Action, origin: [2]f32, ctx: ^r.Ste
         event_position = origin
     }
 
-    r.emit(ctx, u64(seat), 100 + u64(action.verb), Event{kind, event_position, seat, amount})
+    r.emit(ctx, u64(seat), 100 + u64(action.verb), Event{contact=contact, kind=kind, position=event_position, seat=seat, amount=amount})
     return true
 }
 

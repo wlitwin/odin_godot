@@ -22,7 +22,8 @@ if (phase === 'lobs') {
   assert.equal(truth.lobs, truth.lands);
   assert.equal(local.predicted_lobs, truth.lobs);
   assert.equal(metrics.visible_lobs, truth.lobs);
-  assert.ok(metrics.lob_visible_max_ms < 120, JSON.stringify(metrics)); // less than one injected network leg
+  assert.equal(metrics.throw_cues, truth.lobs);
+  assert.ok(metrics.throw_cue_max_ms < 120, JSON.stringify(metrics)); // muzzle responds before one injected network leg
 } else {
   assert.ok(truth.shots >= 15);
   assert.equal(local.local, truth.shots, `${phase}: local shot effects`);

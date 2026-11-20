@@ -2,7 +2,7 @@
 
 The igniter draws flame trails using the original ASCII `*` glyphs, called
 tongues here: five on the caster's
-predicted view at −0.5, −0.25, 0, 0.25 and 0.5 radians, one on remote observed
+view at −0.5, −0.25, 0, 0.25 and 0.5 radians, one on remote observed
 views. Each starts 18 pixels from the origin, advances 10 pixels per displayed
 simulation tick and expires after 15 ticks. Those fixed visual constants match
 the original even when a custom cone's gameplay range differs. Labels are centered

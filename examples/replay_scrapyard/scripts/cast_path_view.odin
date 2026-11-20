@@ -15,21 +15,19 @@ Flame_Rig :: struct {
     track: flow.Flame_Track,
 }
 
-cast_paths_paint :: proc(self: ^ReplayScrapyard, observed, predicted: ^game.World, seat: u16) {
-    flame_paths_paint(self, observed, predicted, seat)
+cast_paths_paint :: proc(self: ^ReplayScrapyard, observed: ^game.World, seat: u16) {
+    flame_paths_paint(self, observed, seat)
     arc_paths_paint(self, observed)
 }
 
-flame_paths_paint :: proc(self: ^ReplayScrapyard, observed, predicted: ^game.World, seat: u16) {
+flame_paths_paint :: proc(self: ^ReplayScrapyard, observed: ^game.World, seat: u16) {
     scope_info, scope_ready := rgd.session_presentation(self.session)
     if !scope_ready {return}
     epoch := scope_info.epoch
 
     for pass in 0 ..< 2 {
-        world := pass == 0 ? predicted : observed
-
         for &rig, index in self.flame_rigs[pass] {
-            flame_rig_paint(self, &rig, index, world, observed, seat, epoch, pass == 0)
+            flame_rig_paint(self, &rig, index, observed, seat, epoch, pass == 0)
         }
     }
 }
@@ -40,10 +38,10 @@ flame_rig_paint :: proc(
     self: ^ReplayScrapyard,
     rig: ^Flame_Rig,
     index: int,
-    world, observed: ^game.World,
+    world: ^game.World,
     seat: u16,
     epoch: u64,
-    predicted_pass: bool,
+    local_pass: bool,
 ) {
     f := &world.flashes.values[index]
     local := seat != 0 && f.seat == seat
@@ -51,7 +49,7 @@ flame_rig_paint :: proc(
         world.flashes.alive[index] &&
         f.kind == .Cast &&
         world.catalog.abilities[f.ability].family == .Cone &&
-        local == (predicted_pass)
+        local == (local_pass)
     previous_tick, was_active := rig.track.tick, rig.track.seeded
     key := flow.Flame_Key {
         epoch,
@@ -79,7 +77,7 @@ flame_rig_paint :: proc(
     for &label, tongue in rig.labels {
         if label == nil {
             label = gd.new_label()
-            scenery_name(label, fmt.tprintf("Flame%d_%d_%d", int(!predicted_pass), index, tongue))
+            scenery_name(label, fmt.tprintf("Flame%d_%d_%d", int(!local_pass), index, tongue))
             gd.add_child(self.world_node, label)
             gd.set_string(label, "text", "*")
             gd.control_set_mouse_filter(label, .Mouse_Filter_Ignore)
@@ -89,7 +87,7 @@ flame_rig_paint :: proc(
         visible := active && valid && (local || tongue == 2) && !rig.track.stopped[tongue]
 
         if visible && !reset && world.clock > previous_tick {
-            if flame_hits_mob(observed, rig.track.previous[tongue], position) {
+            if flame_hits_mob(world, rig.track.previous[tongue], position) {
                 rig.track.stopped[tongue] = true
                 visible = false
             }

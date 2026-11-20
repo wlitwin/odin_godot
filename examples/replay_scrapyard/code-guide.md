@@ -16,7 +16,6 @@ control := sample_gameplay_input(self, typing)
 if !advance_gameplay_session(self, dt, control) {
     return
 }
-update_prediction_smoothing(self)
 dispatch_session_changes(self)
 present_session_frame(self, dt)
 ```
